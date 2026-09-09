@@ -1,0 +1,148 @@
+# Mapeamento rótulo original → classe canônica do UrMind.
+#
+# A conversão nunca acontece dentro de datasets/raw/. Ela é uma CAMADA:
+#
+#     label original do dataset  →  este arquivo  →  classe UrMind
+#
+# Toda recusa carrega motivo. Isso é deliberado: um dataset em que 90% dos
+# rótulos ficam de fora não pode parecer, no relatório, igual a um totalmente
+# aproveitado. O motivo também impede que uma recusa vire, meses depois, um
+# "acho que esqueceram de mapear".
+#
+# Regra do §8.2 que este arquivo materializa: não reutilizar uma classe só
+# porque visualmente "parece parecida".
+#
+# A implementação executável correspondente vive em backend/app/ml/taxonomy.py;
+# os dois precisam concordar. Este arquivo é a declaração versionável.
+
+version: 1
+updated: 2026-09-08
+taxonomy_ref: datasets/metadata/taxonomy.yaml
+code_ref: backend/app/ml/taxonomy.py
+
+datasets:
+
+  # ------------------------------------------------------------------ RDD2022
+  rdd2022:
+    annotation_format: pascal_voc_xml
+    label_field: object/name
+    accepted:
+      D00: URMIND_ROAD_D00
+      D10: URMIND_ROAD_D10
+      D20: URMIND_ROAD_D20
+      D40: URMIND_ROAD_D40
+    rejected:
+      D01: trinca longitudinal em junta de construção; subtipo não separado na V1
+      D11: trinca transversal em junta de construção; subtipo não separado na V1
+      D43: faixa de pedestre apagada; é sinalização horizontal, não dano de pavimento
+      D44: linha de bordo apagada; é sinalização horizontal, não dano de pavimento
+      D50: >-
+        tampa de poço de visita; NÃO confundir com URMIND_MANHOLE, que exige
+        dataset e protocolo próprios (§8.2)
+      Repair: remendo/reparo já executado; é intervenção, não dano ativo
+      Block crack: >-
+        trinca em bloco; aparece só em parte das edições e não corresponde a
+        nenhuma das quatro categorias da V1
+      D0w0: >-
+        erro de digitação de D00 presente na anotação oficial; corrigir seria
+        adivinhar a intenção do anotador, então é recusado e reportado
+
+  # ------------------------------------------------------------ UNIVALI/DNIT
+  univali_br:
+    annotation_format: segmentation_mask_png
+    label_field: sufixo do nome do arquivo
+    note: >-
+      Anotação é máscara, não caixa. Converter máscara em caixa é uma versão
+      derivada a registrar, não um efeito colateral da leitura.
+    accepted:
+      POTHOLE: URMIND_ROAD_D40
+    rejected:
+      CRACK: >-
+        trinca genérica; o dataset não separa longitudinal, transversal e malha,
+        e o §8.2 proíbe escolher entre D00/D10/D20 por semelhança visual
+      LANE: faixa de rolamento; é delimitação de via, não dano de pavimento
+      RAW: é a imagem original do par, não um rótulo
+
+  # -------------------------------------------------- Urban Community Issues
+  urban_community:
+    annotation_format: yolo_txt
+    label_field: id numérico da primeira coluna
+    note: >-
+      O pacote não traz data.yaml. O mapa id→nome abaixo foi inferido dos nomes
+      das pastas e conferido contra os ids que aparecem nos .txt. É inferência
+      documentada, não um mapa oficial da fonte.
+    class_ids:
+      0: animal
+      1: traffic_lights
+      2: waste_container
+      3: pothole
+      4: cracks
+      5: open_manhole
+    accepted:
+      pothole: URMIND_ROAD_D40
+    rejected:
+      cracks: trinca genérica em classe única; não distingue D00/D10/D20 (§8.2)
+      open_manhole: >-
+        bueiro aberto só vira URMIND_MANHOLE com dataset e protocolo próprios
+        (§8.2); 152 imagens de uma classe herdada não substituem isso
+      good_road: classe negativa do pacote original; não é dano nem objeto da V1
+      animal: fora do escopo funcional do UrMind
+      traffic_lights: >-
+        semáforo é sinalização vertical; URMIND_SIGNAGE exige dataset e
+        protocolo próprios (§8.2)
+      waste_container: fora do escopo funcional do UrMind
+
+  # ---------------------------------------------------------- Project Sidewalk
+  project_sidewalk:
+    acquisition_format: parquet_images_and_curb_ramp_keypoints
+    acquisition_mapping_status: specialized_keypoint_task_not_road_boxes
+    annotation_format: csv_point_labels
+    purpose: accessibility
+    accepted: {}
+    rejected:
+      "*": >-
+        pontos de acessibilidade com severidade humana, sem imagem anexa. Não
+        geram classe de treino; URMIND_SIDEWALK segue sem dataset próprio.
+
+  # ------------------------------------------------------------------- CAMBER
+  camber:
+    annotation_format: csv_detections + gpx
+    purpose: longitudinal_risk
+    accepted: {}
+    rejected:
+      "*": >-
+        as detecções vêm de um YOLO de terceiros e a coluna user_confirmed está
+        vazia. É saída de modelo, não ground truth: não vira rótulo de treino
+        nem ocorrência real (§8.3).
+
+  # ---------------------------- fontes lidas que não contribuem classe da V1
+  rampnet:
+    status: acquired_subset_readable
+    annotation_format: parquet_image_and_normalized_curb_ramp_points
+    accepted: {}
+    reason: >-
+      Recorte oficial em disco e lido pelo adaptador `rampnet`. Keypoint de rampa
+      é tarefa especializada: não vira caixa nem classe de pavimento. A coordenada
+      real sai como GeoRecord, que é ocorrência georreferenciada, não rótulo.
+  project_sidewalk:
+    status: acquired_subset_readable
+    annotation_format: parquet_image_and_pixel_curb_ramp_keypoints
+    accepted: {}
+    reason: >-
+      Mesma razão do RampNet. O §8.2 não tem classe de acessibilidade, e inventar
+      extensão em volta do ponto para formar caixa seria fabricar anotação.
+  bdd100k:
+    status: acquired_subset_readable
+    annotation_format: zip_images_plus_semantic_segmentation_maps
+    accepted: {}
+    reason: >-
+      Percepção e condução: via, veículo, pedestre. Nenhuma classe do §8.2 aparece,
+      então toda amostra sai com máscara recusada e motivo. Contexto de navegação.
+  global_streetscapes:
+    status: acquired_subset_readable
+    annotation_format: csv_scene_context_labels_with_coordinates
+    accepted: {}
+    reason: >-
+      Substitui o mapillary_subset. Os rótulos humanos descrevem a condição da
+      captura — clima, iluminação, plataforma da via, qualidade — e não o dano.
+      Entram como atributo de contexto; nenhum vira classe da V1.

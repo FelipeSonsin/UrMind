@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "real_images_checked": 47420,
+  "selected_images_checked": 35490,
+  "checks": [
+    "artifact_hash_chain",
+    "summary_recalculation",
+    "negative_definition",
+    "taxonomy",
+    "selection_order_independence",
+    "split_order_independence",
+    "split_coverage",
+    "duplicate_group_isolation",
+    "budget_boundaries",
+    "peak_storage",
+    "disk_reserve",
+    "raw_write_refusal",
+    "path_traversal_refusal",
+    "visual_index_real_sample",
+    "python_syntax",
+    "active_directory_structure"
+  ],
+  "leakage": {
+    "passed": true,
+    "groups_checked": 6,
+    "sha256_checked": 35489,
+    "near_clusters_checked": 296,
+    "scope": "grupos e duplicatas detectados; não garante ausência de relações não documentadas"
+  },
+  "backend_integration": "taxonomy IDs compatible; new manifests not yet consumed by legacy backend; no runtime/training tested"
+}

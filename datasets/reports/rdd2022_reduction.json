@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-09-08T21:28:46-0300",
+  "authorization": "usuario 2026-09-08: podar somente Norway, teto 7 GB",
+  "source": {
+    "dataset": "rdd2022",
+    "official_source_url": "https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547",
+    "version": "figshare-21431547-v1 (2022-crddc)",
+    "license": "CC BY 4.0",
+    "archive_md5": "b62bd51d2ffcfaa76c60f234f0cc2bb3"
+  },
+  "seed": 20260908,
+  "algorithm": "manter 100% das imagens Norway com objeto V1; negativas por estratificacao (resolucao x bloco de rota x tercil de brilho) com k-medoids farthest-point sobre brilho/contraste/saturacao/claro/escuro e descarte de dhash128 a Hamming <= 4",
+  "target_bytes": 6500000000,
+  "hard_cap_bytes": 7000000000,
+  "before": {
+    "bytes_total": 13835738131,
+    "files_total": 85810,
+    "images_train_all_countries": 38385,
+    "norway_train_images": 8161,
+    "norway_test_images": 2040,
+    "norway_bytes": 11028102805,
+    "class_objects_norway": {
+      "D00": 8570,
+      "D10": 1730,
+      "D20": 468,
+      "D40": 461
+    }
+  },
+  "after": {
+    "bytes_total": 13671317053,
+    "files_total": 73546,
+    "norway_bytes": 3679434660,
+    "norway_train_images": 7993,
+    "norway_test_images": 0,
+    "class_objects_norway": {
+      "D00": 8570,
+      "D10": 1730,
+      "D20": 468,
+      "D40": 461
+    }
+  },
+  "removed": {
+    "norway_train_negatives": 5112,
+    "norway_test_images": 2040,
+    "files_total": 12264,
+    "freed_bytes": 7348668145,
+    "other_countries": 0,
+    "unlinked_in_this_run": 12213,
+    "restored_by_sync_and_removed_again": 8679,
+    "note": "As contagens comparam a linha de base gravada com o disco atual, entao reexecutar o script depois da poda reproduz os mesmos numeros em vez de reportar zero."
+  },
+  "untouched_countries": [
+    "China_Drone",
+    "China_MotorBike",
+    "Czech",
+    "India",
+    "Japan",
+    "United_States"
+  ],
+  "validation": {
+    "loader_samples": 38217,
+    "loader_classes": {
+      "URMIND_ROAD_D00": 26016,
+      "URMIND_ROAD_D10": 11830,
+      "URMIND_ROAD_D20": 10616,
+      "URMIND_ROAD_D40": 6544
+    },
+    "per_country": {
+      "China_Drone": {
+        "samples": 2401,
+        "objects": 3068
+      },
+      "China_MotorBike": {
+        "samples": 1977,
+        "objects": 4650
+      },
+      "Czech": {
+        "samples": 2829,
+        "objects": 1745
+      },
+      "India": {
+        "samples": 7706,
+        "objects": 6831
+      },
+      "Japan": {
+        "samples": 10506,
+        "objects": 16469
+      },
+      "Norway": {
+        "samples": 3049,
+        "objects": 11229
+      },
+      "United_States": {
+        "samples": 4805,
+        "objects": 11014
+      }
+    },
+    "annotations_without_image": 0,
+    "images_without_annotation": 0,
+    "bytes_total": 6487069986,
+    "files_total": 73546,
+    "bytes_norway": 3679434660,
+    "files_norway": 6098,
+    "gb_total": 6.4871
+  },
+  "integrity_ok": true,
+  "manifests": {
+    "kept": "datasets\\manifests\\rdd2022_norway_kept.jsonl",
+    "removed": "datasets\\manifests\\rdd2022_norway_removed.jsonl"
+  },
+  "elapsed_seconds": 689.8,
+  "outcome_2026_09_09": {
+    "aplicada": false,
+    "motivo": "O OneDrive reverteu a exclusao pela protecao de exclusao em massa (limiar de 200 itens), inclusive com o cliente parado durante a remocao.",
+    "decisao_do_usuario": "manter o RDD2022 como excecao ao teto de 7 GB",
+    "medido_quando_a_poda_valeu": {
+      "bytes": 6487069986,
+      "norway_train_images": 3049,
+      "integridade": "OK"
+    },
+    "estado_atual": {
+      "bytes": 13671317053,
+      "norway_train_images": 7993,
+      "orfaos": 0,
+      "objetos_perdidos": 0
+    },
+    "como_aplicar": "confirmar o aviso do OneDrive na barra de tarefas, ou elevar HKCU\\SOFTWARE\\Policies\\Microsoft\\OneDrive\\LocalMassDeleteFileDeleteThreshold, e reexecutar reduce_rdd2022.py --execute"
+  }
+}

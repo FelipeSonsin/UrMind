@@ -1,0 +1,14 @@
+{
+  "mapillary_msls": {
+    "removed_at": "2026-09-08",
+    "official_source_url": "https://github.com/mapillary/mapillary_sls",
+    "reason": "O portal oficial exige login para qualquer download, inclusive a amostra. O projeto nao tem credencial e nao pode usar servico pago.",
+    "replaced_by": "global_streetscapes",
+    "replacement_rationale": "Cobre a mesma funcao — imagem street-level de contexto urbano — e de fato redistribui imagem do proprio Mapillary sob CC BY-SA 4.0, sem login. Ainda acrescenta rotulo humano de clima, iluminacao, plataforma da via e qualidade, que o MSLS nao oferecia.",
+    "alternatives_considered": {
+      "Mapillary Vistas": "exige conta",
+      "Cityscapes": "exige registro",
+      "KartaView API": "aberto, mas exigiria raspagem imagem a imagem; o Global Streetscapes ja entrega KartaView empacotado e rotulado"
+    }
+  }
+}

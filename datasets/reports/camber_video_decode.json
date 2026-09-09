@@ -1,0 +1,8 @@
+{
+  "path": "datasets/raw/camber/videos/video_1778861897924_compressed.mp4",
+  "sha256": "1ed0453d3ef78f7bea971b7305795d11b05a9b1981ecfd56bc4a77b197c5177b",
+  "decoder": "ffmpeg",
+  "exit_code": 0,
+  "passed": true,
+  "scope": "full video decoding only; no inference or stored frames"
+}

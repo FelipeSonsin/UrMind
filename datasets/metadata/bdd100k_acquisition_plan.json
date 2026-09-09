@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "authorization": "user_explicit_download_20260908",
+  "dataset": "bdd100k",
+  "purpose": "navigation",
+  "official_source_url": "http://bdd-data.berkeley.edu/download.html",
+  "source_documentation_url": "https://raw.githubusercontent.com/bdd100k/bdd100k/9ac17c6c7c51d2fc83065fccd707cd5b1882a293/doc/source/download.rst",
+  "source_version": "10K images and legacy segmentation maps; server revision 2025-02-06",
+  "license": "UC Berkeley BDD/BAIR Commons educational/research/not-for-profit terms",
+  "license_evidence": "datasets/metadata/bdd100k_data_license.rst",
+  "classes_relevant": [
+    "road",
+    "sidewalk",
+    "vehicles",
+    "person",
+    "traffic_sign",
+    "traffic_light",
+    "urban_scene_semantic_classes"
+  ],
+  "subset_strategy": "official 10K segmentation package only; not full 100K images or videos; keep original ZIPs, read in memory",
+  "transport_note": "Public HTTP links explicitly published by official Berkeley download page. HTTPS fails hostname validation; TLS verification was not disabled. No login gate on current published download page. Transport lacks authentication.",
+  "checksum_note": "Official documentation image MD5 08f26aecceda982568063d3d5873378e has 31 hex characters and is invalid. No valid official checksum located for these two exact ZIPs. Full ZIP CRC plus local SHA256; source authenticity is not cryptographically established.",
+  "files": [
+    {
+      "dataset": "bdd100k",
+      "path": "datasets/raw/bdd100k/acquired_20260908/bdd100k_images_10k.zip",
+      "url": "http://128.32.162.150/bdd100k/bdd100k_images_10k.zip",
+      "size_bytes": 1103797977,
+      "sha256": null,
+      "verification": "official_bdd_zip_crc_local_sha256"
+    },
+    {
+      "dataset": "bdd100k",
+      "path": "datasets/raw/bdd100k/acquired_20260908/bdd100k_seg_maps.zip",
+      "url": "http://128.32.162.150/bdd100k/bdd100k_seg_maps.zip",
+      "size_bytes": 167867229,
+      "sha256": null,
+      "verification": "official_bdd_zip_crc_local_sha256"
+    }
+  ]
+}

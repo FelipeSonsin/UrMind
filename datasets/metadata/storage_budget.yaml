@@ -1,0 +1,98 @@
+version: 5
+updated: 2026-09-08
+# v5: o usuario fixou o teto POR DATASET em 5-7 GB, alem do teto global de 40 GB.
+# As alocacoes deixaram de ser orientativas e viraram limite verificavel.
+limits:
+  MAX_TOTAL_ML_STORAGE_GB: 40
+  # MAX_LOCAL_DATASET_SIZE_GB e TARGET_LOCAL_DATASET_SIZE_GB continuam aqui
+  # porque `scripts/datasets/_budget.py` os exige para o preflight de espaco.
+  # Remove-los quebra propose_subset.py, make_splits.py e audit_storage.py.
+  MAX_LOCAL_DATASET_SIZE_GB: 40
+  TARGET_LOCAL_DATASET_SIZE_GB: 35
+  MAX_PER_DATASET_GB: 7
+  TARGET_PER_DATASET_GB: 6.5
+  MIN_FREE_DISK_GB: 10
+  REPORT_THRESHOLD_MB: 500
+datasets:
+  rdd2022:
+    cap_gb: 14
+    exception_above_per_dataset_cap: true
+    authorized_by: usuario, 2026-09-09
+    purpose: road_damage
+    note: >-
+      EXCECAO explicita ao teto de 7 GB. A poda da origem Norway foi executada e
+      validada, mas o OneDrive reverteu a exclusao (protecao de exclusao em massa,
+      limiar de 200 itens, aguardando confirmacao do usuario). O usuario decidiu
+      manter o RDD2022 como esta em vez de mexer na politica da maquina. Nenhum
+      objeto anotado se perdeu no processo: as quatro classes seguem completas.
+      Ver reports/rdd2022_reduction.json e reports/rdd2022_norway_partial_restore.json.
+  univali_br:
+    cap_gb: 0.5
+    purpose: road_damage
+    note: Fonte inteira cabe folgada; nao ha o que podar.
+  urban_community:
+    cap_gb: 1.5
+    purpose: urban_damage
+    note: Fonte inteira cabe folgada; nao ha o que podar.
+  project_sidewalk:
+    cap_gb: 7
+    purpose: accessibility
+    note: Recorte oficial de 5 shards Parquet (5,36 GB) dos 13,4 GB publicados.
+  rampnet:
+    cap_gb: 7
+    purpose: accessibility
+    note: Recorte oficial de 5 shards Parquet (6,84 GB) dos 462 GB publicados.
+  camber:
+    cap_gb: 0.2
+    purpose: longitudinal_risk
+    note: Amostra oficial de um registro Zenodo (video + rota).
+  bdd100k:
+    cap_gb: 7
+    purpose: navigation
+    note: >-
+      Recorte oficial 10K + mapas de segmentacao (1,27 GB). Os ZIPs nao sao
+      extraidos; o adaptador le as entradas fechadas.
+  global_streetscapes:
+    cap_gb: 7
+    purpose: urban_context
+    replaces: mapillary_msls
+    note: >-
+      Substitui o MSLS, cujo portal exige login. Recorte estratificado de
+      ~6 GB a partir de 3 dos 7 tarballs oficiais, sem baixar-para-apagar.
+  urmind_own:
+    cap_gb: 2
+    purpose: road_damage
+    note: Reserva para dados proprios do Scout. Ainda nao existe.
+removed_sources:
+  mapillary_msls:
+    reason: >-
+      O portal oficial exige login para qualquer download, inclusive a amostra,
+      e o projeto nao tem credencial nem pode usar servico pago. Substituido por
+      global_streetscapes, que redistribui imagem do proprio Mapillary e do
+      KartaView sob CC BY-SA 4.0, sem gating.
+    decided: 2026-09-08
+policy:
+  units: decimal_GB_1000000000_bytes
+  per_dataset_cap_is_binding: true
+  manual_additions_never_trigger_deletion: true
+  raw_is_read_only_except_authorized_reduction: true
+  authorized_reductions:
+  - dataset: rdd2022
+    scope: somente a origem Norway
+    authorized_by: usuario, 2026-09-08
+    evidence: reports/rdd2022_reduction.json
+  processed_stores_only_metadata: true
+  splits_are_manifests_not_copies: true
+  destructive_default_mode: dry-run
+  require_explicit_authorization_for:
+  - download
+  - delete
+  - move
+  - rename_raw
+  - overwrite_raw
+  - recompress
+  onedrive_note: >-
+    O projeto fica numa pasta sincronizada pelo OneDrive. Exclusao em massa e
+    revertida pela sincronizacao: qualquer poda exige pausar o OneDrive, remover
+    e so entao retomar, para que a exclusao propague para a nuvem. Sem isso o
+    disco local encolhe mas outra maquina continua baixando o volume antigo.

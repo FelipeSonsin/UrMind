@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "scope": "local data and formats, not model performance",
+  "raw_modified": false,
+  "univali_br": {
+    "images": 2235,
+    "decoded_masks": {
+      "CRACK": 2235,
+      "LANE": 2235,
+      "POTHOLE": 2235
+    },
+    "issues": [],
+    "orphan_masks": [],
+    "format_valid": true,
+    "use": "segmentation originals; derived bounding boxes not prepared",
+    "note": "v1 is the preserved local folder name; upstream version is Mendeley v4"
+  },
+  "urban_community": {
+    "by_folder": {
+      "animal": {
+        "images": 600,
+        "labels": 600,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "0": 1113
+        },
+        "orphan_labels": []
+      },
+      "cracks": {
+        "images": 166,
+        "labels": 166,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "4": 194
+        },
+        "orphan_labels": []
+      },
+      "good_road": {
+        "images": 100,
+        "labels": 100,
+        "missing_labels": 0,
+        "empty_labels": 100,
+        "valid_objects_by_original_id": {},
+        "orphan_labels": []
+      },
+      "open_manhole": {
+        "images": 152,
+        "labels": 152,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "5": 154
+        },
+        "orphan_labels": []
+      },
+      "pothole": {
+        "images": 300,
+        "labels": 300,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "3": 478
+        },
+        "orphan_labels": []
+      },
+      "traffic_lights": {
+        "images": 600,
+        "labels": 600,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "1": 2522
+        },
+        "orphan_labels": []
+      },
+      "waste_container": {
+        "images": 600,
+        "labels": 600,
+        "missing_labels": 0,
+        "empty_labels": 0,
+        "valid_objects_by_original_id": {
+          "2": 1112
+        },
+        "orphan_labels": []
+      }
+    },
+    "issues": [],
+    "class_id_mapping": "inferred_not_official",
+    "use": "quarantine from automatic training until class IDs and annotations reviewed",
+    "format_valid": true
+  },
+  "camber": {
+    "detections": 9,
+    "human_confirmed": 0,
+    "gpx_trackpoints": 51,
+    "mp4_top_level_boxes": [
+      "ftyp",
+      "moov",
+      "free",
+      "mdat"
+    ],
+    "container_valid": true,
+    "video_frames_decoded": false,
+    "local_checksums": [
+      {
+        "path": "datasets/raw/camber/detections/detections_50.csv",
+        "sha256": "c670a10cca33a3e3e8ca4115b54a149fa1f0c7f1c0165a5ac86db0508e082dc8"
+      },
+      {
+        "path": "datasets/raw/camber/routes/ride_1778861898555.gpx",
+        "sha256": "9aa30b0bddcbc7287429f9f27ad6364fce7c305238fd35cae2ecde4bfcc93cb8"
+      },
+      {
+        "path": "datasets/raw/camber/videos/video_1778861897924_compressed.mp4",
+        "sha256": "1ed0453d3ef78f7bea971b7305795d11b05a9b1981ecfd56bc4a77b197c5177b"
+      }
+    ],
+    "use": "historical/georeferenced model outputs; not human ground truth"
+  },
+  "unacquired_sources": {
+    "project_sidewalk": {
+      "files": [
+        "datasets/raw/project_sidewalk/labels/README.md"
+      ],
+      "non_readme_files": [],
+      "status": "no_dataset_data"
+    },
+    "rampnet": {
+      "files": [
+        "datasets/raw/rampnet/README.md"
+      ],
+      "non_readme_files": [],
+      "status": "no_dataset_data"
+    },
+    "bdd100k": {
+      "files": [
+        "datasets/raw/bdd100k/README.md"
+      ],
+      "non_readme_files": [],
+      "status": "no_dataset_data"
+    },
+    "mapillary_msls": {
+      "files": [
+        "datasets/raw/mapillary_msls/README.md"
+      ],
+      "non_readme_files": [],
+      "status": "no_dataset_data"
+    }
+  },
+  "local_sizes": {
+    "bdd100k": {
+      "path": "datasets/raw/bdd100k",
+      "logical_size": 254,
+      "logical_size_human": "254,00 B",
+      "size_on_disk": 254,
+      "size_on_disk_human": "254,00 B",
+      "file_count": 1,
+      "dir_count": 0,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "camber": {
+      "path": "datasets/raw/camber",
+      "logical_size": 95830501,
+      "logical_size_human": "91,39 MiB",
+      "size_on_disk": 95830501,
+      "size_on_disk_human": "91,39 MiB",
+      "file_count": 8,
+      "dir_count": 3,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "mapillary_msls": {
+      "path": "datasets/raw/mapillary_msls",
+      "logical_size": 368,
+      "logical_size_human": "368,00 B",
+      "size_on_disk": 368,
+      "size_on_disk_human": "368,00 B",
+      "file_count": 1,
+      "dir_count": 0,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "project_sidewalk": {
+      "path": "datasets/raw/project_sidewalk",
+      "logical_size": 288,
+      "logical_size_human": "288,00 B",
+      "size_on_disk": 288,
+      "size_on_disk_human": "288,00 B",
+      "file_count": 1,
+      "dir_count": 1,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "rampnet": {
+      "path": "datasets/raw/rampnet",
+      "logical_size": 391,
+      "logical_size_human": "391,00 B",
+      "size_on_disk": 391,
+      "size_on_disk_human": "391,00 B",
+      "file_count": 1,
+      "dir_count": 0,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "rdd2022": {
+      "path": "datasets/raw/rdd2022",
+      "logical_size": 27099910750,
+      "logical_size_human": "25,24 GiB",
+      "size_on_disk": 27099910750,
+      "size_on_disk_human": "25,24 GiB",
+      "file_count": 85811,
+      "dir_count": 48,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "univali_br": {
+      "path": "datasets/raw/univali_br",
+      "logical_size": 483203492,
+      "logical_size_human": "460,82 MiB",
+      "size_on_disk": 483203492,
+      "size_on_disk_human": "460,82 MiB",
+      "file_count": 8943,
+      "dir_count": 2236,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    },
+    "urban_community": {
+      "path": "datasets/raw/urban_community",
+      "logical_size": 1491788588,
+      "logical_size_human": "1,39 GiB",
+      "size_on_disk": 1491788588,
+      "size_on_disk_human": "1,39 GiB",
+      "file_count": 5038,
+      "dir_count": 23,
+      "cloud_only_count": 0,
+      "cloud_only_logical": 0,
+      "errors": []
+    }
+  },
+  "rdd_audit_sha256": "4a91b507f93ac40e84e995076c94916563197ff05d3a9473036753fdb8d7f184",
+  "all_requested_datasets_present": false,
+  "identification_runtime_verified": false
+}

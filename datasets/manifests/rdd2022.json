@@ -1,0 +1,138 @@
+{
+    "name":  "rdd2022",
+    "version":  "2022-crddc",
+    "source":  "https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547",
+    "license":  "CC BY 4.0",
+    "classes":  [
+                    "URMIND_ROAD_D00",
+                    "URMIND_ROAD_D10",
+                    "URMIND_ROAD_D20",
+                    "URMIND_ROAD_D40"
+                ],
+    "split":  {
+                  "role":  "training_v1",
+                  "generated_at":  "2026-09-08T03:47:53.781278+00:00",
+                  "summary":  {
+                                  "dataset_id":  "rdd2022",
+                                  "total_samples":  38385,
+                                  "usable_samples":  23767,
+                                  "class_counts":  {
+                                                       "URMIND_ROAD_D00":  26016,
+                                                       "URMIND_ROAD_D10":  11830,
+                                                       "URMIND_ROAD_D20":  10616,
+                                                       "URMIND_ROAD_D40":  6544
+                                                   },
+                                  "rejected_counts":  {
+                                                          "Block crack":  3,
+                                                          "D01":  179,
+                                                          "D0w0":  1,
+                                                          "D11":  45,
+                                                          "D20":  1,
+                                                          "D43":  793,
+                                                          "D44":  5057,
+                                                          "D50":  3581,
+                                                          "Repair":  1046
+                                                      },
+                                  "group_count":  7,
+                                  "groups":  [
+                                                 "China_Drone",
+                                                 "China_MotorBike",
+                                                 "Czech",
+                                                 "India",
+                                                 "Japan",
+                                                 "Norway",
+                                                 "United_States"
+                                             ]
+                              },
+                  "inventory":  {
+                                    "dataset_id":  "rdd2022",
+                                    "root":  "datasets/raw/rdd2022",
+                                    "state":  "ready",
+                                    "total_bytes":  27099910750,
+                                    "checksums_verified":  true,
+                                    "extracted_dirs":  [
+                                                           "RDD2022"
+                                                       ],
+                                    "files":  [
+                                                  {
+                                                      "path":  "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip",
+                                                      "state":  "verified",
+                                                      "expected_bytes":  13264172619,
+                                                      "actual_bytes":  13264172619,
+                                                      "found_at":  "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip",
+                                                      "required":  true,
+                                                      "note":  "md5 confere"
+                                                  },
+                                                  {
+                                                      "path":  "datasets/raw/rdd2022/label_map.pbtxt",
+                                                      "state":  "verified",
+                                                      "expected_bytes":  127,
+                                                      "actual_bytes":  127,
+                                                      "found_at":  "datasets/raw/rdd2022/label_map.pbtxt",
+                                                      "required":  false,
+                                                      "note":  "md5 confere"
+                                                  },
+                                                  {
+                                                      "path":  "datasets/raw/rdd2022/Directory_Structure_CRDDC_RDD2022.txt",
+                                                      "state":  "verified",
+                                                      "expected_bytes":  1161,
+                                                      "actual_bytes":  1161,
+                                                      "found_at":  "datasets/raw/rdd2022/Directory_Structure_CRDDC_RDD2022.txt",
+                                                      "required":  false,
+                                                      "note":  "md5 confere"
+                                                  },
+                                                  {
+                                                      "path":  "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+                                                      "state":  "verified",
+                                                      "expected_bytes":  3250534,
+                                                      "actual_bytes":  3250534,
+                                                      "found_at":  "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+                                                      "required":  false,
+                                                      "note":  "md5 confere"
+                                                  }
+                                              ],
+                                    "blocking_reasons":  [
+
+                                                         ]
+                                },
+                  "taxonomy_note":  "Fonte das quatro classes da V1 (§8.2). D00/D10/D20/D40 entram; D01, D11, D43, D44 e D50 são recusados com motivo em app.ml.taxonomy.",
+                  "group_note":  "Grupo = país de origem, e o split oficial train/test é preservado. O diretório test/ não traz anotação, então só train/ produz amostra rotulada; a validação sai de dentro de train/ (§8.3 passos 4-7).",
+                  "caveats":  [
+                                  "13,2 GB. O §4.4 proíbe copiar o raw inteiro para o Supabase Free.",
+                                  "Seis países; desempenho no Brasil não é herdado da métrica global."
+                              ],
+                  "split":  {
+                                "counts":  {
+                                               "train":  17000,
+                                               "validation":  3853,
+                                               "test":  2914
+                                           },
+                                "groups":  {
+                                               "train":  [
+                                                             "Czech",
+                                                             "India",
+                                                             "Japan",
+                                                             "United_States"
+                                                         ],
+                                               "validation":  [
+                                                                  "China_Drone",
+                                                                  "China_MotorBike"
+                                                              ],
+                                               "test":  [
+                                                            "Norway"
+                                                        ]
+                                           },
+                                "achieved_ratios":  {
+                                                        "train":  0.7153,
+                                                        "validation":  0.1621,
+                                                        "test":  0.1226
+                                                    },
+                                "warnings":  [
+
+                                             ]
+                            }
+              },
+    "dvc_revision":  null,
+    "audit_stage_status":  "legacy_backend_registration_not_current_selection",
+    "path_base":  "project_root"
+}

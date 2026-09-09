@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "authorization": "user_explicit_download_20260908",
+  "sources": [
+    {
+      "dataset": "project_sidewalk",
+      "official_source_url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1",
+      "version": "521f74ff752d57824400c8f7d5ca4717efa7bf16",
+      "license": "MIT declared on official dataset card",
+      "purpose": "accessibility",
+      "classes_relevant": "curb_ramp_keypoints",
+      "selection": "official shard subset; no image copies; seed 20260908",
+      "source_total_bytes": 13372633908
+    },
+    {
+      "dataset": "rampnet",
+      "official_source_url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset",
+      "version": "ee882e3f3c779dc13182f307bca616e50d9b8c5c",
+      "license": "MIT declared on official dataset card",
+      "purpose": "accessibility",
+      "classes_relevant": "curb_ramp_keypoints",
+      "selection": "official shard subset; no image copies; seed 20260908",
+      "source_total_bytes": 462469266265
+    }
+  ],
+  "files": [
+    {
+      "dataset": "project_sidewalk",
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/test/test-00000.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1/resolve/521f74ff752d57824400c8f7d5ca4717efa7bf16/data/test/test-00000.parquet",
+      "size_bytes": 1500576330,
+      "sha256": "ca5231e729c059ad7ae0be8f998b921b67adda44bb95c7a61175ddae71e58c48",
+      "official_split": "test"
+    },
+    {
+      "dataset": "project_sidewalk",
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00000.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1/resolve/521f74ff752d57824400c8f7d5ca4717efa7bf16/data/train/train-00000.parquet",
+      "size_bytes": 1500828918,
+      "sha256": "d49c283b17deab2d7a38d7da5cba94014f86318cc95626ef9acbdbbf50ddb4a2",
+      "official_split": "train"
+    },
+    {
+      "dataset": "project_sidewalk",
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00003.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1/resolve/521f74ff752d57824400c8f7d5ca4717efa7bf16/data/train/train-00003.parquet",
+      "size_bytes": 1500555082,
+      "sha256": "3ad4f9609b0438e046a70cd3ac155038e8bb14106408b4eb2472e22137477ae1",
+      "official_split": "train"
+    },
+    {
+      "dataset": "project_sidewalk",
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00006.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1/resolve/521f74ff752d57824400c8f7d5ca4717efa7bf16/data/train/train-00006.parquet",
+      "size_bytes": 356172777,
+      "sha256": "692ff3cbb9070362c9f08818952ba2a313c7bcb625d1dde7d89a5aed7e722a13",
+      "official_split": "train"
+    },
+    {
+      "dataset": "project_sidewalk",
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/val/val-00001.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1/resolve/521f74ff752d57824400c8f7d5ca4717efa7bf16/data/val/val-00001.parquet",
+      "size_bytes": 506305947,
+      "sha256": "bfd94df1d276106281fe547438966c8f90862313c2ea042832ea9cde6a91aae9",
+      "official_split": "val"
+    },
+    {
+      "dataset": "rampnet",
+      "path": "datasets/raw/rampnet/acquired_20260908/train/data-00090-of-00128.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset/resolve/ee882e3f3c779dc13182f307bca616e50d9b8c5c/train/data-00090-of-00128.parquet",
+      "size_bytes": 2511807273,
+      "sha256": "d00f63948e01ef148c28a651f26bd83b9a845695d353d791c2a1155895b876fc",
+      "official_split": "train"
+    },
+    {
+      "dataset": "rampnet",
+      "path": "datasets/raw/rampnet/acquired_20260908/train/data-00018-of-00128.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset/resolve/ee882e3f3c779dc13182f307bca616e50d9b8c5c/train/data-00018-of-00128.parquet",
+      "size_bytes": 2520183371,
+      "sha256": "a56c7121056f7b7bc005f75deaf3106650279e1d4b67ccd87993ed6b28212273",
+      "official_split": "train"
+    },
+    {
+      "dataset": "rampnet",
+      "path": "datasets/raw/rampnet/acquired_20260908/val/data-00122-of-00128.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset/resolve/ee882e3f3c779dc13182f307bca616e50d9b8c5c/val/data-00122-of-00128.parquet",
+      "size_bytes": 717035291,
+      "sha256": "4620acc3860db82c0249be09a14f9a14653e6ce2de813d56a6bda53011c8674a",
+      "official_split": "val"
+    },
+    {
+      "dataset": "rampnet",
+      "path": "datasets/raw/rampnet/acquired_20260908/val/data-00039-of-00128.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset/resolve/ee882e3f3c779dc13182f307bca616e50d9b8c5c/val/data-00039-of-00128.parquet",
+      "size_bytes": 718473690,
+      "sha256": "f2fae6506382e0f5a45b27046af479c9ad25044eb63a8277f37b720832c4badd",
+      "official_split": "val"
+    },
+    {
+      "dataset": "rampnet",
+      "path": "datasets/raw/rampnet/acquired_20260908/test/data-00061-of-00128.parquet",
+      "url": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset/resolve/ee882e3f3c779dc13182f307bca616e50d9b8c5c/test/data-00061-of-00128.parquet",
+      "size_bytes": 373869607,
+      "sha256": "d036dc1ea816dd4cd7ef91454278ee8b6dcbad31ecdcba70a356c34459867887",
+      "official_split": "test"
+    }
+  ],
+  "seed": 20260908,
+  "algorithm": "whole pinned official shards; RampNet hash-ranked within official split; Sidewalk explicitly listed shards spanning splits",
+  "original_files_to_delete": [
+    "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip"
+  ],
+  "cleanup_condition": "Only after official MD5 and all 85805 extracted file CRCs verified; release_rdd_archive.py"
+}

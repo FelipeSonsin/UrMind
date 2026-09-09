@@ -1,0 +1,63 @@
+{
+  "note": "Estado do RDD2022 medido antes da poda da Norway (2026-09-08). Norway = 11028102805 bytes / 18362 arquivos, conferido no FINAL_REPORT.md e em sources.csv (local_size_bytes 13835738131).",
+  "countries": [
+    "China_Drone",
+    "China_MotorBike",
+    "Czech",
+    "India",
+    "Japan",
+    "Norway",
+    "United_States"
+  ],
+  "pairing": {
+    "China_Drone": {
+      "images": 2401,
+      "annotations": 2401,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "China_MotorBike": {
+      "images": 1977,
+      "annotations": 1977,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "Czech": {
+      "images": 2829,
+      "annotations": 2829,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "India": {
+      "images": 7706,
+      "annotations": 7706,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "Japan": {
+      "images": 10506,
+      "annotations": 10506,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "Norway": {
+      "images": 8161,
+      "annotations": 8161,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    },
+    "United_States": {
+      "images": 4805,
+      "annotations": 4805,
+      "images_without_annotation": 0,
+      "annotations_without_image": 0
+    }
+  },
+  "loader_ok": true,
+  "bytes_total": 13835738131,
+  "files_total": 85810,
+  "bytes_norway": 11028102805,
+  "files_norway": 18362,
+  "bytes_other_countries": 2807635326,
+  "problems": []
+}

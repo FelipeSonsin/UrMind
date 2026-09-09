@@ -1,0 +1,86 @@
+{
+  "policy_version": "policy-v1.0",
+  "feature_schema_version": "features-1.0",
+  "description": "Politica de decisao da V1. Todos os valores sao transcritos do Documento 1, secoes 9.12 e 9.13, e do Documento 3, secao 14. Nenhum numero aqui foi escolhido por este arquivo.",
+  "source": {
+    "bands": "Documento 1, 9.12",
+    "safety_rules": "Documento 1, 9.13",
+    "association": "Documento 3, 14",
+    "road_link": "Documento 1, 8.3",
+    "context_radius": "Documento 1, 8.4"
+  },
+  "risk_bands": {
+    "band_low": 0.35,
+    "band_high": 0.65,
+    "high_risk": 0.8,
+    "comment": "p < 0.35 MONITOR; 0.35 <= p <= 0.65 HUMAN_REVIEW + INSPECT; p > 0.65 INSPECT ou FORWARD_REPAIR conforme piso. high_risk = 0.80 e o limiar de R-PRIMARY-HIGH."
+  },
+  "evidence": {
+    "max_missing": 2,
+    "comment": "Numero maximo de modalidades ausentes que ainda permite decidir. O Documento 1, 9.12 chama isto de policy.max_missing sem fixar o valor; 2 de 5 e a escolha desta versao de politica e muda criando outra versao."
+  },
+  "safety_rules": [
+    {
+      "id": "R-GPS-POOR",
+      "condition": "gps_accuracy_m > 15 ou gps_missing",
+      "gps_accuracy_max_m": 15.0,
+      "effect": "information_action := COLLECT_MORE_EVIDENCE"
+    },
+    {
+      "id": "R-IMPACT-CONFIRM",
+      "condition": "imu_peak_vertical_g >= 1.5 e vision_confidence >= 0.60",
+      "imu_peak_vertical_g_min": 1.5,
+      "vision_confidence_min": 0.6,
+      "effect": "operational_action := max(atual, INSPECT)"
+    },
+    {
+      "id": "R-RECURRENCE",
+      "condition": "recurrence_count >= 3",
+      "recurrence_count_min": 3,
+      "effect": "operational_action := max(atual, FORWARD_REPAIR)"
+    },
+    {
+      "id": "R-PRIMARY-HIGH",
+      "condition": "road_class em {primary, trunk} e p > 0.80",
+      "road_classes": ["primary", "trunk"],
+      "p_min": 0.8,
+      "effect": "operational_action := URGENT_RESPONSE"
+    },
+    {
+      "id": "R-SCHOOL-NEAR",
+      "condition": "dist_school_m <= 100 e p > 0.65",
+      "dist_school_max_m": 100.0,
+      "p_min": 0.65,
+      "effect": "operational_action := max(atual, FORWARD_REPAIR)"
+    },
+    {
+      "id": "R-OOD",
+      "condition": "is_ood",
+      "effect": "information_action := HUMAN_REVIEW"
+    },
+    {
+      "id": "R-NO-ROAD",
+      "condition": "road_segment_id IS NULL",
+      "effect": "information_action := HUMAN_REVIEW"
+    }
+  ],
+  "road_link": {
+    "search_radius_factor": 2.0,
+    "search_radius_min_m": 10.0,
+    "search_radius_max_m": 25.0,
+    "ambiguity_margin_m": 3.0,
+    "comment": "Documento 1, 8.3: search_radius_m = clamp(2 x gps_accuracy_m, 10, 25). Dois ou mais candidatos: associar o primeiro apenas se distance_2 - distance_1 >= 3.0 m."
+  },
+  "association": {
+    "max_distance_m": 3.0,
+    "max_age_days": 180,
+    "min_cosine_similarity": 0.85,
+    "ambiguity_similarity_delta": 0.05,
+    "ambiguity_distance_delta_m": 1.0,
+    "comment": "Documento 3, secao 14. Proximidade nao e identidade: tipo identico, mesmo road_segment_id, distancia, janela temporal e similaridade visual sao gates conjuntos."
+  },
+  "context": {
+    "poi_search_radius_m": 500.0,
+    "comment": "Documento 1, 8.4: menor distancia a bus_stop e a school dentro de 500 m. Sem POI no raio, o campo fica nulo e context_missing e ativado."
+  }
+}

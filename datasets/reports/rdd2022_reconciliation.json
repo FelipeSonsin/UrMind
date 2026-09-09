@@ -1,0 +1,111 @@
+{
+  "generated_at": "2026-09-09T00:55:25-0300",
+  "dropped": {
+    "train": 0,
+    "validation": 0,
+    "test": 0
+  },
+  "kept": {
+    "train": 23830,
+    "validation": 3858,
+    "test": 7634
+  },
+  "unknown_paths": 0,
+  "leakage_check": {
+    "passed": true,
+    "groups_checked": 6,
+    "sha256_checked": 35321,
+    "collisions": [],
+    "scope": "grupos e hashes das linhas mantidas; nao garante ausencia de relacoes nao documentadas na fonte"
+  },
+  "stats": {
+    "train": {
+      "images": 23830,
+      "objects": 34526,
+      "negatives": 9794,
+      "class_counts": {
+        "URMIND_ROAD_D00": 14173,
+        "URMIND_ROAD_D10": 5777,
+        "URMIND_ROAD_D20": 8685,
+        "URMIND_ROAD_D40": 5891
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 6423,
+        "URMIND_ROAD_D10": 3306,
+        "URMIND_ROAD_D20": 6793,
+        "URMIND_ROAD_D40": 3176
+      },
+      "original_class_counts": {
+        "D00": 14173,
+        "D01": 43,
+        "D10": 5777,
+        "D11": 14,
+        "D20": 8685,
+        "D40": 5891,
+        "D43": 310,
+        "D44": 3195,
+        "D50": 2522
+      },
+      "groups": [
+        "country:India",
+        "country:Japan",
+        "country:Norway"
+      ]
+    },
+    "validation": {
+      "images": 3858,
+      "objects": 7718,
+      "negatives": 5,
+      "class_counts": {
+        "URMIND_ROAD_D00": 4104,
+        "URMIND_ROAD_D10": 2359,
+        "URMIND_ROAD_D20": 934,
+        "URMIND_ROAD_D40": 321
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 2453,
+        "URMIND_ROAD_D10": 1761,
+        "URMIND_ROAD_D20": 750,
+        "URMIND_ROAD_D40": 228
+      },
+      "original_class_counts": {
+        "Block crack": 2,
+        "D00": 4104,
+        "D10": 2359,
+        "D20": 934,
+        "D40": 321,
+        "Repair": 353
+      },
+      "groups": [
+        "country:China"
+      ]
+    },
+    "test": {
+      "images": 7634,
+      "objects": 12759,
+      "negatives": 1757,
+      "class_counts": {
+        "URMIND_ROAD_D00": 7738,
+        "URMIND_ROAD_D10": 3694,
+        "URMIND_ROAD_D20": 995,
+        "URMIND_ROAD_D40": 332
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 4671,
+        "URMIND_ROAD_D10": 2642,
+        "URMIND_ROAD_D20": 868,
+        "URMIND_ROAD_D40": 270
+      },
+      "original_class_counts": {
+        "D00": 7738,
+        "D10": 3694,
+        "D20": 995,
+        "D40": 332
+      },
+      "groups": [
+        "country:Czech",
+        "country:United_States"
+      ]
+    }
+  }
+}

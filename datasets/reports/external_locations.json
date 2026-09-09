@@ -1,0 +1,36 @@
+{
+  "scope": "immediate children of Downloads/Desktop/project parent matching project/dataset names; no global exhaustive scan",
+  "checked": [
+    {
+      "base": "user_profile",
+      "relative_location": "Desktop"
+    },
+    {
+      "base": "user_profile",
+      "relative_location": "Downloads"
+    },
+    {
+      "base": "user_profile",
+      "relative_location": "OneDrive - Fundação Escola de Comércio Álvares Penteado"
+    }
+  ],
+  "matches": [
+    {
+      "base": "user_profile",
+      "relative_location": "Downloads/FECART IDEIA DO PROJETO.docx",
+      "logical_size": 16026,
+      "file_count": 1,
+      "errors": []
+    },
+    {
+      "base": "user_profile",
+      "relative_location": "OneDrive - Fundação Escola de Comércio Álvares Penteado/Fecart 2°Ano",
+      "logical_size": 26704367,
+      "file_count": 26,
+      "errors": []
+    }
+  ],
+  "errors": [],
+  "external_files_deleted": false,
+  "note": "Localizações são inventário externo, nunca referências de dataset. Somente leitura de metadados."
+}

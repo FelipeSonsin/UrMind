@@ -1,0 +1,3480 @@
+{
+  "algorithm_version": 2,
+  "source_inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+  "images_analyzed": 47420,
+  "images_hashed": 47420,
+  "images_with_visual_hash": 47420,
+  "method_exact": "SHA-256 completo; todas as imagens locais",
+  "method_near": "dHash horizontal+vertical 128 bits; bandas completas; componentes conexos transitivos",
+  "near_threshold": 4,
+  "near_edges_between_hashes": 555,
+  "near_candidate_filter": "gray_stddev >= 10; candidatos exigem revisão visual; similaridade não prova mesma sessão",
+  "exact_duplicates": [
+    {
+      "sha256": "1dbf9599919d661531f14b7070bc05d4db19198956cb8735176c54dae69fbc4e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001623.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_003917.jpg"
+      ],
+      "reclaimable_bytes": 77583
+    },
+    {
+      "sha256": "4107e8ab8766d5208ebc1008bf266dff668ecbc68dd130c1f59c6a5493ce3617",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/test/images/United_States_005833.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_003260.jpg"
+      ],
+      "reclaimable_bytes": 73827
+    }
+  ],
+  "near_duplicates": [
+    {
+      "cluster": "dhash128:00000000000000008080000000000000",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001126.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001558.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002306.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 125259
+    },
+    {
+      "cluster": "dhash128:0000000003020000f7ffffff3f3fffc0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005876.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006171.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 48339
+    },
+    {
+      "cluster": "dhash128:0000000007020100a7ffffff3f3ffff0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008592.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009873.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 32813
+    },
+    {
+      "cluster": "dhash128:0000000007030000f7ffffff1f7ffec0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_001645.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004529.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001853.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007457.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007688.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008809.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 190059
+    },
+    {
+      "cluster": "dhash128:0000000101c00006c0e0ff3f38feffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005613.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006703.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 635097
+    },
+    {
+      "cluster": "dhash128:0000000303810000ffffff7f3ffffcc0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007593.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002850.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 35291
+    },
+    {
+      "cluster": "dhash128:0000000416fffff67f07c3ff0f3dfcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006317.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009279.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 68281
+    },
+    {
+      "cluster": "dhash128:000000070727c603c3ffffff1f0cfffd",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001555.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009555.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40812
+    },
+    {
+      "cluster": "dhash128:00000007073fff7b070303ffdf3cffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002644.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003634.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 39112
+    },
+    {
+      "cluster": "dhash128:0000000c0fcf8001c3ffffff3f7cffe3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002693.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005540.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 62225
+    },
+    {
+      "cluster": "dhash128:00000010373b1f0fc0feff0f0160e3f2",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008867.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002599.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 772394
+    },
+    {
+      "cluster": "dhash128:00000012a2000020000007ffff00ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002030.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002124.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002725.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 125242
+    },
+    {
+      "cluster": "dhash128:000001018183030100c1ff783effffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004041.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006291.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006362.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1829195
+    },
+    {
+      "cluster": "dhash128:0000010307030000f0ffff7f0e28fef1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004420.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009829.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 53576
+    },
+    {
+      "cluster": "dhash128:0000010707810018ffffffff3cfee01f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002888.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000104.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008586.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 94939
+    },
+    {
+      "cluster": "dhash128:00000805071f35760703e3ff0ffdfcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003810.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005505.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006213.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007745.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009348.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 213691
+    },
+    {
+      "cluster": "dhash128:00000c020636ce0600231ffffffffdff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007184.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008513.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 36248
+    },
+    {
+      "cluster": "dhash128:00000c020737cb0700231ffffffffffe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003124.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005444.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 51453
+    },
+    {
+      "cluster": "dhash128:00001110180c13190003ffff7f7ff9fc",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002010.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_003342.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 57401
+    },
+    {
+      "cluster": "dhash128:00001c1a19185c5cf71f1f1900060201",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002211.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000663.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001620.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 139333
+    },
+    {
+      "cluster": "dhash128:000100051f7fffff7f0707ff0f10fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002558.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003414.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003496.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003842.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 160099
+    },
+    {
+      "cluster": "dhash128:0001010307030001f9ffff1f00fcfef1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004137.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_006573.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40320
+    },
+    {
+      "cluster": "dhash128:000101071f7ff7ff3f0787ff0f30ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004094.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005853.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008582.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 103411
+    },
+    {
+      "cluster": "dhash128:00010303110703000000c1ff7f00bdfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001171.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001389.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 62616
+    },
+    {
+      "cluster": "dhash128:00010382808303010003fcf89fffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000016.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000530.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003246.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007263.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007834.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 3510565
+    },
+    {
+      "cluster": "dhash128:00013f331b7fffef000fffff0f3f7ff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004570.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006070.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 912652
+    },
+    {
+      "cluster": "dhash128:000606020e6781070003cffffffcffc3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005565.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007719.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 53581
+    },
+    {
+      "cluster": "dhash128:00073ff99b1f1f0f835fffffc7b77fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002652.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007282.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 927805
+    },
+    {
+      "cluster": "dhash128:0007fff91f1b1b1f03fffff3833cffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000390.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000563.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 830537
+    },
+    {
+      "cluster": "dhash128:000c0003123b73c3031fffff1f3fff60",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004486.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009395.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 39038
+    },
+    {
+      "cluster": "dhash128:0011dfdb1f7fffff011fffff8f3f7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004930.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007368.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 880336
+    },
+    {
+      "cluster": "dhash128:001f3f331f1f1f0f07fffff00f37fbfd",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008428.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000943.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1262316
+    },
+    {
+      "cluster": "dhash128:00202060206060240101035f27e6fff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002300.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001048.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 88271
+    },
+    {
+      "cluster": "dhash128:0031b55a5adbd9dc0747abbe7d7d6edf",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002086.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000395.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 67591
+    },
+    {
+      "cluster": "dhash128:0031b55a5adbd9dc0f05abaa7d7d7cce",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001040.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001231.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 68398
+    },
+    {
+      "cluster": "dhash128:00616347030f6700110387ffff07f8fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000745.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001312.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 53450
+    },
+    {
+      "cluster": "dhash128:0082024280800000f2f0000044a080f8",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000693.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001381.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001912.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 146589
+    },
+    {
+      "cluster": "dhash128:00c12066660703440100ffffff00feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000231.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001079.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 59843
+    },
+    {
+      "cluster": "dhash128:00e1070f0e274140000007eff839fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000627.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001790.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 82195
+    },
+    {
+      "cluster": "dhash128:00f14347470705440001f7ffdf00ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001786.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002862.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 62825
+    },
+    {
+      "cluster": "dhash128:01000004473fff7f1f0f07ffff1cffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000060.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009669.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 47662
+    },
+    {
+      "cluster": "dhash128:010000060f1f3def0f07e3ff0f18feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_005312.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005343.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 41546
+    },
+    {
+      "cluster": "dhash128:01010004071f7fff0f07e3ff1f0f3eff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003170.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008085.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 59618
+    },
+    {
+      "cluster": "dhash128:0101010133331b1f00c1ff7f0f6fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000154.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000770.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004094.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004604.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005425.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2572329
+    },
+    {
+      "cluster": "dhash128:0101010190180e17000000ff7faff7fb",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001150.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003799.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 951848
+    },
+    {
+      "cluster": "dhash128:010101071f3fd77f7f0707ff0e30fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003444.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007281.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 43677
+    },
+    {
+      "cluster": "dhash128:01010121e3c1081c0000ff1ff8ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000115.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003124.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007704.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1670040
+    },
+    {
+      "cluster": "dhash128:01010127e791081c0000ff3ff8feffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008841.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009187.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 924497
+    },
+    {
+      "cluster": "dhash128:0101030333311d1f00c3ffff0e6fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002757.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007030.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 648826
+    },
+    {
+      "cluster": "dhash128:01010303e1180e17000003f87efff7fb",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002252.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002447.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007830.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1749601
+    },
+    {
+      "cluster": "dhash128:0101038fe7c10c360000c33fb8fcffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009223.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000280.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 916281
+    },
+    {
+      "cluster": "dhash128:0101070de08101040000cf7c70ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008344.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001494.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 922677
+    },
+    {
+      "cluster": "dhash128:01010f497b0d7ac70f03ef1ffffefff3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000406.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007996.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 65601
+    },
+    {
+      "cluster": "dhash128:01011717333f1f1f00e7ffff0f67e1f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009990.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004977.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 648073
+    },
+    {
+      "cluster": "dhash128:01030306070d1121ffefffff1f0810be",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007758.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008501.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 59429
+    },
+    {
+      "cluster": "dhash128:0117dffd9f3b3d3f136ffff9c33cffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009309.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003491.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 777276
+    },
+    {
+      "cluster": "dhash128:011f1f1d393b1f2fffffff100021e5f2",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001939.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003825.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 823034
+    },
+    {
+      "cluster": "dhash128:012307070f1821c1fbfbff4f0e00f8f1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_005907.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000696.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 77030
+    },
+    {
+      "cluster": "dhash128:0202181c0e0723313f00000333193cfc",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000158.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000734.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001379.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 143998
+    },
+    {
+      "cluster": "dhash128:024280000000808200404480c0f070f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000108.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001358.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001537.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 141235
+    },
+    {
+      "cluster": "dhash128:03010303d0181f17000061fc7ffff7fb",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008225.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008525.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 946014
+    },
+    {
+      "cluster": "dhash128:0301031be3c100140000cf12f8ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_010195.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002615.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004306.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004637.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005079.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005910.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 4549428
+    },
+    {
+      "cluster": "dhash128:03030109e28108380000fd3ff0ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000452.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000525.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002538.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1856953
+    },
+    {
+      "cluster": "dhash128:0303031b678301080000e39f70fcffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000479.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000817.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 906572
+    },
+    {
+      "cluster": "dhash128:03030327e18008360000bf30f8ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001017.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002127.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 878011
+    },
+    {
+      "cluster": "dhash128:03030361e38108300000fc3ff0fc7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008695.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007320.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 871682
+    },
+    {
+      "cluster": "dhash128:03030367e091182400003f7078ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000536.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006787.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 938156
+    },
+    {
+      "cluster": "dhash128:03030377638108380000ff30f0ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009146.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005210.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006735.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1720250
+    },
+    {
+      "cluster": "dhash128:03030387efc309060000e13fbff8ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000674.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001704.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006722.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1868029
+    },
+    {
+      "cluster": "dhash128:03030387efc3090600c0e01f1ff8feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009750.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_010075.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001200.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006475.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2923318
+    },
+    {
+      "cluster": "dhash128:030307070e1f1f7f1d0ff7fe08fdfeff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008224.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009205.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 66868
+    },
+    {
+      "cluster": "dhash128:03031f39c7830104000f3e71f0fcffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003615.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004968.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006753.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2080686
+    },
+    {
+      "cluster": "dhash128:030707070f0d0100f7ffffff0c38ffe0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003084.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004879.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 39797
+    },
+    {
+      "cluster": "dhash128:0307072727371b0dffff1f00006fedf6",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000010.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002588.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003463.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004598.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007275.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 3497109
+    },
+    {
+      "cluster": "dhash128:03070f0f0e184e0f0f07fffffe14ff00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009086.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010315.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 58373
+    },
+    {
+      "cluster": "dhash128:030b393f33391f1f80dfff72186fe3f2",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001447.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002972.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004605.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004680.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004865.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2466427
+    },
+    {
+      "cluster": "dhash128:030f1f1f33391f0fc7ffff380c6fe3f2",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008778.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002824.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003388.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004096.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006084.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006359.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006478.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006832.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006865.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007988.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 6180722
+    },
+    {
+      "cluster": "dhash128:0319393d37391f1f80dfff720e6fe3f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009130.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009480.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001717.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003536.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1867888
+    },
+    {
+      "cluster": "dhash128:03193d3d373b1d0f84dfff71086fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009394.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009623.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009680.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001955.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004399.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005204.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006500.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 3793349
+    },
+    {
+      "cluster": "dhash128:031c1e3f373d1f1feeffff70006fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009261.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001462.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 700670
+    },
+    {
+      "cluster": "dhash128:031f312337371f0f079cf0ef0f21e7f7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004088.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007236.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 861276
+    },
+    {
+      "cluster": "dhash128:04011f6fc3c3010100073ff870fdffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000948.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002713.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1045760
+    },
+    {
+      "cluster": "dhash128:06048c8286860713c61d690307878101",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000117.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000543.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001191.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001833.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001935.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002291.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 331696
+    },
+    {
+      "cluster": "dhash128:060602000307870f06381defff1fc59c",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007840.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008544.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009528.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 110283
+    },
+    {
+      "cluster": "dhash128:060602010707070f0e380fffff1fc41c",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_006489.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000373.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 56744
+    },
+    {
+      "cluster": "dhash128:060c8882868e1313ce3d4103078f8111",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000586.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001802.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 65085
+    },
+    {
+      "cluster": "dhash128:070303010000f7f4183f7dfeffff01ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009720.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012893.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 47333
+    },
+    {
+      "cluster": "dhash128:070307070e1f3f7f3c0fe7fe08fbfeff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004338.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007713.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 67526
+    },
+    {
+      "cluster": "dhash128:0703070f0e1f1e7f390fe7fe1839feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000587.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001287.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002487.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 131901
+    },
+    {
+      "cluster": "dhash128:07033737333b1f3700bfffff0027f3f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004952.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005915.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 663179
+    },
+    {
+      "cluster": "dhash128:0707070607070707ffffffffff0cfff0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004083.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000482.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000670.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000870.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003495.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006661.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006872.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007378.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007384.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008124.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009546.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009736.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 559769
+    },
+    {
+      "cluster": "dhash128:0707070707070707ffffffff0dfce08c",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_001762.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007994.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005021.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 70297
+    },
+    {
+      "cluster": "dhash128:0707070707070707ffffffff1f3cf080",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_009276.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004613.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 38837
+    },
+    {
+      "cluster": "dhash128:0707070707070707ffffffffff0cbdfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002601.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003350.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 51819
+    },
+    {
+      "cluster": "dhash128:07070707074fcb1de133ffdf002c078f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_003334.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009306.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012598.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 175481
+    },
+    {
+      "cluster": "dhash128:07070e0707070707ffffffff0b3cf0c0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000306.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001878.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 45925
+    },
+    {
+      "cluster": "dhash128:07071f1f3331191fc1ffff38086fe7f7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001403.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002268.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 677904
+    },
+    {
+      "cluster": "dhash128:07076707074615158031ffffff1fc000",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005415.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_003492.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_011194.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 114621
+    },
+    {
+      "cluster": "dhash128:07079485078f0f1fdfff7fa1affc9e1e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_003130.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_004433.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 86041
+    },
+    {
+      "cluster": "dhash128:0707c70f0c0f0b09f77ebfcc1339a83c",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_006763.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005617.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010274.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010483.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 243515
+    },
+    {
+      "cluster": "dhash128:070b0b07071f77f7fcffff7f0c1c3f7e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004287.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007853.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 69449
+    },
+    {
+      "cluster": "dhash128:070f0f050f0f070fffffffff093ce09f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000573.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003987.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006983.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 143395
+    },
+    {
+      "cluster": "dhash128:070f0f0f0f0f0f07ffffffff1f1ce081",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004825.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007074.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008152.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 114453
+    },
+    {
+      "cluster": "dhash128:070f1f1b3333191fc7ffff30006feff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001069.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001889.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002408.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005362.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006943.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2872331
+    },
+    {
+      "cluster": "dhash128:070f1f1f333b1f2fc0ffff18086fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004403.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005527.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 677420
+    },
+    {
+      "cluster": "dhash128:071737b3333f1f2f041cfcc00727e3f4",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008285.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006233.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 871201
+    },
+    {
+      "cluster": "dhash128:071f3c70e38309050f1f38f0fffffff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008423.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003486.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1156615
+    },
+    {
+      "cluster": "dhash128:079f1f1c0f0303016fbffcf01038ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004833.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007784.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1345011
+    },
+    {
+      "cluster": "dhash128:08101d0f0f1fff19f80703f7ff0bf8fc",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_001613.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005845.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005979.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009585.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 163921
+    },
+    {
+      "cluster": "dhash128:09010122260f1777f97f0fffff007eff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001505.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003681.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40373
+    },
+    {
+      "cluster": "dhash128:09030102061f1f7f78ffffff0f03fdfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001005.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008733.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 69440
+    },
+    {
+      "cluster": "dhash128:0909193826272746c0ffff7e200026a6",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_000850.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_011344.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 89738
+    },
+    {
+      "cluster": "dhash128:0b030323a37d7f4008027fff0e00f8ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_001981.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000771.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001783.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 158846
+    },
+    {
+      "cluster": "dhash128:0b0b0e1713820242ffff3f007cffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001689.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009544.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 74635
+    },
+    {
+      "cluster": "dhash128:0b3d3f073331191fdffffb00186fe7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008473.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001233.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005373.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005493.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2191388
+    },
+    {
+      "cluster": "dhash128:0c000000520f1f3f197f07ffff051cff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004003.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009226.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40719
+    },
+    {
+      "cluster": "dhash128:0c0c0207070f0703f4fbff3f1ffefffe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003596.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006853.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 56298
+    },
+    {
+      "cluster": "dhash128:0d0d0d0d0d0d2d2d0404840104042004",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000040.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000645.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001599.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001766.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 142797
+    },
+    {
+      "cluster": "dhash128:0d0d0d0d0d2d2d2d04040580040c0001",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000530.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000558.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 47646
+    },
+    {
+      "cluster": "dhash128:0d0d0d2d2d2d0d0d00040504c0c0c000",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000047.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000144.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001252.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 96822
+    },
+    {
+      "cluster": "dhash128:0d1d1f0733311b19fffff8001f2feff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009422.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009826.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 794728
+    },
+    {
+      "cluster": "dhash128:0d2aa92d246466663f0094b632336363",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000440.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001021.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 52569
+    },
+    {
+      "cluster": "dhash128:0e060202277fcb19f0790ef7ff1ffcfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000630.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001966.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 66641
+    },
+    {
+      "cluster": "dhash128:0e0e0f0f0f0f0f0fffffffff0f3ce087",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007743.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007247.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 48842
+    },
+    {
+      "cluster": "dhash128:0e0f0b09296868e899393c3c373f7f6f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000869.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001188.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 63049
+    },
+    {
+      "cluster": "dhash128:0e0f0b0ece8e8e0eff98002776dfd99d",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002233.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001364.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 57383
+    },
+    {
+      "cluster": "dhash128:0e1e3f3f373f1f0f0f9ffff8006fe5f2",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001874.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005781.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 817074
+    },
+    {
+      "cluster": "dhash128:0f070381000027e310b87dfeffff3f18",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_009762.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_004585.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 64308
+    },
+    {
+      "cluster": "dhash128:0f0704458f126116f0ff7f0000ffff02",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002156.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012154.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 90313
+    },
+    {
+      "cluster": "dhash128:0f07070f0e0f1f7e70188fff7ff8fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003565.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008860.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40495
+    },
+    {
+      "cluster": "dhash128:0f07070f0f1f1f7f201b9fff79f8fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_006457.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001550.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 50177
+    },
+    {
+      "cluster": "dhash128:0f07471f1f47c40d00000ffffff8ff03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/test/images/United_States_005741.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_000797.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 65688
+    },
+    {
+      "cluster": "dhash128:0f0b4d8c0e06f7f0983c7effffff1fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_001600.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_011975.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 53914
+    },
+    {
+      "cluster": "dhash128:0f0f070f0e1f1f3f70311ffefcf1fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006362.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007204.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 64684
+    },
+    {
+      "cluster": "dhash128:0f0f0f07070f0f0fffffffffff003ec1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003641.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007525.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 39539
+    },
+    {
+      "cluster": "dhash128:0f0f0f070f0f1f0fffffffffff083e01",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001179.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006770.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008053.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 78933
+    },
+    {
+      "cluster": "dhash128:0f0f0f0f07070f07ffffffff1f38fcc0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000934.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005040.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 40451
+    },
+    {
+      "cluster": "dhash128:0f0f0f0f0f0f0f0fefffff7f7ff8dc00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_006015.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007382.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003989.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 106407
+    },
+    {
+      "cluster": "dhash128:0f0f0f0f0f0f0f0fffffffffff187cc1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_005632.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002736.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004025.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 124800
+    },
+    {
+      "cluster": "dhash128:0f0f0f0f0f0f1f1fffffffffff003c40",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004540.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005833.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005834.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007158.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 180894
+    },
+    {
+      "cluster": "dhash128:0f0f0f5f9b0c0606072f7dfeff27f3f8",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005926.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006323.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 72648
+    },
+    {
+      "cluster": "dhash128:0f0f1f1f1f5b1d1e07110400380844fb",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000774.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001110.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001146.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001346.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001431.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 291288
+    },
+    {
+      "cluster": "dhash128:0f1f17c5de9bb33300feff7f03f89bff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002104.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000108.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001137.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 139891
+    },
+    {
+      "cluster": "dhash128:0f4f4f4b070f1f1fffffffffff097cfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003604.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003586.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 60830
+    },
+    {
+      "cluster": "dhash128:0f87070707030303e1bc18010c3efdff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002201.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000956.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 55736
+    },
+    {
+      "cluster": "dhash128:10000c1818191c5cf79f0f9b00000603",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000378.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000381.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001252.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001323.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001797.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 283118
+    },
+    {
+      "cluster": "dhash128:10001606656160600003ffffffccefff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_002987.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002555.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 71922
+    },
+    {
+      "cluster": "dhash128:10107b5b1f7fffef001fffff8f3fffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009488.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_010109.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006175.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1714312
+    },
+    {
+      "cluster": "dhash128:1312400e7e0f4332ff300f1f0000ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_006902.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_008001.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010402.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 216134
+    },
+    {
+      "cluster": "dhash128:1811031f1fe76300000106ffff30f8ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000009.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001388.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 62892
+    },
+    {
+      "cluster": "dhash128:1831170f0f1fef3c7d0701ffff097cfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_008837.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008555.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 60118
+    },
+    {
+      "cluster": "dhash128:18e1671f1f0f43120103cfff7f30feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000167.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002731.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 69232
+    },
+    {
+      "cluster": "dhash128:18e1bc9c9c376388000006ffbb93ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000498.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001245.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 78919
+    },
+    {
+      "cluster": "dhash128:1b1c3931303341dd00107dfe637000ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002189.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001380.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001923.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001958.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 207998
+    },
+    {
+      "cluster": "dhash128:1b24a5324b49cdcc00009aad2d646646",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000319.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001241.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001257.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001317.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 168376
+    },
+    {
+      "cluster": "dhash128:1d0c0f0d89c8c889203b1df87c1fcfff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000588.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000694.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 77185
+    },
+    {
+      "cluster": "dhash128:1ddf5f471f1b07077bfbfecc3cffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002821.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002912.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 84174
+    },
+    {
+      "cluster": "dhash128:1e0e8f8d41411383e3f7fdfffe0e0bff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_012647.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_001402.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 89061
+    },
+    {
+      "cluster": "dhash128:1e3dbdfe3f3fff6f08f0f30080f8feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000127.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001047.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001607.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 124129
+    },
+    {
+      "cluster": "dhash128:1f0f070e0e0f0f1fe1301eff7f39fcfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003702.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006535.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 52139
+    },
+    {
+      "cluster": "dhash128:1f1f0f070f3f3f3effffffff1ff8fc03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001844.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008918.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009297.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 92636
+    },
+    {
+      "cluster": "dhash128:1f1f0f0f0f1f3d7effffffff1f08bc7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000070.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000266.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000099.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002787.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004562.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007224.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009751.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 392899
+    },
+    {
+      "cluster": "dhash128:1f1f1e0e0e1f3f7dffffffff1f08bc76",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_008350.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001368.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 49558
+    },
+    {
+      "cluster": "dhash128:1f1f1e0f0f0f0f1fffffffffff003cc1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000129.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002436.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 44959
+    },
+    {
+      "cluster": "dhash128:1f1f1f0f0f3f3d7effffffff1d18fe73",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000283.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006692.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007463.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008853.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 194336
+    },
+    {
+      "cluster": "dhash128:1f1f1f0f1f3f7fbfffffffff3ff8fe03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003574.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007670.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 64797
+    },
+    {
+      "cluster": "dhash128:1f1f1f19cf3f7f7fc37efc7f01beefff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_008448.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_007583.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 78454
+    },
+    {
+      "cluster": "dhash128:1f1f9f8f0f6f397cffffffff3ff8ec76",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003304.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007888.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 63566
+    },
+    {
+      "cluster": "dhash128:1f1f9fbf3f3f3d3f034ffff8106fe7f7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000818.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007724.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 733838
+    },
+    {
+      "cluster": "dhash128:1f3860e2cb8bc9880030ffef8500be00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000387.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000880.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 64199
+    },
+    {
+      "cluster": "dhash128:1f3f3733333f1b1bdfff7f3f0741e1f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008339.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004068.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 763076
+    },
+    {
+      "cluster": "dhash128:1f4f4f07073f7ffff0f9ffff0e3f3f7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000772.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006314.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 56359
+    },
+    {
+      "cluster": "dhash128:20222127272fffff80031f673f3f3f7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000032.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000179.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001271.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001809.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 188057
+    },
+    {
+      "cluster": "dhash128:20606040c04282003f3f6fedefefcf80",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002080.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000815.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 63603
+    },
+    {
+      "cluster": "dhash128:23335303084560602f79c80c573f2401",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001502.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001637.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002267.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002294.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 179226
+    },
+    {
+      "cluster": "dhash128:24272f2f2941498bc70faffcffe71ec1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_000451.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009985.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 70438
+    },
+    {
+      "cluster": "dhash128:2a787cf4ee6767e7bffff2f3e1eff0ef",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000000.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000936.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 86950
+    },
+    {
+      "cluster": "dhash128:2b07070505020303c0fe3c7ff9fe7f7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000038.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000059.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000515.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 108447
+    },
+    {
+      "cluster": "dhash128:2b0f070706060641c0fe3c7ffffcff7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000396.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001702.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 53284
+    },
+    {
+      "cluster": "dhash128:2d0d2d2d2d2d2f2f8800000000010000",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000324.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000540.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000582.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000601.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000844.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001164.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001437.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001681.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001891.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 368154
+    },
+    {
+      "cluster": "dhash128:2d272626a6262f2f0f7ffffffe81df00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_004976.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009225.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 75351
+    },
+    {
+      "cluster": "dhash128:31313330252d796501f36e1c00ee3fe3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000317.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000945.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 65878
+    },
+    {
+      "cluster": "dhash128:31e36f0f0e1fdbcc0300c1ffff01f8ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000695.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_003224.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 49516
+    },
+    {
+      "cluster": "dhash128:373e1d4fc7a30b23fefcfbff0087ef79",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_000071.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010798.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 75299
+    },
+    {
+      "cluster": "dhash128:3a6e63067e8f0b23ffffff0771d0ac3c",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_009834.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006635.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 85159
+    },
+    {
+      "cluster": "dhash128:3b3e2ebfbfbfbfbffef7f9f9f0fcfcfc",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000010.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000854.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001002.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 147324
+    },
+    {
+      "cluster": "dhash128:3c3e1f0f0f3ffd7ce12081ff7f18fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000878.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002839.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 71158
+    },
+    {
+      "cluster": "dhash128:3e060e4ec647c3caffffff7808807aff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006154.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009355.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 92611
+    },
+    {
+      "cluster": "dhash128:3f1f1c1c0c707f0fef2036f0f81f01f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005580.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_001853.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006545.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 162879
+    },
+    {
+      "cluster": "dhash128:3f1f1f0f0f1f1d3cffffffffff18fcfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_009125.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006383.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 62333
+    },
+    {
+      "cluster": "dhash128:3f1f1f0f0f1f7f7effffffffbf087cff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_007490.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000483.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001187.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 83774
+    },
+    {
+      "cluster": "dhash128:3f1f1f0f0f7f7d3fffffffff3f78fe03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000272.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002067.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003153.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009284.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 141662
+    },
+    {
+      "cluster": "dhash128:3f1f1f0f0f7f7d7effffffff1f38fee3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_004317.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_008788.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 62820
+    },
+    {
+      "cluster": "dhash128:3f3f1f8f0f7f7f7efffff8ffff1ffeff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000929.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005810.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007213.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008572.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009593.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 191582
+    },
+    {
+      "cluster": "dhash128:3f3f3b3f3f3f1f1ffff870071661e1f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009157.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005060.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 750040
+    },
+    {
+      "cluster": "dhash128:3f3f3f3b3f7f5f2ffcf8f0800020e0f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006107.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007894.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 789988
+    },
+    {
+      "cluster": "dhash128:3f3f3f3f3b7b7f7f0080ffff0f67e3f1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008279.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008626.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002660.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006211.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007463.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 2713136
+    },
+    {
+      "cluster": "dhash128:3f7ffffff3fbfbf9f87cfefaf9fdfdfd",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002400.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000367.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 78854
+    },
+    {
+      "cluster": "dhash128:3f7ffffffeb3bbfbf87cfefefbf9fdfd",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002202.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001414.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 78829
+    },
+    {
+      "cluster": "dhash128:3f8f8e8f0f0d2eefe0ffffff0cfeffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_001214.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005787.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 68406
+    },
+    {
+      "cluster": "dhash128:4000004041010180c000703878f1e063",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001244.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001683.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002233.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002329.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 236834
+    },
+    {
+      "cluster": "dhash128:4301011f1f1f7fff1f0f830f7ffeffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004079.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009217.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 58863
+    },
+    {
+      "cluster": "dhash128:47474f4f4f5f397e9fe707ffff5c10e3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002075.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005656.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 94538
+    },
+    {
+      "cluster": "dhash128:48f1730d0c67e308000387ffff3ff8fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000413.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000538.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_001907.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001817.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 157081
+    },
+    {
+      "cluster": "dhash128:49041e0e67c3d94dffdffff8000ffdff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006241.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006364.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 85631
+    },
+    {
+      "cluster": "dhash128:496363672e87b3cfb3fbffff7f001c00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_001275.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_003220.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 85367
+    },
+    {
+      "cluster": "dhash128:4adb9b99193939396d4ddc9c9c1e143e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000708.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001852.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 65072
+    },
+    {
+      "cluster": "dhash128:4f0fce4ecfc9d0d2fdfc883178fcfee3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_007438.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_004329.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_007325.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 217097
+    },
+    {
+      "cluster": "dhash128:5f130f0747070b9bc0e5ffbfe08e071f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_001370.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_007599.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010787.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010987.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 235576
+    },
+    {
+      "cluster": "dhash128:60a1b96a4a49c9ccdf08a2ab2d644ed6",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000545.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000703.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 66961
+    },
+    {
+      "cluster": "dhash128:60e1808010370122ff86e7ff1320fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000766.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001553.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 105946
+    },
+    {
+      "cluster": "dhash128:61614c4ccd496121ffffffff0000ff00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005431.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_009591.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 76682
+    },
+    {
+      "cluster": "dhash128:6325b59189e4e74e00ffff033673e7e7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_001186.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_003866.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 89557
+    },
+    {
+      "cluster": "dhash128:696979797979696b000c3f7942373701",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000237.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002189.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 65971
+    },
+    {
+      "cluster": "dhash128:696b69797979697901000ec002207039",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000930.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001118.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 70078
+    },
+    {
+      "cluster": "dhash128:6f6f3f0b01010300fcfcc0fe7c0047ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004978.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009471.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 78296
+    },
+    {
+      "cluster": "dhash128:7061034b4b1b1c440100ffffff0cffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002500.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_003398.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 56903
+    },
+    {
+      "cluster": "dhash128:713b9d3c27081a1bcfffffff408edf5f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_001990.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002533.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 62238
+    },
+    {
+      "cluster": "dhash128:7143072d092fe70401001dffff37f8fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000770.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_003574.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 55515
+    },
+    {
+      "cluster": "dhash128:71a73f3f3f072723e787fff80070feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009485.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003796.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 820011
+    },
+    {
+      "cluster": "dhash128:7777333727870f0f000000e3ffffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_004157.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006815.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 62604
+    },
+    {
+      "cluster": "dhash128:783c1f0e0e1ffb3ce3e1c0ff3f08fcfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000971.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008271.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009095.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 135394
+    },
+    {
+      "cluster": "dhash128:78f86047e0c00026638080fffeffdf03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/test/images/United_States_005108.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_000935.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_000965.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_002072.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004115.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 259617
+    },
+    {
+      "cluster": "dhash128:794fcfcec76587030327ffffd828d39f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002133.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006439.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 76700
+    },
+    {
+      "cluster": "dhash128:797969796979797b0ec00230603b0f19",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000852.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001349.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 68788
+    },
+    {
+      "cluster": "dhash128:797979796979797b0ec18030301b0f99",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000334.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_000783.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 68247
+    },
+    {
+      "cluster": "dhash128:797979797979696b800c3c7962173701",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001773.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_002132.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 65208
+    },
+    {
+      "cluster": "dhash128:79990aa763e04040f7a01079fefcffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_006820.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_002909.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_008919.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 205051
+    },
+    {
+      "cluster": "dhash128:7f3f6766460f1f3fd0f070f3cf003cff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_008427.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000041.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000321.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009130.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009757.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 240481
+    },
+    {
+      "cluster": "dhash128:7f55150c0c05272700ffffffffffff1f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002079.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002217.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 71683
+    },
+    {
+      "cluster": "dhash128:7f7f3f9f8f0f1f3fffe0f3ffffff1fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002731.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_009540.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 53282
+    },
+    {
+      "cluster": "dhash128:7fff97333f331b0ffff8ff0f0068eff7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000423.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_008013.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 765317
+    },
+    {
+      "cluster": "dhash128:8080002101216060de1d1c7d803002f0",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001119.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_Drone/train/images/China_Drone_001829.jpg"
+      ],
+      "countries": [
+        "China_Drone"
+      ],
+      "reclaimable_bytes_if_review_approved": 88951
+    },
+    {
+      "cluster": "dhash128:83818182c0802060000007302cc0803d",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000793.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000820.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001677.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 132364
+    },
+    {
+      "cluster": "dhash128:86064f8f030603430fef1fd0fe1f3d3e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005636.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_003745.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005197.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 184697
+    },
+    {
+      "cluster": "dhash128:878706262624332780bf3fff7f8dff03",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005550.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_008969.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012402.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012779.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 262681
+    },
+    {
+      "cluster": "dhash128:891c54d29a9b1919ff00004bdd9d9e16",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000027.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001855.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 64832
+    },
+    {
+      "cluster": "dhash128:8b198918501e1f0dff703fffffc0e53e",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005232.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_012465.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 73974
+    },
+    {
+      "cluster": "dhash128:8d0f0d0c8d0c040eff98000584dafbfb",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001175.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001820.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 57859
+    },
+    {
+      "cluster": "dhash128:8def6dd7b73731683f2067ffc181bfff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_005919.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_011430.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 96504
+    },
+    {
+      "cluster": "dhash128:8e072747c78fcfe291193c7c40ffff10",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002293.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001063.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 57790
+    },
+    {
+      "cluster": "dhash128:8e0f0d0d0d040606f7bc04011cfaffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000997.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001640.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 56205
+    },
+    {
+      "cluster": "dhash128:91f1770f1f6f63180000c7ffff30ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001050.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002309.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 62506
+    },
+    {
+      "cluster": "dhash128:99101f0f0f3fcb393c0701ffdf19fcfe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_000161.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007360.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 58376
+    },
+    {
+      "cluster": "dhash128:9bd8cdce8607274764f7f31bc08178e9",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002118.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001750.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 89627
+    },
+    {
+      "cluster": "dhash128:9e1f111008041201ff300067ff961b0f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002005.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000101.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000832.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 117532
+    },
+    {
+      "cluster": "dhash128:9f9f1f1e0e1f1b7ef8f000e7ef007cff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_001500.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003673.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007454.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 110860
+    },
+    {
+      "cluster": "dhash128:9f9f3f0f0e071377f8f000c0f7013cff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001488.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003846.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 57513
+    },
+    {
+      "cluster": "dhash128:a163670f4f0713580003dfffffff39fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_000954.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002209.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 48872
+    },
+    {
+      "cluster": "dhash128:b2b6bc3e35343672ff6fe0f038feff7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000794.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001486.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 111810
+    },
+    {
+      "cluster": "dhash128:c143434347c7e3819fffffffff20fcc6",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_007406.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010223.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 68398
+    },
+    {
+      "cluster": "dhash128:c301050f0733e8ec9e0703ff7f187fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001321.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008800.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 65268
+    },
+    {
+      "cluster": "dhash128:c3010f0707386cec9e0783ffdf1e7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_003701.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004297.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 48922
+    },
+    {
+      "cluster": "dhash128:c34343670f4fc80fff9f1fcfef3c1f00",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_006038.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/train/images/Japan_010468.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 84033
+    },
+    {
+      "cluster": "dhash128:c7470f0f07031efece03e7ff8008ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_009515.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009321.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 69979
+    },
+    {
+      "cluster": "dhash128:cd15555adb99991883006a5fdddcdef6",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000886.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001080.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 67043
+    },
+    {
+      "cluster": "dhash128:ce2043aba92d646600ffff0084b67a73",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002185.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000438.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001863.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 153024
+    },
+    {
+      "cluster": "dhash128:cfc70f0c0c071f6cbc80c0fffb801f7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002694.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001985.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 73406
+    },
+    {
+      "cluster": "dhash128:cfcf9f0f0f1f7ffffcf800ffff083eff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002959.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001097.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008533.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_009488.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 168776
+    },
+    {
+      "cluster": "dhash128:dfff3f1c07091c3c1f9feef4bb0c7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_003336.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008527.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 112531
+    },
+    {
+      "cluster": "dhash128:e1e1c7470f05c700800307efffff7bce",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002115.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002283.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002945.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 113614
+    },
+    {
+      "cluster": "dhash128:e2e6265fc7880d3f3e80cf7ff8cf0301",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004268.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004430.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 84110
+    },
+    {
+      "cluster": "dhash128:e327074707031c77c781e2ffc00c7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_002271.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_004215.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005051.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 142662
+    },
+    {
+      "cluster": "dhash128:e347070707031477c780f2ff800c7fff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000376.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006599.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 73001
+    },
+    {
+      "cluster": "dhash128:e3e30747570701043fc780ffff800c7f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_002744.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006110.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 67834
+    },
+    {
+      "cluster": "dhash128:e3e3631f1e9824033900c7fff83eb161",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_000992.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001198.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 77459
+    },
+    {
+      "cluster": "dhash128:ef7f7737060f0f1f38c0c0f2ff0708fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_000117.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005560.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 53119
+    },
+    {
+      "cluster": "dhash128:f0c1d13127e7212c000180ff03fcfc07",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_000329.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_002944.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 68466
+    },
+    {
+      "cluster": "dhash128:f0e0f0312560202c000098ff00fcff0f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/test/images/United_States_005194.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_003060.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 63692
+    },
+    {
+      "cluster": "dhash128:f0f0fc3464e0e03900040cf23bfeff8f",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004636.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004791.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 65422
+    },
+    {
+      "cluster": "dhash128:f1b320143070f034ffffeeffff7f03d7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002349.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000083.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001501.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 175148
+    },
+    {
+      "cluster": "dhash128:f1f1fbb0311d0f2f0001fff08f63e1f4",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000641.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002124.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 710589
+    },
+    {
+      "cluster": "dhash128:f3b125141070b294ffffefffff7f0bd7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001017.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001782.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 85347
+    },
+    {
+      "cluster": "dhash128:f3f1f3f131598f2f00037ff08f67e7f3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_009164.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004277.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 752363
+    },
+    {
+      "cluster": "dhash128:f3f37e1c06f2fce60187c4ff013c66e3",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001565.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001963.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 94764
+    },
+    {
+      "cluster": "dhash128:f3f3f7373179efa70000fffe0f67f3f1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_003500.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004145.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005715.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006000.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007155.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 3008979
+    },
+    {
+      "cluster": "dhash128:f3f3f73f31790f2f0000fffe0f67e3f1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008439.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_006845.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 750166
+    },
+    {
+      "cluster": "dhash128:f3f3fff93351492f0007fff8806cf7f7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002132.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002587.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 682432
+    },
+    {
+      "cluster": "dhash128:f3f3fffd31511d0f0007fff8006ce7f7",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/test/images/Norway_008303.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000828.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_000993.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1447973
+    },
+    {
+      "cluster": "dhash128:f7fff8713179bf2f071ef8e00067e3f4",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_001118.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007557.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 783775
+    },
+    {
+      "cluster": "dhash128:f8780886c370620380c0e13f08fef301",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001076.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_004789.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 77850
+    },
+    {
+      "cluster": "dhash128:f8f17f1f1bef4b42000387ff7a00e0ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001950.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_001952.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 74779
+    },
+    {
+      "cluster": "dhash128:f8f2fe1e1deea6a6000007fff90040ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000867.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/test/images/Czech_000913.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002044.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 149929
+    },
+    {
+      "cluster": "dhash128:f9f1ff57063562c01803f6ffdf00ffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_002509.jpg",
+        "datasets/raw/rdd2022/RDD2022/Czech/train/images/Czech_003572.jpg"
+      ],
+      "countries": [
+        "Czech"
+      ],
+      "reclaimable_bytes_if_review_approved": 70886
+    },
+    {
+      "cluster": "dhash128:fe1e76e5e47cf97fc0fc3480ccfff3ff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_000497.jpg",
+        "datasets/raw/rdd2022/RDD2022/Japan/test/images/Japan_005039.jpg"
+      ],
+      "countries": [
+        "Japan"
+      ],
+      "reclaimable_bytes_if_review_approved": 102718
+    },
+    {
+      "cluster": "dhash128:fe7a7bfdfdfc3e3ff8e7e4f472faf335",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000219.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_000867.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001793.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 149551
+    },
+    {
+      "cluster": "dhash128:fedc54b5a6276766f08755d6b3bb207a",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/test/images/China_MotorBike_002021.jpg",
+        "datasets/raw/rdd2022/RDD2022/China_MotorBike/train/images/China_MotorBike_001069.jpg"
+      ],
+      "countries": [
+        "China_MotorBike"
+      ],
+      "reclaimable_bytes_if_review_approved": 60792
+    },
+    {
+      "cluster": "dhash128:fef73f1d0c12f8fc0087cef8003d3fe1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_001288.jpg",
+        "datasets/raw/rdd2022/RDD2022/United_States/train/images/United_States_002359.jpg"
+      ],
+      "countries": [
+        "United_States"
+      ],
+      "reclaimable_bytes_if_review_approved": 96230
+    },
+    {
+      "cluster": "dhash128:ff3f1f0f070b300080c0e0f31f1effff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_005618.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007912.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 49682
+    },
+    {
+      "cluster": "dhash128:ff3f3f37071f051ec0e010ffe701feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_005585.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_006763.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 69071
+    },
+    {
+      "cluster": "dhash128:ff3f7fb3973f3c3ee0e000ffe700feff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_008729.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001235.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_008526.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 136745
+    },
+    {
+      "cluster": "dhash128:ff7f1f06061f4bfcc0c0e0ff1f09fcff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_001583.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007243.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 64946
+    },
+    {
+      "cluster": "dhash128:ffff5fcfc60f3b7938c0c0faff0378fe",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/India/test/images/India_009140.jpg",
+        "datasets/raw/rdd2022/RDD2022/India/train/images/India_007856.jpg"
+      ],
+      "countries": [
+        "India"
+      ],
+      "reclaimable_bytes_if_review_approved": 58542
+    },
+    {
+      "cluster": "dhash128:ffff77f161e1d1b80000fff000ffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004436.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_007473.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 957604
+    },
+    {
+      "cluster": "dhash128:ffff7ffbe1f1f8fc0000fff03cffffff",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004502.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_004925.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 1090064
+    },
+    {
+      "cluster": "dhash128:ffffbf9f33795faf07cefcf80f6fe7f1",
+      "files": [
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_002032.jpg",
+        "datasets/raw/rdd2022/RDD2022/Norway/train/images/Norway_005297.jpg"
+      ],
+      "countries": [
+        "Norway"
+      ],
+      "reclaimable_bytes_if_review_approved": 743995
+    }
+  ],
+  "exact_duplicate_groups": 2,
+  "near_duplicate_groups": 296,
+  "exact_reclaimable_bytes": 151410,
+  "near_reclaimable_bytes_upper_bound": 118624915,
+  "note": "Não somar economia exata e visual: pode haver sobreposição. Nenhuma exclusão nem descarte automático de near-duplicates.",
+  "preflight": {
+    "operation": "relatório duplicatas",
+    "allowed": true,
+    "reasons": [],
+    "current_datasets_bytes": 29254463165,
+    "current_ml_bytes": 29255058679,
+    "free_disk_bytes": 168270422016,
+    "estimated_delta_bytes": 32000000,
+    "estimated_peak_bytes": 64000000,
+    "projected_datasets_bytes": 29286463165,
+    "projected_free_bytes": 168206422016
+  }
+}

@@ -1,0 +1,27 @@
+# Ambientes e segredos locais
+.env
+.env.*
+!.env.example
+backend/.venv/
+.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Dados grandes e temporários; documentação, metadata e manifestos permanecem versionáveis.
+/datasets/raw/
+/datasets/processed/
+/datasets/downloads/
+/datasets/reports/tmp/
+/datasets/reports/cache/
+/models/
+/checkpoints/
+/mlruns/
+/mlartifacts/
+/.cache/
+*.part
+*.tmp

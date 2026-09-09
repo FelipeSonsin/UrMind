@@ -1,0 +1,6 @@
+{
+  "raw_metadata_sha256": "600be3a14fac247677e2b01ab804f16c424ae5943a7f9945366b9ac6b033434d",
+  "raw_file_count": 99804,
+  "raw_logical_bytes": 29170734632,
+  "method": "ordered relative path + size + mtime_ns; read metadata only; not full content proof"
+}

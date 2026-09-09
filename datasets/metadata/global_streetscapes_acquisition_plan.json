@@ -1,0 +1,18 @@
+{
+  "dataset": "global_streetscapes",
+  "official_source_url": "https://huggingface.co/datasets/NUS-UAL/global-streetscapes",
+  "revision": "main",
+  "license": "CC BY-SA 4.0 (declarada na ficha oficial do dataset)",
+  "replaces": "mapillary_msls",
+  "replacement_reason": "O portal oficial do MSLS exige login para qualquer download. O Global Streetscapes redistribui, sob CC BY-SA 4.0 e sem gating, imagens street-level do proprio Mapillary e do KartaView, com rotulo humano de cenario. Cobre a funcao original sem credencial e sem custo.",
+  "seed": 20260908,
+  "buckets": [
+    "1",
+    "2",
+    "3"
+  ],
+  "target_bytes": 6000000000,
+  "selection_algorithm": "estratificacao por continente x plataforma da via x clima x iluminacao, com piso de 1 por estrato e espalhamento em rodadas por cidade e sequencia de captura",
+  "selected": 15353,
+  "group_basis": "sequence_id (sequencia de captura), para split sem vazamento"
+}

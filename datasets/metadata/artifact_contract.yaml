@@ -1,0 +1,42 @@
+version: 1
+purpose: standalone_dataset_audit
+project_root_detection: parents_of_script_containing_docs_datasets_scripts
+path_base: project_root
+path_separator: slash
+raw_policy: read_only
+authorized_exceptions:
+  - new_registered_downloads_in_acquired_20260908
+  - verified_redundant_rdd_zip_release_reported_separately
+raw_primary_location: datasets/raw
+artifact_pipeline:
+  sources: datasets/metadata/sources.csv
+  official_checksums: datasets/metadata/upstream_checksums.json
+  taxonomy: datasets/metadata/taxonomy.yaml
+  mapping: datasets/metadata/class_mapping.yaml
+  inventory: datasets/manifests/rdd2022_inventory.jsonl
+  duplicate_report: datasets/reports/rdd2022_duplicates.json
+  selection: datasets/manifests/rdd2022_subset_selection.jsonl
+  split_report: datasets/splits/rdd2022_subset_splits.json
+  verification: datasets/reports/pipeline_verification.json
+legacy_backend:
+  taxonomy_ids: compatible
+  path_default: datasets/raw
+  external_override: exists_in_backend_not_used_by_dataset_scripts
+  consumes_current_selection: false
+  keeps_negative_examples: false
+  integration_status: future_work_outside_current_scope
+  registration_manifests: historical_not_current_selection
+future_preparation:
+  image_copy_required: false
+  derived_annotations_location: datasets/processed
+  create_directory_only_when_used: true
+  download_requires_explicit_authorization: true
+  training_configured: false
+authorized_acquisition:
+  plan: datasets/metadata/acquisition_plan.json
+  bdd_plan: datasets/metadata/bdd100k_acquisition_plan.json
+  parquet_reader: scripts/datasets/audit_acquired.py
+  image_storage: original_containers_read_in_memory
+  image_copy_required: false
+  keypoints_are_road_bounding_boxes: false
+  cross_source_leakage_review_required: true

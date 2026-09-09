@@ -1,0 +1,120 @@
+{# Relatório de evento — MASTER_PLAN §15.
+
+   Regra do template: ele só pode falar o que existe no resultado. Todo bloco é
+   condicional; dado ausente vira "não disponível" ou é omitido. Não há texto de
+   preenchimento, não há adjetivo que o dado não sustente, e nenhuma frase é
+   gerada por LLM.
+
+   O ambiente usa trim_blocks + lstrip_blocks: as tags de bloco ficam em linha
+   própria e não deixam rastro na saída.
+#}
+OCORRÊNCIA {{ report.event_key }}
+
+Problema: {{ report.class_label }}
+{% if report.visual_confidence is not none %}
+Confiança da detecção: {{ '%.0f'|format(report.visual_confidence * 100) }}%
+{% else %}
+Confiança da detecção: não disponível
+{% endif %}
+{% if report.model_version %}
+Modelo: {{ report.model_version }}
+{% else %}
+Modelo: não disponível (resultado não veio de modelo promovido)
+{% endif %}
+
+LOCALIZAÇÃO
+{% if report.latitude is not none and report.longitude is not none %}
+Coordenada informada: {{ '%.6f'|format(report.latitude) }}, {{ '%.6f'|format(report.longitude) }}
+{% if report.location_accuracy_m is not none %}
+Precisão declarada: ±{{ '%.0f'|format(report.location_accuracy_m) }} m
+{% else %}
+Precisão declarada: não disponível
+{% endif %}
+{% if report.location_source %}
+Origem da coordenada: {{ report.location_source }}
+{% endif %}
+{% else %}
+Coordenada: não disponível — este registro ainda não tem posição no mapa.
+{% endif %}
+{% if report.road_segment_name %}
+Trecho associado: {{ report.road_segment_name }}
+{% if report.distance_to_road_m is not none %}
+Distância entre o ponto informado e o trecho: {{ '%.1f'|format(report.distance_to_road_m) }} m
+{% endif %}
+{% elif report.latitude is not none %}
+Trecho associado: não disponível
+{% endif %}
+{% if report.address %}
+Endereço aproximado: {{ report.address }}
+{% endif %}
+
+EVIDÊNCIAS
+{% if report.evidence %}
+{% for item in report.evidence %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- não disponível
+{% endif %}
+
+AVALIAÇÃO
+Severidade: {{ report.severity_label }}
+{% if report.priority_score is not none %}
+Prioridade: {{ '%.2f'|format(report.priority_score) }} de 1,00
+{% else %}
+Prioridade: não calculada
+{% endif %}
+{% if report.uncertainty is not none %}
+Incerteza: {{ '%.2f'|format(report.uncertainty) }} de 1,00
+{% endif %}
+{% if report.coverage is not none %}
+Fatores disponíveis: {{ '%.0f'|format(report.coverage * 100) }}% do peso total da regra
+{% endif %}
+{% if report.ruleset_version %}
+Regra aplicada: {{ report.ruleset_version }}
+{% endif %}
+
+RESPONSÁVEL
+{% if report.responsible %}
+Sugerido: {{ report.responsible }}
+{% if report.responsibility_source %}
+Fundamento: {{ report.responsibility_source }}
+{% endif %}
+{% if report.responsibility_version %}
+Versão da regra: {{ report.responsibility_version }}
+{% endif %}
+{% else %}
+Não há regra de competência aplicável a este caso: requer triagem.
+{% endif %}
+
+AÇÃO SUGERIDA
+{% if report.action_label %}
+{{ report.action_label }}{% if report.action_code %} ({{ report.action_code }}){% endif %}
+
+{% if report.action_version %}
+Versão do catálogo: {{ report.action_version }}
+{% endif %}
+Esta é uma sugestão. A decisão técnica e administrativa continua sendo do órgão responsável.
+{% else %}
+Não disponível.
+{% endif %}
+{% if report.predictions %}
+
+PREVISÕES
+{% for prediction in report.predictions %}
+- {{ prediction }}
+{% endfor %}
+{% endif %}
+
+LIMITAÇÕES
+{% if report.limitations %}
+{% for limitation in report.limitations %}
+- {{ limitation }}
+{% endfor %}
+{% else %}
+- nenhuma limitação registrada para este resultado
+{% endif %}
+{% if report.osm_attribution %}
+
+Dados de vias e endereço: © colaboradores do OpenStreetMap (ODbL).
+{% endif %}

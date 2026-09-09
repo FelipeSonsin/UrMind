@@ -1,0 +1,141 @@
+{
+    "name":  "univali_br",
+    "version":  "v4",
+    "source":  "https://data.mendeley.com/datasets/t576ydh9v8/4",
+    "license":  "conferir a licença na ficha Mendeley antes de publicar resultado",
+    "classes":  [
+                    "URMIND_ROAD_D40"
+                ],
+    "split":  {
+                  "role":  "training_v1",
+                  "generated_at":  "2026-09-08T03:34:28.503756+00:00",
+                  "summary":  {
+                                  "dataset_id":  "univali_br",
+                                  "total_samples":  2235,
+                                  "usable_samples":  2235,
+                                  "class_counts":  {
+                                                       "URMIND_ROAD_D40":  2235
+                                                   },
+                                  "rejected_counts":  {
+                                                          "CRACK":  2235,
+                                                          "LANE":  2235
+                                                      },
+                                  "group_count":  29,
+                                  "groups":  [
+                                                 "DF_010_010BDF0010",
+                                                 "DF_010_010BDF0018",
+                                                 "DF_010_010BDF0030_1",
+                                                 "DF_020_020BDF0070",
+                                                 "DF_060_060BDF0010",
+                                                 "DF_060_060BDF0012",
+                                                 "DF_060_060BDF0030",
+                                                 "DF_060_060BDF0050",
+                                                 "DF_070_070BDF0010",
+                                                 "DF_070_070BDF0050",
+                                                 "DF_080_080BDF0032",
+                                                 "DF_080_080BDF0050",
+                                                 "DF_080_080BDF0050_1",
+                                                 "DF_080_080BDF0070",
+                                                 "DF_080_080BDF0090",
+                                                 "DF_251_251BDF0052",
+                                                 "DF_251_251BDF0490",
+                                                 "DF_251_251BDF0525",
+                                                 "DF_251_251BDF0530",
+                                                 "ES_101_101ES000000",
+                                                 "ES_259_259ES000000",
+                                                 "ES_482_482ES014500",
+                                                 "RS_290_290RS070691",
+                                                 "RS_290_290RS150131",
+                                                 "RS_290_290RS294095",
+                                                 "RS_386_386RS124739",
+                                                 "RS_386_386RS169832",
+                                                 "RS_386_386RS191729",
+                                                 "RS_386_386RS289112"
+                                             ]
+                              },
+                  "inventory":  {
+                                    "dataset_id":  "univali_br",
+                                    "root":  "datasets/raw/univali_br",
+                                    "state":  "ready",
+                                    "total_bytes":  483203492,
+                                    "checksums_verified":  true,
+                                    "extracted_dirs":  [
+                                                           "v1"
+                                                       ],
+                                    "files":  [
+                                                  {
+                                                      "path":  "datasets/raw/univali_br/Cracks-and-Potholes-in-Road-Images.zip",
+                                                      "state":  "verified",
+                                                      "expected_bytes":  231728698,
+                                                      "actual_bytes":  231728698,
+                                                      "found_at":  "datasets/raw/univali_br/Cracks-and-Potholes-in-Road-Images.zip",
+                                                      "required":  true,
+                                                      "note":  "sha256 confere"
+                                                  }
+                                              ],
+                                    "blocking_reasons":  [
+
+                                                         ]
+                                },
+                  "taxonomy_note":  "Rodovias federais brasileiras — o contexto mais próximo do uso real. Máscara POTHOLE vira URMIND_ROAD_D40; CRACK é trinca genérica e é recusada, porque o §8.2 proíbe escolher entre D00/D10/D20 por semelhança.",
+                  "group_note":  "Grupo = trecho de rodovia extraído do nome da pasta (1007599_RS_386_386RS289112_28920 → RS_386_386RS289112). Fotos do mesmo trecho são quase duplicadas e não podem se separar (§8.4).",
+                  "caveats":  [
+                                  "Anotação é máscara PNG, não caixa. Treinar detecção exige conversão explícita, registrada como versão derivada — não acontece na leitura."
+                              ],
+                  "split":  {
+                                "counts":  {
+                                               "train":  1565,
+                                               "validation":  335,
+                                               "test":  335
+                                           },
+                                "groups":  {
+                                               "train":  [
+                                                             "DF_010_010BDF0010",
+                                                             "DF_010_010BDF0030_1",
+                                                             "DF_070_070BDF0010",
+                                                             "DF_080_080BDF0032",
+                                                             "DF_080_080BDF0050",
+                                                             "DF_080_080BDF0050_1",
+                                                             "DF_080_080BDF0090",
+                                                             "DF_251_251BDF0052",
+                                                             "DF_251_251BDF0490",
+                                                             "RS_290_290RS294095",
+                                                             "RS_386_386RS124739",
+                                                             "RS_386_386RS169832",
+                                                             "RS_386_386RS289112"
+                                                         ],
+                                               "validation":  [
+                                                                  "DF_010_010BDF0018",
+                                                                  "DF_020_020BDF0070",
+                                                                  "DF_060_060BDF0010",
+                                                                  "DF_060_060BDF0012",
+                                                                  "DF_070_070BDF0050",
+                                                                  "ES_482_482ES014500",
+                                                                  "RS_290_290RS070691",
+                                                                  "RS_386_386RS191729"
+                                                              ],
+                                               "test":  [
+                                                            "DF_060_060BDF0030",
+                                                            "DF_060_060BDF0050",
+                                                            "DF_080_080BDF0070",
+                                                            "DF_251_251BDF0525",
+                                                            "DF_251_251BDF0530",
+                                                            "ES_101_101ES000000",
+                                                            "ES_259_259ES000000",
+                                                            "RS_290_290RS150131"
+                                                        ]
+                                           },
+                                "achieved_ratios":  {
+                                                        "train":  0.7002,
+                                                        "validation":  0.1499,
+                                                        "test":  0.1499
+                                                    },
+                                "warnings":  [
+
+                                             ]
+                            }
+              },
+    "dvc_revision":  null,
+    "audit_stage_status":  "legacy_backend_registration_not_current_selection",
+    "path_base":  "project_root"
+}

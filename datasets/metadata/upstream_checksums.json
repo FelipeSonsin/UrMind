@@ -1,0 +1,65 @@
+[
+  {
+    "dataset": "rdd2022",
+    "path": "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip",
+    "official_url": "https://ndownloader.figshare.com/files/38030910",
+    "version": "figshare-21431547-v1",
+    "expected_bytes": 13264172619,
+    "algorithm": "md5",
+    "checksum": "b62bd51d2ffcfaa76c60f234f0cc2bb3"
+  },
+  {
+    "dataset": "rdd2022",
+    "path": "datasets/raw/rdd2022/Directory_Structure_CRDDC_RDD2022.txt",
+    "official_url": "https://ndownloader.figshare.com/files/38030823",
+    "version": "figshare-21431547-v1",
+    "expected_bytes": 1161,
+    "algorithm": "md5",
+    "checksum": "96dadd450b1122b9c798fac54207ea04"
+  },
+  {
+    "dataset": "rdd2022",
+    "path": "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+    "official_url": "https://ndownloader.figshare.com/files/38030826",
+    "version": "figshare-21431547-v1",
+    "expected_bytes": 3250534,
+    "algorithm": "md5",
+    "checksum": "08993a6e2bca4a841c2f37b526e52d96"
+  },
+  {
+    "dataset": "rdd2022",
+    "path": "datasets/raw/rdd2022/label_map.pbtxt",
+    "official_url": "https://ndownloader.figshare.com/files/38030820",
+    "version": "figshare-21431547-v1",
+    "expected_bytes": 127,
+    "algorithm": "md5",
+    "checksum": "1c2f8cabf4217798538989ebe203db2e"
+  },
+  {
+    "dataset": "univali_br",
+    "path": "datasets/raw/univali_br/Cracks-and-Potholes-in-Road-Images.zip",
+    "official_url": "https://data.mendeley.com/public-files/datasets/t576ydh9v8/files/afc7c028-06e0-475b-b190-e008df681b19/file_downloaded",
+    "version": "v4",
+    "expected_bytes": 231728698,
+    "algorithm": "sha256",
+    "checksum": "e59bb8d771e18f059ab78d88e640e83869fc8c8fd808697a0c2c48e16eec4f76"
+  },
+  {
+    "dataset": "camber",
+    "path": "datasets/raw/camber/detections/detections_50.csv",
+    "official_url": "https://zenodo.org/api/records/21361827/files/detections_50.csv/content",
+    "version": "zenodo-21361827-v1.0",
+    "expected_bytes": 1053,
+    "algorithm": "md5",
+    "checksum": "da2e0926f063783be65741238b30ee7c"
+  },
+  {
+    "dataset": "camber",
+    "path": "datasets/raw/camber/videos/video_50_metadata.txt",
+    "official_url": "https://zenodo.org/api/records/21361827/files/video_50_metadata.txt/content",
+    "version": "zenodo-21361827-v1.0",
+    "expected_bytes": 700,
+    "algorithm": "md5",
+    "checksum": "31a92d13ebbe068157ffe696127eb3b5"
+  }
+]

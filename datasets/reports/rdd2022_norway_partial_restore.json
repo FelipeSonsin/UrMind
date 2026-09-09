@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-09-09T00:49:53-0300",
+  "situacao": "A poda da Norway foi revertida pelo OneDrive, mas de forma incompleta: 8.047 das 8.161 imagens voltaram.",
+  "decisao_do_usuario": "RDD2022 fica como excecao acima do teto de 7 GB; as outras fontes ficam em 5-7 GB.",
+  "norway_train_imagens": 8047,
+  "norway_train_annotations": 7993,
+  "imagens_ausentes_vs_pacote_oficial": 114,
+  "todas_ausentes_sao_negativas": true,
+  "objetos_anotados_perdidos": 0,
+  "xml_orfaos_removidos": 111,
+  "motivo_remocao_xml": "label apontando para imagem inexistente quebra o pareamento exigido pelo loader",
+  "evidencia": "datasets/reports/norway_profile.jsonl mede cada imagem original; as 114 ausentes tem zero objetos D00/D10/D20/D40"
+}

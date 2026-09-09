@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "scope_dataset": "rampnet",
+  "files": [
+    {
+      "path": "datasets/raw/rampnet/acquired_20260908/train/data-00090-of-00128.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "d00f63948e01ef148c28a651f26bd83b9a845695d353d791c2a1155895b876fc",
+      "size_bytes": 2511807273,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/rampnet/acquired_20260908/train/data-00018-of-00128.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "a56c7121056f7b7bc005f75deaf3106650279e1d4b67ccd87993ed6b28212273",
+      "size_bytes": 2520183371,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/rampnet/acquired_20260908/val/data-00122-of-00128.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "4620acc3860db82c0249be09a14f9a14653e6ce2de813d56a6bda53011c8674a",
+      "size_bytes": 717035291,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/rampnet/acquired_20260908/val/data-00039-of-00128.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "f2fae6506382e0f5a45b27046af479c9ad25044eb63a8277f37b720832c4badd",
+      "size_bytes": 718473690,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/rampnet/acquired_20260908/test/data-00061-of-00128.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "d036dc1ea816dd4cd7ef91454278ee8b6dcbad31ecdcba70a356c34459867887",
+      "size_bytes": 373869607,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    }
+  ],
+  "plan_sha256": "6c775cfb7365397ca64d1c3954d26fd53d0004700bc660ab5ae65bed9f937ab2",
+  "existing_raw_modified": false
+}

@@ -1,0 +1,71 @@
+{
+  "passed": true,
+  "dataset": "global_streetscapes",
+  "generated_at": "2026-09-08T21:16:28-0300",
+  "official_source_url": "https://huggingface.co/datasets/NUS-UAL/global-streetscapes",
+  "revision": "main",
+  "license": "CC BY-SA 4.0 (declarada na ficha oficial do dataset)",
+  "replaces": "mapillary_msls",
+  "images": 15007,
+  "bytes": 5999998370,
+  "gb": 6.0,
+  "labels_csv": "datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv",
+  "tarball_sha256_as_streamed": {
+    "1": null,
+    "2": null,
+    "3": "5c1ba83900979303161e77b3b7e494de755cec3b1366b7123999f6c2f02daf15"
+  },
+  "checksum_limitations": "O Hugging Face nao publica SHA-256 dos tarballs em formato consultavel por HEAD nesta consulta. O digest acima foi calculado sobre o fluxo recebido e cada JPEG gravado tem SHA-256 proprio no CSV; isso prova integridade local, nao autenticidade criptografica da origem.",
+  "distribution": {
+    "continent": {
+      "Europe": 9448,
+      "Asia": 3278,
+      "North America": 1744,
+      "Oceania": 262,
+      "South America": 206,
+      "Africa": 69
+    },
+    "platform": {
+      "?": 6805,
+      "walking surface": 3078,
+      "driving surface": 2925,
+      "cycling surface": 1290,
+      "railway": 787,
+      "fields": 93,
+      "tunnel": 29
+    },
+    "weather": {
+      "?": 6090,
+      "clear": 2875,
+      "snowy": 2256,
+      "cloudy": 2234,
+      "rainy": 1319,
+      "foggy": 233
+    },
+    "lighting_condition": {
+      "?": 11876,
+      "day": 2328,
+      "night": 517,
+      "dusk/dawn": 286
+    },
+    "quality": {
+      "?": 12395,
+      "good": 2289,
+      "slightly poor": 251,
+      "very poor": 72
+    },
+    "source": {
+      "Mapillary": 14610,
+      "KartaView": 397
+    },
+    "split_oficial": {
+      "train": 11421,
+      "test": 3586
+    },
+    "countries": 108,
+    "cities": 398,
+    "sequences": 1946
+  },
+  "selection_algorithm": "estratificacao por continente x plataforma da via x clima x iluminacao, com piso de 1 por estrato e espalhamento em rodadas por cidade e sequencia de captura",
+  "seed": 20260908
+}

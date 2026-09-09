@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "status": "aquisicoes concluidas e legiveis pelo backend; RDD2022 mantido como excecao ao teto por decisao do usuario. Nao e configuracao de treinamento.",
+  "artifacts": [
+    {
+      "path": "datasets/manifests/camber.json",
+      "size_bytes": 3010,
+      "sha256": "0ce156bf6977ba31dbcfc994ce99905a4215d914e97e8c3c5f1aecc4639b854e"
+    },
+    {
+      "path": "datasets/manifests/rdd2022.json",
+      "size_bytes": 9012,
+      "sha256": "7a5e992d46b9d3b52107978dfd049c6c99c781bdde2e3bf1ef0248a5a1e983d8"
+    },
+    {
+      "path": "datasets/manifests/rdd2022_inventory.jsonl",
+      "size_bytes": 44319799,
+      "sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d"
+    },
+    {
+      "path": "datasets/manifests/rdd2022_norway_kept.jsonl",
+      "size_bytes": 1493950,
+      "sha256": "b72c4629c84b24929c69f68771b8ff111b1c1d26f8a95795ce4da553809a8d6d"
+    },
+    {
+      "path": "datasets/manifests/rdd2022_norway_removed.jsonl",
+      "size_bytes": 2956423,
+      "sha256": "ae663a97ea11c11401b0642737596168e463b5c1f1eb3ba8a7119ea5c1f6b615"
+    },
+    {
+      "path": "datasets/manifests/rdd2022_subset_selection.jsonl",
+      "size_bytes": 38595167,
+      "sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600"
+    },
+    {
+      "path": "datasets/manifests/univali_br.json",
+      "size_bytes": 9514,
+      "sha256": "5c6fbed49326d9f64e46fe6a77a5111e33b28514e07ec0d26cd50fcc664424ae"
+    },
+    {
+      "path": "datasets/metadata/artifact_contract.yaml",
+      "size_bytes": 1765,
+      "sha256": "479c8b2149cffccaaecac8f8f8fe514ea25ca1a8ea0d9608690ff94d9235d503"
+    },
+    {
+      "path": "datasets/metadata/class_mapping.yaml",
+      "size_bytes": 6544,
+      "sha256": "d724bd2f2daabea8c71e279001472605c0efcb426bb0c7c180d0c1cfa13700af"
+    },
+    {
+      "path": "datasets/metadata/global_streetscapes_acquisition_plan.json",
+      "size_bytes": 944,
+      "sha256": "86def9cd712f7d6f7a44dd91f6fdd6fc25dd5f75d67cf7543dfbc1a41d6507f8"
+    },
+    {
+      "path": "datasets/metadata/licenses.md",
+      "size_bytes": 3536,
+      "sha256": "e28272fdf9d5a7b6622001b7b1ec7e99ea72be0a5de9a15f94f85631c7f0be49"
+    },
+    {
+      "path": "datasets/metadata/removed_sources.json",
+      "size_bytes": 882,
+      "sha256": "1322b1552b921983bb1479ac21f24d0d2f305a087e01c38df50c8fabb05f8885"
+    },
+    {
+      "path": "datasets/metadata/sources.csv",
+      "size_bytes": 4579,
+      "sha256": "c851cba611591cf4766661bf0b859b03a4e3f5aed80a6a1d46569d6eb03c0269"
+    },
+    {
+      "path": "datasets/metadata/storage_budget.yaml",
+      "size_bytes": 3735,
+      "sha256": "97cc2d077a404de8ee777929d3ccf576a60f4146cfda8c705ef60894ae9ed2a4"
+    },
+    {
+      "path": "datasets/metadata/taxonomy.yaml",
+      "size_bytes": 3511,
+      "sha256": "8a87371ee7c5b1cb2fb150ae2a24383f8a0a96b34088fc6e51f3f6d88d963e82"
+    },
+    {
+      "path": "datasets/metadata/upstream_checksums.json",
+      "size_bytes": 2363,
+      "sha256": "6c72c91dae3efdbb381236c271d1f5a7152696a7847fa8ff6fe0fe3d62058638"
+    },
+    {
+      "path": "datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv",
+      "size_bytes": 5917342,
+      "sha256": "8d0a02831868901487531fe150935b943da5ae1cd86805008286253458759bf6"
+    },
+    {
+      "path": "datasets/reports/acquisition_result_global_streetscapes.json",
+      "size_bytes": 2144,
+      "sha256": "24a4d4257d2730e21a1ce69354deb4a368444bf4a1d3a2214ae3500c42d01b16"
+    },
+    {
+      "path": "datasets/reports/norway_profile.jsonl",
+      "size_bytes": 3726705,
+      "sha256": "d6e91afa6351b00cec9f42589034dd2acc062abb801b632823096ea383274768"
+    },
+    {
+      "path": "datasets/reports/rdd2022_norway_partial_restore.json",
+      "size_bytes": 749,
+      "sha256": "22cf606441922f947fc137a7b1fe968d5a389faaddb129b6458a1e9cc77f75a2"
+    },
+    {
+      "path": "datasets/reports/rdd2022_pre_reduction_baseline.json",
+      "size_bytes": 1656,
+      "sha256": "240e7b14152a178923ecfddb3b97d30af84e65c82c18562691839f40a1a41649"
+    },
+    {
+      "path": "datasets/reports/rdd2022_reconciliation.json",
+      "size_bytes": 2603,
+      "sha256": "62efc8c311d610ea9ade7ea298ea513d1681659c33bf32d6bdd3dcf77509beaf"
+    },
+    {
+      "path": "datasets/reports/rdd2022_reduction.json",
+      "size_bytes": 4046,
+      "sha256": "6e921c2759c4c9d2614c5e11ad451d6c3ce0e7bf92e661b91ebae0003807b438"
+    },
+    {
+      "path": "datasets/splits/rdd2022_subset_splits.json",
+      "size_bytes": 5880,
+      "sha256": "4a27f8408933beb514934c2ec3530be6880a5f6c764ab38af698bdb720769843"
+    },
+    {
+      "path": "datasets/splits/rdd2022_subset_test.txt",
+      "size_bytes": 580724,
+      "sha256": "9500cb9a759a8a467ca0ed0069c8be9c0754c7310fa0d4cecac13fd14eddb400"
+    },
+    {
+      "path": "datasets/splits/rdd2022_subset_train.txt",
+      "size_bytes": 1588766,
+      "sha256": "3483ecdcae4ad9bc1600387f732cd2c77c8000080271b537c36c48133cf76a85"
+    },
+    {
+      "path": "datasets/splits/rdd2022_subset_validation.txt",
+      "size_bytes": 316396,
+      "sha256": "0dc9ca29d19ff2606d4d1d84f8ddb3494fa1da597ebd70a1801ceaf97f89acec"
+    }
+  ],
+  "scripts": [
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_budget.py",
+      "sha256": "075d7947d5bf618f123c446793e3099fea5420f870942f4dfce5d63f741499af"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_core.py",
+      "sha256": "3025cd2a305961c4b7ad59fa6c807cd4a1344f6b6e75710983950587e1e697dd"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_taxonomy.py",
+      "sha256": "aa3d736a72631f1e42f9adfc453bc8bcd440b32dd74d4701e4516ff02e68e816"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_bdd100k.py",
+      "sha256": "4a0f5b2e0c6f471c64291e123ca42b08e0a8aec2ec7ce91e06300fe8e89f781b"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_global_streetscapes.py",
+      "sha256": "6655ecd313a39859323895cac1fb105632cf84bc8277809255bfaaab3a81946c"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_registered.py",
+      "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_acquired.py",
+      "sha256": "da97f91aaca81dbc38155c9ad91658a5c617bb69841176fd4a094ea705c9c2c6"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_external.py",
+      "sha256": "5d8cfd1bf9596239b400a5ab31642ea61b5b67807c5a87c0a96e92c5d19e8a5f"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_rdd2022.py",
+      "sha256": "fc0cd7ed55c1a5ff2737dcc9d93ca26b018e150e8d107d456270ae8358369371"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_readiness.py",
+      "sha256": "ccf623c5c1cffd0d7920437d5fd9aec009f8ba0e712bc5501822dddb30d88a09"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_storage.py",
+      "sha256": "d514ebdb93c800812cf3677ca311fc3d1fc9f3290ad5c06b6fb6867cd2b5d094"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/build_report.py",
+      "sha256": "231f98692058f33f77a6a36b9fd289c549c657046fe08f8b80eac66589be0ca5"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/find_duplicates.py",
+      "sha256": "610dc07c9bc56ac228163e9f87610e1be8fd5501ee86383c664ad13d553b1d1c"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/make_splits.py",
+      "sha256": "ce55ce9f82493a06a886fea627aca9e738e5b9a42617a61ac22dc084754cada7"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/plan_storage.py",
+      "sha256": "4cc4e93abc15b2a8554736dd49e06f429cd13acfe8a8c2f387739f3aff495ef0"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/profile_norway.py",
+      "sha256": "b24181dd6f155b606ab49268e85f8da1ffb145f62f4310ca23eb5382ad2d7907"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/propose_subset.py",
+      "sha256": "dad5e753f8f2120973a3be4f86eb7786f9a90d60317f5828c3c226b5310974db"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/reconcile_after_reduction.py",
+      "sha256": "dd3a206f72a3cafe2d1993d50e14d80733068ef1872c86928d90ab815dba474b"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/reduce_rdd2022.py",
+      "sha256": "b0df0aea59b260a39e29a263c402612deedc983aac4ace0415289fbf7247f39c"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_registry.py",
+      "sha256": "5e6d9bf6785e9738d9571e43fa5021967ff4c05abaa1e76f4f7eb7d137704964"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_sources.py",
+      "sha256": "7cbb8d5aae8d4c7ea676549bee75d27bb1d5f9eca10c71429b53aac5b40e749c"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_status.py",
+      "sha256": "ef7945bb8052ae09cb7d4261d039da274205c1431accce7cb04eb2038e4cccbe"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/release_rdd_archive.py",
+      "sha256": "fc5f76b620510864ea287b7bd7293ecb74f79c1e15123617f60a8a4f71ff0d89"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/safety_snapshot.py",
+      "sha256": "2dbc26a6b126bb15f12e88196cc444af91c2048b78a60c4e72b64b7572e9b4e8"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/validate_portability.py",
+      "sha256": "21ce80440a2de596094361a7a63762200dc90ba41bbf7ea3887d1ca3b2e6d567"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/verify_pipeline.py",
+      "sha256": "70ad2ce5844a39dbf0821d2706d7b89d855f2b403f7435fe3eae908436a0ff23"
+    },
+    {
+      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/verify_sources.py",
+      "sha256": "38d75e357ca05fade307b996050ed585fe14a5501735873a890e23ae6056137a"
+    }
+  ],
+  "updated": "2026-09-09"
+}

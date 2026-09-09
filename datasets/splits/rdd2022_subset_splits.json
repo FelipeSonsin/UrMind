@@ -1,0 +1,180 @@
+{
+  "algorithm_version": 4,
+  "seed": 20260908,
+  "source_manifest_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
+  "duplicates_report_sha256": "6b81048d290afbd5f12a7d1742f36d24258712e18d4960860c0fc1e02428ae8d",
+  "ratios_target": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "algorithm": "união países/duplicatas; busca exaustiva: cobertura de classes/negativos, depois soma do erro quadrático de proporções + deriva média de classes/taxa de negativos",
+  "country_components": {
+    "country:China": "country:China",
+    "country:Czech": "country:Czech",
+    "country:India": "country:India",
+    "country:Japan": "country:Japan",
+    "country:Norway": "country:Norway",
+    "country:United_States": "country:United_States"
+  },
+  "optimization_score": [
+    0,
+    0.075120557982
+  ],
+  "leakage_check": {
+    "passed": true,
+    "groups_checked": 6,
+    "sha256_checked": 35321,
+    "collisions": [],
+    "scope": "grupos e hashes das linhas mantidas; nao garante ausencia de relacoes nao documentadas na fonte"
+  },
+  "status": "proposal_requires_human_review; freeze before future training",
+  "physical_copy_created": false,
+  "splits": {
+    "train": {
+      "images": 23830,
+      "objects": 34526,
+      "class_counts": {
+        "URMIND_ROAD_D00": 14173,
+        "URMIND_ROAD_D10": 5777,
+        "URMIND_ROAD_D20": 8685,
+        "URMIND_ROAD_D40": 5891
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 6423,
+        "URMIND_ROAD_D10": 3306,
+        "URMIND_ROAD_D20": 6793,
+        "URMIND_ROAD_D40": 3176
+      },
+      "original_class_counts": {
+        "D00": 14173,
+        "D01": 43,
+        "D10": 5777,
+        "D11": 14,
+        "D20": 8685,
+        "D40": 5891,
+        "D43": 310,
+        "D44": 3195,
+        "D50": 2522
+      },
+      "class_distribution_pct": {
+        "URMIND_ROAD_D00": 41.0502,
+        "URMIND_ROAD_D10": 16.7323,
+        "URMIND_ROAD_D20": 25.155,
+        "URMIND_ROAD_D40": 17.0625
+      },
+      "negative_images": 9962,
+      "out_of_scope_only_images": 0,
+      "invalid_annotations": 0,
+      "invalid_images": 0,
+      "images_without_annotation": 0,
+      "size_bytes": 9997475623,
+      "groups": [
+        "country:India",
+        "country:Japan",
+        "country:Norway"
+      ],
+      "fraction": 0.6761904761904762,
+      "manifest_sha256": "5124b61c61f8fb19cb5d2ba2355177f0510a8640f35b59e78c175b709a22ec5d",
+      "negatives": 9794
+    },
+    "validation": {
+      "images": 3858,
+      "objects": 7718,
+      "class_counts": {
+        "URMIND_ROAD_D00": 4104,
+        "URMIND_ROAD_D10": 2359,
+        "URMIND_ROAD_D20": 934,
+        "URMIND_ROAD_D40": 321
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 2453,
+        "URMIND_ROAD_D10": 1761,
+        "URMIND_ROAD_D20": 750,
+        "URMIND_ROAD_D40": 228
+      },
+      "original_class_counts": {
+        "Block crack": 2,
+        "D00": 4104,
+        "D10": 2359,
+        "D20": 934,
+        "D40": 321,
+        "Repair": 353
+      },
+      "class_distribution_pct": {
+        "URMIND_ROAD_D00": 53.1744,
+        "URMIND_ROAD_D10": 30.5649,
+        "URMIND_ROAD_D20": 12.1016,
+        "URMIND_ROAD_D40": 4.1591
+      },
+      "negative_images": 5,
+      "out_of_scope_only_images": 0,
+      "invalid_annotations": 0,
+      "invalid_images": 0,
+      "images_without_annotation": 0,
+      "size_bytes": 288206473,
+      "groups": [
+        "country:China"
+      ],
+      "fraction": 0.10870667793744716,
+      "manifest_sha256": "355515966a461e50ec289f33ab7fe26db9f60ac991a2af8dfc37988177a4ee3c",
+      "negatives": 5
+    },
+    "test": {
+      "images": 7634,
+      "objects": 12759,
+      "class_counts": {
+        "URMIND_ROAD_D00": 7738,
+        "URMIND_ROAD_D10": 3694,
+        "URMIND_ROAD_D20": 995,
+        "URMIND_ROAD_D40": 332
+      },
+      "images_per_class": {
+        "URMIND_ROAD_D00": 4671,
+        "URMIND_ROAD_D10": 2642,
+        "URMIND_ROAD_D20": 868,
+        "URMIND_ROAD_D40": 270
+      },
+      "original_class_counts": {
+        "D00": 7738,
+        "D10": 3694,
+        "D20": 995,
+        "D40": 332
+      },
+      "class_distribution_pct": {
+        "URMIND_ROAD_D00": 60.6474,
+        "URMIND_ROAD_D10": 28.9521,
+        "URMIND_ROAD_D20": 7.7984,
+        "URMIND_ROAD_D40": 2.6021
+      },
+      "negative_images": 1757,
+      "out_of_scope_only_images": 0,
+      "invalid_annotations": 0,
+      "invalid_images": 0,
+      "images_without_annotation": 0,
+      "size_bytes": 563184529,
+      "groups": [
+        "country:Czech",
+        "country:United_States"
+      ],
+      "fraction": 0.21510284587207665,
+      "manifest_sha256": "b55d5be5a7992e54c18650eadfb20e3dc897d715371ddb58f839576741763baf",
+      "negatives": 1757
+    }
+  },
+  "reconciled_after_reduction": {
+    "at": "2026-09-09T00:55:25-0300",
+    "reason": "A poda autorizada da origem Norway removeu imagens que estes splits citavam. As linhas orfas sairam; nenhuma imagem trocou de lado e o agrupamento por pais nao mudou, porque a Norway inteira estava em train.",
+    "dropped": {
+      "train": 0,
+      "validation": 0,
+      "test": 0
+    },
+    "evidence": [
+      "datasets/reports/rdd2022_reduction.json",
+      "datasets/reports/rdd2022_norway_partial_restore.json"
+    ],
+    "note": "Só o `train` perdeu linhas, porque a Norway inteira estava nele. As proporcoes ficam proximas das que a busca original alcancou (67,6 / 10,9 / 21,5), que ja eram o resultado possivel mantendo paises inteiros -- o alvo 70/15/15 nunca foi atingido exatamente. Reequilibrar exigiria mover paises entre splits, o que mudaria o conjunto de teste depois de ele ja existir; nao se faz isso automaticamente.",
+    "objects_preserved": true
+  }
+}

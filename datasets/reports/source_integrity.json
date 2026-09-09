@@ -1,0 +1,88 @@
+{
+  "checksums": [
+    {
+      "path": "datasets/raw/camber/detections/detections_50.csv",
+      "algorithm": "md5",
+      "expected": "da2e0926f063783be65741238b30ee7c",
+      "actual": "da2e0926f063783be65741238b30ee7c",
+      "passed": true,
+      "verification_basis": "official_zenodo_record"
+    },
+    {
+      "path": "datasets/raw/camber/videos/video_50_metadata.txt",
+      "algorithm": "md5",
+      "expected": "31a92d13ebbe068157ffe696127eb3b5",
+      "actual": "31a92d13ebbe068157ffe696127eb3b5",
+      "passed": true,
+      "verification_basis": "official_zenodo_record"
+    },
+    {
+      "path": "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip",
+      "status": "authorized_archive_release",
+      "required_locally": false,
+      "passed": null,
+      "verification_basis": "historical_full_crc_validation_before_release",
+      "expected": "b62bd51d2ffcfaa76c60f234f0cc2bb3",
+      "algorithm": "md5",
+      "release_report": "datasets/reports/rdd_archive_release.json"
+    },
+    {
+      "path": "datasets/raw/rdd2022/Directory_Structure_CRDDC_RDD2022.txt",
+      "algorithm": "md5",
+      "expected": "96dadd450b1122b9c798fac54207ea04",
+      "actual": "96dadd450b1122b9c798fac54207ea04",
+      "passed": true,
+      "status": "local",
+      "official_download_url": "https://ndownloader.figshare.com/files/38030823",
+      "expected_bytes": 1161
+    },
+    {
+      "path": "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+      "algorithm": "md5",
+      "expected": "08993a6e2bca4a841c2f37b526e52d96",
+      "actual": "08993a6e2bca4a841c2f37b526e52d96",
+      "passed": true,
+      "status": "local",
+      "official_download_url": "https://ndownloader.figshare.com/files/38030826",
+      "expected_bytes": 3250534
+    },
+    {
+      "path": "datasets/raw/rdd2022/label_map.pbtxt",
+      "algorithm": "md5",
+      "expected": "1c2f8cabf4217798538989ebe203db2e",
+      "actual": "1c2f8cabf4217798538989ebe203db2e",
+      "passed": true,
+      "status": "local",
+      "official_download_url": "https://ndownloader.figshare.com/files/38030820",
+      "expected_bytes": 127
+    },
+    {
+      "path": "datasets/raw/univali_br/Cracks-and-Potholes-in-Road-Images.zip",
+      "algorithm": "sha256",
+      "expected": "e59bb8d771e18f059ab78d88e640e83869fc8c8fd808697a0c2c48e16eec4f76",
+      "actual": "e59bb8d771e18f059ab78d88e640e83869fc8c8fd808697a0c2c48e16eec4f76",
+      "passed": true,
+      "verification_basis": "official_record_previously_registered"
+    },
+    {
+      "path": "datasets/raw/urban_community/urban-community-issues.zip",
+      "algorithm": "sha256",
+      "expected": "4f9d5be7220ac12ed479b6a9dd2ca1cfc4b2ef6ba3b163df7e93e9e825dbed8d",
+      "actual": "4f9d5be7220ac12ed479b6a9dd2ca1cfc4b2ef6ba3b163df7e93e9e825dbed8d",
+      "passed": true,
+      "verification_basis": "local_checksum_only_not_official"
+    }
+  ],
+  "passed": true,
+  "rdd_archive_index": {
+    "basis": "official_file_list_tree",
+    "expected_files": 85805,
+    "actual_files": 85805,
+    "missing": [],
+    "extra": [],
+    "size_mismatches": null
+  },
+  "raw_modified": false,
+  "source_snapshot_sha256": "79692eae18c0abc6f30ff6a5b587f4134c5ff856a4ebdd79e9a67e48cea53232",
+  "note": "ZIP não extraído nem recompresso. Lista nominal valida presença, não conteúdo. SHA256 e decodificação por imagem estão no inventário."
+}

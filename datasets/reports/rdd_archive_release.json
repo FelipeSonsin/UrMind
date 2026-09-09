@@ -1,0 +1,15 @@
+{
+  "authorization": "user_cleanup_if_needed_20260908",
+  "mode": "execute",
+  "affected_files": [
+    "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip"
+  ],
+  "count": 1,
+  "source": "datasets/raw/rdd2022/RDD2022_released_through_CRDDC2022.zip",
+  "destination": null,
+  "bytes_to_release": 13264172619,
+  "deleted": true,
+  "extracted_files_crc_verified": 85805,
+  "archive_official_md5": "b62bd51d2ffcfaa76c60f234f0cc2bb3",
+  "passed": true
+}

@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "scope_dataset": "project_sidewalk",
+  "files": [
+    {
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/test/test-00000.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "ca5231e729c059ad7ae0be8f998b921b67adda44bb95c7a61175ddae71e58c48",
+      "size_bytes": 1500576330,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00000.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "d49c283b17deab2d7a38d7da5cba94014f86318cc95626ef9acbdbbf50ddb4a2",
+      "size_bytes": 1500828918,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00003.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "3ad4f9609b0438e046a70cd3ac155038e8bb14106408b4eb2472e22137477ae1",
+      "size_bytes": 1500555082,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/train/train-00006.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "692ff3cbb9070362c9f08818952ba2a313c7bcb625d1dde7d89a5aed7e722a13",
+      "size_bytes": 356172777,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    },
+    {
+      "path": "datasets/raw/project_sidewalk/acquired_20260908/data/val/val-00001.parquet",
+      "status": "downloaded_sha256_verified",
+      "sha256": "bfd94df1d276106281fe547438966c8f90862313c2ea042832ea9cde6a91aae9",
+      "size_bytes": 506305947,
+      "transport": "bounded_http_ranges_4MiB_16workers"
+    }
+  ],
+  "plan_sha256": "6c775cfb7365397ca64d1c3954d26fd53d0004700bc660ab5ae65bed9f937ab2",
+  "existing_raw_modified": false
+}

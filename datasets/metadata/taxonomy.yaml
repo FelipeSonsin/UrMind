@@ -1,0 +1,87 @@
+# Taxonomia canônica do UrMind — MASTER_PLAN §8.2 e decisão §31.8.
+#
+# Este arquivo é a declaração versionável da taxonomia. Ele NÃO a inventa e não
+# a altera: reproduz o que o MASTER_PLAN fixou, para que um manifesto possa
+# apontar para uma versão concreta do vocabulário em vez de para uma memória.
+
+version: 1
+updated: 2026-09-08
+source_of_truth: docs/Planinng/MASTER_PLAN.md
+source_sections: ["8.2", "31.8"]
+
+# ---------------------------------------------------------------- classes V1
+# Estas quatro são as ÚNICAS classes treináveis da V1.
+classes:
+  - id: URMIND_ROAD_D00
+    label_pt: trinca longitudinal
+    label_en: longitudinal crack
+    origin: RDD2022 D00
+    trainable_v1: true
+  - id: URMIND_ROAD_D10
+    label_pt: trinca transversal
+    label_en: transverse crack
+    origin: RDD2022 D10
+    trainable_v1: true
+  - id: URMIND_ROAD_D20
+    label_pt: trinca tipo malha / alligator
+    label_en: alligator crack
+    origin: RDD2022 D20
+    trainable_v1: true
+  - id: URMIND_ROAD_D40
+    label_pt: buraco / pothole
+    label_en: pothole
+    origin: RDD2022 D40
+    trainable_v1: true
+
+# ------------------------------------------------------- estado de aplicação
+# URMIND_UNKNOWN NÃO é classe de treino. Ele é o estado que o sistema assume
+# quando não consegue atribuir uma classe conhecida com confiança e qualidade
+# suficientes. Nenhum rótulo de dataset externo pode ser mapeado para ele.
+application_states:
+  - id: URMIND_UNKNOWN
+    label_pt: desconhecido / inconclusivo
+    trainable_v1: false
+    is_training_class: false
+    note: >-
+      Estado do sistema, nunca classe YOLOX da V1. Só viraria classe treinada se
+      um dataset futuro definisse explicitamente o que "unknown" significa.
+
+# ----------------------------------------- distinção que não pode ser perdida
+# Imagem negativa e URMIND_UNKNOWN são coisas diferentes e confundi-las
+# corromperia tanto o dataset quanto a métrica.
+definitions:
+  negative_image:
+    meaning: >-
+      Imagem que simplesmente não possui nenhuma bounding box de dano. É um fato
+      sobre a anotação, verificável contando objetos.
+    is_a_class: false
+    label_to_assign: none
+    note: >-
+      Negativo é material legítimo e útil de treino. NÃO deve receber
+      URMIND_UNKNOWN nem qualquer outro rótulo automático.
+  urmind_unknown:
+    meaning: >-
+      Resultado do sistema em runtime quando a classe não pôde ser determinada
+      com confiança. É um fato sobre a inferência, não sobre a imagem.
+    is_a_class: false
+    label_to_assign: never_automatically
+
+# ------------------------------------------------- classes fora da V1 (futuro)
+# Entram somente com dataset real e protocolo de anotação próprio (§8.2).
+# Nunca por semelhança visual com uma classe existente.
+future_classes_requiring_own_dataset:
+  - id: URMIND_MANHOLE
+    label_pt: bueiro aberto
+    blocked_reason: exige dataset e protocolo de anotação próprios
+  - id: URMIND_SIDEWALK
+    label_pt: calçada danificada
+    blocked_reason: exige dataset e protocolo de anotação próprios
+  - id: URMIND_SIGNAGE
+    label_pt: problema de sinalização
+    blocked_reason: exige dataset e protocolo de anotação próprios
+
+rules:
+  - Nenhum rótulo externo pode ser mapeado para URMIND_UNKNOWN.
+  - Imagem sem bounding box é negativa, não desconhecida.
+  - Rótulo fora da taxonomia é recusado com motivo, nunca silenciosamente descartado.
+  - Os labels originais dentro de datasets/raw/ nunca são alterados.

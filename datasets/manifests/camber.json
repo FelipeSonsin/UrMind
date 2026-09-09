@@ -1,0 +1,57 @@
+{
+    "name":  "camber",
+    "version":  "zenodo-21361827",
+    "source":  "https://zenodo.org/records/21361827",
+    "license":  "conferir por registro no Zenodo",
+    "classes":  [
+
+                ],
+    "split":  {
+                  "role":  "geo_reference",
+                  "generated_at":  "2026-09-08T03:38:36.035854+00:00",
+                  "summary":  {
+                                  "dataset_id":  "camber",
+                                  "total_samples":  60,
+                                  "usable_samples":  0,
+                                  "class_counts":  {
+
+                                                   },
+                                  "rejected_counts":  {
+                                                          "camber_malfunction_0":  9,
+                                                          "camber_track_point":  51
+                                                      },
+                                  "group_count":  2,
+                                  "groups":  [
+                                                 "route:50",
+                                                 "route:ride_1778861898555"
+                                             ]
+                              },
+                  "inventory":  {
+                                    "dataset_id":  "camber",
+                                    "root":  "datasets/raw/camber",
+                                    "state":  "declared_only",
+                                    "total_bytes":  95830501,
+                                    "checksums_verified":  true,
+                                    "extracted_dirs":  [
+                                                           "detections",
+                                                           "routes",
+                                                           "videos"
+                                                       ],
+                                    "files":  [
+
+                                              ],
+                                    "blocking_reasons":  [
+
+                                                         ]
+                                },
+                  "taxonomy_note":  "As detecções do CSV vêm de um YOLO de terceiros e a coluna `user_confirmed` está vazia na amostra. Isso é saída de modelo, não ground truth: não vira rótulo de treino nem ocorrência real (§8.3).",
+                  "group_note":  "Grupo = rota, que corresponde a uma sessão de coleta.",
+                  "caveats":  [
+                                  "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
+                                  "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real."
+                              ]
+              },
+    "dvc_revision":  null,
+    "audit_stage_status":  "legacy_backend_registration_not_current_selection",
+    "path_base":  "project_root"
+}

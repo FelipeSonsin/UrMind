@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "files": [
+    {
+      "path": "datasets/raw/bdd100k/acquired_20260908/bdd100k_images_10k.zip",
+      "status": "downloaded_zip_crc_verified_local_sha256_recorded",
+      "sha256": "fd95e3ba04afeb89f724e080ea738185decaefe0250471a3a340c19f1f79a118",
+      "size_bytes": 1103797977,
+      "transport": "bounded_http_ranges_4MiB_8workers"
+    },
+    {
+      "path": "datasets/raw/bdd100k/acquired_20260908/bdd100k_seg_maps.zip",
+      "status": "downloaded_zip_crc_verified_local_sha256_recorded",
+      "sha256": "d6642e9efeeb30b4eac351a06f83753b87a6f8bd4def1baf940908159c322efe",
+      "size_bytes": 167867229,
+      "transport": "bounded_http_ranges_4MiB_8workers"
+    }
+  ],
+  "plan_sha256": "cdc9c6b6a84dada486c310c58bf2f646af2c9c16d3af93fc63a095a5c8165f79",
+  "official_checksum_verified": false,
+  "transport_authenticated": false,
+  "checksum_limitations": "Official documentation image MD5 08f26aecceda982568063d3d5873378e has 31 hex characters and is invalid. No valid official checksum located for these two exact ZIPs. Full ZIP CRC plus local SHA256; source authenticity is not cryptographically established."
+}
