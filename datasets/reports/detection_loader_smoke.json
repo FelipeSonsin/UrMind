@@ -1,0 +1,51 @@
+{
+  "manifest": "datasets/manifests/detection_train_authorized.jsonl",
+  "manifest_sha256": "899853da0ed47fc0c456dfb7cf87f15c2262364119a28002ae4a546611ea699c",
+  "manifest_loaded": true,
+  "records": 23830,
+  "images": 23830,
+  "positive_images": 14036,
+  "negative_images": 9794,
+  "boxes": 34526,
+  "batches": 2,
+  "batch_size": 2,
+  "num_workers": 0,
+  "pin_memory": true,
+  "collate": "torch_default_collate_as_used_by_official_yolox",
+  "windows_safe": true,
+  "sampled_images": 4,
+  "mixed_batch": {
+    "images_shape": [
+      3,
+      3,
+      640,
+      640
+    ],
+    "images_dtype": "torch.float32",
+    "targets_shape": [
+      3,
+      120,
+      5
+    ],
+    "targets_dtype": "torch.float32",
+    "boxes_per_sample": [
+      0,
+      1,
+      2
+    ]
+  },
+  "cuda": {
+    "available": true,
+    "batch_transferred": true,
+    "vram_used_bytes": 14753280
+  },
+  "yolox_input_compatible": true,
+  "forward_executed": false,
+  "data_available": true,
+  "epochs": 0,
+  "backprop": false,
+  "status": "PASSED",
+  "passed_consumer_integrity": true,
+  "data_manifest_schema_ready": true,
+  "data_model_interface_ready": true
+}

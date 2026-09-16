@@ -24,7 +24,7 @@ from app.datasets.catalog import SOURCES, DatasetRole, get_source
 from app.datasets.inventory import DatasetState, inspect_all, inspect_source
 from app.datasets.records import AnnotatedImage, MaskSample
 from app.datasets.registration import RegistrationRefused, build_dataset_version, summarize
-from app.ml.splits import split_by_group
+from app.ml.splits import SplitRatios, split_by_group
 
 
 def _human_bytes(value: int) -> str:
@@ -109,7 +109,16 @@ def _cmd_register(args: argparse.Namespace) -> int:
     split = None
     if source.role is DatasetRole.TRAINING_V1 and records:
         treinaveis = [r for r in records if isinstance(r, AnnotatedImage | MaskSample) and r.usable]
-        split = split_by_group(treinaveis, group_key=lambda r: r.group)
+        # As proporções vêm do uso declarado, não de um padrão fixo. Fonte
+        # proibida de avaliar não pode ter lado medido: pedir 70/15/15 para ela
+        # abortaria o registro no portão do §8.4 — o comando falharia por uma
+        # cota que o próprio catálogo já disse que ela não pode ter.
+        ratios = (
+            SplitRatios(train=1.0, validation=0.0, test=0.0)
+            if source.evaluation_forbidden
+            else SplitRatios()
+        )
+        split = split_by_group(treinaveis, group_key=lambda r: r.group, ratios=ratios)
 
     try:
         payload = build_dataset_version(

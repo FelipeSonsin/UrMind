@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "scope": "validação automática da derivada univali_br_boxes.jsonl",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "validação de geometria, pares, rótulos e duplicatas da derivada",
+  "params": {
+    "dhash_threshold": 4,
+    "allowed_labels": [
+      "UNIVALI_POTHOLE"
+    ],
+    "low_contrast_stddev_floor": 10
+  },
+  "script": "scripts/datasets/validate_univali_boxes.py",
+  "generated_at": "2026-09-10T16:52:52-03:00",
+  "inputs": 2235,
+  "outputs": 2235,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+    "scan_manifest_sha256": "dc6ee738d04e55e6925eb35c2d95d2a271df569107a4d61e19a808a7f9cdeb19",
+    "rdd_inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+    "cross_source_valid": true
+  },
+  "raw_modified": false,
+  "passed": true,
+  "failures": [],
+  "geometry": {
+    "boxes_checked": 1490,
+    "invariants": [
+      "x1 < x2",
+      "y1 < y2",
+      "0 <= x1 < largura",
+      "0 < x2 <= largura",
+      "0 <= y1 < altura",
+      "0 < y2 <= altura"
+    ],
+    "violations": [],
+    "violation_count": 0,
+    "overlapping_box_pairs": 108,
+    "overlap_note": "Sobreposição entre caixas de regiões conexas distintas é esperada e registrada; não invalida a anotação."
+  },
+  "labels": {
+    "allowed": [
+      "UNIVALI_POTHOLE"
+    ],
+    "counts": {
+      "UNIVALI_POTHOLE": 1490
+    },
+    "violations": []
+  },
+  "taxonomy_consistency": {
+    "classes_in_boxes": [
+      "None"
+    ],
+    "declared_by_conversion": null,
+    "allowed_by_declaration": {
+      "POTHOLE": "URMIND_ROAD_D40"
+    },
+    "evidence": null,
+    "mapping_status": "nao_verificado_independentemente",
+    "problems": [],
+    "passed": true,
+    "checks": [
+      "urmind_class de cada caixa é nula ou a classe declarada para o rótulo",
+      "classe nas caixas concorda com a declarada no relatório de conversão",
+      "classe da V1 só aparece acompanhada de bloco de evidência"
+    ]
+  },
+  "pairing": {
+    "missing_images": [],
+    "missing_images_count": 0,
+    "unreadable_images": [],
+    "missing_masks": [],
+    "missing_masks_count": 0,
+    "empty_annotations": [],
+    "empty_annotations_count": 0,
+    "empty_mask_samples_count": 1671,
+    "empty_mask_status": "EMPTY_MASK_SEMANTICS_UNRESOLVED"
+  },
+  "duplicates": {
+    "exact_sha256_groups": [
+      {
+        "sha256": "e6c67d2b6c439cfa4df2696fbc34c9d93bf189f9663ced672bec8151680d7286",
+        "directories": [
+          "917232_RS_290_290RS294095_19613",
+          "917233_RS_290_290RS294095_19615"
+        ]
+      }
+    ],
+    "exact_group_count": 1,
+    "near_duplicate_pairs": [
+      {
+        "a": "1014864_RS_386_386RS124739_31245",
+        "b": "1014865_RS_386_386RS124739_31250",
+        "distance": 4
+      },
+      {
+        "a": "1077169_DF_251_251BDF0530_04882",
+        "b": "1077170_DF_251_251BDF0530_04883",
+        "distance": 3
+      },
+      {
+        "a": "917232_RS_290_290RS294095_19613",
+        "b": "917233_RS_290_290RS294095_19615",
+        "distance": 0
+      },
+      {
+        "a": "941500_RS_290_290RS070691_00406",
+        "b": "941501_RS_290_290RS070691_00410",
+        "distance": 3
+      }
+    ],
+    "near_duplicate_count": 4,
+    "low_contrast_excluded": 0,
+    "note": "Quase-duplicata por dHash é candidato para revisão humana, não prova de duplicação. No UNIVALI a relação forte entre imagens é o trecho de rodovia, que o dHash NÃO detecta — por isso o split agrupa por identificador, não por similaridade de pixel."
+  },
+  "cross_source_contamination": {
+    "skipped": false,
+    "valid": true,
+    "compared_against": "datasets/manifests/rdd2022_inventory.jsonl",
+    "inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+    "inventory_records": 47420,
+    "rdd_images_with_hash": 47420,
+    "univali_images_compared": 2235,
+    "exact_sha256_matches": 0,
+    "exact_match_examples": [],
+    "nearest_dhash_distance": 15,
+    "images_within_threshold": 0,
+    "threshold": 4,
+    "reason": null,
+    "verdict": "sem contaminação detectável entre UNIVALI e RDD2022"
+  }
+}

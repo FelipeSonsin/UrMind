@@ -1,0 +1,16 @@
+{
+  "dataset_id": "rdd2022",
+  "dataset_version": "2022-crddc",
+  "population_id": "crddc2022-official-all-images-train-test",
+  "split_manifest_sha256": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
+  "selection_manifest_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
+  "allowed_decisions": [
+    "APPROVED_FOR_MODEL_V1",
+    "REJECTED",
+    "REVISE_REQUIRED"
+  ],
+  "decision": "APPROVED_FOR_MODEL_V1",
+  "reviewed_by": "user_explicit_approval",
+  "reviewed_at": "2026-09-13T17:29:27-03:00",
+  "note": "Aprovação humana explícita nesta sessão, limitada ao MODEL V1 e aos fingerprints, dataset_id, versão e população registrados neste artefato. Riscos aceitos: ausência de rota/sessão, domain shift por país, D40 minoritária em validation/test e negativas TRAIN cloud-only sem hidratação automática. Qualquer divergência torna a decisão stale."
+}

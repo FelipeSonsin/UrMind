@@ -1,8 +1,0 @@
-﻿# Somente conteúdo grande/temporário. README, metadata, manifests, splits e reports são versionáveis.
-/raw/
-/processed/
-/downloads/
-/reports/tmp/
-/reports/cache/
-*.part
-*.tmp

@@ -1,4 +1,20 @@
-"""Valida dados locais auxiliares; não baixa, converte, treina ou altera raw."""
+"""Auditoria PROFUNDA de formato das fontes que exigem decodificação.
+
+Escopo deste script: abrir de verdade cada imagem e máscara, conferir se as
+dimensões batem, validar linha a linha os rótulos YOLO, checar as coordenadas do
+CSV/GPX e percorrer a estrutura de boxes do MP4. É o que nenhuma contagem
+detecta — um JPEG truncado tem tamanho e nome corretos.
+
+O que este script **não** faz mais: publicar `dataset_readiness.json`. Ele
+mantinha uma lista fixa de fontes "não adquiridas" (`project_sidewalk`,
+`rampnet`, `bdd100k`, `mapillary_msls`) que envelheceu e passou a contradizer o
+disco e o catálogo. O estado das fontes agora sai de
+`scripts/datasets/refresh_readiness.py`, que lê o catálogo e o disco e não tem
+lista fixa nenhuma. Aqui ficou só a auditoria de formato, em
+`dataset_format_audit.json`, referenciada por checksum pelo relatório principal.
+
+Não baixa, não converte, não treina e não altera `raw/`.
+"""
 
 import argparse
 import csv
@@ -138,11 +154,53 @@ def urban():
         "by_folder": groups,
         "issues": issues,
         "class_id_mapping": "inferred_not_official",
-        "use": "quarantine from automatic training until class IDs and annotations reviewed",
+        "class_id_mapping_evidence": _class_id_evidence(groups),
+        "use": (
+            "somente a pasta `pothole` entra, como reforço de URMIND_ROAD_D40 no "
+            "treino; nunca como validação ou teste (agrupamento por pasta não "
+            "separa cena, §8.4)"
+        ),
         "format_valid": bool(groups)
         and not issues
         and all(
             not g["missing_labels"] and not g["orphan_labels"] for g in groups.values()
+        ),
+    }
+
+
+def _class_id_evidence(groups):
+    """Confere a inferência id→classe contra o próprio dado, pasta por pasta.
+
+    O pacote do Kaggle não traz `data.yaml`, então o mapa id→nome usado em
+    `app.ml.taxonomy` foi inferido dos nomes das pastas. Inferência que alimenta
+    treino não pode ficar como afirmação: aqui ela vira teste. Se cada pasta
+    contiver exatamente um id distinto, a correspondência pasta↔id é uma
+    observação verificável e não um palpite; se alguma pasta misturar ids, a
+    inferência cai e o relatório precisa dizer isso em vez de seguir usando.
+    """
+    per_folder, consistent = {}, True
+    for name, data in groups.items():
+        ids = sorted(data["valid_objects_by_original_id"])
+        per_folder[name] = {
+            "distinct_class_ids": ids,
+            "single_id": len(ids) == 1,
+            "objects": sum(data["valid_objects_by_original_id"].values()),
+        }
+        # Pasta sem nenhum objeto (good_road, só negativos) não contradiz nada.
+        if len(ids) > 1:
+            consistent = False
+    return {
+        "method": "cada pasta de classe deve conter exatamente um id nos .txt",
+        "per_folder": per_folder,
+        "one_id_per_folder": consistent,
+        "verdict": (
+            "inferência sustentada pelo dado: nenhuma pasta mistura ids"
+            if consistent
+            else "INFERÊNCIA REFUTADA: pasta com mais de um id; revisar antes de treinar"
+        ),
+        "still_not_official": (
+            "a fonte continua sem publicar o mapa; isto prova consistência "
+            "interna, não a intenção do publicador"
         ),
     }
 
@@ -271,8 +329,13 @@ def main():
         decode_video()
         return
     result = {
-        "version": 1,
-        "scope": "local data and formats, not model performance",
+        "version": 2,
+        "scope": (
+            "decodificação e validação de formato das fontes que exigem abrir o "
+            "arquivo. Não mede desempenho de modelo e não descreve o estado das "
+            "fontes — isso é datasets/reports/dataset_readiness.json."
+        ),
+        "state_of_sources_report": "datasets/reports/dataset_readiness.json",
         "raw_modified": False,
     }
     for name, function in (
@@ -282,18 +345,6 @@ def main():
     ):
         result[name] = function()
         print(name, "audit complete", flush=True)
-    absent = {}
-    for name in ("project_sidewalk", "rampnet", "bdd100k", "mapillary_msls"):
-        paths = list(iter_files(RAW_DIR / name))
-        content = [
-            relative_to_project(p) for p in paths if p.name.lower() != "readme.md"
-        ]
-        absent[name] = {
-            "files": [relative_to_project(p) for p in paths],
-            "non_readme_files": content,
-            "status": "requires_review" if content else "no_dataset_data",
-        }
-    result["unacquired_sources"] = absent
     result["local_sizes"] = {
         p.name: measure_dir(p).as_dict()
         for p in sorted(RAW_DIR.iterdir())
@@ -302,13 +353,12 @@ def main():
     result["rdd_audit_sha256"] = file_sha256(
         DATASETS_DIR / "reports/rdd2022_audit.json"
     )
-    result["all_requested_datasets_present"] = False
     result["identification_runtime_verified"] = False
-    write_json_report("dataset_readiness.json", result)
+    write_json_report("dataset_format_audit.json", result)
     print(
         json.dumps(
             {
-                "report": "datasets/reports/dataset_readiness.json",
+                "report": "datasets/reports/dataset_format_audit.json",
                 "univali_format_valid": result["univali_br"]["format_valid"],
                 "urban_format_valid": result["urban_community"]["format_valid"],
                 "camber_container_valid": result["camber"]["container_valid"],

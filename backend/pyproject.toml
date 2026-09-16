@@ -2,7 +2,7 @@
 name = "urmind"
 version = "0.1.0"
 description = "UrMind — detecção rastreável de problemas urbanos em vias públicas"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 # Somente o que o código usa hoje. Cada nova dependência do MASTER_PLAN §28
 # (PyTorch, YOLOX, ONNX Runtime, OpenCV, Pillow, XGBoost...) entra no passo que
 # realmente a exercita, nunca antes.
@@ -11,6 +11,7 @@ dependencies = [
   "fastapi>=0.115,<1",
   "geoalchemy2>=0.15,<1",
   "jinja2>=3.1,<4",
+  "numpy>=2.3,<3",
   "pillow>=10.4,<12",
   "psycopg[binary,pool]>=3.2,<4",
   # Project Sidewalk e RampNet publicam Parquet com a imagem dentro da linha;
@@ -33,6 +34,19 @@ dev = [
   "pytest-asyncio>=0.24,<1",
   "ruff>=0.8,<1",
 ]
+ml = [
+  "loguru==0.7.3",
+  "opencv-python==4.14.0.94",
+  "packaging==26.3",
+  "psutil==7.1.0",
+  "pycocotools==2.0.11",
+  "torch==2.11.0+cu128",
+  "torchvision==0.26.0+cu128",
+]
+mlops = [
+  "dvc==3.67.1",
+  "mlflow-skinny==3.16.0",
+]
 
 [build-system]
 requires = ["setuptools>=75"]
@@ -42,7 +56,8 @@ build-backend = "setuptools.build_meta"
 app = ["templates/*.j2"]
 
 [tool.setuptools.packages.find]
-include = ["app*"]
+where = [".", "third_party/YOLOX"]
+include = ["app*", "yolox*"]
 exclude = ["alembic*", "tests*"]
 
 [tool.pytest.ini_options]
@@ -54,5 +69,9 @@ markers = [
 ]
 
 [tool.ruff]
+# Ancorado ao diretorio deste pyproject: sem isso o ruff grava o cache no
+# cwd, e uma invocacao a partir da raiz criava um segundo .ruff_cache la.
+cache-dir = ".ruff_cache"
+exclude = ["third_party", ".venv*"]
 line-length = 100
 target-version = "py312"

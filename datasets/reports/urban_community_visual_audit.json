@@ -1,0 +1,1928 @@
+{
+  "version": 1,
+  "scope": "evidência visual do conteúdo das caixas do Urban Community. Não registra veredito: olhar é trabalho de quem revisa.",
+  "source_dataset": "urban_community",
+  "source_version": "kaggle-2025",
+  "transform": "renderização de recortes e painéis para auditoria visual",
+  "params": {
+    "folders": [
+      "animal",
+      "cracks",
+      "good_road",
+      "open_manhole",
+      "pothole",
+      "traffic_lights",
+      "waste_container"
+    ],
+    "crops_per_folder": 48,
+    "columns": 8,
+    "panels_per_folder": 3,
+    "selection": "determinística por área; grandes, medianas e pequenas"
+  },
+  "script": "scripts/datasets/render_urban_community_audit.py",
+  "generated_at": "2026-09-10T17:01:26-03:00",
+  "inputs": 2518,
+  "outputs": 24,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "scan_manifest_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e"
+  },
+  "raw_modified": false,
+  "output_dir": "datasets/processed/urban_community/visual_audit",
+  "total_bytes": 28627745,
+  "artifacts": {
+    "animal": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_animal.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "8dad65366b0e0289",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.998573
+          },
+          {
+            "stem": "81006688bff96948",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.998442
+          },
+          {
+            "stem": "c4136a40d63a92f7",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.998442
+          },
+          {
+            "stem": "cd38ebfa6dff429c",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.998438
+          },
+          {
+            "stem": "892b7a65101c0d50",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.998365
+          },
+          {
+            "stem": "e3c6e4150455c637",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.99771
+          },
+          {
+            "stem": "517f7c0333e6c3e1",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.997169
+          },
+          {
+            "stem": "a4fd8accead54d51",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.991875
+          },
+          {
+            "stem": "426348e35842fd8b",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.983066
+          },
+          {
+            "stem": "0471c8fa854dfa88",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.979717
+          },
+          {
+            "stem": "e9c9c49796de7356",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.967212
+          },
+          {
+            "stem": "3a22306b9cd228f1",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.931548
+          },
+          {
+            "stem": "50b846eec78f7bc9",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.926934
+          },
+          {
+            "stem": "e3937a48baafb076",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.913072
+          },
+          {
+            "stem": "7ae821ad1d8c1b3c",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.912763
+          },
+          {
+            "stem": "83b7a6d8b810e5f7",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.903274
+          },
+          {
+            "stem": "19ab4fb6e76a8800",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.040469
+          },
+          {
+            "stem": "a33787202c3d046e",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.04044
+          },
+          {
+            "stem": "3ee10cfeafed3c67",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.040396
+          },
+          {
+            "stem": "334da4676bb0801a",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.040127
+          },
+          {
+            "stem": "45180c87d17548b0",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.040071
+          },
+          {
+            "stem": "bab211fb5c1ffc3b",
+            "index": 3,
+            "class_id": 0,
+            "area_fraction": 0.040006
+          },
+          {
+            "stem": "1661a34f4a95414e",
+            "index": 1,
+            "class_id": 0,
+            "area_fraction": 0.039982
+          },
+          {
+            "stem": "8d66b117984e1cc7",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.039933
+          },
+          {
+            "stem": "2f97572b3f1d296e",
+            "index": 4,
+            "class_id": 0,
+            "area_fraction": 0.03988
+          },
+          {
+            "stem": "88293b2b29f4c78c",
+            "index": 9,
+            "class_id": 0,
+            "area_fraction": 0.039674
+          },
+          {
+            "stem": "d20be2dc358b7955",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.039301
+          },
+          {
+            "stem": "398f4bc0b08ae9c3",
+            "index": 1,
+            "class_id": 0,
+            "area_fraction": 0.039104
+          },
+          {
+            "stem": "58dbd51a1bc2e76f",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.038878
+          },
+          {
+            "stem": "b0b50f8bce98427e",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.038795
+          },
+          {
+            "stem": "4479e7ec0a3f4316",
+            "index": 2,
+            "class_id": 0,
+            "area_fraction": 0.03849
+          },
+          {
+            "stem": "ace08e585c272c01",
+            "index": 2,
+            "class_id": 0,
+            "area_fraction": 0.038284
+          },
+          {
+            "stem": "36a7d6d7e682df15",
+            "index": 3,
+            "class_id": 0,
+            "area_fraction": 0.000516
+          },
+          {
+            "stem": "e6f6a94fd060c9cc",
+            "index": 8,
+            "class_id": 0,
+            "area_fraction": 0.000489
+          },
+          {
+            "stem": "5209f3bdf7dec316",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.000482
+          },
+          {
+            "stem": "afca9392e473f2c1",
+            "index": 6,
+            "class_id": 0,
+            "area_fraction": 0.000479
+          },
+          {
+            "stem": "afca9392e473f2c1",
+            "index": 4,
+            "class_id": 0,
+            "area_fraction": 0.000459
+          },
+          {
+            "stem": "36a7d6d7e682df15",
+            "index": 12,
+            "class_id": 0,
+            "area_fraction": 0.00045
+          },
+          {
+            "stem": "36a7d6d7e682df15",
+            "index": 13,
+            "class_id": 0,
+            "area_fraction": 0.000447
+          },
+          {
+            "stem": "afca9392e473f2c1",
+            "index": 7,
+            "class_id": 0,
+            "area_fraction": 0.000432
+          },
+          {
+            "stem": "36a7d6d7e682df15",
+            "index": 19,
+            "class_id": 0,
+            "area_fraction": 0.000416
+          },
+          {
+            "stem": "b8e81209cc55695d",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.000396
+          },
+          {
+            "stem": "f5216038c29904f5",
+            "index": 3,
+            "class_id": 0,
+            "area_fraction": 0.000393
+          },
+          {
+            "stem": "3f574413466d331e",
+            "index": 0,
+            "class_id": 0,
+            "area_fraction": 0.000361
+          },
+          {
+            "stem": "e6f6a94fd060c9cc",
+            "index": 2,
+            "class_id": 0,
+            "area_fraction": 0.00032
+          },
+          {
+            "stem": "36a7d6d7e682df15",
+            "index": 14,
+            "class_id": 0,
+            "area_fraction": 0.000284
+          },
+          {
+            "stem": "f0fd6388b718b863",
+            "index": 3,
+            "class_id": 0,
+            "area_fraction": 0.000214
+          },
+          {
+            "stem": "f0fd6388b718b863",
+            "index": 2,
+            "class_id": 0,
+            "area_fraction": 0.000187
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_animal__36a7d6d7e682df15.png",
+        "stem": "36a7d6d7e682df15",
+        "boxes": 22
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_animal__6b126b8a6972844a.png",
+        "stem": "6b126b8a6972844a",
+        "boxes": 18
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_animal__ddb21972dd861d37.png",
+        "stem": "ddb21972dd861d37",
+        "boxes": 15
+      }
+    ],
+    "cracks": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_cracks.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "523",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.85643
+          },
+          {
+            "stem": "520",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.833501
+          },
+          {
+            "stem": "533",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.815394
+          },
+          {
+            "stem": "538",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.812071
+          },
+          {
+            "stem": "534",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.788282
+          },
+          {
+            "stem": "514",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.76178
+          },
+          {
+            "stem": "547",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.73544
+          },
+          {
+            "stem": "549",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.7285
+          },
+          {
+            "stem": "517",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.726144
+          },
+          {
+            "stem": "570",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.718466
+          },
+          {
+            "stem": "518",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.693219
+          },
+          {
+            "stem": "510",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.66854
+          },
+          {
+            "stem": "557",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.666336
+          },
+          {
+            "stem": "525",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.65403
+          },
+          {
+            "stem": "546",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.647775
+          },
+          {
+            "stem": "613",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.629272
+          },
+          {
+            "stem": "584",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.284262
+          },
+          {
+            "stem": "503",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.284068
+          },
+          {
+            "stem": "587",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.281872
+          },
+          {
+            "stem": "612",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.281324
+          },
+          {
+            "stem": "627",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.276551
+          },
+          {
+            "stem": "540",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.275104
+          },
+          {
+            "stem": "504",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.26918
+          },
+          {
+            "stem": "532",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.267581
+          },
+          {
+            "stem": "516",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.266549
+          },
+          {
+            "stem": "638",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.265228
+          },
+          {
+            "stem": "531",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.257972
+          },
+          {
+            "stem": "611",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.253212
+          },
+          {
+            "stem": "610",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.250221
+          },
+          {
+            "stem": "508",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.247975
+          },
+          {
+            "stem": "665",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.240951
+          },
+          {
+            "stem": "589",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.24074
+          },
+          {
+            "stem": "536",
+            "index": 3,
+            "class_id": 4,
+            "area_fraction": 0.039764
+          },
+          {
+            "stem": "561",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.039377
+          },
+          {
+            "stem": "642",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.037942
+          },
+          {
+            "stem": "582",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.034433
+          },
+          {
+            "stem": "633",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.032045
+          },
+          {
+            "stem": "536",
+            "index": 4,
+            "class_id": 4,
+            "area_fraction": 0.030451
+          },
+          {
+            "stem": "623",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.026282
+          },
+          {
+            "stem": "629",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.025772
+          },
+          {
+            "stem": "552",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.022894
+          },
+          {
+            "stem": "623",
+            "index": 2,
+            "class_id": 4,
+            "area_fraction": 0.022241
+          },
+          {
+            "stem": "543",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.018927
+          },
+          {
+            "stem": "537",
+            "index": 0,
+            "class_id": 4,
+            "area_fraction": 0.01872
+          },
+          {
+            "stem": "629",
+            "index": 2,
+            "class_id": 4,
+            "area_fraction": 0.014107
+          },
+          {
+            "stem": "623",
+            "index": 4,
+            "class_id": 4,
+            "area_fraction": 0.012158
+          },
+          {
+            "stem": "537",
+            "index": 1,
+            "class_id": 4,
+            "area_fraction": 0.009056
+          },
+          {
+            "stem": "623",
+            "index": 5,
+            "class_id": 4,
+            "area_fraction": 0.007478
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_cracks__623.png",
+        "stem": "623",
+        "boxes": 6
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_cracks__536.png",
+        "stem": "536",
+        "boxes": 5
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_cracks__629.png",
+        "stem": "629",
+        "boxes": 4
+      }
+    ],
+    "good_road": [],
+    "open_manhole": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_open_manhole.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "1073",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.690678
+          },
+          {
+            "stem": "1072",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.663203
+          },
+          {
+            "stem": "1057",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.637431
+          },
+          {
+            "stem": "1014",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.620958
+          },
+          {
+            "stem": "1058",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.565433
+          },
+          {
+            "stem": "1138",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.557593
+          },
+          {
+            "stem": "1118",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.549065
+          },
+          {
+            "stem": "1142",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.517764
+          },
+          {
+            "stem": "1105",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.483203
+          },
+          {
+            "stem": "1141",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.467518
+          },
+          {
+            "stem": "1092",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.450405
+          },
+          {
+            "stem": "1046",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.449886
+          },
+          {
+            "stem": "1152",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.438238
+          },
+          {
+            "stem": "1120",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.419816
+          },
+          {
+            "stem": "1066",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.377072
+          },
+          {
+            "stem": "1060",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.37107
+          },
+          {
+            "stem": "1068",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.110496
+          },
+          {
+            "stem": "1103",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.109028
+          },
+          {
+            "stem": "1143",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.106858
+          },
+          {
+            "stem": "1136",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.104881
+          },
+          {
+            "stem": "1074",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.103717
+          },
+          {
+            "stem": "1059",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.103341
+          },
+          {
+            "stem": "1085",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.102933
+          },
+          {
+            "stem": "1011",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.100486
+          },
+          {
+            "stem": "1005",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.098759
+          },
+          {
+            "stem": "1087",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.097287
+          },
+          {
+            "stem": "1021",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.097162
+          },
+          {
+            "stem": "1099",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.095001
+          },
+          {
+            "stem": "1019",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.094086
+          },
+          {
+            "stem": "1018",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.093978
+          },
+          {
+            "stem": "1110",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.093764
+          },
+          {
+            "stem": "1123",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.093316
+          },
+          {
+            "stem": "1104",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.041208
+          },
+          {
+            "stem": "1034",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.031232
+          },
+          {
+            "stem": "1047",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.029395
+          },
+          {
+            "stem": "1031",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.028213
+          },
+          {
+            "stem": "1077",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.026063
+          },
+          {
+            "stem": "1042",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.025982
+          },
+          {
+            "stem": "1044",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.023201
+          },
+          {
+            "stem": "1023",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.022053
+          },
+          {
+            "stem": "1036",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.021776
+          },
+          {
+            "stem": "1006",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.021615
+          },
+          {
+            "stem": "1040",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.021492
+          },
+          {
+            "stem": "1041",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.021407
+          },
+          {
+            "stem": "1090",
+            "index": 1,
+            "class_id": 5,
+            "area_fraction": 0.015705
+          },
+          {
+            "stem": "1004",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.014327
+          },
+          {
+            "stem": "1091",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.008328
+          },
+          {
+            "stem": "1025",
+            "index": 0,
+            "class_id": 5,
+            "area_fraction": 0.00562
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_open_manhole__1064.png",
+        "stem": "1064",
+        "boxes": 2
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_open_manhole__1090.png",
+        "stem": "1090",
+        "boxes": 2
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_open_manhole__1001.png",
+        "stem": "1001",
+        "boxes": 1
+      }
+    ],
+    "pothole": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_pothole.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "6",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.630225
+          },
+          {
+            "stem": "101",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.609736
+          },
+          {
+            "stem": "216",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.609282
+          },
+          {
+            "stem": "134",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.59757
+          },
+          {
+            "stem": "48",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.581122
+          },
+          {
+            "stem": "106",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.564623
+          },
+          {
+            "stem": "247",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.54471
+          },
+          {
+            "stem": "123",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.531609
+          },
+          {
+            "stem": "85",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.515085
+          },
+          {
+            "stem": "137",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.506369
+          },
+          {
+            "stem": "162",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.504367
+          },
+          {
+            "stem": "32",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.50288
+          },
+          {
+            "stem": "282",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.500395
+          },
+          {
+            "stem": "53",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.493314
+          },
+          {
+            "stem": "68",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.491146
+          },
+          {
+            "stem": "57",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.486231
+          },
+          {
+            "stem": "192",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.093227
+          },
+          {
+            "stem": "110",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.093221
+          },
+          {
+            "stem": "17",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.092797
+          },
+          {
+            "stem": "75",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.092762
+          },
+          {
+            "stem": "15",
+            "index": 1,
+            "class_id": 3,
+            "area_fraction": 0.092735
+          },
+          {
+            "stem": "269",
+            "index": 1,
+            "class_id": 3,
+            "area_fraction": 0.092689
+          },
+          {
+            "stem": "183",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.091225
+          },
+          {
+            "stem": "107",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.090228
+          },
+          {
+            "stem": "33",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.090157
+          },
+          {
+            "stem": "219",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.090023
+          },
+          {
+            "stem": "251",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.089079
+          },
+          {
+            "stem": "3",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.087829
+          },
+          {
+            "stem": "66",
+            "index": 2,
+            "class_id": 3,
+            "area_fraction": 0.08675
+          },
+          {
+            "stem": "16",
+            "index": 1,
+            "class_id": 3,
+            "area_fraction": 0.082768
+          },
+          {
+            "stem": "34",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.08041
+          },
+          {
+            "stem": "2",
+            "index": 0,
+            "class_id": 3,
+            "area_fraction": 0.079304
+          },
+          {
+            "stem": "229",
+            "index": 8,
+            "class_id": 3,
+            "area_fraction": 0.002384
+          },
+          {
+            "stem": "100",
+            "index": 6,
+            "class_id": 3,
+            "area_fraction": 0.00231
+          },
+          {
+            "stem": "229",
+            "index": 6,
+            "class_id": 3,
+            "area_fraction": 0.002185
+          },
+          {
+            "stem": "52",
+            "index": 4,
+            "class_id": 3,
+            "area_fraction": 0.002179
+          },
+          {
+            "stem": "100",
+            "index": 1,
+            "class_id": 3,
+            "area_fraction": 0.002126
+          },
+          {
+            "stem": "116",
+            "index": 5,
+            "class_id": 3,
+            "area_fraction": 0.002006
+          },
+          {
+            "stem": "114",
+            "index": 7,
+            "class_id": 3,
+            "area_fraction": 0.001979
+          },
+          {
+            "stem": "102",
+            "index": 4,
+            "class_id": 3,
+            "area_fraction": 0.001932
+          },
+          {
+            "stem": "100",
+            "index": 7,
+            "class_id": 3,
+            "area_fraction": 0.001659
+          },
+          {
+            "stem": "114",
+            "index": 9,
+            "class_id": 3,
+            "area_fraction": 0.001604
+          },
+          {
+            "stem": "229",
+            "index": 7,
+            "class_id": 3,
+            "area_fraction": 0.001153
+          },
+          {
+            "stem": "116",
+            "index": 2,
+            "class_id": 3,
+            "area_fraction": 0.00101
+          },
+          {
+            "stem": "229",
+            "index": 9,
+            "class_id": 3,
+            "area_fraction": 0.000815
+          },
+          {
+            "stem": "116",
+            "index": 6,
+            "class_id": 3,
+            "area_fraction": 0.0008
+          },
+          {
+            "stem": "229",
+            "index": 11,
+            "class_id": 3,
+            "area_fraction": 0.000704
+          },
+          {
+            "stem": "116",
+            "index": 7,
+            "class_id": 3,
+            "area_fraction": 0.000616
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_pothole__229.png",
+        "stem": "229",
+        "boxes": 13
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_pothole__114.png",
+        "stem": "114",
+        "boxes": 10
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_pothole__116.png",
+        "stem": "116",
+        "boxes": 10
+      }
+    ],
+    "traffic_lights": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_traffic_lights.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "09206c17cacc6a89",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.998434
+          },
+          {
+            "stem": "38827e71064d84f7",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.989188
+          },
+          {
+            "stem": "d3a403fda7026c98",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.950354
+          },
+          {
+            "stem": "c4ca61ff79477049",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.929148
+          },
+          {
+            "stem": "160a112e1e3ef78e",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.856465
+          },
+          {
+            "stem": "96af2882080aa203",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.811018
+          },
+          {
+            "stem": "1091c3ef7d32018f",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.703616
+          },
+          {
+            "stem": "b427faf968664544",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.658909
+          },
+          {
+            "stem": "1539f16167a4b4f6",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.646148
+          },
+          {
+            "stem": "fe3a8d1e4bdc55fd",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 0.518326
+          },
+          {
+            "stem": "7b3f7c6e9d330b8d",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.506513
+          },
+          {
+            "stem": "27fa84f49f848b00",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.495418
+          },
+          {
+            "stem": "b71bd6c947e5c403",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.478937
+          },
+          {
+            "stem": "0aed026b57a9b445",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.438962
+          },
+          {
+            "stem": "10b6fab6eac0f693",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.40631
+          },
+          {
+            "stem": "8bb8e95914478e95",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.385658
+          },
+          {
+            "stem": "100c9bbe2e0c62e5",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 0.001292
+          },
+          {
+            "stem": "59360a05d8f80210",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 0.001292
+          },
+          {
+            "stem": "bbd54374143654b5",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 0.001292
+          },
+          {
+            "stem": "d05cf55d69ac252f",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 0.001292
+          },
+          {
+            "stem": "82602671c4c0e68f",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 0.001289
+          },
+          {
+            "stem": "d025c1aba27e1b1b",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.001289
+          },
+          {
+            "stem": "daf13e068de15058",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.001286
+          },
+          {
+            "stem": "963b52049a6341c3",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 0.001285
+          },
+          {
+            "stem": "1fb7e6177c8564fd",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.001282
+          },
+          {
+            "stem": "4171770ef39181a0",
+            "index": 12,
+            "class_id": 1,
+            "area_fraction": 0.001282
+          },
+          {
+            "stem": "00affa6fa78c07bc",
+            "index": 4,
+            "class_id": 1,
+            "area_fraction": 0.001281
+          },
+          {
+            "stem": "06bf02123ee6a511",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 0.001277
+          },
+          {
+            "stem": "0c07e2a99c5e169b",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.001277
+          },
+          {
+            "stem": "82602671c4c0e68f",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 0.001272
+          },
+          {
+            "stem": "992763ed4f91c391",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 0.001269
+          },
+          {
+            "stem": "e77be4454c43f0cc",
+            "index": 4,
+            "class_id": 1,
+            "area_fraction": 0.001269
+          },
+          {
+            "stem": "daf13e068de15058",
+            "index": 9,
+            "class_id": 1,
+            "area_fraction": 1.9e-05
+          },
+          {
+            "stem": "23431352bcdea9f7",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 1.8e-05
+          },
+          {
+            "stem": "e1e5646bb41ad759",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 1.8e-05
+          },
+          {
+            "stem": "b81e93b81c8b71a8",
+            "index": 4,
+            "class_id": 1,
+            "area_fraction": 1.7e-05
+          },
+          {
+            "stem": "b9209573d1939678",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 1.7e-05
+          },
+          {
+            "stem": "b9209573d1939678",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 1.7e-05
+          },
+          {
+            "stem": "daf13e068de15058",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 1.4e-05
+          },
+          {
+            "stem": "e1eb2d5dc72c4dc7",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 1.3e-05
+          },
+          {
+            "stem": "2d523b4d0f64ce0a",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 1.2e-05
+          },
+          {
+            "stem": "6a488f85d16ebc17",
+            "index": 9,
+            "class_id": 1,
+            "area_fraction": 1.2e-05
+          },
+          {
+            "stem": "d9e1084b56baa9aa",
+            "index": 3,
+            "class_id": 1,
+            "area_fraction": 1.2e-05
+          },
+          {
+            "stem": "d9e1084b56baa9aa",
+            "index": 0,
+            "class_id": 1,
+            "area_fraction": 1.1e-05
+          },
+          {
+            "stem": "d9e1084b56baa9aa",
+            "index": 2,
+            "class_id": 1,
+            "area_fraction": 1.1e-05
+          },
+          {
+            "stem": "6a488f85d16ebc17",
+            "index": 10,
+            "class_id": 1,
+            "area_fraction": 8e-06
+          },
+          {
+            "stem": "cb468cceda6a018b",
+            "index": 1,
+            "class_id": 1,
+            "area_fraction": 7e-06
+          },
+          {
+            "stem": "d9e1084b56baa9aa",
+            "index": 12,
+            "class_id": 1,
+            "area_fraction": 4e-06
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_traffic_lights__0e98b7efc47feb14.png",
+        "stem": "0e98b7efc47feb14",
+        "boxes": 18
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_traffic_lights__d05cf55d69ac252f.png",
+        "stem": "d05cf55d69ac252f",
+        "boxes": 18
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_traffic_lights__616c4bf636e12dbd.png",
+        "stem": "616c4bf636e12dbd",
+        "boxes": 17
+      }
+    ],
+    "waste_container": [
+      {
+        "kind": "contact_sheet",
+        "path": "datasets/processed/urban_community/visual_audit/contact_sheet_waste_container.png",
+        "crops": 48,
+        "cells": [
+          {
+            "stem": "0cd6145777c75a58",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.998543
+          },
+          {
+            "stem": "94c4bf4a429e0526",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.998543
+          },
+          {
+            "stem": "011af1f5beca450d",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.980439
+          },
+          {
+            "stem": "0a692a99b0888cb0",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.966895
+          },
+          {
+            "stem": "9f9d7b08425c0b04",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.965445
+          },
+          {
+            "stem": "3af7ad8cb8197a30",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.921016
+          },
+          {
+            "stem": "c52607acebf13d27",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.870967
+          },
+          {
+            "stem": "03991603677ee84d",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.868625
+          },
+          {
+            "stem": "11741b6be4194c68",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.868095
+          },
+          {
+            "stem": "9655d67a5d0c4cd9",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.864029
+          },
+          {
+            "stem": "10fe58b40b79ee2b",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.832319
+          },
+          {
+            "stem": "05f8d403ea0e4517",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.824241
+          },
+          {
+            "stem": "685de6c3591d3408",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.818617
+          },
+          {
+            "stem": "3c813776630a0010",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.81159
+          },
+          {
+            "stem": "0d34914b9e9b9a97",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.810951
+          },
+          {
+            "stem": "5fc959fa51ceb0ee",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.80708
+          },
+          {
+            "stem": "77c0b88f925bf2fb",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.068236
+          },
+          {
+            "stem": "4606c15421cb2312",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.067783
+          },
+          {
+            "stem": "0320b561562e469c",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.067618
+          },
+          {
+            "stem": "032672906be2e4c9",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.067309
+          },
+          {
+            "stem": "eeb75ab2fb70d9d7",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.066782
+          },
+          {
+            "stem": "618d9be38d5d1bfb",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.06654
+          },
+          {
+            "stem": "057bdbcc7b72b4cc",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.066229
+          },
+          {
+            "stem": "9c072007b20c42a8",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.066129
+          },
+          {
+            "stem": "893258b5c08dc142",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.066087
+          },
+          {
+            "stem": "9d4431351ca9eac4",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.066043
+          },
+          {
+            "stem": "fa0f6d1cd505cfe6",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.066037
+          },
+          {
+            "stem": "04db429ca202f6a3",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.065907
+          },
+          {
+            "stem": "f2ac2d6b0db6e241",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.065613
+          },
+          {
+            "stem": "10b98336e92c4d5a",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.065394
+          },
+          {
+            "stem": "70d1fc74f643d6aa",
+            "index": 5,
+            "class_id": 2,
+            "area_fraction": 0.06533
+          },
+          {
+            "stem": "7f1453bff6e1f8f6",
+            "index": 0,
+            "class_id": 2,
+            "area_fraction": 0.06513
+          },
+          {
+            "stem": "c387557aa2b57f91",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.0012
+          },
+          {
+            "stem": "c51da1794f5e2d75",
+            "index": 8,
+            "class_id": 2,
+            "area_fraction": 0.001167
+          },
+          {
+            "stem": "07d5e5656c0965c9",
+            "index": 5,
+            "class_id": 2,
+            "area_fraction": 0.001125
+          },
+          {
+            "stem": "7c193d69fe87bd89",
+            "index": 2,
+            "class_id": 2,
+            "area_fraction": 0.001101
+          },
+          {
+            "stem": "07810836128acef5",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.0011
+          },
+          {
+            "stem": "07f148e869e7a19e",
+            "index": 4,
+            "class_id": 2,
+            "area_fraction": 0.001064
+          },
+          {
+            "stem": "bd4e8e26c012c99e",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.000995
+          },
+          {
+            "stem": "00f7e34cb220ddbc",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.000871
+          },
+          {
+            "stem": "bd4e8e26c012c99e",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.000838
+          },
+          {
+            "stem": "367d4c7df5167226",
+            "index": 4,
+            "class_id": 2,
+            "area_fraction": 0.000745
+          },
+          {
+            "stem": "a46af7a65dcb8da5",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.000732
+          },
+          {
+            "stem": "bd4e8e26c012c99e",
+            "index": 2,
+            "class_id": 2,
+            "area_fraction": 0.00052
+          },
+          {
+            "stem": "e4ff8ef0a4d0d46b",
+            "index": 1,
+            "class_id": 2,
+            "area_fraction": 0.000462
+          },
+          {
+            "stem": "8aa8c4cf9db9547b",
+            "index": 3,
+            "class_id": 2,
+            "area_fraction": 0.000409
+          },
+          {
+            "stem": "8aa8c4cf9db9547b",
+            "index": 4,
+            "class_id": 2,
+            "area_fraction": 0.000384
+          },
+          {
+            "stem": "a46af7a65dcb8da5",
+            "index": 4,
+            "class_id": 2,
+            "area_fraction": 0.000219
+          }
+        ]
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_waste_container__c51da1794f5e2d75.png",
+        "stem": "c51da1794f5e2d75",
+        "boxes": 12
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_waste_container__7ee6b53585ead951.png",
+        "stem": "7ee6b53585ead951",
+        "boxes": 10
+      },
+      {
+        "kind": "panel",
+        "path": "datasets/processed/urban_community/visual_audit/panel_waste_container__00f7e34cb220ddbc.png",
+        "stem": "00f7e34cb220ddbc",
+        "boxes": 8
+      }
+    ]
+  },
+  "review_status": "PENDENTE — nenhum humano registrou revisão destes recortes"
+}

@@ -1,0 +1,191 @@
+{
+  "version": 3,
+  "source_dataset": "multi_source_detection",
+  "source_version": "pre-training-v1",
+  "transform": "materialização fail-closed de registros explicitamente autorizados",
+  "params": {
+    "roles": [
+      "TRAIN",
+      "VALIDATION",
+      "TEST",
+      "EXTERNAL_TEST"
+    ],
+    "authorization_required": true
+  },
+  "script": "scripts/datasets/build_detection_manifests.py",
+  "generated_at": "2026-09-15T00:55:12-03:00",
+  "inputs": 35322,
+  "outputs": 35322,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "manifests_sha256": {
+      "TRAIN": "899853da0ed47fc0c456dfb7cf87f15c2262364119a28002ae4a546611ea699c",
+      "VALIDATION": "aa686ab48c53bdca5f58a099d91c4697275912bdaa8eb491273b5794b7e26d7a",
+      "TEST": "373efbc1aeb00992dc13c3e296a06b2d3ecc5e5152f2267038ec0bf82b91fe3d",
+      "EXTERNAL_TEST": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "rdd_split_sha256": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
+    "rdd_selection_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600"
+  },
+  "counts": {
+    "TRAIN": {
+      "records": 23830,
+      "total_images": 23830,
+      "positive_images": 14036,
+      "negative_images": 9794,
+      "boxes": 34526
+    },
+    "VALIDATION": {
+      "records": 3858,
+      "total_images": 3858,
+      "positive_images": 3853,
+      "negative_images": 5,
+      "boxes": 7718
+    },
+    "TEST": {
+      "records": 7634,
+      "total_images": 7634,
+      "positive_images": 5877,
+      "negative_images": 1757,
+      "boxes": 12759
+    },
+    "EXTERNAL_TEST": {
+      "records": 0,
+      "total_images": 0,
+      "positive_images": 0,
+      "negative_images": 0,
+      "boxes": 0
+    }
+  },
+  "classes": {
+    "TRAIN": {
+      "URMIND_ROAD_D40": 5891,
+      "URMIND_ROAD_D00": 14173,
+      "URMIND_ROAD_D20": 8685,
+      "URMIND_ROAD_D10": 5777
+    },
+    "VALIDATION": {
+      "URMIND_ROAD_D10": 2359,
+      "URMIND_ROAD_D00": 4104,
+      "URMIND_ROAD_D20": 934,
+      "URMIND_ROAD_D40": 321
+    },
+    "TEST": {
+      "URMIND_ROAD_D00": 7738,
+      "URMIND_ROAD_D40": 332,
+      "URMIND_ROAD_D10": 3694,
+      "URMIND_ROAD_D20": 995
+    },
+    "EXTERNAL_TEST": {}
+  },
+  "sources": {
+    "rdd2022": {
+      "authorized": true,
+      "counts": {
+        "TRAIN": {
+          "total_images": 23830,
+          "positive_images": 14036,
+          "negative_images": 9794,
+          "boxes": 34526
+        },
+        "VALIDATION": {
+          "total_images": 3858,
+          "positive_images": 3853,
+          "negative_images": 5,
+          "boxes": 7718
+        },
+        "TEST": {
+          "total_images": 7634,
+          "positive_images": 5877,
+          "negative_images": 1757,
+          "boxes": 12759
+        }
+      }
+    },
+    "rtk_br": {
+      "authorized": false,
+      "reason": "instance/mapping/duplicate/group gates pending"
+    },
+    "univali_br": {
+      "authorized": false,
+      "reason": "human/mapping gates pending"
+    },
+    "urban_community": {
+      "authorized": false,
+      "reason": "human gates pending; evaluation forbidden"
+    }
+  },
+  "data_manifest_schema_ready": true,
+  "negative_images_supported": true,
+  "data_model_interface_ready": true,
+  "training_engine_ready": true,
+  "evaluator_ready": true,
+  "checkpointing_ready": true,
+  "mlflow_ready": true,
+  "dvc_ready": true,
+  "dry_run_ready": true,
+  "system_ready_for_training": false,
+  "reason": null,
+  "accepted_model_v1_risks": [
+    "RDD2022 não publica rota/sessão por imagem",
+    "domain shift forte por país no split",
+    "D40 minoritária em VALIDATION e TEST",
+    "arquivos cloud-only permanecem no split lógico e não são hidratados automaticamente"
+  ],
+  "loader_smoke": {
+    "manifest": "datasets/manifests/detection_train_authorized.jsonl",
+    "manifest_sha256": "899853da0ed47fc0c456dfb7cf87f15c2262364119a28002ae4a546611ea699c",
+    "manifest_loaded": true,
+    "records": 23830,
+    "images": 23830,
+    "positive_images": 14036,
+    "negative_images": 9794,
+    "boxes": 34526,
+    "batches": 2,
+    "batch_size": 2,
+    "num_workers": 0,
+    "pin_memory": true,
+    "collate": "torch_default_collate_as_used_by_official_yolox",
+    "windows_safe": true,
+    "sampled_images": 4,
+    "mixed_batch": {
+      "images_shape": [
+        3,
+        3,
+        640,
+        640
+      ],
+      "images_dtype": "torch.float32",
+      "targets_shape": [
+        3,
+        120,
+        5
+      ],
+      "targets_dtype": "torch.float32",
+      "boxes_per_sample": [
+        0,
+        1,
+        2
+      ]
+    },
+    "cuda": {
+      "available": true,
+      "batch_transferred": true,
+      "vram_used_bytes": 14753280
+    },
+    "yolox_input_compatible": true,
+    "forward_executed": false,
+    "data_available": true,
+    "epochs": 0,
+    "backprop": false,
+    "status": "PASSED",
+    "passed_consumer_integrity": true,
+    "data_manifest_schema_ready": true,
+    "data_model_interface_ready": true
+  },
+  "model_configuration": {
+    "path": "datasets/metadata/yolox_model_v1.json",
+    "sha256": "83d19b3adfc5575f28679bafc620f1200502e298de62bef0fdee1b8c3015e64b"
+  }
+}

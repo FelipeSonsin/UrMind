@@ -1,0 +1,3 @@
+[submodule "backend/third_party/YOLOX"]
+	path = backend/third_party/YOLOX
+	url = https://github.com/Megvii-BaseDetection/YOLOX.git

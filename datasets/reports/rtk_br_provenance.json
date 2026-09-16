@@ -1,0 +1,23 @@
+{
+  "dataset_id": "rtk_br",
+  "source_version": "mendeley-hssswvmjwf-v1",
+  "doi": "10.17632/hssswvmjwf.1",
+  "official_url": "https://data.mendeley.com/datasets/hssswvmjwf/1",
+  "official_file": "RTK.zip",
+  "official_file_bytes": 101609702,
+  "official_file_sha256": "78803e8df89eae6130139ee9c48de947edd08015fe56826c30fdacb2599841db",
+  "license": "CC BY 4.0",
+  "institution": "Universidade Federal de Santa Catarina",
+  "location": "Santa Catarina, Brasil",
+  "raw_path": "datasets/raw/rtk_br",
+  "raw_preserved_extracted": true,
+  "archive_retained": false,
+  "archive_retention_reason": "evitar cópia permanente duplicada; identidade preservada por SHA-256",
+  "scan_manifest": "datasets/manifests/rtk_br_scan.jsonl",
+  "scan_sha256": "d088ee07c15c5463006e3229b27b0c361d2be299f935660cb86231e632809a7c",
+  "metadata_sha256": {
+    "codes.txt": "07dd15943227a211522ccfa8878224bdc7fb39d4e9ed5352265bb9dad5c7f9ec",
+    "trainpaths.txt": "eaf41c69c618c2649f1c86a3ecfcf29321693d6b9ab5b000368bc906e1beaf3b",
+    "valpaths.txt": "e43cce528c9233225fc71446f62a2388be837b016aa81ebf22b098edbafbac44"
+  }
+}

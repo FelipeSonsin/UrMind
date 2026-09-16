@@ -18,6 +18,7 @@ def test_todas_as_fontes_do_escopo_estao_declaradas():
         "camber",
         "global_streetscapes",
         "bdd100k",
+        "rtk_br",
     }
     assert {s.id for s in SOURCES} == esperadas
 

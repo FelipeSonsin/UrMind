@@ -1,6 +1,6 @@
 # Estado dos datasets
 
-Atualizado em 2026-09-09. GB decimais (1 GB = 1.000.000.000 bytes).
+Atualizado em 2026-09-12. GB decimais (1 GB = 1.000.000.000 bytes).
 
 As oito fontes estão presentes com dado real e somam **35,29 GB** dos 40 GB
 disponíveis. Sete cabem no teto de **7 GB por dataset**; o RDD2022 é uma **exceção

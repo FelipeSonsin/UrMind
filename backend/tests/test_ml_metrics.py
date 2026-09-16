@@ -310,3 +310,25 @@ def test_ordem_de_confianca_muda_o_ap_com_os_mesmos_acertos():
 
     assert ap_bom == 1.0
     assert ap_ruim < ap_bom
+
+
+def test_metricas_globais_sao_micro_precision_e_recall() -> None:
+    truths = [gt("img1", D40, (0, 0, 10, 10)), gt("img2", D00, (0, 0, 10, 10))]
+    predictions = [
+        pred("img1", D40, (0, 0, 10, 10), 0.9),
+        pred("negativa", D40, (0, 0, 10, 10), 0.8),
+    ]
+
+    result = evaluate(predictions, truths, labels=[D40, D00])
+
+    assert result.precision == 0.5
+    assert result.recall == 0.5
+    assert result.as_persisted()["precision"] == 0.5
+    assert result.as_persisted()["recall"] == 0.5
+
+
+def test_metricas_globais_sem_prediction_com_gt_tem_precision_e_recall_zero() -> None:
+    result = evaluate([], [gt("img1", D40, (0, 0, 10, 10))], labels=[D40])
+
+    assert result.precision == 0.0
+    assert result.recall == 0.0

@@ -10,6 +10,7 @@ from _core import (
     DATASETS_DIR,
     configure_stdout,
     file_sha256,
+    timestamp,
     write_json_report,
     write_text_safe,
 )
@@ -96,6 +97,25 @@ def main():
     if stats["size_bytes"] > load_budget().max_local_dataset_bytes:
         raise RuntimeError("seleção acima do orçamento datasets")
     report = {
+        # Proveniencia exigida de toda derivada
+        # (artifact_contract.yaml#derived_manifest_contract).
+        "script": "scripts/datasets/propose_subset.py",
+        "source_dataset": "rdd2022",
+        "source_version": "figshare-21431547-v1 (2022-crddc)",
+        "generated_at": timestamp(),
+        "transform": "seleção determinística de todas as imagens de treino estruturalmente válidas",
+        "params": {"seed": a.seed, "algorithm_version": 2},
+        "inputs": len(rows),
+        "outputs": len(selected),
+        "dropped": len(rows) - len(selected),
+        "drop_reasons": {
+            "official_test_unlabeled": len(unlabeled),
+            "exact_copies": len(excluded),
+            "invalid_or_out_of_scope": len(rows)
+            - len(selected)
+            - len(unlabeled)
+            - len(excluded),
+        },
         "algorithm_version": 2,
         "seed": a.seed,
         "algorithm": "all_valid_training_examples; exact byte duplicate + same annotation only; SHA256(seed:path) tie break",

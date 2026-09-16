@@ -1,0 +1,56 @@
+{
+  "schema_version": 2,
+  "platform": {
+    "supported": "Windows x86_64 with an NVIDIA GPU and compatible driver",
+    "verified": "Windows x86_64"
+  },
+  "verified_at": "2026-09-15",
+  "python": {
+    "requires": ">=3.12,<3.13",
+    "verified": "3.12.10"
+  },
+  "pip": "25.2",
+  "setuptools": "80.9.0",
+  "wheel": "0.45.1",
+  "torch": "2.11.0+cu128",
+  "torchvision": "0.26.0+cu128",
+  "pytorch_cuda_runtime": "12.8",
+  "opencv_python": "4.14.0.94",
+  "pycocotools": "2.0.11",
+  "mlflow_skinny": "3.16.0",
+  "dvc": "3.67.1",
+  "nvidia_driver": {
+    "minimum_windows_for_cuda_12_8_ga": "570.65",
+    "observed": "610.62"
+  },
+  "gpu": {
+    "observed": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "vram_bytes": 6438780928
+  },
+  "yolox": {
+    "version": "0.3.0",
+    "installation": "Official source pinned as backend/third_party/YOLOX git submodule"
+  },
+  "model_metadata": "datasets/metadata/yolox_model_v1.json",
+  "constraints": "requirements-ml-cu128.txt",
+  "readiness": {
+    "data": true,
+    "model_stack": "MODEL_STACK_READY",
+    "data_model_interface": true,
+    "yolox_model_v1": true,
+    "training_engine": true,
+    "evaluator": true,
+    "checkpointing": true,
+    "mlflow": true,
+    "dvc": true,
+    "dry_run": true,
+    "system_ready_for_training": false
+  },
+  "sources": {
+    "python": "https://www.python.org/downloads/release/python-31210/",
+    "pytorch_versions": "https://pytorch.org/get-started/previous-versions/",
+    "pytorch_compatibility": "https://github.com/pytorch/pytorch/blob/main/RELEASE.md",
+    "cuda_driver": "https://docs.nvidia.com/cuda/archive/12.8.0/cuda-toolkit-release-notes/",
+    "yolox": "https://github.com/Megvii-BaseDetection/YOLOX"
+  }
+}

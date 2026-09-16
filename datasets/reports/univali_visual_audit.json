@@ -1,0 +1,1351 @@
+{
+  "version": 1,
+  "scope": "auditoria visual da conversão máscara→caixa. Painéis para revisão humana; não substitui a validação automática e não valida semântica.",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "renderização de painéis de auditoria visual",
+  "params": {
+    "per_case": 2,
+    "scale": 0.5,
+    "cases": [
+      "border",
+      "empty_mask",
+      "largest",
+      "low_fill",
+      "multi_region",
+      "simple",
+      "smallest"
+    ],
+    "selection": "determinística por ordenação, sem sorteio"
+  },
+  "script": "scripts/datasets/render_univali_audit.py",
+  "generated_at": "2026-09-10T16:09:06-03:00",
+  "inputs": 564,
+  "outputs": 14,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "boxes_manifest_sha256": "8d5595c3a4649675431f3200ee7da8bced9a4db6e5554d57eb8e2aa9ffdd1598"
+  },
+  "raw_modified": false,
+  "output_dir": "datasets/processed/univali_br/visual_audit",
+  "total_bytes": 9640909,
+  "cases": {
+    "smallest": [
+      {
+        "directory": "883273_RS_290_290RS150131_17095",
+        "panel": "datasets/processed/univali_br/visual_audit/smallest__883273_RS_290_290RS150131_17095.png",
+        "panel_bytes": 728665,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 21,
+        "box_details": [
+          {
+            "xyxy": [
+              411,
+              269,
+              603,
+              442
+            ],
+            "mask_area_px": 18726,
+            "fill_ratio": 0.5638,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              666,
+              94,
+              784,
+              213
+            ],
+            "mask_area_px": 7517,
+            "fill_ratio": 0.5353,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              489,
+              149,
+              570,
+              256
+            ],
+            "mask_area_px": 5523,
+            "fill_ratio": 0.6372,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              405,
+              477,
+              513,
+              547
+            ],
+            "mask_area_px": 5519,
+            "fill_ratio": 0.73,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              432,
+              440,
+              508,
+              477
+            ],
+            "mask_area_px": 1929,
+            "fill_ratio": 0.686,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              523,
+              108,
+              568,
+              143
+            ],
+            "mask_area_px": 1138,
+            "fill_ratio": 0.7225,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              864,
+              615,
+              914,
+              639
+            ],
+            "mask_area_px": 905,
+            "fill_ratio": 0.7542,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              872,
+              313,
+              915,
+              342
+            ],
+            "mask_area_px": 896,
+            "fill_ratio": 0.7185,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              889,
+              364,
+              914,
+              382
+            ],
+            "mask_area_px": 300,
+            "fill_ratio": 0.6667,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              430,
+              388,
+              431,
+              389
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              431,
+              390,
+              432,
+              391
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              432,
+              392,
+              433,
+              393
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              433,
+              394,
+              434,
+              395
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              434,
+              396,
+              435,
+              397
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              435,
+              398,
+              436,
+              399
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              436,
+              400,
+              437,
+              401
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              437,
+              402,
+              438,
+              403
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              438,
+              404,
+              439,
+              405
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              439,
+              406,
+              440,
+              407
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              440,
+              408,
+              441,
+              409
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              441,
+              410,
+              442,
+              411
+            ],
+            "mask_area_px": 1,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 42465,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "smallest"
+      },
+      {
+        "directory": "917109_RS_290_290RS294095_18995",
+        "panel": "datasets/processed/univali_br/visual_audit/smallest__917109_RS_290_290RS294095_18995.png",
+        "panel_bytes": 627343,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 2,
+        "box_details": [
+          {
+            "xyxy": [
+              207,
+              481,
+              331,
+              542
+            ],
+            "mask_area_px": 5734,
+            "fill_ratio": 0.7581,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              260,
+              480,
+              262,
+              481
+            ],
+            "mask_area_px": 2,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 5736,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "smallest"
+      }
+    ],
+    "largest": [
+      {
+        "directory": "941610_RS_290_290RS070691_00955",
+        "panel": "datasets/processed/univali_br/visual_audit/largest__941610_RS_290_290RS070691_00955.png",
+        "panel_bytes": 632603,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 2,
+        "box_details": [
+          {
+            "xyxy": [
+              593,
+              52,
+              946,
+              639
+            ],
+            "mask_area_px": 95935,
+            "fill_ratio": 0.463,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              491,
+              30,
+              600,
+              73
+            ],
+            "mask_area_px": 2360,
+            "fill_ratio": 0.5035,
+            "size_tier": "medium_large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 98295,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "largest"
+      },
+      {
+        "directory": "883066_RS_290_290RS150131_16060",
+        "panel": "datasets/processed/univali_br/visual_audit/largest__883066_RS_290_290RS150131_16060.png",
+        "panel_bytes": 701549,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 4,
+        "box_details": [
+          {
+            "xyxy": [
+              195,
+              236,
+              590,
+              639
+            ],
+            "mask_area_px": 93808,
+            "fill_ratio": 0.5893,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              469,
+              123,
+              553,
+              193
+            ],
+            "mask_area_px": 4423,
+            "fill_ratio": 0.7522,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              809,
+              267,
+              869,
+              320
+            ],
+            "mask_area_px": 1952,
+            "fill_ratio": 0.6138,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              437,
+              188,
+              496,
+              219
+            ],
+            "mask_area_px": 1474,
+            "fill_ratio": 0.8059,
+            "size_tier": "medium_large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 101657,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "largest"
+      }
+    ],
+    "low_fill": [
+      {
+        "directory": "994527_RS_386_386RS191729_09400",
+        "panel": "datasets/processed/univali_br/visual_audit/low_fill__994527_RS_386_386RS191729_09400.png",
+        "panel_bytes": 722001,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 1,
+        "box_details": [
+          {
+            "xyxy": [
+              435,
+              198,
+              957,
+              535
+            ],
+            "mask_area_px": 18402,
+            "fill_ratio": 0.1046,
+            "size_tier": "large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 18402,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "low_fill"
+      },
+      {
+        "directory": "773854_ES_259_259ES000000_43370",
+        "panel": "datasets/processed/univali_br/visual_audit/low_fill__773854_ES_259_259ES000000_43370.png",
+        "panel_bytes": 656122,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 1,
+        "box_details": [
+          {
+            "xyxy": [
+              128,
+              257,
+              464,
+              639
+            ],
+            "mask_area_px": 27827,
+            "fill_ratio": 0.2168,
+            "size_tier": "large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 27827,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "low_fill"
+      }
+    ],
+    "multi_region": [
+      {
+        "directory": "1025791_RS_386_386RS169832_08695",
+        "panel": "datasets/processed/univali_br/visual_audit/multi_region__1025791_RS_386_386RS169832_08695.png",
+        "panel_bytes": 755988,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 26,
+        "box_details": [
+          {
+            "xyxy": [
+              821,
+              432,
+              840,
+              448
+            ],
+            "mask_area_px": 218,
+            "fill_ratio": 0.7171,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              807,
+              348,
+              828,
+              362
+            ],
+            "mask_area_px": 200,
+            "fill_ratio": 0.6803,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              846,
+              522,
+              864,
+              536
+            ],
+            "mask_area_px": 200,
+            "fill_ratio": 0.7937,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              756,
+              392,
+              786,
+              401
+            ],
+            "mask_area_px": 195,
+            "fill_ratio": 0.7222,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              365,
+              500,
+              386,
+              510
+            ],
+            "mask_area_px": 174,
+            "fill_ratio": 0.8286,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              805,
+              373,
+              823,
+              388
+            ],
+            "mask_area_px": 148,
+            "fill_ratio": 0.5481,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              832,
+              558,
+              850,
+              569
+            ],
+            "mask_area_px": 142,
+            "fill_ratio": 0.7172,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              657,
+              253,
+              672,
+              265
+            ],
+            "mask_area_px": 135,
+            "fill_ratio": 0.75,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              812,
+              333,
+              830,
+              344
+            ],
+            "mask_area_px": 124,
+            "fill_ratio": 0.6263,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              663,
+              316,
+              676,
+              329
+            ],
+            "mask_area_px": 117,
+            "fill_ratio": 0.6923,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              889,
+              486,
+              906,
+              498
+            ],
+            "mask_area_px": 116,
+            "fill_ratio": 0.5686,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              791,
+              384,
+              807,
+              396
+            ],
+            "mask_area_px": 114,
+            "fill_ratio": 0.5938,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              795,
+              404,
+              813,
+              412
+            ],
+            "mask_area_px": 111,
+            "fill_ratio": 0.7708,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              862,
+              502,
+              878,
+              512
+            ],
+            "mask_area_px": 108,
+            "fill_ratio": 0.675,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              844,
+              573,
+              860,
+              582
+            ],
+            "mask_area_px": 99,
+            "fill_ratio": 0.6875,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              850,
+              467,
+              866,
+              476
+            ],
+            "mask_area_px": 97,
+            "fill_ratio": 0.6736,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              770,
+              298,
+              785,
+              309
+            ],
+            "mask_area_px": 92,
+            "fill_ratio": 0.5576,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              830,
+              400,
+              842,
+              408
+            ],
+            "mask_area_px": 90,
+            "fill_ratio": 0.9375,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              691,
+              318,
+              704,
+              330
+            ],
+            "mask_area_px": 89,
+            "fill_ratio": 0.5705,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              762,
+              317,
+              771,
+              326
+            ],
+            "mask_area_px": 81,
+            "fill_ratio": 1.0,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              674,
+              332,
+              687,
+              341
+            ],
+            "mask_area_px": 78,
+            "fill_ratio": 0.6667,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              777,
+              340,
+              788,
+              349
+            ],
+            "mask_area_px": 73,
+            "fill_ratio": 0.7374,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              803,
+              316,
+              817,
+              323
+            ],
+            "mask_area_px": 68,
+            "fill_ratio": 0.6939,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              646,
+              230,
+              655,
+              239
+            ],
+            "mask_area_px": 62,
+            "fill_ratio": 0.7654,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              803,
+              326,
+              814,
+              335
+            ],
+            "mask_area_px": 57,
+            "fill_ratio": 0.5758,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              679,
+              251,
+              686,
+              259
+            ],
+            "mask_area_px": 27,
+            "fill_ratio": 0.4821,
+            "size_tier": "small",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 3015,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "multi_region"
+      },
+      {
+        "directory": "883241_RS_290_290RS150131_16935",
+        "panel": "datasets/processed/univali_br/visual_audit/multi_region__883241_RS_290_290RS150131_16935.png",
+        "panel_bytes": 747125,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 26,
+        "box_details": [
+          {
+            "xyxy": [
+              265,
+              480,
+              464,
+              585
+            ],
+            "mask_area_px": 13283,
+            "fill_ratio": 0.6357,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              704,
+              219,
+              834,
+              306
+            ],
+            "mask_area_px": 7178,
+            "fill_ratio": 0.6347,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              807,
+              495,
+              972,
+              552
+            ],
+            "mask_area_px": 5898,
+            "fill_ratio": 0.6271,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              864,
+              586,
+              1013,
+              639
+            ],
+            "mask_area_px": 5758,
+            "fill_ratio": 0.7291,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              786,
+              349,
+              915,
+              419
+            ],
+            "mask_area_px": 5702,
+            "fill_ratio": 0.6315,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              479,
+              141,
+              570,
+              176
+            ],
+            "mask_area_px": 2013,
+            "fill_ratio": 0.632,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              800,
+              428,
+              848,
+              482
+            ],
+            "mask_area_px": 1560,
+            "fill_ratio": 0.6019,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              740,
+              184,
+              797,
+              219
+            ],
+            "mask_area_px": 1363,
+            "fill_ratio": 0.6832,
+            "size_tier": "medium_large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              355,
+              366,
+              402,
+              392
+            ],
+            "mask_area_px": 996,
+            "fill_ratio": 0.8151,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              672,
+              99,
+              734,
+              117
+            ],
+            "mask_area_px": 880,
+            "fill_ratio": 0.7885,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              698,
+              150,
+              754,
+              174
+            ],
+            "mask_area_px": 878,
+            "fill_ratio": 0.6533,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              653,
+              34,
+              702,
+              60
+            ],
+            "mask_area_px": 791,
+            "fill_ratio": 0.6209,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              532,
+              477,
+              566,
+              509
+            ],
+            "mask_area_px": 737,
+            "fill_ratio": 0.6774,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              760,
+              312,
+              799,
+              338
+            ],
+            "mask_area_px": 718,
+            "fill_ratio": 0.7081,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              764,
+              346,
+              804,
+              369
+            ],
+            "mask_area_px": 667,
+            "fill_ratio": 0.725,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              670,
+              85,
+              723,
+              98
+            ],
+            "mask_area_px": 621,
+            "fill_ratio": 0.9013,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              273,
+              585,
+              312,
+              605
+            ],
+            "mask_area_px": 599,
+            "fill_ratio": 0.7679,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              434,
+              337,
+              471,
+              356
+            ],
+            "mask_area_px": 533,
+            "fill_ratio": 0.7582,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              880,
+              478,
+              929,
+              494
+            ],
+            "mask_area_px": 528,
+            "fill_ratio": 0.6735,
+            "size_tier": "medium_small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              639,
+              153,
+              686,
+              176
+            ],
+            "mask_area_px": 456,
+            "fill_ratio": 0.4218,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              824,
+              487,
+              852,
+              504
+            ],
+            "mask_area_px": 368,
+            "fill_ratio": 0.7731,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              694,
+              208,
+              723,
+              221
+            ],
+            "mask_area_px": 267,
+            "fill_ratio": 0.7082,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              695,
+              195,
+              721,
+              207
+            ],
+            "mask_area_px": 210,
+            "fill_ratio": 0.6731,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              494,
+              344,
+              510,
+              354
+            ],
+            "mask_area_px": 124,
+            "fill_ratio": 0.775,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              694,
+              77,
+              713,
+              84
+            ],
+            "mask_area_px": 119,
+            "fill_ratio": 0.8947,
+            "size_tier": "small",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              695,
+              69,
+              714,
+              76
+            ],
+            "mask_area_px": 94,
+            "fill_ratio": 0.7068,
+            "size_tier": "small",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 52341,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "multi_region"
+      }
+    ],
+    "border": [
+      {
+        "directory": "941599_RS_290_290RS070691_00900",
+        "panel": "datasets/processed/univali_br/visual_audit/border__941599_RS_290_290RS070691_00900.png",
+        "panel_bytes": 659900,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 3,
+        "box_details": [
+          {
+            "xyxy": [
+              711,
+              269,
+              974,
+              639
+            ],
+            "mask_area_px": 50381,
+            "fill_ratio": 0.5177,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              592,
+              0,
+              694,
+              134
+            ],
+            "mask_area_px": 5350,
+            "fill_ratio": 0.3914,
+            "size_tier": "large",
+            "touches_border": true
+          },
+          {
+            "xyxy": [
+              599,
+              39,
+              618,
+              53
+            ],
+            "mask_area_px": 181,
+            "fill_ratio": 0.6805,
+            "size_tier": "small",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 55912,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "border"
+      },
+      {
+        "directory": "941603_RS_290_290RS070691_00921",
+        "panel": "datasets/processed/univali_br/visual_audit/border__941603_RS_290_290RS070691_00921.png",
+        "panel_bytes": 684717,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 3,
+        "box_details": [
+          {
+            "xyxy": [
+              586,
+              209,
+              980,
+              639
+            ],
+            "mask_area_px": 78719,
+            "fill_ratio": 0.4646,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              631,
+              59,
+              695,
+              133
+            ],
+            "mask_area_px": 3754,
+            "fill_ratio": 0.7927,
+            "size_tier": "large",
+            "touches_border": false
+          },
+          {
+            "xyxy": [
+              606,
+              0,
+              664,
+              51
+            ],
+            "mask_area_px": 2077,
+            "fill_ratio": 0.7022,
+            "size_tier": "medium_large",
+            "touches_border": true
+          }
+        ],
+        "mask_foreground_px": 84550,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "border"
+      }
+    ],
+    "simple": [
+      {
+        "directory": "1008367_RS_386_386RS289112_32760",
+        "panel": "datasets/processed/univali_br/visual_audit/simple__1008367_RS_386_386RS289112_32760.png",
+        "panel_bytes": 668913,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 1,
+        "box_details": [
+          {
+            "xyxy": [
+              274,
+              400,
+              363,
+              427
+            ],
+            "mask_area_px": 1678,
+            "fill_ratio": 0.6983,
+            "size_tier": "medium_large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 1678,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "simple"
+      },
+      {
+        "directory": "1014631_RS_386_386RS124739_30080",
+        "panel": "datasets/processed/univali_br/visual_audit/simple__1014631_RS_386_386RS124739_30080.png",
+        "panel_bytes": 697352,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 1,
+        "box_details": [
+          {
+            "xyxy": [
+              689,
+              599,
+              734,
+              634
+            ],
+            "mask_area_px": 1277,
+            "fill_ratio": 0.8108,
+            "size_tier": "medium_large",
+            "touches_border": false
+          }
+        ],
+        "mask_foreground_px": 1277,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "simple"
+      }
+    ],
+    "empty_mask": [
+      {
+        "directory": "1007599_RS_386_386RS289112_28920",
+        "panel": "datasets/processed/univali_br/visual_audit/empty_mask__1007599_RS_386_386RS289112_28920.png",
+        "panel_bytes": 677689,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 0,
+        "box_details": [],
+        "mask_foreground_px": 0,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "empty_mask"
+      },
+      {
+        "directory": "1007600_RS_386_386RS289112_28925",
+        "panel": "datasets/processed/univali_br/visual_audit/empty_mask__1007600_RS_386_386RS289112_28925.png",
+        "panel_bytes": 680942,
+        "image_size": [
+          1024,
+          640
+        ],
+        "boxes": 0,
+        "box_details": [],
+        "mask_foreground_px": 0,
+        "layout": "cima-esq RAW | cima-dir máscara | baixo-esq caixas | baixo-dir sobreposição",
+        "case": "empty_mask"
+      }
+    ]
+  },
+  "how_to_read": "Em cada painel a máscara (ciano) precisa estar dentro da caixa (laranja) e a caixa precisa envolver a região apertadamente. Caixa sem máscara dentro, máscara fora da caixa ou caixa cobrindo o quadro inteiro invalidam a conversão, mesmo que o script tenha terminado sem erro.",
+  "review_status": "PENDENTE — nenhum humano registrou revisão destes painéis"
+}

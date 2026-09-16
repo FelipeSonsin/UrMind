@@ -1,4 +1,21 @@
 {
+  "script": "scripts/datasets/propose_subset.py",
+  "source_dataset": "rdd2022",
+  "source_version": "figshare-21431547-v1 (2022-crddc)",
+  "generated_at": "2026-09-13T06:10:22-03:00",
+  "transform": "seleção determinística de todas as imagens de treino estruturalmente válidas",
+  "params": {
+    "seed": 20260908,
+    "algorithm_version": 2
+  },
+  "inputs": 47420,
+  "outputs": 35490,
+  "dropped": 11930,
+  "drop_reasons": {
+    "official_test_unlabeled": 9035,
+    "exact_copies": 0,
+    "invalid_or_out_of_scope": 2895
+  },
   "algorithm_version": 2,
   "seed": 20260908,
   "algorithm": "all_valid_training_examples; exact byte duplicate + same annotation only; SHA256(seed:path) tie break",
@@ -14829,13 +14846,13 @@
     "operation": "manifesto seleção e revisão",
     "allowed": true,
     "reasons": [],
-    "current_datasets_bytes": 35478473192,
-    "current_ml_bytes": 35479068703,
-    "free_disk_bytes": 160017092608,
+    "current_datasets_bytes": 35567614897,
+    "current_ml_bytes": 35613450427,
+    "free_disk_bytes": 172184584192,
     "estimated_delta_bytes": 96000000,
     "estimated_peak_bytes": 128000000,
-    "projected_datasets_bytes": 35574473192,
-    "projected_free_bytes": 159889092608
+    "projected_datasets_bytes": 35663614897,
+    "projected_free_bytes": 172056584192
   },
   "manifest_sha256": "e222a8cca1efbae0613f6c09bfbbd001e957a6d7a0135b6d000801f81145e5d1"
 }

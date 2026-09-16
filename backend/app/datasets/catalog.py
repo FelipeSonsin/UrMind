@@ -24,10 +24,15 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 __all__ = [
+    "EVALUATION_USAGES",
     "SOURCES",
     "DatasetRole",
     "DatasetSource",
+    "DatasetUsage",
+    "EvaluationForbidden",
     "ExpectedFile",
+    "assert_evaluation_allowed",
+    "evaluation_forbidden_ids",
     "get_source",
     "sources_by_role",
 ]
@@ -37,6 +42,49 @@ class DatasetRole(StrEnum):
     TRAINING_V1 = "training_v1"
     GEO_REFERENCE = "geo_reference"
     DEFERRED = "deferred"
+
+
+class DatasetUsage(StrEnum):
+    """Função concreta da fonte no pipeline, mais fina que `DatasetRole`.
+
+    `DatasetRole` decide o que o registro exige (§8.3) e não muda. `DatasetUsage`
+    responde a pergunta operacional que o papel não responde: *este dado entra no
+    treino, no teste, ou em nenhum dos dois?* Uma fonte pode ter mais de um uso.
+
+    A diferença entre `TEST` e `EXTERNAL_TEST` é a que mais importa aqui: `TEST`
+    é o conjunto congelado que sai da mesma fonte do treino, e mede o detector
+    dentro do domínio em que ele aprendeu; `EXTERNAL_TEST` vem de outra fonte e
+    mede generalização para um domínio que o treino não viu. Confundir os dois
+    faz uma métrica dizer o que ela não mediu.
+    """
+
+    TRAIN = "TRAIN"
+    VALIDATION = "VALIDATION"
+    TEST = "TEST"
+    EXTERNAL_TEST = "EXTERNAL_TEST"
+    GEO_REFERENCE = "GEO_REFERENCE"
+    CONTEXT_ONLY = "CONTEXT_ONLY"
+    UNUSABLE = "UNUSABLE"
+    """Presente e íntegro, mas nenhuma etapa do pipeline consegue consumi-lo hoje.
+
+    Exige justificativa técnica em `usage_note` e, quando o bloqueio for
+    removível, o caminho concreto em `potential_usage`/`unlock_requirement`.
+    """
+
+
+EVALUATION_USAGES: frozenset[DatasetUsage] = frozenset(
+    {DatasetUsage.VALIDATION, DatasetUsage.TEST, DatasetUsage.EXTERNAL_TEST}
+)
+"""Os três usos em que a fonte está do lado **medido**, não do lado aprendido."""
+
+
+class EvaluationForbidden(RuntimeError):
+    """Uma fonte proibida de avaliar foi oferecida a um conjunto avaliado.
+
+    Erro, não aviso: a consequência de deixar passar é uma métrica que mede o
+    próprio treino. Quem for corrigir, corrige a origem do dado — nunca captura
+    esta exceção para seguir em frente.
+    """
 
 
 @dataclass(frozen=True)
@@ -72,9 +120,63 @@ class DatasetSource:
 
     caveats: tuple[str, ...] = field(default_factory=tuple)
 
+    annotation_format: str = ""
+    """Formato em que a fonte publica a anotação, como ela é lida do disco."""
+
+    usage: tuple[DatasetUsage, ...] = ()
+    """O que esta fonte alimenta **hoje**, com o dado no estado em que está.
+
+    Declarado aqui e conferido contra o disco por `app.datasets.readiness`: uma
+    fonte que declara `TRAIN` e não produz nenhuma caixa da taxonomia V1 é uma
+    divergência que o relatório aponta, não um detalhe que passa.
+    """
+
+    usage_note: str = ""
+    """Por que a fonte tem esse uso — e, quando é `UNUSABLE`, por que não tem outro."""
+
+    potential_usage: tuple[DatasetUsage, ...] = ()
+    """Uso que a fonte teria depois de `unlock_requirement`. Não vale como uso atual."""
+
+    unlock_requirement: str = ""
+    """Trabalho concreto que separa `usage` de `potential_usage`."""
+
+    planned_step: str = ""
+    """Etapa do §25 que consome esta fonte. Vazio = nenhuma etapa prevista a consome."""
+
+    evaluation_forbidden: bool = False
+    """A fonte não pode entrar em VALIDATION, TEST nem EXTERNAL_TEST — nunca.
+
+    Declarar isto aqui é o que transforma a restrição em regra executável: o
+    `__post_init__` recusa um catálogo que se contradiga, `assert_evaluation_allowed`
+    é o portão que qualquer consumidor chama, e `app.ml.splits` levanta
+    `EvaluationForbidden` se um registro desta fonte chegar a um split com lado
+    avaliado. Antes disso a proibição existia só em prosa, e prosa não bloqueia
+    ninguém.
+    """
+
+    evaluation_forbidden_reason: str = ""
+
+    def __post_init__(self) -> None:
+        proibidos = EVALUATION_USAGES & set(self.usage)
+        if self.evaluation_forbidden and proibidos:
+            raise ValueError(
+                f"{self.id}: evaluation_forbidden e usage declara "
+                f"{sorted(u.value for u in proibidos)} ao mesmo tempo"
+            )
+        if self.evaluation_forbidden and not self.evaluation_forbidden_reason:
+            raise ValueError(f"{self.id}: evaluation_forbidden exige motivo declarado")
+
     @property
     def trainable(self) -> bool:
         return self.role is DatasetRole.TRAINING_V1
+
+    @property
+    def feeds_training(self) -> bool:
+        """Declara alimentar treino, validação ou teste do detector."""
+        return bool(
+            {DatasetUsage.TRAIN, DatasetUsage.VALIDATION, DatasetUsage.TEST}
+            & set(self.usage)
+        )
 
 
 SOURCES: tuple[DatasetSource, ...] = (
@@ -136,6 +238,59 @@ SOURCES: tuple[DatasetSource, ...] = (
             "13,2 GB. O §4.4 proíbe copiar o raw inteiro para o Supabase Free.",
             "Seis países; desempenho no Brasil não é herdado da métrica global.",
         ),
+        annotation_format="pascal_voc_xml",
+        usage=(DatasetUsage.TRAIN, DatasetUsage.VALIDATION, DatasetUsage.TEST),
+        usage_note=(
+            "Única fonte que produz caixa na taxonomia V1. Os três splits saem "
+            "daqui, isolados por país (datasets/splits/), então o `TEST` mede "
+            "generalização entre países — não desempenho no domínio do piloto."
+        ),
+        planned_step="§25 passo 7 — baseline YOLOX",
+    ),
+    DatasetSource(
+        id="rtk_br",
+        title="Road Traversing Knowledge (RTK) — UFSC",
+        homepage="https://data.mendeley.com/datasets/hssswvmjwf/1",
+        license="CC BY 4.0",
+        role=DatasetRole.TRAINING_V1,
+        version="mendeley-hssswvmjwf-v1",
+        adapter=None,
+        expected_files=(
+            ExpectedFile(
+                "codes.txt",
+                required=True,
+            ),
+            ExpectedFile("trainpaths.txt", required=True),
+            ExpectedFile("valpaths.txt", required=True),
+        ),
+        taxonomy_note=(
+            "Class-map sem IDs de instância. Pothole é candidato semântico a D40, "
+            "mas nenhum componente ou bbox é autorizado até a semântica de instância "
+            "da transformação ser validada. Crack genérico não distingue D00/D10/D20; "
+            "as demais classes ficam sem mapping canônico V1."
+        ),
+        group_note=(
+            "Frames foram capturados de veículo em movimento em Santa Catarina; "
+            "rota, sessão e sequência por frame não estão publicadas no pacote. "
+            "Preservar o split oficial não prova isolamento por grupo."
+        ),
+        caveats=(
+            "Máscara semântica não é anotação de instância nem bbox pronta.",
+            "Lineage de rota/sessão não acompanha os 701 frames.",
+        ),
+        annotation_format="semantic_class_mask_png",
+        usage=(DatasetUsage.UNUSABLE,),
+        usage_note=(
+            "Conectado e auditado, mas bloqueado para treino e avaliação: mapping "
+            "canônico por anotação, semântica de instância e isolamento de grupos "
+            "ainda não foram demonstrados."
+        ),
+        potential_usage=(DatasetUsage.TRAIN, DatasetUsage.EXTERNAL_TEST),
+        unlock_requirement=(
+            "Protocolo humano/versionado para classe pothole, validação de semântica "
+            "dos componentes e evidência de grupos/isolamento contra splits protegidos."
+        ),
+        planned_step="candidato brasileiro para detector V1 após fechamento dos gates",
     ),
     DatasetSource(
         id="univali_br",
@@ -164,10 +319,49 @@ SOURCES: tuple[DatasetSource, ...] = (
         ),
         caveats=(
             (
-                "Anotação é máscara PNG, não caixa. Treinar detecção exige conversão "
-                "explícita, registrada como versão derivada — não acontece na leitura."
+                "Anotação é máscara PNG, não caixa. A conversão existe como versão "
+                "derivada registrada (`datasets/manifests/univali_br_boxes.jsonl`), "
+                "não acontece na leitura e não sobrescreve nada em raw/."
+            ),
+            (
+                "A caixa derivada carrega o rótulo nativo `UNIVALI_POTHOLE`, não "
+                "`URMIND_ROAD_D40`. A correspondência é declarada pela fonte e ainda "
+                "não foi verificada contra documentação oficial nem inspeção humana; "
+                "promovê-la seria mapear por nome, que é o que o §8.2 proíbe."
+            ),
+            (
+                "Rodovia federal em 3 UFs e 12 rodovias. Não representa via urbana "
+                "brasileira nem o Brasil inteiro."
             ),
         ),
+        annotation_format="segmentation_mask_png",
+        usage=(DatasetUsage.UNUSABLE,),
+        usage_note=(
+            "NOT_EVALUATION_READY. A derivada em caixas existe "
+            "(`datasets/manifests/univali_br_boxes.jsonl`), mas ter caixa não é ter "
+            "avaliação, e declarar EXTERNAL_TEST prometeria uma medição que este "
+            "artefato ainda não sustenta. Três bloqueios, todos abertos: a hipótese "
+            "componente conexo = objeto nunca foi verificada por revisão humana; "
+            "`urmind_class` continua null, então não há classe-alvo para comparar "
+            "com a saída do detector; e 1.671 das 2.235 máscaras estão vazias sem "
+            "significado declarado, de modo que falso positivo não é medível no "
+            "domínio. O que existe hoje mede localização em imagens sabidamente "
+            "positivas — é candidato a teste externo, não teste externo. "
+            "Treino continua PROIBIDO em qualquer hipótese."
+        ),
+        potential_usage=(DatasetUsage.EXTERNAL_TEST,),
+        unlock_requirement=(
+            "Três evidências, nesta ordem e todas versionadas: (1) auditoria humana "
+            "da folha `datasets/annotations/univali_instance_audit_v1.jsonl` "
+            "resolvendo se componente conexo é objeto independente; (2) semântica "
+            "das máscaras vazias declarada pela documentação oficial da UNIVALI/DNIT "
+            "— negativo examinado ou quadro não anotado muda a métrica em direções "
+            "opostas; (3) verificação do significado da máscara POTHOLE contra a "
+            "definição canônica de D40, que então habilita "
+            "`convert_univali_masks.py --assert-v1-mapping`. Sem as três, o conjunto "
+            "permanece candidato."
+        ),
+        planned_step="§25 passo 6 — derivada candidata; avaliação depende das três verificações",
     ),
     DatasetSource(
         id="urban_community",
@@ -193,14 +387,58 @@ SOURCES: tuple[DatasetSource, ...] = (
                 "e conferido contra os ids dos .txt (app.ml.taxonomy)."
             ),
             (
-                "Traz pesos .pt de um treino de terceiros. Não são modelo do UrMind e "
-                "não podem ser promovidos (§9)."
+                "A ficha registra pesos .pt de um treino de terceiros dentro do ZIP. "
+                "Nenhum código do pipeline os referencia — busca por `.pt` em "
+                "backend/app e scripts/ não encontra uso —, então são artefato "
+                "externo desnecessário para o funcionamento atual. A conferência do "
+                "conteúdo do ZIP segue PENDENTE por decisão explícita: inspecioná-lo "
+                "exige `--inspect-package`, nunca acontece sozinho, e peso de "
+                "terceiro não entra em model_versions (§9) de qualquer forma."
             ),
             (
                 "O Kaggle não publica checksum deste pacote: dá para conferir a "
                 "integridade pelo CRC interno do ZIP, não contra a fonte."
             ),
         ),
+        annotation_format="yolo_txt",
+        usage=(DatasetUsage.UNUSABLE,),
+        evaluation_forbidden=True,
+        evaluation_forbidden_reason=(
+            "o único agrupamento disponível é a pasta de classe, que não separa "
+            "cena (§8.4), e a procedência das imagens não é declarada. Some-se a "
+            "isso que a fonte tem contaminação de rótulo observada e nenhuma "
+            "validação humana caixa a caixa: ruído assim em treino é custo; em "
+            "métrica, é mentira."
+        ),
+        potential_usage=(DatasetUsage.TRAIN,),
+        unlock_requirement=(
+            "Revisão humana caixa a caixa com protocolo de aceitação declarado "
+            "ANTES das decisões (datasets/annotations/urban_community_box_audit_v1.jsonl). "
+            "Uma caixa só recebe URMIND_ROAD_D40 quando todos os portões de "
+            "app.datasets.authorization passam — inclusive `approved_pothole` "
+            "registrado por pessoa e completude de anotação confirmada na imagem. "
+            "A amostra de 50 estima a qualidade da fonte; ela não promove as "
+            "outras 401 caixas."
+        ),
+        usage_note=(
+            "UNUSABLE hoje, por decisão de segurança e não por defeito de formato. "
+            "Só a pasta `pothole` entra, "
+            "como reforço de URMIND_ROAD_D40; as outras seis foram reexaminadas e "
+            "seguem recusadas. Nunca TEST nem VALIDATION: o único agrupamento "
+            "disponível é a pasta de classe, que não separa cena, então esta fonte "
+            "no lado avaliado não sustentaria a garantia do §8.4. A derivada está "
+            "em `datasets/manifests/urban_community_boxes.jsonl`: 290 imagens e "
+            "451 candidatas semânticas e **zero** autorizadas a treinar, depois "
+            "de bloquear 10 imagens duplicadas (22 caixas) e pôr 5 caixas em "
+            "quarentena heurística. O mapeamento `pothole → URMIND_ROAD_D40` "
+            "está sustentado no nível da CLASSE; nenhuma das 451 caixas foi "
+            "conferida por pessoa, e a pasta já exibiu trinca sem cavidade, "
+            "bueiro aberto e imagem com buracos não anotados. Enquanto isso, "
+            "`urmind_class` sai null e `feeds_training` é falso. Verificação "
+            "cruzada contra o teste do RDD2022 e o holdout do UNIVALI: sem "
+            "contaminação detectável."
+        ),
+        planned_step="§25 passo 7 — reforço de D40 no conjunto de treino",
     ),
     DatasetSource(
         id="project_sidewalk",
@@ -264,6 +502,21 @@ SOURCES: tuple[DatasetSource, ...] = (
                 "vazamento entre si."
             ),
         ),
+        annotation_format="parquet_embedded_image_and_pixel_keypoints",
+        usage=(DatasetUsage.CONTEXT_ONLY,),
+        usage_note=(
+            "Não é GEO_REFERENCE apesar do papel declarado: o pacote traz o ponto "
+            "em pixels da imagem e **não** publica latitude/longitude, então não "
+            "exercita nenhuma consulta espacial. O que ele oferece é referência "
+            "visual de rampa de calçada para a futura tarefa de acessibilidade."
+        ),
+        potential_usage=(DatasetUsage.TRAIN,),
+        unlock_requirement=(
+            "Só com URMIND_SIDEWALK aprovada no §8.2 — o que exige dataset e "
+            "protocolo de anotação próprios — e com uma tarefa de keypoint, não "
+            "de caixa. Não é conversão: é outra tarefa de visão."
+        ),
+        planned_step="nenhuma etapa do §25 atual o consome; reserva para V2 (acessibilidade)",
     ),
     DatasetSource(
         id="rampnet",
@@ -318,6 +571,16 @@ SOURCES: tuple[DatasetSource, ...] = (
             ),
             "GeoRecord não é observação do sistema e não vira Capture/Detection.",
         ),
+        annotation_format="parquet_embedded_image_normalized_keypoints_and_wgs84_coords",
+        usage=(DatasetUsage.GEO_REFERENCE, DatasetUsage.CONTEXT_ONLY),
+        usage_note=(
+            "É a única fonte com coordenada real e rótulo humano em volume: "
+            "serve para exercitar ST_DWithin/ST_ClosestPoint e o snap à via do "
+            "§11.2 com dado que não é inventado, antes de existir Capture real. "
+            "O keypoint na panorâmica é CONTEXT_ONLY, pelo motivo do Project "
+            "Sidewalk."
+        ),
+        planned_step="§25 passo 5 — exercitar PostGIS/snap antes de haver captura real",
     ),
     DatasetSource(
         id="camber",
@@ -337,6 +600,15 @@ SOURCES: tuple[DatasetSource, ...] = (
             "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
             "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real.",
         ),
+        annotation_format="csv_model_detections_plus_gpx_track",
+        usage=(DatasetUsage.GEO_REFERENCE,),
+        usage_note=(
+            "Um trajeto GPX com detecções datadas ao longo dele é a única amostra "
+            "que o projeto tem do formato de uma sessão de coleta do Scout: serve "
+            "para modelar Mission/rota e recorrência por RoadSegment. As detecções "
+            "são saída de um YOLO de terceiros e nunca viram rótulo."
+        ),
+        planned_step="§25 passo 5 — modelar Mission/rota e recorrência por trecho",
     ),
     DatasetSource(
         id="global_streetscapes",
@@ -380,6 +652,16 @@ SOURCES: tuple[DatasetSource, ...] = (
                 "desta imagem obriga a atribuir e a manter a licença."
             ),
         ),
+        annotation_format="csv_scene_context_labels_with_wgs84_coords",
+        usage=(DatasetUsage.CONTEXT_ONLY, DatasetUsage.GEO_REFERENCE),
+        usage_note=(
+            "Os rótulos humanos descrevem a **condição da captura** — clima, "
+            "iluminação, reflexo, brilho, qualidade — que é exatamente o vetor "
+            "de `Capture.quality` do §5 e o fator de qualidade da evidência que "
+            "o §14.2 usa na prioridade. Também traz coordenada, o que a torna "
+            "utilizável como GEO_REFERENCE."
+        ),
+        planned_step="§25 passos 3 e 11 — vocabulário de Capture.quality e fator de evidência",
     ),
     DatasetSource(
         id="bdd100k",
@@ -424,6 +706,19 @@ SOURCES: tuple[DatasetSource, ...] = (
                 "sem máscara e sai sem `rejected`."
             ),
         ),
+        annotation_format="zip_images_plus_semantic_segmentation_maps",
+        usage=(DatasetUsage.CONTEXT_ONLY,),
+        usage_note=(
+            "Percepção de condução — via, veículo, pedestre. Nenhuma classe do "
+            "§8.2, e a fonte não publica coordenada, então também não é "
+            "GEO_REFERENCE. O uso previsto é o módulo separado do §23 "
+            "(movimentação do Scout: área trafegável e obstáculo), que ainda "
+            "não começou."
+        ),
+        planned_step=(
+            "§23 — visão para movimentação do Scout, posterior ao §25; "
+            "nenhuma etapa atual o consome"
+        ),
     ),
 )
 
@@ -443,3 +738,24 @@ def get_source(dataset_id: str) -> DatasetSource:
 
 def sources_by_role(role: DatasetRole) -> tuple[DatasetSource, ...]:
     return tuple(s for s in SOURCES if s.role is role)
+
+
+def evaluation_forbidden_ids() -> frozenset[str]:
+    """Ids que nenhum conjunto avaliado pode conter."""
+    return frozenset(s.id for s in SOURCES if s.evaluation_forbidden)
+
+
+def assert_evaluation_allowed(dataset_id: str, usage: str = "avaliação") -> None:
+    """Portão de avaliação. Levanta `EvaluationForbidden` quando a fonte é vetada.
+
+    Chamado por quem monta conjunto medido — split com validação/teste, holdout
+    externo, benchmark. Fonte desconhecida não passa em silêncio: `get_source`
+    levanta, porque avaliar com dado que o catálogo não descreve é o mesmo
+    problema com outro nome.
+    """
+    source = get_source(dataset_id)
+    if source.evaluation_forbidden:
+        raise EvaluationForbidden(
+            f"{dataset_id} não pode entrar em {usage}: "
+            f"{source.evaluation_forbidden_reason}"
+        )

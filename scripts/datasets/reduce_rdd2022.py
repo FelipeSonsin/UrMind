@@ -19,6 +19,7 @@ nenhum objeto.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -53,6 +54,10 @@ SOURCE = {
     "license": "CC BY 4.0",
     "archive_md5": "b62bd51d2ffcfaa76c60f234f0cc2bb3",
 }
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 # --------------------------------------------------------------------- helpers
@@ -534,6 +539,28 @@ def main() -> int:
 
     report = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        # Contrato de proveniencia (artifact_contract.yaml#derived_manifest_contract):
+        # sem o script que gerou, a derivada nao se reproduz.
+        "script": "scripts/datasets/reduce_rdd2022.py",
+        "source_dataset": "rdd2022",
+        "source_version": "figshare-21431547-v1 (2022-crddc)",
+        "transform": "poda autorizada e estratificada exclusivamente da origem Norway",
+        "params": {
+            "seed": SEED,
+            "target_bytes": args.target_bytes,
+            "hard_cap_bytes": HARD_CAP_BYTES,
+        },
+        "inputs": base["files_total"],
+        "outputs": post["files_total"],
+        "dropped": base["files_total"] - post["files_total"],
+        "drop_reasons": {
+            "norway_train_negative_not_selected": len(pl["removed_train"]),
+            "norway_unlabeled_test": len(pl["removed_test_files"]),
+        },
+        "integrity": {
+            "kept_manifest_sha256": _sha256(KEPT_MANIFEST),
+            "removed_manifest_sha256": _sha256(REMOVED_MANIFEST),
+        },
         "authorization": "usuario 2026-09-08: podar somente Norway, teto 7 GB",
         "source": SOURCE,
         "seed": SEED,

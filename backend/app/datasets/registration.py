@@ -143,9 +143,18 @@ def build_dataset_version(
             raise RegistrationRefused(
                 f"{source.id}: split por grupo é obrigatório antes do registro (§8.4)"
             )
-        if split is not None and split.empty_splits:
+        # Conjunto vazio normalmente invalida a etapa: o §8.3 precisa dos três.
+        # A exceção é a fonte proibida de avaliar — nela, validação e teste
+        # vazios são a consequência pretendida da proibição, não uma falha.
+        # Treino vazio continua sendo falha em qualquer caso.
+        vazios = set(split.empty_splits) if split is not None else set()
+        if split is not None:
+            vazios -= set(split.expected_empty)
+        if source.evaluation_forbidden:
+            vazios -= {"validation", "test"}
+        if vazios:
             raise RegistrationRefused(
-                f"{source.id}: {'; '.join(split.warnings)}"
+                f"{source.id}: split(s) sem nenhum item: {', '.join(sorted(vazios))}"
             )
 
     split_payload: dict[str, Any] = {

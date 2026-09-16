@@ -36,6 +36,7 @@ from typing import Any
 from app.schemas.core import UrmindClass
 
 __all__ = [
+    "NEGATIVE_SEMANTICS_UNVERIFIED",
     "AnnotatedImage",
     "BoundingBox",
     "GeoRecord",
@@ -44,6 +45,18 @@ __all__ = [
     "MaskSample",
     "RejectedLabel",
 ]
+
+
+NEGATIVE_SEMANTICS_UNVERIFIED = "NEGATIVE_SEMANTICS_UNVERIFIED"
+"""A imagem não tem anotação e a fonte não prova que isso significa "não há nada".
+
+Uma imagem sem caixa só é negativa de verdade se alguém tiver olhado e concluído
+que não havia o que anotar. Quando a fonte não publica protocolo de anotação, a
+ausência de caixa também é compatível com anotador que não anotou — e treinar com
+isso ensina o detector que aquele objeto não existe naquela cena. Enquanto o
+protocolo não for comprovado, o registro carrega esta marca e nenhum consumidor
+pode contá-lo como negativa confiável.
+"""
 
 
 @dataclass(frozen=True)
@@ -97,10 +110,22 @@ class AnnotatedImage:
     official_split: str | None = None
     """Split publicado pela fonte, quando existe. Preservá-lo é o §8.3 passo 4."""
 
+    negative_status: str | None = None
+    """Por que a ausência de anotação nesta imagem ainda não é uma negativa.
+
+    `None` = a ausência foi aceita como negativa. `NEGATIVE_SEMANTICS_UNVERIFIED`
+    = a fonte não comprova o protocolo, e a imagem fica retida.
+    """
+
     @property
     def usable(self) -> bool:
         """Tem ao menos uma caixa na taxonomia V1."""
         return bool(self.boxes)
+
+    @property
+    def trusted_negative(self) -> bool:
+        """Sem anotação, sem recusa e sem ressalva de protocolo."""
+        return not self.boxes and not self.rejected and self.negative_status is None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -110,6 +135,7 @@ class AnnotatedImage:
             "height": self.height,
             "group": self.group,
             "official_split": self.official_split,
+            "negative_status": self.negative_status,
             "boxes": [
                 {
                     "class": str(b.urmind_class),

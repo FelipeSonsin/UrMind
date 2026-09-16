@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "model_id": "yolox-s-model-v1",
+  "architecture": "YOLOX-s",
+  "source_repository": "https://github.com/Megvii-BaseDetection/YOLOX",
+  "source_commit": "6ddff4824372906469a7fae2dc3206c7aa4bbaee",
+  "license": "Apache-2.0",
+  "num_classes": 4,
+  "class_names": ["D00", "D10", "D20", "D40"],
+  "canonical_class_names": [
+    "URMIND_ROAD_D00",
+    "URMIND_ROAD_D10",
+    "URMIND_ROAD_D20",
+    "URMIND_ROAD_D40"
+  ],
+  "input_size": [640, 640],
+  "test_size": [640, 640],
+  "preprocessing": {
+    "color": "RGB decoded then converted to BGR",
+    "image_tensor": "float32 CHW/BCHW, padding=114, range=0..255, no normalization",
+    "implementation": "yolox.data.data_augment.preproc"
+  },
+  "target_format": {
+    "manifest": "xyxy",
+    "model": "float32 max_labels x 5 [class_id,cx,cy,width,height]",
+    "max_labels": 120,
+    "implementation": "yolox.utils.xyxy2cxcywh"
+  },
+  "cuda_capability": {
+    "expected": true,
+    "runtime": "PyTorch CUDA 12.8",
+    "minimum_nvidia_driver_windows": "570.65"
+  },
+  "pretrained_policy": {
+    "mode": "pretrained_official_optional",
+    "future_source": "official YOLOX-s COCO checkpoint from Megvii-BaseDetection/YOLOX release 0.1.1rc0",
+    "head_adaptation": "load compatible backbone/neck weights and replace/reinitialize the detection head for 4 classes",
+    "download_in_priority_5": false
+  },
+  "resume_policy": "urmind_checkpoint_full_state_fail_closed",
+  "checkpointing": {
+    "enabled": true,
+    "save_last": true,
+    "save_best": true,
+    "monitor": "map50_95",
+    "mode": "max",
+    "schema_version": 1
+  },
+  "mlflow": {
+    "tracking_mode": "local_sqlite",
+    "tracking_directory": "mlruns",
+    "experiment": "urmind-yolox-model-v1",
+    "artifact_policy": "lightweight_metadata_and_references_only"
+  },
+  "dry_run": {
+    "train_steps": 2,
+    "validation_max_batches": 1,
+    "batch_size": 1,
+    "test_access": "forbidden",
+    "artifact_policy": "temporary_checkpoints_and_lightweight_mlflow_only"
+  },
+  "evaluation": {
+    "confidence_threshold": 0.01,
+    "nms_threshold": 0.65,
+    "iou_threshold": 0.5,
+    "threshold_source": "official YOLOX Exp defaults: test_conf=0.01, nmsthre=0.65"
+  },
+  "readiness": {
+    "model_stack_ready": true,
+    "data_model_interface_ready": true,
+    "yolox_model_v1_ready": true,
+    "training_engine_ready": true,
+    "evaluator_ready": true,
+    "checkpointing_ready": true,
+    "mlflow_ready": true,
+    "dvc_ready": true,
+    "dry_run_ready": true,
+    "system_ready_for_training": false
+  },
+  "training": {
+    "batch_size": 2,
+    "max_epoch": 300,
+    "optimizer": "SGD",
+    "basic_lr_per_image": 0.00015625,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "scheduler": "yoloxwarmcos",
+    "warmup_epochs": 5,
+    "warmup_lr": 0.0,
+    "min_lr_ratio": 0.05,
+    "no_aug_epochs": 15,
+    "amp": true,
+    "amp_initial_scale": 128.0,
+    "ema": true,
+    "workers": 0,
+    "seed": 20260908,
+    "augmentation": {
+      "enabled": false,
+      "priority_6_policy": "disabled because the authorized dataset adapter currently exposes deterministic official YOLOX preproc only; no parallel augmentation adapter is introduced",
+      "multiscale_range": 5,
+      "mosaic_probability": 1.0,
+      "mixup_probability": 1.0,
+      "hsv_probability": 1.0,
+      "flip_probability": 0.5,
+      "degrees": 10.0,
+      "translate": 0.1,
+      "mosaic_scale": [0.1, 2.0],
+      "mixup_scale": [0.5, 1.5],
+      "shear": 2.0
+    },
+    "validation_interval_epochs": 10,
+    "checkpoint_interval_epochs": 1,
+    "log_interval_steps": 10,
+    "output_directory": "models/checkpoints/yolox_s_model_v1",
+    "device": "cuda",
+    "local_availability_policy": "fail_on_sample_access_no_hydration",
+    "determinism": "best_effort_seeded; CUDA and YOLOX operations may remain nondeterministic"
+  },
+  "architecture_parameters": {
+    "depth": 0.33,
+    "width": 0.5,
+    "in_channels": [256, 512, 1024],
+    "activation": "silu"
+  }
+}

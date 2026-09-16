@@ -1,4 +1,17 @@
 {
+  "script": "scripts/datasets/make_splits.py",
+  "source_dataset": "rdd2022",
+  "source_version": "figshare-21431547-v1 (2022-crddc)",
+  "generated_at": "2026-09-13T06:09:14-03:00",
+  "inputs": {
+    "images": 35490
+  },
+  "dropped": {
+    "images": 0
+  },
+  "drop_reasons": {
+    "none": "partição: toda imagem do manifesto de seleção entra em um split"
+  },
   "algorithm_version": 4,
   "seed": 20260908,
   "source_manifest_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
@@ -75,7 +88,7 @@
         "country:Norway"
       ],
       "fraction": 0.6761904761904762,
-      "manifest_sha256": "5124b61c61f8fb19cb5d2ba2355177f0510a8640f35b59e78c175b709a22ec5d",
+      "manifest_sha256": "3483ecdcae4ad9bc1600387f732cd2c77c8000080271b537c36c48133cf76a85",
       "negatives": 9794
     },
     "validation": {
@@ -117,7 +130,7 @@
         "country:China"
       ],
       "fraction": 0.10870667793744716,
-      "manifest_sha256": "355515966a461e50ec289f33ab7fe26db9f60ac991a2af8dfc37988177a4ee3c",
+      "manifest_sha256": "0dc9ca29d19ff2606d4d1d84f8ddb3494fa1da597ebd70a1801ceaf97f89acec",
       "negatives": 5
     },
     "test": {
@@ -158,12 +171,12 @@
         "country:United_States"
       ],
       "fraction": 0.21510284587207665,
-      "manifest_sha256": "b55d5be5a7992e54c18650eadfb20e3dc897d715371ddb58f839576741763baf",
+      "manifest_sha256": "9500cb9a759a8a467ca0ed0069c8be9c0754c7310fa0d4cecac13fd14eddb400",
       "negatives": 1757
     }
   },
   "reconciled_after_reduction": {
-    "at": "2026-09-09T00:55:25-0300",
+    "at": "2026-09-13T17:09:04-0300",
     "reason": "A poda autorizada da origem Norway removeu imagens que estes splits citavam. As linhas orfas sairam; nenhuma imagem trocou de lado e o agrupamento por pais nao mudou, porque a Norway inteira estava em train.",
     "dropped": {
       "train": 0,

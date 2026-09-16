@@ -21,7 +21,13 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
-__all__ = ["DatasetSplit", "SplitRatios", "find_leakage", "split_by_group"]
+__all__ = [
+    "DatasetSplit",
+    "SplitRatios",
+    "assert_no_forbidden_evaluation",
+    "find_leakage",
+    "split_by_group",
+]
 
 
 @dataclass(frozen=True)
@@ -79,13 +85,22 @@ class DatasetSplit:
             if not members
         ]
 
+    expected_empty: tuple[str, ...] = ()
+    """Conjuntos que DEVEM sair vazios, por decisão declarada — não por falha.
+
+    Uma fonte proibida de avaliar produz validação e teste vazios de propósito.
+    Sem esta distinção, o split registrado saía carregando o aviso genérico de
+    que conjunto vazio invalida a etapa: a versão nascia aprovada e se declarando
+    inutilizável na mesma frase, e aviso que sempre aparece para de ser lido.
+    """
+
     @property
     def warnings(self) -> list[str]:
         """Problemas que não impedem o split, mas invalidam o uso dele."""
         problems: list[str] = []
         if not len(self):
             return problems
-        vazios = self.empty_splits
+        vazios = [nome for nome in self.empty_splits if nome not in self.expected_empty]
         if vazios:
             total_grupos = sum(len(items) for items in self.groups.values())
             problems.append(
@@ -105,6 +120,7 @@ class DatasetSplit:
             },
             "groups": {name: sorted(items) for name, items in self.groups.items()},
             "achieved_ratios": self.achieved_ratios,
+            "expected_empty": list(self.expected_empty),
             "warnings": self.warnings,
         }
 
@@ -128,8 +144,21 @@ def split_by_group[T](
     ratios = ratios or SplitRatios()
 
     buckets: dict[str, list[T]] = defaultdict(list)
+    materializados: list[T] = []
     for item in items:
+        materializados.append(item)
         buckets[group_key(item)].append(item)
+
+    # Portão do §8.4, aplicado antes de distribuir qualquer coisa: fonte marcada
+    # como proibida de avaliar não pode chegar a um split que tem lado medido.
+    if ratios.validation > 0 or ratios.test > 0:
+        assert_no_forbidden_evaluation(materializados)
+
+    # Cota zero é decisão declarada, não falha: o conjunto sai vazio porque foi
+    # pedido que saísse.
+    esperados_vazios = tuple(
+        nome for nome, fracao in ratios.as_dict().items() if fracao == 0
+    )
 
     if not buckets:
         return DatasetSplit(
@@ -138,6 +167,7 @@ def split_by_group[T](
             test=[],
             groups={"train": [], "validation": [], "test": []},
             achieved_ratios={"train": 0.0, "validation": 0.0, "test": 0.0},
+            expected_empty=esperados_vazios,
         )
 
     total = sum(len(members) for members in buckets.values())
@@ -173,7 +203,40 @@ def split_by_group[T](
         test=assigned["test"],
         groups=assigned_groups,
         achieved_ratios=achieved,
+        expected_empty=esperados_vazios,
     )
+
+
+def assert_no_forbidden_evaluation(items: Iterable[object]) -> None:
+    """Recusa registros de fonte que o catálogo proíbe de avaliar.
+
+    A restrição existia como frase em `usage_note` e em campo de manifesto, e
+    frase nenhuma impede um split. Aqui ela vira código no único ponto por onde
+    um conjunto avaliado nasce: se um registro carrega `dataset_id` de fonte com
+    `evaluation_forbidden`, o split não acontece.
+
+    Registro sem `dataset_id` passa — este módulo é genérico e recebe listas de
+    caminhos nos testes. Quem passa objeto anônimo assume a conferência; quem
+    passa registro do catálogo ganha o bloqueio de graça.
+    """
+    from app.datasets.catalog import EvaluationForbidden, evaluation_forbidden_ids
+
+    proibidos = evaluation_forbidden_ids()
+    if not proibidos:
+        return
+    encontrados = sorted(
+        {
+            str(dataset_id)
+            for item in items
+            if (dataset_id := getattr(item, "dataset_id", None)) in proibidos
+        }
+    )
+    if encontrados:
+        raise EvaluationForbidden(
+            f"{', '.join(encontrados)} não pode entrar em split com validação ou "
+            "teste: a fonte é declarada evaluation_forbidden no catálogo. Use "
+            "SplitRatios(train=1.0, validation=0.0, test=0.0) para reforço de treino."
+        )
 
 
 def find_leakage(split: DatasetSplit) -> dict[str, list[str]]:

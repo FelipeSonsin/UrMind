@@ -48,7 +48,7 @@ A fila assíncrona será o Supabase Queues/pgmq (§7), não Celery/Redis.
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Linguagem | Python 3.12+ |
+| Linguagem | Python 3.12 |
 | API | FastAPI + Pydantic v2 |
 | Banco | Supabase PostgreSQL + PostGIS |
 | Acesso a dados | SQLAlchemy 2 + GeoAlchemy2 + psycopg 3 |
@@ -56,13 +56,33 @@ A fila assíncrona será o Supabase Queues/pgmq (§7), não Celery/Redis.
 | Respostas | Jinja2 sobre dado estruturado, sem LLM |
 | Migrações | Alembic (revisões assíncronas sobre psycopg 3) |
 | Logs | structlog em JSON, com `correlation_id` |
+| Visão (MODEL V1) | PyTorch/CUDA + YOLOX-s oficial fixados; fundação validada em `backend/ml-stack.json` |
 | Testes | pytest |
 | Lint | ruff |
 
-Previstas pelo MASTER_PLAN §28 e ainda **não** presentes no código: PyTorch,
-YOLOX-s, ONNX Runtime, OpenCV, ExifTool, SciPy, librosa, XGBoost, SHAP,
-Supabase Storage/Auth/Queues, DVC,
-MLflow, Evidently.
+Previstas pelo MASTER_PLAN §28 e ainda **não** presentes no código: ONNX Runtime,
+ExifTool, SciPy, librosa, XGBoost, SHAP,
+Supabase Storage/Auth/Queues e Evidently. DVC e MLflow estão integrados
+exclusivamente em modo local, sem remote ou serviço SaaS obrigatório.
+
+### Estado comprovado da fundação YOLOX
+
+Verificação local reproduzida em 15/09/2026; a fonte autoritativa de versões e
+fontes oficiais é `backend/ml-stack.json`.
+
+| Componente | Declarado | Comprovado |
+|---|---:|---:|
+| Python 3.12.x | sim | sim |
+| PyTorch com runtime CUDA | sim | sim |
+| torchvision | sim | sim |
+| OpenCV | sim | sim |
+| pycocotools | sim | sim |
+| YOLOX-s oficial, commit fixado | sim | importável e instanciável |
+| CUDA via PyTorch | sim | operação CPU→CUDA→CPU comprovada |
+
+Isto significa `MODEL_STACK_READY`, não prontidão para treinamento. A interface
+Dataset→YOLOX, o engine de treino e o evaluator exclusivo de VALIDATION estão
+validados; checkpoint/resume completo está integrado, enquanto o sistema completo de treino continua não pronto.
 
 ## Estado atual
 
@@ -351,7 +371,7 @@ por `.gitignore`, como o §10.2 pede. O estado detalhado de cada fonte está em
 
 ## Como executar
 
-Pré-requisitos: Python 3.12+ e um projeto Supabase com a extensão PostGIS
+Pré-requisitos: Python 3.12 e um projeto Supabase com a extensão PostGIS
 disponível.
 
 1. Copie `backend/.env.example` para `backend/.env` e preencha `DATABASE_URL` —
@@ -365,13 +385,28 @@ disponível.
 2. No PowerShell, a partir da raiz do projeto:
 
 ```powershell
-py -m venv backend\.venv
-backend\.venv\Scripts\python.exe -m pip install -e "backend[dev]"
+& scripts\setup_ml_env.ps1
 Set-Location backend
 .venv\Scripts\python.exe -m alembic upgrade head  # aplica as migrations pendentes
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
+
+Essa automação foi validada para Windows x86-64 com GPU NVIDIA e driver
+compatível. Outros sistemas operacionais ou máquinas sem CUDA exigem uma stack
+separadamente validada; não há fallback silencioso para CPU.
+
+O script inspeciona primeiro `backend/.venv`. Quando ela já aponta para uma
+stack Python 3.12/CUDA/YOLOX válida, reutiliza o target real sem reinstalar ou
+criar outro ambiente. Somente quando `.venv` não existe ele detecta Python 3.12,
+cria um target determinístico por checkout sob `%LOCALAPPDATA%\UrMind\venvs` e
+cria a junction. Em outra máquina, `URMIND_PYTHON312` pode
+apontar explicitamente para o `python.exe` oficial, e `URMIND_VENV_TARGET` pode
+alterar apenas o diretório físico do ambiente.
+
+Papéis de configuração: `backend/pyproject.toml` declara as dependências diretas,
+`backend/requirements-ml-cu128.txt` é o lock da resolução ML e
+`backend/ml-stack.json` registra compatibilidade, origem e evidência observada.
 
 API interativa: `http://127.0.0.1:8000/api/v1/docs`
 

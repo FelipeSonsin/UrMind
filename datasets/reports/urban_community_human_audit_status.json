@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "scope": "estado da auditoria humana caixa a caixa do reforço do Urban Community. Este artefato NÃO contém decisão gerada por máquina.",
+  "source_dataset": "urban_community",
+  "source_version": "kaggle-2025",
+  "transform": "preparação de folha de auditoria humana estratificada por caixa",
+  "params": {
+    "per_stratum": 8,
+    "strata": [
+      "near_area_floor",
+      "quarantined",
+      "small_box",
+      "medium_box",
+      "large_box",
+      "near_full_frame",
+      "single_box_image",
+      "many_boxes_image",
+      "near_duplicate"
+    ],
+    "selection": "determinística por ordenação de área; sem sorteio",
+    "audit_version": "urban-community-box-audit-v1"
+  },
+  "script": "scripts/datasets/prepare_urban_community_human_audit.py",
+  "generated_at": "2026-09-12T17:03:31-03:00",
+  "inputs": 451,
+  "outputs": 50,
+  "dropped": 0,
+  "drop_reasons": {},
+  "duplicate_review": {
+    "sheet": "datasets/annotations/urban_community_duplicate_audit_v1.jsonl",
+    "pairs": 4,
+    "pending": 4,
+    "status": "PENDING_HUMAN_DUPLICATE_REVIEW",
+    "allowed_decisions": [
+      "same_scene_keep_a",
+      "same_scene_keep_b",
+      "different_scenes",
+      "ambiguous"
+    ],
+    "rule": "decisão de duplicata é por PAR e não se deduz de aprovação de caixa: aprovar um buraco não responde se duas imagens são a mesma cena"
+  },
+  "integrity": {
+    "boxes_manifest_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+    "duplicate_sheet_sha256": "f71065eb4f9b8ca8b2c4792ca602b73dbdda240d9ea4517a1ca7bb2d8f68a6ef",
+    "conversion_report_sha256": "ba0e1c668ffa0886a2a04aa03524f296a3767f9693f2268e4e0978c4a3f06b78",
+    "sheet_sha256": "76b988fa27b5bd5a8340fe7f0658fb6b1a604149ae37a3a7c1cd3b5e0a28325e"
+  },
+  "raw_modified": false,
+  "status": {
+    "audit_version": "urban-community-box-audit-v1",
+    "sheet": "datasets/annotations/urban_community_box_audit_v1.jsonl",
+    "rows": 50,
+    "reviewed": 0,
+    "pending": 50,
+    "decision_counts": {
+      "None": 50
+    },
+    "invalid_decisions": [],
+    "allowed_decisions": [
+      "approved_pothole",
+      "wrong_class",
+      "annotation_incomplete",
+      "bad_box",
+      "ambiguous",
+      "duplicate",
+      "other"
+    ],
+    "sample_complete": false,
+    "boxes_with_individual_human_decision": 0,
+    "boxes_without_individual_human_decision": 451,
+    "approved_boxes": 0,
+    "rejected_boxes": 0,
+    "inconclusive_boxes": 0,
+    "human_review_status": "PENDING",
+    "acceptance_protocol": {
+      "approved_pothole": [
+        "a região mostra claramente cavidade ou depressão do pavimento;",
+        "a caixa envolve o objeto de forma suficiente — sem cortar metade dele nem cobrir meio quadro;",
+        "não é apenas trinca, mesmo trinca larga, sem perda de material;",
+        "não é bueiro, tampa, grelha ou boca de lobo;",
+        "não é remendo, sombra, mancha de óleo, poça ou emenda de asfalto;",
+        "não é ambígua a ponto de deixar o rótulo inseguro."
+      ],
+      "wrong_class": "o conteúdo é outro objeto — trinca, bueiro, remendo, sombra.",
+      "annotation_incomplete": "há buraco visível NESTA imagem sem caixa. É defeito da IMAGEM: marque mesmo quando a caixa desta linha estiver correta, porque a imagem inteira ensina falso negativo.",
+      "bad_box": "é buraco, mas a caixa está mal colocada ou mal dimensionada.",
+      "ambiguous": "a imagem não permite decidir. Não é aprovação nem recusa.",
+      "duplicate": "a mesma cena já aparece em outra amostra do reforço.",
+      "other": "qualquer outro problema; descreva em `note`.",
+      "multiple_problems": "escolha a decisão mais grave e descreva as demais em `note`. Nenhuma observação se perde.",
+      "image_level_rule": "uma caixa correta NÃO torna a imagem segura. Se houver buraco não anotado, a imagem inteira fica com `annotation_completeness=INCOMPLETE` e nenhuma caixa dela é autorizada.",
+      "declared_before_review": true
+    },
+    "semantic_mapping_approved": true,
+    "box_level_human_validation_complete": false,
+    "why_not_complete": "50 de 50 linha(s) da amostra sem decisão humana.",
+    "meaning": "`semantic_mapping_approved` é sobre a CLASSE: `pothole` corresponde à definição de URMIND_ROAD_D40. `box_level_human_validation_complete` é sobre CADA CAIXA. A primeira não implica a segunda, e enquanto a segunda for falsa as caixas são candidatas a reforço de treino."
+  },
+  "stratum_population": {},
+  "sample_vs_population": "A folha é uma AMOSTRA estratificada. Fechá-la ESTIMA a taxa de erro da fonte — aprovadas, wrong_class, annotation_incomplete, bad_box, ambiguous — e serve para decidir entre (A) ampliar a revisão, (B) revisar todas as caixas ou (C) manter a fonte bloqueada. Ela NÃO promove as caixas que ninguém olhou: `box_level_validation` é por caixa, e cada caixa autorizada precisa da própria decisão.",
+  "how_to_fill": "Para cada linha, abra a evidência visual, decida entre ['approved_pothole', 'wrong_class', 'annotation_incomplete', 'bad_box', 'ambiguous', 'duplicate', 'other'] e preencha `decision`, `note`, `reviewed_by` e `reviewed_at`. `annotation_incomplete` é sobre a IMAGEM: use quando houver buraco visível sem caixa, mesmo que a caixa desta linha esteja correta — é o defeito que ensina falso negativo. Decisão fora do vocabulário é contada como inválida e a auditoria não fecha."
+}

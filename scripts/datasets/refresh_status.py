@@ -4,10 +4,11 @@ Gerado, nao escrito a mao: o numero publicado tem de vir do disco e dos
 relatorios, senao a documentacao envelhece sem ninguem perceber.
 """
 
+import json
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-import json
 
 
 def br(value: float, casas: int = 2) -> str:
@@ -87,9 +88,14 @@ for name in ORDER:
 v = red["validation"]
 classes = v["loader_classes"]
 
+# A data sai do relógio, não do teclado. Estava escrita à mão e envelhecia
+# sozinha: um STATUS recém-gerado já nascia dizendo ser de dois dias antes, o
+# que é pior do que não ter data — convida a duvidar dos números que estão certos.
+gerado_em = datetime.now().astimezone().date().isoformat()
+
 texto = rf"""# Estado dos datasets
 
-Atualizado em 2026-09-09. GB decimais (1 GB = 1.000.000.000 bytes).
+Atualizado em {gerado_em}. GB decimais (1 GB = 1.000.000.000 bytes).
 
 As oito fontes estão presentes com dado real e somam **{br(total)} GB** dos 40 GB
 disponíveis. Sete cabem no teto de **7 GB por dataset**; o RDD2022 é uma **exceção

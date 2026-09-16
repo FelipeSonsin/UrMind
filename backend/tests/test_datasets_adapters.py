@@ -7,6 +7,8 @@ nunca viu 13 GB de RDD2022.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.datasets.adapters import (
@@ -112,28 +114,117 @@ def test_rdd_pasta_errada_falha_com_mensagem_util(tmp_path):
 
 @pytest.fixture
 def urban_root(tmp_path):
-    pytest.importorskip("PIL")
-    from PIL import Image
+    """A cadeia derivada que o adaptador exige — e um raw que ele nunca abre.
 
-    raiz = tmp_path / "urban_community"
+    O raw é criado de propósito, com rótulo válido e legível: se o adaptador
+    voltasse a lê-lo, os testes abaixo passariam pelo motivo errado. A única
+    fonte de verdade é `urban_community_boxes.jsonl`.
+    """
+    import hashlib
+
+    datasets = tmp_path / "datasets"
+    raiz = datasets / "raw" / "urban_community"
     base = raiz / "Data_sets" / "Data_sets"
+    (datasets / "manifests").mkdir(parents=True)
+    (datasets / "reports").mkdir(parents=True)
+
+    scan = []
     for classe, class_id in (("pothole", 3), ("open_manhole", 5), ("cracks", 4)):
         (base / classe / "images").mkdir(parents=True)
         (base / classe / "labels").mkdir(parents=True)
-        Image.new("RGB", (200, 100)).save(base / classe / "images" / "1.jpg")
         (base / classe / "labels" / "1.txt").write_text(
             f"{class_id} 0.5 0.5 0.2 0.4\n", encoding="utf-8"
         )
+        scan.append(
+            {
+                "folder": classe,
+                "stem": "1",
+                "image_relpath": (
+                    f"datasets/raw/urban_community/Data_sets/Data_sets/{classe}/images/1.jpg"
+                ),
+                "image_width": 200,
+                "image_height": 100,
+                "boxes": [{"index": 0, "class_id": class_id}],
+            }
+        )
+
+    # A caixa de `pothole` com decisão humana registrada: é o único caminho para
+    # uma classe da V1 sair daqui.
+    derivada = {
+        "dataset_id": "urban_community",
+        "stem": "1",
+        "folder": "pothole",
+        "image_relpath": scan[0]["image_relpath"],
+        "image_width": 200,
+        "image_height": 100,
+        "group": "folder:pothole",
+        "annotation_completeness": "COMPLETE",
+        "duplicate_review_status": "NOT_IN_DUPLICATE_PAIR",
+        "boxes": [
+            {
+                "source_label": "pothole",
+                "geometry_valid": True,
+                "source_category_validated": True,
+                "quarantine_reasons": [],
+                "human_decision": "approved_pothole",
+                "xmin": 80.0,
+                "ymin": 30.0,
+                "xmax": 120.0,
+                "ymax": 70.0,
+            }
+        ],
+    }
+
+    scan_path = datasets / "manifests" / "urban_community_scan.jsonl"
+    boxes_path = datasets / "manifests" / "urban_community_boxes.jsonl"
+    scan_path.write_text("\n".join(json.dumps(r) for r in scan) + "\n", encoding="utf-8")
+    boxes_path.write_text(json.dumps(derivada) + "\n", encoding="utf-8")
+
+    def sha(path):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    (datasets / "reports" / "urban_community_conversion.json").write_text(
+        json.dumps(
+            {
+                "mapping": {"semantic_mapping_approved": True},
+                "integrity": {
+                    "scan_manifest_sha256": sha(scan_path),
+                    "boxes_manifest_sha256": sha(boxes_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (datasets / "reports" / "urban_community_validation.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "duplicates": {
+                    "exact_sha256_groups": [],
+                    "blocking_near_duplicate_pairs": [],
+                },
+                "integrity": {
+                    "cross_source_valid": True,
+                    "conversion_report_sha256": sha(
+                        datasets / "reports" / "urban_community_conversion.json"
+                    ),
+                    "boxes_manifest_sha256": sha(boxes_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     return raiz
 
 
-def test_urban_converte_yolo_normalizado_para_pixels(urban_root):
+def test_urban_le_a_caixa_autorizada_do_manifesto_derivado(urban_root):
+    """A caixa vem em pixels do manifesto, não de uma releitura do .txt YOLO."""
     amostras = {a.group: a for a in read_urban_community(urban_root)}
     caixa = amostras["pothole"].boxes[0]
 
     assert caixa.urmind_class is UrmindClass.ROAD_D40
-    assert (caixa.xmin, caixa.xmax) == (80.0, 120.0)  # 200 * (0,5 ∓ 0,1)
-    assert (caixa.ymin, caixa.ymax) == (30.0, 70.0)  # 100 * (0,5 ∓ 0,2)
+    assert (caixa.xmin, caixa.xmax) == (80.0, 120.0)
+    assert (caixa.ymin, caixa.ymax) == (30.0, 70.0)
 
 
 def test_open_manhole_nao_vira_urmind_manhole(urban_root):
@@ -189,6 +280,11 @@ def test_univali_agrupa_por_trecho_de_rodovia(univali_root):
     [
         ("1007599_RS_386_386RS289112_28920", "RS_386_386RS289112"),
         ("994588_RS_386_386RS191729_09705", "RS_386_386RS191729"),
+        # Quatro pastas do pacote trazem um campo extra antes da posição. O
+        # corte posicional antigo devolvia "DF_080_080BDF0050_1" e inventava um
+        # trecho que a fonte não declara.
+        ("1050564_DF_080_080BDF0050_1_00368", "DF_080_080BDF0050_1"),
+        ("1050001_DF_080_080BDF0050_00100", "DF_080_080BDF0050"),
         ("semunderline", "semunderline"),
     ],
 )

@@ -11,14 +11,11 @@ from _budget import preflight
 from _core import (
     DATASETS_DIR,
     PROJECT_ROOT,
-    file_sha256,
     free_disk_bytes,
     relative_to_project,
     require_local,
-    write_json_report,
     write_text_safe,
 )
-from audit_storage import coletar
 
 MODIFIED = [
     ".gitignore",
@@ -73,8 +70,10 @@ def main():
         4_000_000,
         raise_on_block=True,
     )
-    storage = coletar()
-    write_json_report("storage_audit.json", storage)
+    # ``audit_storage.py`` is the single writer for this measured artifact.
+    # The final report consumes that authoritative snapshot instead of silently
+    # recomputing and overwriting it through a second producer.
+    storage = read("reports/storage_audit.json")
     audit = read("reports/rdd2022_audit.json")
     dup = read("reports/rdd2022_duplicates.json")
     subset = read("reports/rdd2022_subset_proposal.json")
@@ -233,7 +232,7 @@ def main():
         "As medidas são um snapshot anterior à gravação deste próprio relatório; pequenas diferenças de metadados são esperadas. Pastas vazias removidas tinham zero arquivos e zero bytes de conteúdo.",
         "\n## 24–26. Orçamento, disco e OneDrive",
         f"Alvo agregado 35 GB; máximo 40 GB, distribuição individual orientativa e redistribuível. Espaço livre medido: {storage['disk']['free_bytes']} bytes ({gb(storage['disk']['free_bytes'])}); preservar pelo menos 10 GB no pico.",
-        "Projeto em pasta OneDrive: SIM, detectado pelo caminho. Não foi movido, não houve pausa/reconfiguração de sincronização nem hidratação forçada. DVC não foi configurado e não foi encontrada configuração .dvc na raiz ou no backend; nenhum cache DVC foi criado.",
+        "Projeto em pasta OneDrive: SIM, detectado pelo caminho. Não foi movido, não houve pausa/reconfiguração de sincronização nem hidratação forçada. DVC local foi inicializado sem remote; nenhum dataset foi adicionado ao cache DVC.",
         "\n## 27–28. Arquivos externos e preservação",
         table(
             ["Base dinâmica", "Localização relativa", "Bytes lógicos"],
@@ -284,31 +283,6 @@ def main():
     )
     status = f"""# Estado atual — etapa de datasets\n\nAuditoria concluída em 2026-09-08. Fonte detalhada: [relatório final](reports/FINAL_REPORT.md).\n\n- {total["images"]} imagens RDD2022 auditadas; {total["objects"]} caixas válidas da V1.\n- {total["negative_images"]} negativos confirmados; {total["invalid_annotations"]} annotations inválidas; originais preservados.\n- Manifesto proposto: {selected["images"]} imagens, {gb(selected["size_bytes"])}; nenhuma cópia física.\n- Splits e cadeia de hashes verificados. Teste permanece proposta a congelar antes do treino.\n- Pastas efetivas: raw, metadata, manifests, splits, reports. As três pastas vazias sem uso foram removidas por autorização.\n- Meta total 35 GB, máximo 40 GB; distribuição por fonte flexível.\n- Nenhum download, treino, inferência, DVC, Supabase ou alteração de backend/frontend executado.\n\nO backend legado não consome automaticamente os novos manifestos. Veja metadata/artifact_contract.yaml.\nOs relatórios anteriores foram substituídos por medições atuais; fatos históricos de ações de outra IA não são atribuídos a esta execução.\n"""
     write_text_safe(DATASETS_DIR / "STATUS.md", status)
-    artifacts = []
-    for folder in ("metadata", "manifests", "splits"):
-        for path in sorted((DATASETS_DIR / folder).glob("*")):
-            if path.is_file() and path.name != "artifact_registry.json":
-                artifacts.append(
-                    {
-                        "path": relative_to_project(path),
-                        "size_bytes": path.stat().st_size,
-                        "sha256": file_sha256(path),
-                    }
-                )
-    scripts = [
-        {"path": relative_to_project(p), "sha256": file_sha256(p)}
-        for p in sorted((PROJECT_ROOT / "scripts" / "datasets").glob("*.py"))
-    ]
-    write_json_report(
-        "artifact_registry.json",
-        {
-            "version": 1,
-            "status": "audited_proposal_not_training_configuration",
-            "artifacts": artifacts,
-            "scripts": scripts,
-        },
-        "metadata",
-    )
     print("datasets/reports/FINAL_REPORT.md")
     print(
         {

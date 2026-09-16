@@ -3,250 +3,587 @@
   "status": "aquisicoes concluidas e legiveis pelo backend; RDD2022 mantido como excecao ao teto por decisao do usuario. Nao e configuracao de treinamento.",
   "artifacts": [
     {
+      "path": "backend/ml-stack.json",
+      "sha256": "71916e6ce710db94f38083ee091bc28e8ee651a25babcbb97f9b01f453dc6f4e",
+      "size_bytes": 1697
+    },
+    {
+      "path": "datasets/annotations/rdd2022_split_authorization_v1.json",
+      "sha256": "dc5db296f105be2b7aa47ccabe4637550a364ef0d3f59a509701944baab1973e",
+      "size_bytes": 916
+    },
+    {
+      "path": "datasets/annotations/univali_instance_audit_v1.jsonl",
+      "sha256": "2d5ff1037272c8e0c8a6a411cfa5b5fbeebab5b0e03a5217658fa14a34756bf0",
+      "size_bytes": 32512
+    },
+    {
+      "path": "datasets/annotations/urban_community_box_audit_v1.jsonl",
+      "sha256": "76b988fa27b5bd5a8340fe7f0658fb6b1a604149ae37a3a7c1cd3b5e0a28325e",
+      "size_bytes": 73620
+    },
+    {
+      "path": "datasets/annotations/urban_community_duplicate_audit_v1.jsonl",
+      "sha256": "f71065eb4f9b8ca8b2c4792ca602b73dbdda240d9ea4517a1ca7bb2d8f68a6ef",
+      "size_bytes": 4766
+    },
+    {
       "path": "datasets/manifests/camber.json",
-      "size_bytes": 3010,
-      "sha256": "0ce156bf6977ba31dbcfc994ce99905a4215d914e97e8c3c5f1aecc4639b854e"
+      "sha256": "0ce156bf6977ba31dbcfc994ce99905a4215d914e97e8c3c5f1aecc4639b854e",
+      "size_bytes": 3010
+    },
+    {
+      "path": "datasets/manifests/detection_external_test.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "datasets/manifests/detection_test_authorized.jsonl",
+      "sha256": "373efbc1aeb00992dc13c3e296a06b2d3ecc5e5152f2267038ec0bf82b91fe3d",
+      "size_bytes": 5768482
+    },
+    {
+      "path": "datasets/manifests/detection_train_authorized.jsonl",
+      "sha256": "899853da0ed47fc0c456dfb7cf87f15c2262364119a28002ae4a546611ea699c",
+      "size_bytes": 17284502
+    },
+    {
+      "path": "datasets/manifests/detection_validation_authorized.jsonl",
+      "sha256": "aa686ab48c53bdca5f58a099d91c4697275912bdaa8eb491273b5794b7e26d7a",
+      "size_bytes": 3077852
     },
     {
       "path": "datasets/manifests/rdd2022.json",
-      "size_bytes": 9012,
-      "sha256": "7a5e992d46b9d3b52107978dfd049c6c99c781bdde2e3bf1ef0248a5a1e983d8"
+      "sha256": "7a5e992d46b9d3b52107978dfd049c6c99c781bdde2e3bf1ef0248a5a1e983d8",
+      "size_bytes": 9012
     },
     {
       "path": "datasets/manifests/rdd2022_inventory.jsonl",
-      "size_bytes": 44319799,
-      "sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d"
+      "sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+      "size_bytes": 44319799
     },
     {
       "path": "datasets/manifests/rdd2022_norway_kept.jsonl",
-      "size_bytes": 1493950,
-      "sha256": "b72c4629c84b24929c69f68771b8ff111b1c1d26f8a95795ce4da553809a8d6d"
+      "sha256": "b72c4629c84b24929c69f68771b8ff111b1c1d26f8a95795ce4da553809a8d6d",
+      "size_bytes": 1493950
     },
     {
       "path": "datasets/manifests/rdd2022_norway_removed.jsonl",
-      "size_bytes": 2956423,
-      "sha256": "ae663a97ea11c11401b0642737596168e463b5c1f1eb3ba8a7119ea5c1f6b615"
+      "sha256": "ae663a97ea11c11401b0642737596168e463b5c1f1eb3ba8a7119ea5c1f6b615",
+      "size_bytes": 2956423
     },
     {
       "path": "datasets/manifests/rdd2022_subset_selection.jsonl",
-      "size_bytes": 38595167,
-      "sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600"
+      "sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
+      "size_bytes": 38595167
+    },
+    {
+      "path": "datasets/manifests/rtk_br.json",
+      "sha256": "363014201b5d52e9fe9e977079ea8f036b9ca6cd46d0a06c2d7a3ac7b7351019",
+      "size_bytes": 1039
+    },
+    {
+      "path": "datasets/manifests/rtk_br_scan.jsonl",
+      "sha256": "d088ee07c15c5463006e3229b27b0c361d2be299f935660cb86231e632809a7c",
+      "size_bytes": 575292
     },
     {
       "path": "datasets/manifests/univali_br.json",
-      "size_bytes": 9514,
-      "sha256": "5c6fbed49326d9f64e46fe6a77a5111e33b28514e07ec0d26cd50fcc664424ae"
+      "sha256": "5c6fbed49326d9f64e46fe6a77a5111e33b28514e07ec0d26cd50fcc664424ae",
+      "size_bytes": 9514
+    },
+    {
+      "path": "datasets/manifests/univali_br_boxes.jsonl",
+      "sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+      "size_bytes": 2871731
+    },
+    {
+      "path": "datasets/manifests/univali_br_crack_scan.jsonl",
+      "sha256": "f44c6759b8e7e627abdfacd9eb0ee2c4c217663d3ed523338c24571098533f5a",
+      "size_bytes": 5099206
+    },
+    {
+      "path": "datasets/manifests/univali_br_mask_scan.jsonl",
+      "sha256": "dc6ee738d04e55e6925eb35c2d95d2a271df569107a4d61e19a808a7f9cdeb19",
+      "size_bytes": 3422803
+    },
+    {
+      "path": "datasets/manifests/urban_community_boxes.jsonl",
+      "sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+      "size_bytes": 659829
+    },
+    {
+      "path": "datasets/manifests/urban_community_scan.jsonl",
+      "sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e",
+      "size_bytes": 1806874
+    },
+    {
+      "path": "datasets/metadata/acquisition_plan.json",
+      "sha256": "6c775cfb7365397ca64d1c3954d26fd53d0004700bc660ab5ae65bed9f937ab2",
+      "size_bytes": 5963
     },
     {
       "path": "datasets/metadata/artifact_contract.yaml",
-      "size_bytes": 1765,
-      "sha256": "479c8b2149cffccaaecac8f8f8fe514ea25ca1a8ea0d9608690ff94d9235d503"
+      "sha256": "c4fb7d8703987938f95ac365c6af474faddc0625c4cfbb38b0e3f36674f4d5da",
+      "size_bytes": 19020
+    },
+    {
+      "path": "datasets/metadata/bdd100k_acquisition_plan.json",
+      "sha256": "cdc9c6b6a84dada486c310c58bf2f646af2c9c16d3af93fc63a095a5c8165f79",
+      "size_bytes": 2022
     },
     {
       "path": "datasets/metadata/class_mapping.yaml",
-      "size_bytes": 6544,
-      "sha256": "d724bd2f2daabea8c71e279001472605c0efcb426bb0c7c180d0c1cfa13700af"
+      "sha256": "dbc2818d4203e9b363e9e84019bfe4726c9b2042fc6795d63588513e02960ed0",
+      "size_bytes": 10642
     },
     {
       "path": "datasets/metadata/global_streetscapes_acquisition_plan.json",
-      "size_bytes": 944,
-      "sha256": "86def9cd712f7d6f7a44dd91f6fdd6fc25dd5f75d67cf7543dfbc1a41d6507f8"
+      "sha256": "86def9cd712f7d6f7a44dd91f6fdd6fc25dd5f75d67cf7543dfbc1a41d6507f8",
+      "size_bytes": 944
     },
     {
       "path": "datasets/metadata/licenses.md",
-      "size_bytes": 3536,
-      "sha256": "e28272fdf9d5a7b6622001b7b1ec7e99ea72be0a5de9a15f94f85631c7f0be49"
+      "sha256": "e28272fdf9d5a7b6622001b7b1ec7e99ea72be0a5de9a15f94f85631c7f0be49",
+      "size_bytes": 3536
     },
     {
       "path": "datasets/metadata/removed_sources.json",
-      "size_bytes": 882,
-      "sha256": "1322b1552b921983bb1479ac21f24d0d2f305a087e01c38df50c8fabb05f8885"
+      "sha256": "1322b1552b921983bb1479ac21f24d0d2f305a087e01c38df50c8fabb05f8885",
+      "size_bytes": 882
     },
     {
       "path": "datasets/metadata/sources.csv",
-      "size_bytes": 4579,
-      "sha256": "c851cba611591cf4766661bf0b859b03a4e3f5aed80a6a1d46569d6eb03c0269"
+      "sha256": "c6a7f893b133b1cdd768ea9a43a1492dc141a83b877a98560ef0c9b05e84a39b",
+      "size_bytes": 5030
     },
     {
       "path": "datasets/metadata/storage_budget.yaml",
-      "size_bytes": 3735,
-      "sha256": "97cc2d077a404de8ee777929d3ccf576a60f4146cfda8c705ef60894ae9ed2a4"
+      "sha256": "50eec80414ad3a93cc94ecf30a924606fdf37e01f49ac22c74bc5fd8b8fd9966",
+      "size_bytes": 3945
     },
     {
       "path": "datasets/metadata/taxonomy.yaml",
-      "size_bytes": 3511,
-      "sha256": "8a87371ee7c5b1cb2fb150ae2a24383f8a0a96b34088fc6e51f3f6d88d963e82"
+      "sha256": "8a87371ee7c5b1cb2fb150ae2a24383f8a0a96b34088fc6e51f3f6d88d963e82",
+      "size_bytes": 3511
     },
     {
       "path": "datasets/metadata/upstream_checksums.json",
-      "size_bytes": 2363,
-      "sha256": "6c72c91dae3efdbb381236c271d1f5a7152696a7847fa8ff6fe0fe3d62058638"
+      "sha256": "6c72c91dae3efdbb381236c271d1f5a7152696a7847fa8ff6fe0fe3d62058638",
+      "size_bytes": 2363
+    },
+    {
+      "path": "datasets/metadata/yolox_model_v1.json",
+      "sha256": "83d19b3adfc5575f28679bafc620f1200502e298de62bef0fdee1b8c3015e64b",
+      "size_bytes": 3967
     },
     {
       "path": "datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv",
-      "size_bytes": 5917342,
-      "sha256": "8d0a02831868901487531fe150935b943da5ae1cd86805008286253458759bf6"
+      "sha256": "8d0a02831868901487531fe150935b943da5ae1cd86805008286253458759bf6",
+      "size_bytes": 5917342
+    },
+    {
+      "path": "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+      "sha256": "56180db30512f57ae8e63af7ae5bbe391ad9f8617f8c64e8064b2dd084b638b4",
+      "size_bytes": 3250534
     },
     {
       "path": "datasets/reports/acquisition_result_global_streetscapes.json",
-      "size_bytes": 2144,
-      "sha256": "24a4d4257d2730e21a1ce69354deb4a368444bf4a1d3a2214ae3500c42d01b16"
+      "sha256": "24a4d4257d2730e21a1ce69354deb4a368444bf4a1d3a2214ae3500c42d01b16",
+      "size_bytes": 2144
+    },
+    {
+      "path": "datasets/reports/dataset_readiness.json",
+      "sha256": "2e1095f95fb3b9561d06665923ef001272baffc39dd4b787f7ae0cc676481115",
+      "size_bytes": 36397
+    },
+    {
+      "path": "datasets/reports/detection_loader_smoke.json",
+      "sha256": "24aec067619acd01689d2696a51108a889482c76513355bd5558ddb44e64f5fd",
+      "size_bytes": 1134
     },
     {
       "path": "datasets/reports/norway_profile.jsonl",
-      "size_bytes": 3726705,
-      "sha256": "d6e91afa6351b00cec9f42589034dd2acc062abb801b632823096ea383274768"
+      "sha256": "d6e91afa6351b00cec9f42589034dd2acc062abb801b632823096ea383274768",
+      "size_bytes": 3726705
+    },
+    {
+      "path": "datasets/reports/pipeline_verification.json",
+      "sha256": "8132f528cb375de4f27917e038ad7b1128e1d8247e2188f9f324e60c9589b20f",
+      "size_bytes": 896
+    },
+    {
+      "path": "datasets/reports/pre_training_readiness.json",
+      "sha256": "d92a1b675a074e030d3c4cb4652a48a213f76fe4b82b153fdada61487ae295ab",
+      "size_bytes": 5146
+    },
+    {
+      "path": "datasets/reports/rdd2022_duplicates.json",
+      "sha256": "6b81048d290afbd5f12a7d1742f36d24258712e18d4960860c0fc1e02428ae8d",
+      "size_bytes": 123051
+    },
+    {
+      "path": "datasets/reports/rdd2022_legacy_artifact_status.json",
+      "sha256": "0b1443529f6302f2b69dbfea82fe3bd679aff48426cac278d904ddb401c79ffa",
+      "size_bytes": 842
     },
     {
       "path": "datasets/reports/rdd2022_norway_partial_restore.json",
-      "size_bytes": 749,
-      "sha256": "22cf606441922f947fc137a7b1fe968d5a389faaddb129b6458a1e9cc77f75a2"
+      "sha256": "22cf606441922f947fc137a7b1fe968d5a389faaddb129b6458a1e9cc77f75a2",
+      "size_bytes": 749
     },
     {
       "path": "datasets/reports/rdd2022_pre_reduction_baseline.json",
-      "size_bytes": 1656,
-      "sha256": "240e7b14152a178923ecfddb3b97d30af84e65c82c18562691839f40a1a41649"
+      "sha256": "240e7b14152a178923ecfddb3b97d30af84e65c82c18562691839f40a1a41649",
+      "size_bytes": 1656
     },
     {
       "path": "datasets/reports/rdd2022_reconciliation.json",
-      "size_bytes": 2603,
-      "sha256": "62efc8c311d610ea9ade7ea298ea513d1681659c33bf32d6bdd3dcf77509beaf"
+      "sha256": "966d4f0ac38660aa0568cc8b8e74e1a38211826be0868cf8ea2b50ccec308b2e",
+      "size_bytes": 4016
     },
     {
       "path": "datasets/reports/rdd2022_reduction.json",
-      "size_bytes": 4046,
-      "sha256": "6e921c2759c4c9d2614c5e11ad451d6c3ce0e7bf92e661b91ebae0003807b438"
+      "sha256": "6e921c2759c4c9d2614c5e11ad451d6c3ce0e7bf92e661b91ebae0003807b438",
+      "size_bytes": 4046
+    },
+    {
+      "path": "datasets/reports/rdd2022_split_authorization_review.json",
+      "sha256": "2264e386cdca3b0e548be086edc2b34d7b1fa569ba8a645d4df136c379aa23bf",
+      "size_bytes": 6528
+    },
+    {
+      "path": "datasets/reports/rdd2022_split_authorization_status.json",
+      "sha256": "5fa04e3c5d05f0c1c179d2e33dff75a2b883acbd14aa979fe0bd1053fae5ba91",
+      "size_bytes": 609
+    },
+    {
+      "path": "datasets/reports/rtk_br_audit.json",
+      "sha256": "d93b5a30b7b1d88c275d679a7e4ef8a23a744b08e29e6243a21ecc8b50b8c2f3",
+      "size_bytes": 138796
+    },
+    {
+      "path": "datasets/reports/rtk_br_provenance.json",
+      "sha256": "37838e6da4ca78ca7771e097e60a75c85092ef6c84869e1e293974f9f6e938b6",
+      "size_bytes": 1101
+    },
+    {
+      "path": "datasets/reports/univali_box_validation.json",
+      "sha256": "c5883b6607dadd630f38d1e32fb76c6013166d4c61a6a4f261a10770c9cb74a0",
+      "size_bytes": 4234
+    },
+    {
+      "path": "datasets/reports/univali_conversion.json",
+      "sha256": "265f612c44975e6462e7cb689a4f384a25065ab98850bbb2292c68c887880fce",
+      "size_bytes": 5388
+    },
+    {
+      "path": "datasets/reports/univali_crack_inventory.json",
+      "sha256": "c8f4f15e41f8b2429e0b19f7f9676c40c371c37d8c49ce46678b3e5124eb3a45",
+      "size_bytes": 3344
+    },
+    {
+      "path": "datasets/reports/univali_human_audit_status.json",
+      "sha256": "7954e39407da8a1a19ec0c02e6da13986599041855f543ed06e6376be63422df",
+      "size_bytes": 2432
+    },
+    {
+      "path": "datasets/reports/univali_mask_semantics.json",
+      "sha256": "faac0730ad8dc32a1b57f6974be2dab05eaa2a994cf3f198acbef1fd70ce2ed0",
+      "size_bytes": 18407
+    },
+    {
+      "path": "datasets/reports/univali_visual_audit.json",
+      "sha256": "9667f8dec1ebe20822a169ae1baf365cc8b056744fc377cba9f0a25f58dad0f1",
+      "size_bytes": 33533
+    },
+    {
+      "path": "datasets/reports/urban_community_audit.json",
+      "sha256": "1d904e92e37ad34800a14d0d71d09731b5bf97decc82744211e904653dce07f8",
+      "size_bytes": 11430
+    },
+    {
+      "path": "datasets/reports/urban_community_conversion.json",
+      "sha256": "ba0e1c668ffa0886a2a04aa03524f296a3767f9693f2268e4e0978c4a3f06b78",
+      "size_bytes": 13344
+    },
+    {
+      "path": "datasets/reports/urban_community_human_audit_status.json",
+      "sha256": "14cccdd248e87dc94997ccc3a48ea7b452cb18116f251c9cff86ae69ededd6ea",
+      "size_bytes": 5439
+    },
+    {
+      "path": "datasets/reports/urban_community_validation.json",
+      "sha256": "2c79e06eca8f1a3447552f5eb1858799e12917444195953cc2425eb82e8dd05c",
+      "size_bytes": 9755
+    },
+    {
+      "path": "datasets/reports/urban_community_visual_audit.json",
+      "sha256": "f087dc88098f59768e5bf4a1d57b8633be92d5b67e578cc9688610c22ef8c379",
+      "size_bytes": 48400
     },
     {
       "path": "datasets/splits/rdd2022_subset_splits.json",
-      "size_bytes": 5880,
-      "sha256": "4a27f8408933beb514934c2ec3530be6880a5f6c764ab38af698bdb720769843"
+      "sha256": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
+      "size_bytes": 6257
     },
     {
       "path": "datasets/splits/rdd2022_subset_test.txt",
-      "size_bytes": 580724,
-      "sha256": "9500cb9a759a8a467ca0ed0069c8be9c0754c7310fa0d4cecac13fd14eddb400"
+      "sha256": "9500cb9a759a8a467ca0ed0069c8be9c0754c7310fa0d4cecac13fd14eddb400",
+      "size_bytes": 580724
     },
     {
       "path": "datasets/splits/rdd2022_subset_train.txt",
-      "size_bytes": 1588766,
-      "sha256": "3483ecdcae4ad9bc1600387f732cd2c77c8000080271b537c36c48133cf76a85"
+      "sha256": "3483ecdcae4ad9bc1600387f732cd2c77c8000080271b537c36c48133cf76a85",
+      "size_bytes": 1588766
     },
     {
       "path": "datasets/splits/rdd2022_subset_validation.txt",
-      "size_bytes": 316396,
-      "sha256": "0dc9ca29d19ff2606d4d1d84f8ddb3494fa1da597ebd70a1801ceaf97f89acec"
+      "sha256": "0dc9ca29d19ff2606d4d1d84f8ddb3494fa1da597ebd70a1801ceaf97f89acec",
+      "size_bytes": 316396
+    },
+    {
+      "path": "datasets/splits/univali_br_external_test_splits.json",
+      "sha256": "0abd00443b8900b37db34342143e8be589ef0650ffefddc20a48fe06b64ff418",
+      "size_bytes": 7364
     }
   ],
   "scripts": [
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_budget.py",
-      "sha256": "075d7947d5bf618f123c446793e3099fea5420f870942f4dfce5d63f741499af"
+      "path": "scripts/datasets/_budget.py",
+      "sha256": "075d7947d5bf618f123c446793e3099fea5420f870942f4dfce5d63f741499af",
+      "size_bytes": 8414
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_core.py",
-      "sha256": "3025cd2a305961c4b7ad59fa6c807cd4a1344f6b6e75710983950587e1e697dd"
+      "path": "scripts/datasets/_core.py",
+      "sha256": "8e242afb7e0513444ddd0bdfd6f10385e226e6b0f199e766444374426a6b289c",
+      "size_bytes": 16399
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/_taxonomy.py",
-      "sha256": "aa3d736a72631f1e42f9adfc453bc8bcd440b32dd74d4701e4516ff02e68e816"
+      "path": "scripts/datasets/_taxonomy.py",
+      "sha256": "aa3d736a72631f1e42f9adfc453bc8bcd440b32dd74d4701e4516ff02e68e816",
+      "size_bytes": 3506
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_bdd100k.py",
-      "sha256": "4a0f5b2e0c6f471c64291e123ca42b08e0a8aec2ec7ce91e06300fe8e89f781b"
+      "path": "scripts/datasets/_univali.py",
+      "sha256": "5c4fdb1dd00f2103c1eab822ba7da2725be48d41d4d175ab69642700e6e07e56",
+      "size_bytes": 12492
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_global_streetscapes.py",
-      "sha256": "6655ecd313a39859323895cac1fb105632cf84bc8277809255bfaaab3a81946c"
+      "path": "scripts/datasets/acquire_bdd100k.py",
+      "sha256": "4a0f5b2e0c6f471c64291e123ca42b08e0a8aec2ec7ce91e06300fe8e89f781b",
+      "size_bytes": 4448
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/acquire_registered.py",
-      "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4"
+      "path": "scripts/datasets/acquire_global_streetscapes.py",
+      "sha256": "6655ecd313a39859323895cac1fb105632cf84bc8277809255bfaaab3a81946c",
+      "size_bytes": 18491
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_acquired.py",
-      "sha256": "da97f91aaca81dbc38155c9ad91658a5c617bb69841176fd4a094ea705c9c2c6"
+      "path": "scripts/datasets/acquire_registered.py",
+      "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4",
+      "size_bytes": 15194
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_external.py",
-      "sha256": "5d8cfd1bf9596239b400a5ab31642ea61b5b67807c5a87c0a96e92c5d19e8a5f"
+      "path": "scripts/datasets/audit_acquired.py",
+      "sha256": "da97f91aaca81dbc38155c9ad91658a5c617bb69841176fd4a094ea705c9c2c6",
+      "size_bytes": 6364
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_rdd2022.py",
-      "sha256": "fc0cd7ed55c1a5ff2737dcc9d93ca26b018e150e8d107d456270ae8358369371"
+      "path": "scripts/datasets/audit_external.py",
+      "sha256": "5d8cfd1bf9596239b400a5ab31642ea61b5b67807c5a87c0a96e92c5d19e8a5f",
+      "size_bytes": 3215
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_readiness.py",
-      "sha256": "ccf623c5c1cffd0d7920437d5fd9aec009f8ba0e712bc5501822dddb30d88a09"
+      "path": "scripts/datasets/audit_rdd2022.py",
+      "sha256": "fc0cd7ed55c1a5ff2737dcc9d93ca26b018e150e8d107d456270ae8358369371",
+      "size_bytes": 12157
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/audit_storage.py",
-      "sha256": "d514ebdb93c800812cf3677ca311fc3d1fc9f3290ad5c06b6fb6867cd2b5d094"
+      "path": "scripts/datasets/audit_rdd2022_legacy_artifacts.py",
+      "sha256": "8dc752ab88dbb5e054dd0e9903883ecdf1d3d6bee1e6f3ffaef8224e798d3e0c",
+      "size_bytes": 1848
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/build_report.py",
-      "sha256": "231f98692058f33f77a6a36b9fd289c549c657046fe08f8b80eac66589be0ca5"
+      "path": "scripts/datasets/audit_readiness.py",
+      "sha256": "7bd88dafbb557ac5c25cd8d362bc3c221dfaae8f80b08a9c1fc5e0d92ca6a858",
+      "size_bytes": 13762
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/find_duplicates.py",
-      "sha256": "610dc07c9bc56ac228163e9f87610e1be8fd5501ee86383c664ad13d553b1d1c"
+      "path": "scripts/datasets/audit_rtk.py",
+      "sha256": "3d2b6106d0522d016fc30af4ccffb27447821d6d3ccba259967f4dc29a1ef781",
+      "size_bytes": 15606
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/make_splits.py",
-      "sha256": "ce55ce9f82493a06a886fea627aca9e738e5b9a42617a61ac22dc084754cada7"
+      "path": "scripts/datasets/audit_storage.py",
+      "sha256": "d514ebdb93c800812cf3677ca311fc3d1fc9f3290ad5c06b6fb6867cd2b5d094",
+      "size_bytes": 6925
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/plan_storage.py",
-      "sha256": "4cc4e93abc15b2a8554736dd49e06f429cd13acfe8a8c2f387739f3aff495ef0"
+      "path": "scripts/datasets/audit_univali_cracks.py",
+      "sha256": "9e49f2bf39bdbc361111460fdc3e82f986ffb6d82062edf107139daa24917baa",
+      "size_bytes": 13447
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/profile_norway.py",
-      "sha256": "b24181dd6f155b606ab49268e85f8da1ffb145f62f4310ca23eb5382ad2d7907"
+      "path": "scripts/datasets/audit_univali_masks.py",
+      "sha256": "d25221c37c73894acfb2a5c49d38dd4b98412ca61fbe54f9a71415bf2092e757",
+      "size_bytes": 19338
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/propose_subset.py",
-      "sha256": "dad5e753f8f2120973a3be4f86eb7786f9a90d60317f5828c3c226b5310974db"
+      "path": "scripts/datasets/audit_urban_community.py",
+      "sha256": "018e3b564e51c4edaad51ee4a0aa926547626aa2c4af6f59e55f10fd9139c4d9",
+      "size_bytes": 17658
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/reconcile_after_reduction.py",
-      "sha256": "dd3a206f72a3cafe2d1993d50e14d80733068ef1872c86928d90ab815dba474b"
+      "path": "scripts/datasets/build_detection_manifests.py",
+      "sha256": "9c6917436346ca206fcbad929f4f1e798930ef926b907ef761b54449410525ee",
+      "size_bytes": 13328
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/reduce_rdd2022.py",
-      "sha256": "b0df0aea59b260a39e29a263c402612deedc983aac4ace0415289fbf7247f39c"
+      "path": "scripts/datasets/build_report.py",
+      "sha256": "5f3ad8c28586b1056815c3f3e8840d37cf0e1e1c96758ba23a2f9db788031e1c",
+      "size_bytes": 22248
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_registry.py",
-      "sha256": "5e6d9bf6785e9738d9571e43fa5021967ff4c05abaa1e76f4f7eb7d137704964"
+      "path": "scripts/datasets/convert_univali_masks.py",
+      "sha256": "0e06bc336214822faf68a74cc53aa16f54e34be1561e21cd3906abd4dd06d052",
+      "size_bytes": 27626
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_sources.py",
-      "sha256": "7cbb8d5aae8d4c7ea676549bee75d27bb1d5f9eca10c71429b53aac5b40e749c"
+      "path": "scripts/datasets/convert_urban_community.py",
+      "sha256": "17f2dea03d34e2a970d948b213c2d36aeac61c5827c4bd00b4c44c451453604b",
+      "size_bytes": 40119
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/refresh_status.py",
-      "sha256": "ef7945bb8052ae09cb7d4261d039da274205c1431accce7cb04eb2038e4cccbe"
+      "path": "scripts/datasets/find_duplicates.py",
+      "sha256": "610dc07c9bc56ac228163e9f87610e1be8fd5501ee86383c664ad13d553b1d1c",
+      "size_bytes": 5222
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/release_rdd_archive.py",
-      "sha256": "fc5f76b620510864ea287b7bd7293ecb74f79c1e15123617f60a8a4f71ff0d89"
+      "path": "scripts/datasets/make_splits.py",
+      "sha256": "624acfb673065947e97f1eb29edb9c8ad04d9b79842a2bd0a5371b2283598513",
+      "size_bytes": 8673
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/safety_snapshot.py",
-      "sha256": "2dbc26a6b126bb15f12e88196cc444af91c2048b78a60c4e72b64b7572e9b4e8"
+      "path": "scripts/datasets/make_univali_splits.py",
+      "sha256": "c9cbc9e99e7066585cb5130ec3c45c76ead77c0432af7beba2de292576f380d8",
+      "size_bytes": 20858
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/validate_portability.py",
-      "sha256": "21ce80440a2de596094361a7a63762200dc90ba41bbf7ea3887d1ca3b2e6d567"
+      "path": "scripts/datasets/plan_storage.py",
+      "sha256": "4cc4e93abc15b2a8554736dd49e06f429cd13acfe8a8c2f387739f3aff495ef0",
+      "size_bytes": 1172
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/verify_pipeline.py",
-      "sha256": "70ad2ce5844a39dbf0821d2706d7b89d855f2b403f7435fe3eae908436a0ff23"
+      "path": "scripts/datasets/prepare_rdd_split_authorization.py",
+      "sha256": "18a5c30e84d415b83aa6bdc0c77b096103d6cd15ceba43e7574ca4b65cb189c6",
+      "size_bytes": 6309
     },
     {
-      "path": "C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema/scripts/datasets/verify_sources.py",
-      "sha256": "38d75e357ca05fade307b996050ed585fe14a5501735873a890e23ae6056137a"
+      "path": "scripts/datasets/prepare_univali_human_audit.py",
+      "sha256": "ff394ed368005ad5cff578432bd82c86aab5433611f3d633f4fb8bca8800686c",
+      "size_bytes": 13030
+    },
+    {
+      "path": "scripts/datasets/prepare_urban_community_human_audit.py",
+      "sha256": "185385e2383889a083cf61f3543aaa77d74816a3ffba7fe81f14f7e27ea0eba1",
+      "size_bytes": 26391
+    },
+    {
+      "path": "scripts/datasets/profile_norway.py",
+      "sha256": "b24181dd6f155b606ab49268e85f8da1ffb145f62f4310ca23eb5382ad2d7907",
+      "size_bytes": 4788
+    },
+    {
+      "path": "scripts/datasets/propose_subset.py",
+      "sha256": "6e81b518e627cfaaf366808a563609436cdf7b4d88e03163147d39a70ca5842b",
+      "size_bytes": 6393
+    },
+    {
+      "path": "scripts/datasets/reconcile_after_reduction.py",
+      "sha256": "e55f10674fff24585c6048e2b01d7e1412da15c5d0c221219a18762cb9defa56",
+      "size_bytes": 10038
+    },
+    {
+      "path": "scripts/datasets/reduce_rdd2022.py",
+      "sha256": "205ead05a9f7052d30ea89945b679c5b31572e5c1e4e3fed24675f0881bd82b5",
+      "size_bytes": 25474
+    },
+    {
+      "path": "scripts/datasets/refresh_readiness.py",
+      "sha256": "ba145515bb056939d61a63ef787dae63c42447f6388e188848c43a2797011a4a",
+      "size_bytes": 8723
+    },
+    {
+      "path": "scripts/datasets/refresh_registry.py",
+      "sha256": "c58337e90691e5dd17f314e9c2981085c6f71e5aa81e4e0402d1d7a33c214d6c",
+      "size_bytes": 7791
+    },
+    {
+      "path": "scripts/datasets/refresh_sources.py",
+      "sha256": "e539bab51c1c1733b4d322ae207f3c0e646a4ebb06301b3341111e16392ea2d4",
+      "size_bytes": 11320
+    },
+    {
+      "path": "scripts/datasets/refresh_status.py",
+      "sha256": "b6a6827ecb7f75e8b44acff38aa5451e23bdf3ac1150f47d952968ff06427257",
+      "size_bytes": 11847
+    },
+    {
+      "path": "scripts/datasets/release_rdd_archive.py",
+      "sha256": "fc5f76b620510864ea287b7bd7293ecb74f79c1e15123617f60a8a4f71ff0d89",
+      "size_bytes": 4447
+    },
+    {
+      "path": "scripts/datasets/render_univali_audit.py",
+      "sha256": "6faaffb4e987a214492093f88de733ff3b59c0924a27779da81d1798e797eb76",
+      "size_bytes": 11487
+    },
+    {
+      "path": "scripts/datasets/render_urban_community_audit.py",
+      "sha256": "fedc5c1fa3d83f5383d48e8d437d0668f42376b30538362e64e4f7a297fa39c9",
+      "size_bytes": 15807
+    },
+    {
+      "path": "scripts/datasets/safety_snapshot.py",
+      "sha256": "2dbc26a6b126bb15f12e88196cc444af91c2048b78a60c4e72b64b7572e9b4e8",
+      "size_bytes": 1672
+    },
+    {
+      "path": "scripts/datasets/smoke_detection_loader.py",
+      "sha256": "0972e893ead45f6e2f48f5ac550d247b427c91f77257bf7013fe5d12b5740dce",
+      "size_bytes": 4112
+    },
+    {
+      "path": "scripts/datasets/validate_manifests.py",
+      "sha256": "10aaf334f3a3c45df75dcefca4c3f865261ba0d667f76bf9ef634137b8629229",
+      "size_bytes": 7000
+    },
+    {
+      "path": "scripts/datasets/validate_portability.py",
+      "sha256": "21ce80440a2de596094361a7a63762200dc90ba41bbf7ea3887d1ca3b2e6d567",
+      "size_bytes": 4872
+    },
+    {
+      "path": "scripts/datasets/validate_univali_boxes.py",
+      "sha256": "d25ba01703edbf6be348cabe4ec2e1a4871f278544b1e4059bbee4c04af58df0",
+      "size_bytes": 21207
+    },
+    {
+      "path": "scripts/datasets/validate_urban_community.py",
+      "sha256": "b83230b12d17bc92fad1973939a175cd63bbd84354ba97008adde2876e3ff263",
+      "size_bytes": 40531
+    },
+    {
+      "path": "scripts/datasets/verify_pipeline.py",
+      "sha256": "70ad2ce5844a39dbf0821d2706d7b89d855f2b403f7435fe3eae908436a0ff23",
+      "size_bytes": 8965
+    },
+    {
+      "path": "scripts/datasets/verify_sources.py",
+      "sha256": "38d75e357ca05fade307b996050ed585fe14a5501735873a890e23ae6056137a",
+      "size_bytes": 7387
     }
   ],
-  "updated": "2026-09-09"
+  "updated": "2026-09-15"
 }

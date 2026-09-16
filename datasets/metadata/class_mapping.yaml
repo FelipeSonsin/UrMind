@@ -22,6 +22,33 @@ code_ref: backend/app/ml/taxonomy.py
 
 datasets:
 
+  # ------------------------------------------------------------- RTK / UFSC
+  rtk_br:
+    annotation_format: semantic_class_mask_png
+    label_field: pixel_value
+    note: >-
+      codes.txt do release oficial define uma class-map sem identificadores de
+      instancia. Connected components sao candidatos, nao objetos validados.
+    accepted: {}
+    candidates:
+      pothole:
+        possible_urmind_class: URMIND_ROAD_D40
+        mapping_status: blocked_pending_semantic_and_instance_validation
+    rejected:
+      craks: >-
+        trinca generica; nao distingue longitudinal, transversal e malha, logo
+        nao pode escolher entre D00, D10 e D20.
+      roadAsphalt: superficie, nao dano V1
+      roadPaved: superficie, nao dano V1
+      roadUnpaved: superficie, nao dano V1
+      roadMarking: sinalizacao horizontal, fora da taxonomia de dano V1
+      speedBump: sem classe canonica V1
+      catsEye: sem classe canonica V1
+      stormDrain: sem classe canonica V1
+      manholeCover: tampa fechada nao equivale a URMIND_MANHOLE
+      patchs: reparo, nao dano ativo V1
+      waterPuddle: sem classe canonica V1
+
   # ------------------------------------------------------------------ RDD2022
   rdd2022:
     annotation_format: pascal_voc_xml
@@ -53,9 +80,36 @@ datasets:
     label_field: sufixo do nome do arquivo
     note: >-
       Anotação é máscara, não caixa. Converter máscara em caixa é uma versão
-      derivada a registrar, não um efeito colateral da leitura.
+      derivada a registrar, não um efeito colateral da leitura. A derivada
+      existe desde 2026-09-10 em manifests/univali_br_boxes.jsonl.
     accepted:
       POTHOLE: URMIND_ROAD_D40
+    # A correspondência acima é a que a FONTE declara (README do pacote e ficha
+    # Mendeley V4: a categoria se chama POTHOLE e o dataset se chama "Cracks and
+    # Potholes in Road Images"). Ela nunca foi conferida contra a documentação
+    # oficial da UNIVALI nem contra inspeção humana das imagens, então o projeto
+    # a trata em dois níveis diferentes, de propósito:
+    #
+    #   contabilidade de máscara  o adaptador aplica o mapa acima, e é assim que
+    #                             `dataset_readiness.json` conta máscara por classe;
+    #   anotação de detecção      a derivada NÃO aplica. A caixa sai com o rótulo
+    #                             nativo UNIVALI_POTHOLE e só vira URMIND_ROAD_D40
+    #                             quando `convert_univali_masks.py` receber
+    #                             `--assert-v1-mapping <evidência>`.
+    #
+    # O nível que alimenta métrica é o segundo. Promover a caixa por semelhança
+    # de nome é exatamente o que o §8.2 proíbe.
+    verification_status:
+      POTHOLE: declarada_pela_fonte_nao_verificada_independentemente
+      required_to_verify:
+        - documentação oficial da UNIVALI/DNIT sobre o significado da máscara
+        - inspeção humana de amostra, com critério de aceitação declarado antes
+      evidence_artifact: datasets/reports/univali_mask_semantics.json
+    derived_version:
+      manifest: datasets/manifests/univali_br_boxes.jsonl
+      derived_label: UNIVALI_POTHOLE
+      urmind_class: null
+      script: scripts/datasets/convert_univali_masks.py
     rejected:
       CRACK: >-
         trinca genérica; o dataset não separa longitudinal, transversal e malha,
@@ -80,6 +134,31 @@ datasets:
       5: open_manhole
     accepted:
       pothole: URMIND_ROAD_D40
+    # Reexaminado em 2026-09-10 com evidência, não por herança.
+    #
+    # A correspondência não vem de aparência: `taxonomy.yaml` define
+    # URMIND_ROAD_D40 como "buraco / pothole" (origem RDD2022 D40) e o rótulo de
+    # origem é literalmente `pothole`. É um nome batendo com a definição oficial
+    # da classe. A inspeção estratificada de 48 recortes confirmou que o
+    # conteúdo predominante da pasta é cavidade de pavimento.
+    #
+    # O que a mesma inspeção mostrou e continua pendente de revisão humana:
+    # apareceram trinca sem cavidade e um bueiro aberto entre os recortes
+    # rotulados como buraco, e há imagem com vários buracos visíveis e só parte
+    # deles anotada. Por isso a derivada tem quarentena, e por isso esta fonte
+    # nunca entra em avaliação — ruído de rótulo em treino é custo; em métrica,
+    # é mentira.
+    verification_status:
+      pothole: verificada_por_definicao_canonica_com_inspecao_assistida
+      evidence_artifact: datasets/reports/urban_community_conversion.json
+      visual_evidence: datasets/processed/urban_community/visual_audit
+      known_contamination: trinca e bueiro observados na pasta pothole
+      pending: revisão humana caixa a caixa da amostra estratificada
+    derived_version:
+      manifest: datasets/manifests/urban_community_boxes.jsonl
+      script: scripts/datasets/convert_urban_community.py
+      usage: TRAIN_REINFORCEMENT
+      evaluation_use: FORBIDDEN
     rejected:
       cracks: trinca genérica em classe única; não distingue D00/D10/D20 (§8.2)
       open_manhole: >-
@@ -91,18 +170,6 @@ datasets:
         semáforo é sinalização vertical; URMIND_SIGNAGE exige dataset e
         protocolo próprios (§8.2)
       waste_container: fora do escopo funcional do UrMind
-
-  # ---------------------------------------------------------- Project Sidewalk
-  project_sidewalk:
-    acquisition_format: parquet_images_and_curb_ramp_keypoints
-    acquisition_mapping_status: specialized_keypoint_task_not_road_boxes
-    annotation_format: csv_point_labels
-    purpose: accessibility
-    accepted: {}
-    rejected:
-      "*": >-
-        pontos de acessibilidade com severidade humana, sem imagem anexa. Não
-        geram classe de treino; URMIND_SIDEWALK segue sem dataset próprio.
 
   # ------------------------------------------------------------------- CAMBER
   camber:
@@ -116,6 +183,10 @@ datasets:
         nem ocorrência real (§8.3).
 
   # ---------------------------- fontes lidas que não contribuem classe da V1
+  # `project_sidewalk` aparecia duas vezes neste arquivo. Em YAML a última
+  # definição vence em silêncio, então o bloco de cima — que descrevia a fonte
+  # como `csv_point_labels` "sem imagem anexa" — estava ao mesmo tempo errado e
+  # inerte. O que a fonte publica é Parquet com a imagem embutida na linha.
   rampnet:
     status: acquired_subset_readable
     annotation_format: parquet_image_and_normalized_curb_ramp_points

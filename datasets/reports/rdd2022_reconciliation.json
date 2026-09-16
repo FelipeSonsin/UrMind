@@ -1,9 +1,33 @@
 {
-  "generated_at": "2026-09-09T00:55:25-0300",
+  "generated_at": "2026-09-13T17:09:04-0300",
+  "script": "scripts/datasets/reconcile_after_reduction.py",
+  "source_dataset": "rdd2022",
+  "source_version": "figshare-21431547-v1 (2022-crddc)",
+  "transform": "remocao das linhas orfas dos manifestos e splits apos a poda autorizada da Norway; nenhuma imagem muda de split",
+  "params": {
+    "seed": null,
+    "reason": "operacao deterministica: nao ha sorteio a reproduzir",
+    "splits_preserved": true,
+    "grouping": "country"
+  },
+  "inputs": {
+    "train": 23830,
+    "validation": 3858,
+    "test": 7634
+  },
+  "outputs": {
+    "train": 23830,
+    "validation": 3858,
+    "test": 7634
+  },
   "dropped": {
     "train": 0,
     "validation": 0,
     "test": 0
+  },
+  "drop_reasons": {
+    "referencia_quebrada": "a linha citava uma imagem removida pela poda autorizada da Norway; o objeto anotado nao se perdeu, todas eram negativas",
+    "unknown_paths": "caminho presente no split e ausente do manifesto de selecao"
   },
   "kept": {
     "train": 23830,
@@ -106,6 +130,15 @@
         "country:Czech",
         "country:United_States"
       ]
+    }
+  },
+  "integrity": {
+    "selection_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
+    "split_report_sha256_before_report_write": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
+    "split_manifests_sha256": {
+      "train": "3483ecdcae4ad9bc1600387f732cd2c77c8000080271b537c36c48133cf76a85",
+      "validation": "0dc9ca29d19ff2606d4d1d84f8ddb3494fa1da597ebd70a1801ceaf97f89acec",
+      "test": "9500cb9a759a8a467ca0ed0069c8be9c0754c7310fa0d4cecac13fd14eddb400"
     }
   }
 }

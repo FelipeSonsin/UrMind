@@ -139,8 +139,24 @@ python -B scripts/datasets/validate_portability.py --check-files
 python -B scripts/datasets/verify_pipeline.py
 python -B scripts/datasets/audit_readiness.py
 python -B scripts/datasets/audit_readiness.py --video-only
+python -B scripts/datasets/validate_manifests.py
 python -B scripts/datasets/plan_storage.py --operation revisao --delta-gb 0 --peak-gb 0
 ```
+
+O estado das fontes é **gerado**, nunca escrito à mão (exige `backend/.venv`, porque usa
+os mesmos adaptadores que o sistema):
+
+```text
+backend/.venv/Scripts/python -B scripts/datasets/refresh_readiness.py
+backend/.venv/Scripts/python -B scripts/datasets/refresh_readiness.py --verify
+```
+
+`refresh_readiness.py` produz `reports/dataset_readiness.json` lendo o catálogo em
+`backend/app/datasets/catalog.py`, medindo o disco e rodando cada adaptador. Ele sai com
+código 1 quando o catálogo discorda do disco, e a divergência vai no relatório em vez de
+ser resolvida em silêncio. `audit_readiness.py` cuida só da auditoria profunda de formato
+(`reports/dataset_format_audit.json`): ele não descreve mais o estado das fontes, porque a
+lista fixa que mantinha envelheceu e passou a contradizer o disco.
 
 Nenhum desses comandos baixa, extrai, apaga originais ou executa modelos. As escritas ficam
 em pastas derivadas. `--no-report`, onde disponível, não grava saída. Dados cloud-only não
@@ -154,10 +170,105 @@ interrupção bloqueia nova escrita até revisão; não há limpeza automática 
 usuais, sem mover/excluir arquivos. `safety_snapshot.py` registra uma assinatura de nomes,
 tamanhos e datas de raw; `--verify` compara ao baseline existente sem sobrescrevê-lo.
 
+## Fonte de verdade do estado dos datasets
+
+Existe **uma** e ela é código: `backend/app/datasets/catalog.py`. Ela declara identidade,
+licença, papel, uso (`TRAIN`, `VALIDATION`, `TEST`, `EXTERNAL_TEST`, `GEO_REFERENCE`,
+`CONTEXT_ONLY`, `UNUSABLE`), formato de anotação e a etapa do §25 que consome a fonte.
+
+Tudo o mais é derivado dela e do disco:
+
+| Artefato | Gerado por | Responde |
+|---|---|---|
+| `reports/dataset_readiness.json` | `refresh_readiness.py` | estado, contagens, divergências |
+| `reports/dataset_format_audit.json` | `audit_readiness.py` | formato decodifica? |
+| `reports/derived_manifest_validation.json` | `validate_manifests.py` | derivadas têm proveniência? |
+| `metadata/sources.csv` | `refresh_sources.py` | tabela para leitura humana |
+
+Contagem escrita à mão em documentação envelhece sem ninguém perceber — foi o que aconteceu
+com a versão anterior do `dataset_readiness.json`, que declarou por semanas
+`project_sidewalk`, `rampnet` e `bdd100k` como `no_dataset_data` enquanto os três estavam em
+disco, com adaptador e checksum oficial conferido. Ao mudar qualquer coisa sobre uma fonte,
+mude o catálogo e regenere; não edite o JSON.
+
+## Dado existente não é dado treinável
+
+São perguntas diferentes e o relatório separa as colunas:
+
+- `stored_bytes` — quanto ocupa. É orçamento.
+- `box_annotations` — caixas na taxonomia V1. **É só isto que o YOLOX da V1 treina.**
+- `mask_annotations` — anotação humana real, em geometria que o detector não lê.
+- `cloud_only_files` — existe no OneDrive, não está no disco. `exists()` mente aqui.
+
+Uma fonte pode ter 6,8 GB, 17 mil amostras e zero caixas. Não é defeito dela: é a resposta
+correta para "quanto deste dado o detector consegue aprender".
+
+## UNIVALI/DNIT — versão derivada e holdout brasileiro
+
+O UNIVALI anota por máscara e o detector consome caixa. A conversão existe desde
+2026-09-10 como **versão derivada registrada**, em cinco etapas que se consomem em cadeia,
+cada uma gravando o SHA-256 do que leu:
+
+```text
+backend/.venv/Scripts/python -B scripts/datasets/audit_univali_masks.py
+backend/.venv/Scripts/python -B scripts/datasets/convert_univali_masks.py
+backend/.venv/Scripts/python -B scripts/datasets/validate_univali_boxes.py
+backend/.venv/Scripts/python -B scripts/datasets/render_univali_audit.py
+backend/.venv/Scripts/python -B scripts/datasets/make_univali_splits.py
+```
+
+| Etapa | Produz | Responde |
+|---|---|---|
+| `audit_univali_masks.py` | `manifests/univali_br_mask_scan.jsonl`, `reports/univali_mask_semantics.json` | que valores, regiões e identificadores as máscaras realmente têm |
+| `convert_univali_masks.py` | `manifests/univali_br_boxes.jsonl`, `reports/univali_conversion.json` | máscara → componentes conexos → caixas |
+| `validate_univali_boxes.py` | `reports/univali_box_validation.json` | geometria, pares, rótulos, duplicatas, contaminação |
+| `render_univali_audit.py` | `processed/univali_br/visual_audit/`, `reports/univali_visual_audit.json` | a caixa está no lugar certo? (olho humano) |
+| `make_univali_splits.py` | `splits/univali_br_external_test_splits.json` + listas `.txt` | partição por grupo com holdout congelado |
+
+Três decisões ficam explícitas porque são o tipo de coisa que some num diff:
+
+**A caixa derivada NÃO é `URMIND_ROAD_D40`.** Ela sai como `UNIVALI_POTHOLE`. A fonte
+declara que a máscara é buraco, e o projeto registra essa correspondência candidata em
+`metadata/class_mapping.yaml`, mas ela nunca foi conferida contra a documentação oficial
+da UNIVALI nem contra inspeção humana. Promover por semelhança de nome é o que o §8.2
+proíbe. `convert_univali_masks.py --assert-v1-mapping <evidência.json>` aplica o mapa
+quando a verificação existir, e recusa rodar se o arquivo de evidência estiver incompleto.
+
+**`CRACK` não vira nada.** A fonte publica uma única categoria de trinca e não declara
+subtipo. Escolher entre D00, D10 e D20 por geometria seria fabricar anotação.
+
+**Nenhum limiar de área foi escolhido.** O padrão é `--min-area 0`: nada é descartado por
+tamanho. Cada caixa carrega sua área e um `size_tier` tirado dos quantis do próprio
+dataset, e o relatório mede quanto cada limiar candidato custaria — de 1 px até os 1024 px
+da convenção COCO para "objeto pequeno". Escolher o corte é decisão humana registrada,
+não default de script.
+
+O UNIVALI inteiro é **EXTERNAL_TEST_BR**: nenhuma amostra entra em treino. É a única fonte
+com anotação humana em rodovia brasileira, e gastá-la treinando destruiria o único
+termômetro honesto de desempenho no domínio real. Dentro dela a partição é por **rodovia**,
+não por trecho nem por imagem: capturas do mesmo trecho são sequenciais, e o dHash
+praticamente não as detecta como parecidas — a proteção precisa vir do identificador
+publicado pela fonte, não de similaridade de pixel (§8.4). Um dos lados é
+`holdout_br_frozen`, congelado antes de qualquer treino e medido uma única vez.
+
+### PyYAML e o `.venv`
+
+Os scripts desta pasta escrevem via `_core.write_text_safe`, que chama o preflight de
+orçamento, que carrega `storage_budget.yaml` — ou seja, **PyYAML é obrigatório para
+qualquer escrita**, inclusive nas etapas que parecem só de leitura. Ele vive em
+`backend/.venv`. Um Python de sistema sem PyYAML roda a medição inteira e falha na hora
+de gravar, desperdiçando a varredura.
+
 ## Contrato dos artefatos
 
 `taxonomy.yaml` define as quatro classes canônicas; `class_mapping.yaml` preserva a camada
 rótulo original → classe canônica. `URMIND_UNKNOWN` é estado do sistema, não rótulo automático.
+
+Toda versão derivada de um dataset — poda, subconjunto, split, conversão — precisa registrar
+origem, versão, transformação, parâmetros, script, data, entradas, saídas, descartes, motivos
+dos descartes e integridade. O contrato está em
+`metadata/artifact_contract.yaml#derived_manifest_contract` e `validate_manifests.py` confere.
+O original nunca é sobrescrito: derivada é sempre arquivo novo.
 Negativo confirmado significa XML válido com **zero objetos originais**. Imagens com somente
 rótulos fora da V1, XML inválido ou sem XML não são confundidas com negativos.
 
@@ -195,7 +306,7 @@ não executar uma extração integral que ultrapasse o pico de 40 GB.
 
 Imagens, ZIPs, processed e downloads não entram no Git; metadata, manifests e splits entram.
 Não existe `.git` nesta cópia; o `.gitignore` está preparado para um futuro repositório.
-DVC não foi configurado nem recebeu cópias/cache de datasets. O projeto está em OneDrive;
+DVC local foi inicializado sem remote e não recebeu cópias/cache de datasets. O projeto está em OneDrive;
 sincronização e localização não foram alteradas.
 
 ## Aquisição e leitura sem cópias

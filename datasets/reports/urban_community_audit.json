@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "scope": "reanálise das sete pastas do Urban Community: conteúdo, quantidade, formato, qualidade e confronto com a recusa anterior. Não decide aproveitamento e não converte nada.",
+  "source_dataset": "urban_community",
+  "source_version": "kaggle-2025",
+  "transform": "auditoria por pasta com medição de qualidade de anotação",
+  "params": {
+    "folders": [
+      "animal",
+      "cracks",
+      "good_road",
+      "open_manhole",
+      "pothole",
+      "traffic_lights",
+      "waste_container"
+    ]
+  },
+  "script": "scripts/datasets/audit_urban_community.py",
+  "generated_at": "2026-09-11T00:13:10-03:00",
+  "inputs": 2518,
+  "outputs": 2518,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "package_sha256_local": "4f9d5be7220ac12ed479b6a9dd2ca1cfc4b2ef6ba3b163df7e93e9e825dbed8d",
+    "package_is_cloud_only": false,
+    "official_checksum": null,
+    "official_checksum_note": "O Kaggle não publica checksum deste pacote. O SHA-256 acima é local: prova que o arquivo não mudou aqui, não que corresponde à publicação original.",
+    "scan_manifest": "datasets/manifests/urban_community_scan.jsonl",
+    "scan_manifest_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e"
+  },
+  "raw_modified": false,
+  "provenance": {
+    "homepage": "https://www.kaggle.com/datasets/rajeevpaudel1/urban-community-issues",
+    "author": "Rajeev Paudel",
+    "license_declared": "CC0 na ficha do Kaggle",
+    "image_origin_declared": false,
+    "limitation": "A ficha declara CC0 do pacote; a origem e os direitos de cada imagem não são declarados. Registrar isso em qualquer resultado publicado é obrigação, não formalidade."
+  },
+  "class_id_map": {
+    "source": "inferido das pastas; o pacote não traz data.yaml",
+    "ids_per_folder": {
+      "animal": [
+        0
+      ],
+      "cracks": [
+        4
+      ],
+      "good_road": [],
+      "open_manhole": [
+        5
+      ],
+      "pothole": [
+        3
+      ],
+      "traffic_lights": [
+        1
+      ],
+      "waste_container": [
+        2
+      ]
+    },
+    "one_id_per_folder": true,
+    "folders_mixing_ids": [],
+    "ids_shared_between_folders": [],
+    "verdict": "consistência interna sustenta a inferência",
+    "still_not_official": true
+  },
+  "package": {
+    "present": true,
+    "is_cloud_only": false,
+    "third_party_weights_used_by_pipeline": false,
+    "pipeline_usage_evidence": "busca por `.pt` em backend/app e scripts/: nenhuma referência de carregamento. Os pesos são artefato externo, não requisito do funcionamento atual.",
+    "weights_note": "Peso de treino de terceiros não é modelo do UrMind e não entra em model_versions (§9). Fica no pacote original, sem uso.",
+    "inspected": false,
+    "verification": "PENDING_EXPLICIT_AUTHORIZATION",
+    "reason": "inspeção do ZIP não é automática: exige `--inspect-package`. O arquivo está local agora, mas depender do estado de hidratação do momento faria a auditoria oscilar entre abrir e não abrir 786 MB sem ninguém decidir."
+  },
+  "folders": {
+    "animal": {
+      "content": "animal",
+      "images": 600,
+      "labels": 600,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 1113,
+      "empty_label_files": 0,
+      "class_ids": {
+        "0": 1113
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 423,
+        "2": 75,
+        "3": 40,
+        "4": 18,
+        "5": 17,
+        "6": 3,
+        "7": 4,
+        "8": 4,
+        "9": 7,
+        "10": 4,
+        "13": 1,
+        "14": 1,
+        "15": 1,
+        "18": 1,
+        "22": 1
+      },
+      "image_sizes_top": {
+        "1024x768": 175,
+        "1024x683": 57,
+        "768x1024": 33,
+        "1024x1024": 26,
+        "1024x576": 23
+      },
+      "distinct_image_sizes": 184,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {
+        "caixa cobre quase o quadro inteiro": 11
+      },
+      "box_area_fraction": {
+        "mean": 0.16337,
+        "min": 0.000187,
+        "max": 0.998573
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "fora do escopo funcional do UrMind",
+      "refusal_kind": "escopo: fora do domínio funcional"
+    },
+    "cracks": {
+      "content": "cracks",
+      "images": 166,
+      "labels": 166,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 194,
+      "empty_label_files": 0,
+      "class_ids": {
+        "4": 194
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 148,
+        "2": 14,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1
+      },
+      "image_sizes_top": {
+        "540x360": 48,
+        "480x360": 13,
+        "626x417": 10,
+        "640x640": 9,
+        "612x408": 7
+      },
+      "distinct_image_sizes": 50,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {},
+      "box_area_fraction": {
+        "mean": 0.30679,
+        "min": 0.007478,
+        "max": 0.85643
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "trinca genérica em classe única; não distingue D00/D10/D20 (§8.2)",
+      "refusal_kind": "taxonomia: a V1 não tem classe de trinca genérica"
+    },
+    "good_road": {
+      "content": "good_road",
+      "images": 100,
+      "labels": 100,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 0,
+      "empty_label_files": 100,
+      "class_ids": {},
+      "single_class_id": true,
+      "boxes_per_image": {
+        "0": 100
+      },
+      "image_sizes_top": {
+        "800x534": 29,
+        "600x400": 14,
+        "800x533": 6,
+        "640x427": 5,
+        "612x408": 4
+      },
+      "distinct_image_sizes": 37,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {},
+      "box_area_fraction": {
+        "mean": null,
+        "min": null,
+        "max": null
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "classe negativa do pacote original; não é dano nem objeto da V1",
+      "refusal_kind": "não é objeto: são imagens sem anotação"
+    },
+    "open_manhole": {
+      "content": "open_manhole",
+      "images": 152,
+      "labels": 152,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 154,
+      "empty_label_files": 0,
+      "class_ids": {
+        "5": 154
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 150,
+        "2": 2
+      },
+      "image_sizes_top": {
+        "612x408": 41,
+        "600x400": 16,
+        "612x459": 5,
+        "540x360": 4,
+        "612x406": 3
+      },
+      "distinct_image_sizes": 73,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {},
+      "box_area_fraction": {
+        "mean": 0.17414,
+        "min": 0.00562,
+        "max": 0.690678
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "bueiro aberto só vira URMIND_MANHOLE com dataset e protocolo próprios (§8.2)",
+      "refusal_kind": "taxonomia: URMIND_MANHOLE é classe futura bloqueada"
+    },
+    "pothole": {
+      "content": "pothole",
+      "images": 300,
+      "labels": 300,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 478,
+      "empty_label_files": 0,
+      "class_ids": {
+        "3": 478
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 222,
+        "2": 45,
+        "3": 16,
+        "4": 5,
+        "5": 2,
+        "6": 1,
+        "7": 2,
+        "8": 2,
+        "9": 1,
+        "10": 3,
+        "13": 1
+      },
+      "image_sizes_top": {
+        "612x408": 25,
+        "640x640": 11,
+        "540x360": 11,
+        "800x600": 9,
+        "640x480": 6
+      },
+      "distinct_image_sizes": 183,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {},
+      "box_area_fraction": {
+        "mean": 0.14373,
+        "min": 0.000616,
+        "max": 0.630225
+      },
+      "previous_decision": "ACEITA",
+      "previous_reason": "única categoria mapeada; entra como reforço de URMIND_ROAD_D40",
+      "refusal_kind": null
+    },
+    "traffic_lights": {
+      "content": "traffic_lights",
+      "images": 600,
+      "labels": 600,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 2522,
+      "empty_label_files": 0,
+      "class_ids": {
+        "1": 2522
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 118,
+        "2": 104,
+        "3": 104,
+        "4": 64,
+        "5": 48,
+        "6": 53,
+        "7": 22,
+        "8": 28,
+        "9": 16,
+        "10": 12,
+        "11": 5,
+        "12": 6,
+        "13": 6,
+        "14": 4,
+        "15": 2,
+        "16": 1,
+        "17": 5,
+        "18": 2
+      },
+      "image_sizes_top": {
+        "1024x768": 238,
+        "1024x683": 78,
+        "768x1024": 33,
+        "1024x680": 19,
+        "1024x685": 18
+      },
+      "distinct_image_sizes": 117,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {
+        "caixa com menos de 2 px de lado": 13,
+        "caixa cobre quase o quadro inteiro": 3
+      },
+      "box_area_fraction": {
+        "mean": 0.01504,
+        "min": 4e-06,
+        "max": 0.998434
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "semáforo é sinalização vertical; URMIND_SIGNAGE exige dataset próprio (§8.2)",
+      "refusal_kind": "taxonomia: URMIND_SIGNAGE é classe futura bloqueada"
+    },
+    "waste_container": {
+      "content": "waste_container",
+      "images": 600,
+      "labels": 600,
+      "annotation_format": "yolo_txt normalizado (class_id cx cy w h)",
+      "boxes": 1112,
+      "empty_label_files": 0,
+      "class_ids": {
+        "2": 1112
+      },
+      "single_class_id": true,
+      "boxes_per_image": {
+        "1": 374,
+        "2": 103,
+        "3": 56,
+        "4": 22,
+        "5": 20,
+        "6": 11,
+        "7": 8,
+        "8": 4,
+        "10": 1,
+        "12": 1
+      },
+      "image_sizes_top": {
+        "1024x768": 197,
+        "768x1024": 93,
+        "1024x683": 67,
+        "683x1024": 22,
+        "1024x1024": 16
+      },
+      "distinct_image_sizes": 125,
+      "labels_without_image": [],
+      "images_without_label": [],
+      "unreadable_images": [],
+      "format_problems": [],
+      "format_problem_count": 0,
+      "quality_problems": {
+        "caixa cobre quase o quadro inteiro": 5
+      },
+      "box_area_fraction": {
+        "mean": 0.13457,
+        "min": 0.000219,
+        "max": 0.998543
+      },
+      "previous_decision": "RECUSADA",
+      "previous_reason": "fora do escopo funcional do UrMind",
+      "refusal_kind": "escopo: fora do domínio funcional"
+    }
+  }
+}

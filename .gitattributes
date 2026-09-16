@@ -1,0 +1,28 @@
+# Integridade byte-a-byte dos artefatos verificados por SHA-256.
+#
+# O artifact_registry.json fixa o SHA-256 de 69 artefatos e 47 scripts, e
+# `refresh_registry.py --check` e `app.ml.training.validate_readiness()` reprovam
+# quando o hash do disco diverge. Com core.autocrlf=true o Git normaliza CRLF->LF
+# ao gravar o blob: o arquivo commitado deixa de ser o arquivo cujo hash foi
+# registrado, e um clone em Linux/CI reprova o proprio portao de treino.
+#
+# `-text` desliga toda normalizacao de fim de linha: o Git grava e restaura os
+# bytes exatos em Windows, Linux e CI. O escopo e a superficie de proveniencia
+# verificada por hash, nao os tipos de arquivo em geral.
+
+# Artefatos do registry (datasets/annotations, manifests, metadata, reports, splits).
+datasets/annotations/**  -text
+datasets/manifests/**    -text
+datasets/metadata/**     -text
+datasets/reports/**      -text
+datasets/splits/**       -text
+
+# Os dois artefatos REQUIRED que vivem sob raw/. O restante de raw/ e ignorado.
+datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt                          -text
+datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv  -text
+
+# Secao `scripts` do registry: os 47 scripts tem SHA-256 fixado do mesmo modo.
+scripts/datasets/*.py    -text
+
+# Metadata da stack ML, conferida por hash no portao de treino.
+backend/ml-stack.json    -text

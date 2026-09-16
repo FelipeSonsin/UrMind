@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "artifact_kind": "derived_dataset_version",
+  "scope": "conversão de máscara de segmentação em caixa envolvente. Não treina, não altera raw e não promove o rótulo à taxonomia V1.",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "máscara POTHOLE → componentes conexos → bounding boxes",
+  "params": {
+    "min_area_px": 0,
+    "connectivity": 8,
+    "coordinate_convention": "meio-aberto: [xmin, xmax), [ymin, ymax)",
+    "source_mask": "POTHOLE",
+    "derived_label": "UNIVALI_POTHOLE",
+    "v1_mapping_asserted": false,
+    "scan_manifest_sha256": "dc6ee738d04e55e6925eb35c2d95d2a271df569107a4d61e19a808a7f9cdeb19"
+  },
+  "script": "scripts/datasets/convert_univali_masks.py",
+  "generated_at": "2026-09-10T16:55:29-03:00",
+  "inputs": 2235,
+  "outputs": 2235,
+  "dropped": 0,
+  "drop_reasons": {},
+  "dropped_examples": {},
+  "integrity": {
+    "scan_manifest_sha256": "dc6ee738d04e55e6925eb35c2d95d2a271df569107a4d61e19a808a7f9cdeb19",
+    "boxes_manifest": "datasets/manifests/univali_br_boxes.jsonl",
+    "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9"
+  },
+  "raw_modified": false,
+  "counts": {
+    "source_images": 2235,
+    "manifest_samples": 2235,
+    "positive_mask_samples": 564,
+    "empty_mask_samples": 1671,
+    "images_foreground_without_box": 0,
+    "boxes": 1490,
+    "components_available": 1490,
+    "boxes_per_image": {
+      "1": 276,
+      "2": 126,
+      "3": 58,
+      "4": 31,
+      "5": 12,
+      "6": 17,
+      "7": 6,
+      "8": 8,
+      "9": 6,
+      "10": 5,
+      "11": 3,
+      "12": 1,
+      "13": 3,
+      "14": 4,
+      "15": 2,
+      "16": 2,
+      "17": 1,
+      "21": 1,
+      "26": 2
+    },
+    "boxes_touching_border": 6
+  },
+  "capability": {
+    "has_semantic_mask": true,
+    "has_candidate_detection_boxes": true,
+    "is_detection_evaluation_ready": false,
+    "blockers": [
+      "instance_semantics_validated=false: componente conexo ainda não foi verificado como objeto independente por revisão humana",
+      "canonical_mapping_validated=false: urmind_class continua null",
+      "empty_mask_semantics_validated=false: 1671 máscaras vazias sem significado declarado"
+    ]
+  },
+  "instance_derivation": {
+    "status": "CANDIDATE_DERIVED_BOXES",
+    "hypothesis": "cada componente conexo da máscara é um objeto independente",
+    "evidence": "NENHUMA. A fonte publica máscara semântica, sem id de instância.",
+    "connectivity": 8,
+    "components_total": 1490,
+    "max_boxes_in_one_image": 26,
+    "overlapping_box_pairs": 108,
+    "single_pixel_components": 12,
+    "noise_candidates": 15,
+    "noise_floor_px": 24,
+    "known_limitations": [
+      "Fragmentos podem ser partes do mesmo buraco separadas por oclusão, remendo ou falha de anotação; 8-conectividade une diagonal mas não atravessa vão.",
+      "Caixas sobrepostas podem duplicar o mesmo objeto no ground truth e inflar contagem, o que distorce AP sem aparecer como erro.",
+      "Componentes de 1 px produzem caixa 1x1 válida e praticamente indetectável; deprimem recall sem medir capacidade.",
+      "Nenhum filtro de área foi aplicado: `noise_candidate` é marca para revisão, não regra."
+    ]
+  },
+  "empty_masks": {
+    "status": "EMPTY_MASK_SEMANTICS_UNRESOLVED",
+    "count": 1671,
+    "kept_in_manifest": true,
+    "meaning_candidates": [
+      "negativo verdadeiro: a imagem foi examinada e não havia buraco",
+      "imagem sem buraco, mas não necessariamente examinada",
+      "anotação ausente para este quadro",
+      "quadro não anotado nesta campanha"
+    ],
+    "why_unresolved": "A fonte não declara qual delas vale. Tratar como negativo mediria falso positivo em cima de suposição; excluir do conjunto esconde 75% do domínio. As duas escolhas mudam a métrica em direções opostas, então nenhuma é feita aqui.",
+    "usable_as_negative": false
+  },
+  "class_distribution": {
+    "UNIVALI_POTHOLE": 1490
+  },
+  "taxonomy": {
+    "derived_label": "UNIVALI_POTHOLE",
+    "source_label": "POTHOLE",
+    "urmind_class": null,
+    "class_allowed_by_declaration": "URMIND_ROAD_D40",
+    "mapping_status": "nao_verificado_independentemente",
+    "evidence": null,
+    "note": "A fonte declara POTHOLE = buraco e o projeto já registra a correspondência candidata com URMIND_ROAD_D40 em datasets/metadata/class_mapping.yaml. Esta derivada NÃO a aplica: sem verificação independente registrada, a caixa permanece com o rótulo nativo da fonte.",
+    "not_converted": {
+      "CRACK": "categoria única de trinca; a fonte não declara subtipo e o §8.2 proíbe escolher entre D00/D10/D20 por geometria ou aparência",
+      "LANE": "superfície da via; delimitação, não dano"
+    }
+  },
+  "size_policy": {
+    "min_area_applied_px": 0,
+    "rationale": "Padrão 0: nenhuma região é descartada por tamanho. Descarte é irreversível e qualquer corte precisa de um número justificado; em vez disso a área de cada região fica no manifesto e o custo de cada limiar candidato é medido abaixo.",
+    "tier_quantiles_px": {
+      "q25": 463,
+      "q50": 1014,
+      "q75": 2727
+    },
+    "components_below_threshold": {
+      "1": 0,
+      "2": 12,
+      "4": 14,
+      "8": 15,
+      "16": 15,
+      "32": 17,
+      "64": 25,
+      "128": 64,
+      "256": 192,
+      "512": 408,
+      "1024": 752
+    }
+  }
+}

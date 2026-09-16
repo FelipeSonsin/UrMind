@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "scope": "validação da derivada urban_community_boxes.jsonl (reforço de treino)",
+  "source_dataset": "urban_community",
+  "source_version": "kaggle-2025",
+  "transform": "validação de geometria, classes, duplicatas e contaminação cruzada",
+  "params": {
+    "dhash_threshold": 4,
+    "allowed_classes": [
+      "None",
+      "URMIND_ROAD_D40"
+    ],
+    "cross_source_references": [
+      "rdd2022",
+      "univali_br"
+    ]
+  },
+  "script": "scripts/datasets/validate_urban_community.py",
+  "generated_at": "2026-09-12T21:36:48-03:00",
+  "inputs": 290,
+  "outputs": 290,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "boxes_manifest_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+    "scan_manifest_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e",
+    "audit_report_sha256": "1d904e92e37ad34800a14d0d71d09731b5bf97decc82744211e904653dce07f8",
+    "conversion_report_sha256": "ba0e1c668ffa0886a2a04aa03524f296a3767f9693f2268e4e0978c4a3f06b78",
+    "provenance_chain": {
+      "valid": true,
+      "reason": null,
+      "links": [
+        {
+          "link": "boxes_manifest",
+          "file": "datasets/manifests/urban_community_boxes.jsonl",
+          "recorded_in": "datasets/reports/urban_community_conversion.json#integrity",
+          "recorded_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+          "current_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+          "valid": true,
+          "reason": null
+        },
+        {
+          "link": "scan_manifest",
+          "file": "datasets/manifests/urban_community_scan.jsonl",
+          "recorded_in": "datasets/reports/urban_community_conversion.json#integrity",
+          "recorded_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e",
+          "current_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e",
+          "valid": true,
+          "reason": null
+        },
+        {
+          "link": "audit_report",
+          "file": "datasets/reports/urban_community_audit.json",
+          "recorded_in": "datasets/reports/urban_community_conversion.json#integrity",
+          "recorded_sha256": "1d904e92e37ad34800a14d0d71d09731b5bf97decc82744211e904653dce07f8",
+          "current_sha256": "1d904e92e37ad34800a14d0d71d09731b5bf97decc82744211e904653dce07f8",
+          "valid": true,
+          "reason": null
+        },
+        {
+          "link": "human_audit_conversion_link",
+          "file": "datasets/reports/urban_community_conversion.json",
+          "recorded_in": "datasets/reports/urban_community_human_audit_status.json#integrity",
+          "recorded_sha256": "ba0e1c668ffa0886a2a04aa03524f296a3767f9693f2268e4e0978c4a3f06b78",
+          "current_sha256": "ba0e1c668ffa0886a2a04aa03524f296a3767f9693f2268e4e0978c4a3f06b78",
+          "valid": true,
+          "reason": null
+        },
+        {
+          "link": "human_audit_boxes_link",
+          "file": "datasets/manifests/urban_community_boxes.jsonl",
+          "recorded_in": "datasets/reports/urban_community_human_audit_status.json#integrity",
+          "recorded_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+          "current_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c",
+          "valid": true,
+          "reason": null
+        },
+        {
+          "link": "human_audit_sheet",
+          "file": "datasets/annotations/urban_community_box_audit_v1.jsonl",
+          "recorded_in": "datasets/reports/urban_community_human_audit_status.json#integrity",
+          "recorded_sha256": "76b988fa27b5bd5a8340fe7f0658fb6b1a604149ae37a3a7c1cd3b5e0a28325e",
+          "current_sha256": "76b988fa27b5bd5a8340fe7f0658fb6b1a604149ae37a3a7c1cd3b5e0a28325e",
+          "valid": true,
+          "reason": null
+        }
+      ],
+      "policy": "o relatório que libera esta fonte vale para os arquivos cujos hashes estão aqui, e para nenhum outro"
+    },
+    "required_inventories": [
+      "rdd2022",
+      "univali_br"
+    ],
+    "required_inventories_verified": [
+      "rdd2022",
+      "univali_br"
+    ],
+    "cross_source_valid": true,
+    "cross_source_references": {
+      "rdd2022": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+      "univali_br": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9"
+    }
+  },
+  "raw_modified": false,
+  "passed": false,
+  "failures": [
+    "4 par(es) de quase-duplicata com distância dHash 0 sem decisão humana POR PAR registrada em datasets/annotations/urban_community_duplicate_audit_v1.jsonl: a mesma cena entraria duas vezes no reforço"
+  ],
+  "counts": {
+    "images": 290,
+    "semantic_candidate_boxes": 451,
+    "training_authorized_boxes": 0,
+    "quarantined_boxes": 5,
+    "groups": {
+      "folder:pothole": 290
+    }
+  },
+  "geometry": {
+    "violations": [],
+    "violation_count": 0
+  },
+  "classes": {
+    "allowed": [
+      "None",
+      "URMIND_ROAD_D40"
+    ],
+    "violations": [],
+    "rule": "nenhuma caixa carrega classe da V1 sem `training_allowed`; nenhuma é autorizada com portão aberto"
+  },
+  "duplicates": {
+    "exact_sha256_groups": [],
+    "near_duplicate_pairs": [
+      {
+        "a": "203",
+        "b": "204",
+        "distance": 1
+      },
+      {
+        "a": "187",
+        "b": "206",
+        "distance": 0
+      },
+      {
+        "a": "138",
+        "b": "218",
+        "distance": 1
+      },
+      {
+        "a": "136",
+        "b": "240",
+        "distance": 0
+      },
+      {
+        "a": "141",
+        "b": "272",
+        "distance": 2
+      },
+      {
+        "a": "192",
+        "b": "278",
+        "distance": 0
+      },
+      {
+        "a": "24",
+        "b": "289",
+        "distance": 4
+      },
+      {
+        "a": "280",
+        "b": "42",
+        "distance": 2
+      },
+      {
+        "a": "21",
+        "b": "95",
+        "distance": 0
+      }
+    ],
+    "near_duplicate_count": 9,
+    "identical_dhash_pairs": [
+      {
+        "a": "187",
+        "b": "206",
+        "distance": 0
+      },
+      {
+        "a": "136",
+        "b": "240",
+        "distance": 0
+      },
+      {
+        "a": "192",
+        "b": "278",
+        "distance": 0
+      },
+      {
+        "a": "21",
+        "b": "95",
+        "distance": 0
+      }
+    ],
+    "blocking_near_duplicate_pairs": [
+      {
+        "a": "187",
+        "b": "206",
+        "distance": 0,
+        "reason": "decisão não resolve o par: ('PENDING_HUMAN_DUPLICATE_REVIEW', 'PENDING_HUMAN_DUPLICATE_REVIEW')"
+      },
+      {
+        "a": "136",
+        "b": "240",
+        "distance": 0,
+        "reason": "decisão não resolve o par: ('PENDING_HUMAN_DUPLICATE_REVIEW', 'PENDING_HUMAN_DUPLICATE_REVIEW')"
+      },
+      {
+        "a": "192",
+        "b": "278",
+        "distance": 0,
+        "reason": "decisão não resolve o par: ('PENDING_HUMAN_DUPLICATE_REVIEW', 'PENDING_HUMAN_DUPLICATE_REVIEW')"
+      },
+      {
+        "a": "21",
+        "b": "95",
+        "distance": 0,
+        "reason": "decisão não resolve o par: ('PENDING_HUMAN_DUPLICATE_REVIEW', 'PENDING_HUMAN_DUPLICATE_REVIEW')"
+      }
+    ],
+    "duplicate_review_sheet": "datasets/annotations/urban_community_duplicate_audit_v1.jsonl",
+    "duplicate_review_status": "PENDING_HUMAN_DUPLICATE_REVIEW",
+    "note": "Quase-duplicata em conjunto de TREINO não é vazamento, é repetição: infla o peso da mesma cena sem acrescentar informação. Distância > 0 fica registrada para revisão; distância 0 BLOQUEIA, porque é a mesma cena e deixá-la passar contradiz a regra que removeu as cópias byte a byte."
+  },
+  "cross_source_contamination": [
+    {
+      "reference": "rdd2022",
+      "compared_against": "datasets/manifests/rdd2022_inventory.jsonl",
+      "skipped": false,
+      "valid": true,
+      "inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+      "expected_records": 47420,
+      "inventory_records": 47420,
+      "hashable_records": 47420,
+      "unreadable_records": 0,
+      "cloud_only_records": 0,
+      "completeness_ratio": 1.0,
+      "completeness_status": "COMPLETE",
+      "authority_dataset_id": "rdd2022",
+      "authority_version": "2022-crddc",
+      "population_id": "crddc2022-official-all-images-train-test",
+      "source_index": "datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt",
+      "source_index_sha256": "56180db30512f57ae8e63af7ae5bbe391ad9f8617f8c64e8064b2dd084b638b4",
+      "threshold": 4,
+      "reference_records": 47420,
+      "reference_images_with_hash": 47420,
+      "exact_sha256_matches": 0,
+      "nearest_dhash_distance": 20,
+      "images_within_threshold": 0,
+      "reason": null,
+      "verdict": "sem contaminação detectável entre urban_community e rdd2022"
+    },
+    {
+      "reference": "univali_br",
+      "compared_against": "datasets/manifests/univali_br_boxes.jsonl",
+      "skipped": false,
+      "valid": true,
+      "inventory_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+      "threshold": 4,
+      "reference_records": 2235,
+      "reference_images_with_hash": 2235,
+      "reference_images_missing": 0,
+      "reference_images_cloud_only": 0,
+      "reference_images_unreadable": 0,
+      "status": "OK",
+      "exact_sha256_matches": 0,
+      "nearest_dhash_distance": 20,
+      "images_within_threshold": 0,
+      "reason": null,
+      "verdict": "sem contaminação detectável entre urban_community e univali_br"
+    }
+  ],
+  "leakage_policy": "Esta fonte só reforça treino. A garantia que ela precisa dar é não conter imagem que apareça no teste do RDD2022 nem no holdout do UNIVALI — é isso que a verificação cruzada mede."
+}

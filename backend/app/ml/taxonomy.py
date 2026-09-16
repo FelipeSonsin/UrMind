@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from app.schemas.core import UrmindClass
 
 __all__ = [
+    "MODEL_V1_CANONICAL_CLASS_ORDER",
+    "MODEL_V1_CLASS_ORDER",
     "RDD2022_TO_URMIND",
     "REJECTED_RDD2022_LABELS",
     "REJECTED_UNIVALI_LABELS",
@@ -43,8 +45,21 @@ RDD2022_TO_URMIND: dict[str, UrmindClass] = {
     "D40": UrmindClass.ROAD_D40,  # buraco / pothole
 }
 
+MODEL_V1_CLASS_ORDER: tuple[str, ...] = tuple(RDD2022_TO_URMIND)
+MODEL_V1_CANONICAL_CLASS_ORDER: tuple[str, ...] = tuple(
+    member.value for member in RDD2022_TO_URMIND.values()
+)
+
 # Rótulos que aparecem em parte das edições do RDD e que **não** entram na V1.
 # Cada um traz o motivo, para a recusa não parecer esquecimento.
+#
+# As chaves são maiúsculas porque `map_dataset_label` normaliza o rótulo de
+# entrada com `.strip().upper()` antes de procurar aqui.
+#
+# Este mapa é o par executável de `datasets/metadata/class_mapping.yaml`, e os
+# dois precisam listar os mesmos rótulos: um rótulo declarado lá e ausente aqui
+# continua sendo recusado, mas cai no motivo genérico e perde a explicação que
+# alguém escreveu justamente para ela não se perder.
 REJECTED_RDD2022_LABELS: dict[str, str] = {
     "D01": "trinca longitudinal em junta de construção; subtipo não separado na V1",
     "D11": "trinca transversal em junta de construção; subtipo não separado na V1",
@@ -53,6 +68,15 @@ REJECTED_RDD2022_LABELS: dict[str, str] = {
     "D50": (
         "tampa de poço de visita no RDD; não confundir com URMIND_MANHOLE, "
         "que exige dataset e protocolo próprios (§8.2)"
+    ),
+    "REPAIR": "remendo/reparo já executado; é intervenção, não dano ativo",
+    "BLOCK CRACK": (
+        "trinca em bloco; aparece só em parte das edições e não corresponde a "
+        "nenhuma das quatro categorias da V1"
+    ),
+    "D0W0": (
+        "erro de digitação de D00 presente na anotação oficial; corrigir seria "
+        "adivinhar a intenção do anotador, então é recusado e reportado"
     ),
 }
 

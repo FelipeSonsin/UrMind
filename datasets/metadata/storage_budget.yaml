@@ -34,6 +34,12 @@ datasets:
     cap_gb: 1.5
     purpose: urban_damage
     note: Fonte inteira cabe folgada; nao ha o que podar.
+  rtk_br:
+    cap_gb: 7
+    purpose: road_damage
+    note: >-
+      Release oficial Mendeley hssswvmjwf v1; 701 imagens e mascaras semanticas.
+      Raw extraido sem manter uma segunda copia permanente do ZIP.
   project_sidewalk:
     cap_gb: 7
     purpose: accessibility

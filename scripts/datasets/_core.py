@@ -49,7 +49,9 @@ __all__ = [
     "human_bytes",
     "is_cloud_only",
     "measure_dir",
+    "provenance",
     "relative_to_project",
+    "timestamp",
     "write_json_report",
 ]
 
@@ -317,6 +319,41 @@ def iter_files(root: Path, suffixes: Iterable[str] | None = None) -> Iterator[Pa
             caminho = assert_inside_project(Path(atual) / nome)
             if normalizados is None or caminho.suffix.lower() in normalizados:
                 yield caminho
+
+
+def provenance(
+    script_file: str,
+    *,
+    source_dataset: str,
+    source_version: str,
+    transform: str,
+    params: dict,
+) -> dict:
+    """Bloco de proveniência exigido de toda versão derivada (§10.2).
+
+    O contrato está em `datasets/metadata/artifact_contract.yaml`, seção
+    `derived_manifest_contract`, e `validate_manifests.py` confere. Ele existe
+    porque uma derivada sem origem, semente e script não é reproduzível — e um
+    recorte de dataset que não se reproduz não sustenta a métrica que sair dele.
+
+    `script_file` é o `__file__` de quem chama; o caminho é gravado relativo à
+    raiz para o registro continuar valendo em outra máquina.
+    """
+    return {
+        "source_dataset": source_dataset,
+        "source_version": source_version,
+        "transform": transform,
+        "params": params,
+        "script": relative_to_project(Path(script_file)),
+        "generated_at": timestamp(),
+    }
+
+
+def timestamp() -> str:
+    """Instante local COM fuso. Instante sem fuso não é instante."""
+    from datetime import datetime
+
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def write_json_report(name: str, payload: dict, subdir: str = "reports") -> Path:

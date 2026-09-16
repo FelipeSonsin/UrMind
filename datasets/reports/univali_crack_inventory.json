@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "artifact_kind": "provenance_inventory",
+  "scope": "inventário das máscaras CRACK do UNIVALI. Registra existência, conteúdo medido e proveniência. NÃO mapeia, NÃO autoriza treino e NÃO habilita avaliação.",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "medição de pixel das máscaras não consumidas e registro de proveniência",
+  "params": {
+    "source_labels": [
+      "CRACK",
+      "LANE"
+    ],
+    "mapped_to": null,
+    "no_mapping_reason": {
+      "CRACK": "categoria única de trinca. A fonte não declara subtipo e o §8.2 proíbe escolher entre D00/D10/D20 por geometria ou aparência: escolher seria inventar o rótulo, não derivá-lo.",
+      "LANE": "delimitação da superfície trafegável, não dano. Não há classe da V1 que corresponda, e nem deveria haver: é contexto geométrico, não avaria."
+    }
+  },
+  "script": "scripts/datasets/audit_univali_cracks.py",
+  "generated_at": "2026-09-12T14:46:02-03:00",
+  "inputs": 4470,
+  "outputs": 4470,
+  "dropped": 0,
+  "drop_reasons": {
+    "none": "inventário não descarta: registrar é o objetivo"
+  },
+  "integrity": {
+    "scan_manifest": "datasets/manifests/univali_br_crack_scan.jsonl",
+    "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+    "scan_manifest_sha256": "f44c6759b8e7e627abdfacd9eb0ee2c4c217663d3ed523338c24571098533f5a"
+  },
+  "raw_modified": false,
+  "counts": {
+    "samples": 4470,
+    "by_label": {
+      "CRACK": 2235,
+      "LANE": 2235
+    },
+    "positive_by_label": {
+      "CRACK": 1921,
+      "LANE": 2235
+    },
+    "positive_masks": 4156,
+    "empty_masks": 314,
+    "unreadable_masks": 0,
+    "cloud_only_masks": 0,
+    "samples_without_derived_metadata": 0,
+    "crack_foreground_px": {
+      "min": 80,
+      "median": 5417,
+      "max": 55689
+    },
+    "ufs": {
+      "RS": 2362,
+      "DF": 2016,
+      "ES": 92
+    },
+    "roads": 11,
+    "segments": 29
+  },
+  "taxonomy": {
+    "source_labels": {
+      "CRACK": "categoria única de trinca. A fonte não declara subtipo e o §8.2 proíbe escolher entre D00/D10/D20 por geometria ou aparência: escolher seria inventar o rótulo, não derivá-lo.",
+      "LANE": "delimitação da superfície trafegável, não dano. Não há classe da V1 que corresponda, e nem deveria haver: é contexto geométrico, não avaria."
+    },
+    "source_taxonomy": "CRACK é categoria única de trinca, sem subtipo declarado; LANE é delimitação de superfície, não avaria",
+    "urmind_class": null,
+    "training_eligible": false,
+    "canonical_evaluation_eligible": false,
+    "what_would_unlock": "o §8.2 ganhar classe de trinca compatível — genérica, ou com protocolo próprio que separe D00/D10/D20. Sem isso, nenhuma quantidade de máscara resolve, porque o que falta é a classe."
+  },
+  "coverage": {
+    "raw_files": 8940,
+    "referenced_by_manifests": 8940,
+    "invisible_files": 0,
+    "invisible_sample": [],
+    "passed": true,
+    "rule": "todo arquivo de raw/univali_br precisa ser citado por algum manifesto — como usado, recusado ou apenas inventariado"
+  },
+  "why_this_exists": "1.921 anotações humanas brasileiras de trinca estavam em disco e invisíveis ao sistema. Registrá-las não as torna utilizáveis; torna possível decidir sobre elas."
+}

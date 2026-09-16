@@ -17,11 +17,15 @@ nenhuma informação. Quem quiser o JPEG em arquivo usa `extract_image`.
 from __future__ import annotations
 
 import csv
+import json
+import os
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 from app.datasets.records import (
+    NEGATIVE_SEMANTICS_UNVERIFIED,
     AnnotatedImage,
     BoundingBox,
     GeoRecord,
@@ -40,6 +44,7 @@ from app.ml.taxonomy import (
 
 __all__ = [
     "ADAPTERS",
+    "DERIVED_ONLY_ADAPTERS",
     "AdapterError",
     "extract_image",
     "read_bdd100k",
@@ -180,91 +185,284 @@ def _parse_voc(
 
 # ----------------------------------------------------------- Urban Community
 
+URBAN_COMMUNITY_LABEL = "pothole"
+"""Única pasta da fonte cujo rótulo corresponde a uma classe da V1 (§8.2)."""
 
-def read_urban_community(root: Path) -> Iterator[AnnotatedImage]:
-    """Lê o pacote YOLO do Kaggle.
 
-    O rótulo YOLO é normalizado (cx, cy, w, h em fração), então a conversão para
-    pixels precisa do tamanho real da imagem — lido com Pillow, uma imagem por
-    vez. O id numérico vira nome pela tabela inferida das pastas.
+def _urban_community_artifacts(root: Path) -> Path:
+    """Diretório `datasets/` a partir da raiz da fonte em `datasets/raw/<id>`."""
+    return root.parent.parent
 
-    Grupo = pasta de classe, com a ressalva registrada no catálogo: é o único
-    agrupamento disponível e não garante separação de cena.
+
+_CLOUD_ONLY_ATTRIBUTES = 0x00000400 | 0x00001000 | 0x00400000
+
+
+def _is_cloud_only(path: Path) -> bool:
+    """Detecta placeholder sem abrir o arquivo e sem provocar hidratação."""
+    attributes = getattr(path.stat(), "st_file_attributes", 0)
+    return os.name == "nt" and bool(attributes & _CLOUD_ONLY_ATTRIBUTES)
+
+
+def _require_local_artifact(path: Path) -> Path:
+    """Libera leitura/hash somente de arquivo regular materializado localmente."""
+    if not path.exists():
+        raise AdapterError(f"artefato ausente: {path}")
+    if not path.is_file():
+        raise AdapterError(f"artefato não é arquivo regular: {path}")
+    if _is_cloud_only(path):
+        raise AdapterError(f"artefato cloud-only: leitura recusada sem hidratação: {path}")
+    return path
+
+
+def _read_artifact_text(path: Path, *, encoding: str = "utf-8") -> str:
+    return _require_local_artifact(path).read_text(encoding=encoding)
+
+
+def _load_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in _read_artifact_text(path).splitlines() if line.strip()]
+
+
+def _is_sha256(value: object) -> bool:
+    """64 dígitos hexadecimais minúsculos — o formato que `_sha256` produz."""
+    return (
+        isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+    )
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with _require_local_artifact(path).open("rb") as handle:
+        while chunk := handle.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _urban_community_chain(datasets_dir: Path) -> tuple[list[dict], list[dict], dict]:
+    """Carrega a derivada autorizada, conferindo a cadeia antes de devolver nada.
+
+    Fail-closed em todos os elos. Artefato ausente, ilegível ou com hash de outra
+    versão levanta `AdapterError` — **nunca** cai de volta no raw. O fallback para
+    o dado bruto é exatamente o caminho que produziu a divergência que este
+    adaptador existe para eliminar: a derivada dizia 290 imagens e 451 candidatas,
+    e a leitura direta do raw media 300 imagens e 478 caixas promovidas a D40,
+    incluindo as dez duplicatas e as cinco em quarentena.
     """
-    from PIL import Image  # importado aqui: só este adaptador precisa decodificar imagem
+    manifests = datasets_dir / "manifests"
+    reports = datasets_dir / "reports"
+    scan_path = manifests / "urban_community_scan.jsonl"
+    boxes_path = manifests / "urban_community_boxes.jsonl"
+    conversion_path = reports / "urban_community_conversion.json"
 
-    base = _find_marker(root, "Data_sets")
-    if (base / "Data_sets").is_dir():
-        base = base / "Data_sets"
+    for caminho in (scan_path, boxes_path, conversion_path):
+        try:
+            _require_local_artifact(caminho)
+        except AdapterError as exc:
+            raise AdapterError(
+                f"urban_community: artefato autorizado indisponível ({caminho.name}): "
+                f"{exc}. "
+                "A fonte fica bloqueada; ler o raw diretamente recriaria a "
+                "decisão paralela que o manifesto derivado substituiu."
+            ) from exc
 
-    for class_dir in sorted(p for p in base.iterdir() if p.is_dir()):
-        label_dir, image_dir = class_dir / "labels", class_dir / "images"
-        if not (label_dir.is_dir() and image_dir.is_dir()):
-            continue
-        for label_path in sorted(label_dir.glob("*.txt")):
-            image_path = _sibling_image(image_dir, label_path.stem)
-            if image_path is None:
-                continue
-            with Image.open(image_path) as image:
-                width, height = image.size
+    try:
+        conversao = json.loads(_read_artifact_text(conversion_path, encoding="utf-8-sig"))
+        scan = _load_jsonl(scan_path)
+        rows = _load_jsonl(boxes_path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        raise AdapterError(f"urban_community: derivada ilegível: {exc}") from exc
 
-            boxes: list[BoundingBox] = []
-            rejected: list[RejectedLabel] = []
-            for line in label_path.read_text(encoding="utf-8").splitlines():
-                parsed = _parse_yolo_line(line, width, height)
-                if parsed is None:
-                    continue
-                class_id, coords = parsed
-                name = URBAN_COMMUNITY_CLASS_IDS.get(class_id)
-                if name is None:
-                    rejected.append(
-                        RejectedLabel(str(class_id), "id fora do mapa inferido das pastas")
-                    )
-                    continue
-                mapping = map_urban_community_label(name)
-                if not mapping.accepted or mapping.urmind_class is None:
-                    rejected.append(RejectedLabel(name, mapping.reason or ""))
-                    continue
-                try:
-                    boxes.append(
-                        BoundingBox(mapping.urmind_class, name, *coords)
-                    )
-                except ValueError as exc:
-                    rejected.append(RejectedLabel(name, f"caixa inválida: {exc}"))
-
-            yield AnnotatedImage(
-                dataset_id="urban_community",
-                image_path=_relative(image_path, root),
-                width=width,
-                height=height,
-                group=class_dir.name,
-                boxes=tuple(boxes),
-                rejected=tuple(rejected),
+    integridade = conversao.get("integrity", {})
+    for nome, caminho in (("scan_manifest", scan_path), ("boxes_manifest", boxes_path)):
+        registrado = integridade.get(f"{nome}_sha256")
+        atual = _sha256(caminho)
+        if not registrado:
+            raise AdapterError(
+                f"urban_community: a conversão não registrou o sha256 de {nome}; "
+                "sem vínculo, não há como saber que esta é a versão validada"
+            )
+        if registrado != atual:
+            raise AdapterError(
+                f"urban_community: {nome} diverge do que a conversão registrou "
+                f"({atual[:12]} != {registrado[:12]}); a derivada está "
+                "desatualizada e a fonte fica bloqueada"
             )
 
+    # Duplicata e contaminação cruzada são propriedades do conjunto e só existem
+    # depois da validação. Ausente, reprovada ou de outra versão do manifesto: os
+    # portões correspondentes ficam fechados e nada é autorizado.
+    validation_path = reports / "urban_community_validation.json"
+    checks: dict[str, Any] = {
+        "taxonomy_mapping_validated": bool(
+            conversao.get("mapping", {}).get("semantic_mapping_approved")
+        ),
+        "duplicate_check_passed": False,
+        "cross_source_check_passed": False,
+        "validation_report": None,
+    }
+    if validation_path.is_file():
+        try:
+            validacao = json.loads(_read_artifact_text(validation_path, encoding="utf-8-sig"))
+        except AdapterError:
+            raise
+        except (OSError, json.JSONDecodeError) as exc:
+            raise AdapterError(f"urban_community: validação ilegível: {exc}") from exc
+        integridade_validacao = validacao.get("integrity", {})
 
-def _sibling_image(image_dir: Path, stem: str) -> Path | None:
-    for suffix in _IMAGE_SUFFIXES:
-        candidate = image_dir / f"{stem}{suffix}"
-        if candidate.exists():
-            return candidate
-    return None
+        # Dois elos, não um. Conferir só o manifesto de caixas deixava passar o
+        # caso em que alguém edita `urban_community_conversion.json` depois da
+        # validação: as caixas continuam idênticas, a validação continua dizendo
+        # "aprovado", e o `semantic_mapping_approved` que abre o portão de
+        # taxonomia passa a vir de um arquivo que ninguém validou. A validação
+        # já grava o SHA-256 da conversão que ela leu — é esse que vale.
+        mesma_versao = integridade_validacao.get("boxes_manifest_sha256") == _sha256(boxes_path)
+        conversao_registrada = integridade_validacao.get("conversion_report_sha256")
+        conversao_atual = _sha256(conversion_path)
+        # Ausente, vazio ou malformado reprova como divergente. Pular a comparação
+        # quando o campo falta era fail-open: um relatório antigo, ou escrito à
+        # mão, abria os portões de duplicata e contaminação cruzada com resultados
+        # que ninguém provou pertencerem à conversão em disco.
+        if not _is_sha256(conversao_registrada):
+            raise AdapterError(
+                "urban_community: a validação não registra um "
+                "`integrity.conversion_report_sha256` válido "
+                f"(valor: {conversao_registrada!r}). Sem esse vínculo não há como "
+                "provar que duplicata, contaminação e mapeamento pertencem à "
+                "mesma conversão; nenhuma caixa é autorizada."
+            )
+        if conversao_registrada != conversao_atual:
+            raise AdapterError(
+                "urban_community: o relatório de conversão mudou depois da "
+                f"validação ({conversao_atual[:12]} != {conversao_registrada[:12]}). "
+                "A cadeia está quebrada e nenhuma caixa é autorizada: revalide "
+                "antes de consumir a derivada."
+            )
+
+        if mesma_versao and validacao.get("passed"):
+            duplicatas = validacao.get("duplicates", {})
+            checks["duplicate_check_passed"] = not duplicatas.get(
+                "exact_sha256_groups"
+            ) and not duplicatas.get("blocking_near_duplicate_pairs")
+            checks["cross_source_check_passed"] = bool(
+                integridade_validacao.get("cross_source_valid")
+            )
+        checks["validation_report"] = {
+            "same_version": mesma_versao,
+            "passed": bool(validacao.get("passed")),
+            "conversion_report_linked": bool(conversao_registrada),
+            "conversion_report_sha256": conversao_atual,
+        }
+    else:
+        # Sem validação não há como saber se a conversão em disco é a auditada,
+        # então o portão de taxonomia também fecha. O relatório de conversão
+        # sozinho afirma sobre si mesmo, e isso não é verificação.
+        checks["taxonomy_mapping_validated"] = False
+        checks["validation_report"] = {
+            "same_version": False,
+            "passed": False,
+            "reason": "relatório de validação ausente",
+        }
+
+    return scan, rows, checks
 
 
-def _parse_yolo_line(
-    line: str, width: int, height: int
-) -> tuple[int, tuple[float, float, float, float]] | None:
-    parts = line.split()
-    if len(parts) < 5:
-        return None
-    class_id = int(float(parts[0]))
-    cx, cy, bw, bh = (float(v) for v in parts[1:5])
-    return class_id, (
-        (cx - bw / 2) * width,
-        (cy - bh / 2) * height,
-        (cx + bw / 2) * width,
-        (cy + bh / 2) * height,
-    )
+def read_urban_community(root: Path) -> Iterator[AnnotatedImage]:
+    """Lê o Urban Community pela **derivada autorizada**, nunca pelo raw.
+
+    A fonte de verdade é `datasets/manifests/urban_community_boxes.jsonl`, com a
+    cadeia de hashes conferida antes de qualquer coisa. Só vira `BoundingBox` a
+    caixa que passou por todos os portões de `app.datasets.authorization` — hoje,
+    nenhuma: ninguém revisou caixa alguma, e o rótulo `pothole` da pasta sustenta
+    a CLASSE, não cada anotação feita sob aquele nome.
+
+    O que a fonte trazia continua contabilizado. Candidata não autorizada sai como
+    `RejectedLabel` com o portão que a barrou — some de `usable`, não some da
+    conta. `good_road` sai marcada como negativa de semântica não verificada, e
+    as cinco pastas fora do escopo continuam com a recusa de sempre. O adaptador
+    lê o *scan* derivado para isso, e não o rótulo bruto: nenhuma classe da V1
+    nasce aqui.
+    """
+    from app.datasets.authorization import authorize_rows
+
+    scan, rows, checks = _urban_community_chain(_urban_community_artifacts(root))
+
+    mapeamento = map_urban_community_label(URBAN_COMMUNITY_LABEL)
+    classe = mapeamento.urmind_class
+    if not mapeamento.accepted or classe is None:  # pragma: no cover
+        raise AdapterError("urban_community: taxonomia não declara classe para `pothole`")
+
+    autorizadas: dict[str, list[dict]] = {}
+    barradas: dict[str, list[dict]] = {}
+    for linha in authorize_rows(rows, source_checks=checks, urmind_class=str(classe)):
+        stem = linha["stem"]
+        autorizadas[stem] = [b for b in linha["boxes"] if b["training_allowed"]]
+        barradas[stem] = [b for b in linha["boxes"] if not b["training_allowed"]]
+
+    derivadas = {linha["stem"] for linha in rows}
+
+    for linha in scan:
+        pasta, stem = linha["folder"], linha["stem"]
+        boxes: list[BoundingBox] = []
+        rejected: list[RejectedLabel] = []
+        negative_status: str | None = None
+
+        if pasta == URBAN_COMMUNITY_LABEL:
+            if stem not in derivadas:
+                # Imagem bloqueada por duplicata na conversão. Continua contada,
+                # com o motivo, para que 478 → 456 permaneça auditável.
+                rejected.extend(
+                    RejectedLabel(
+                        URBAN_COMMUNITY_LABEL,
+                        "imagem removida da derivada por duplicata exata",
+                    )
+                    for _ in linha["boxes"]
+                )
+            else:
+                for box in autorizadas[stem]:
+                    boxes.append(
+                        BoundingBox(
+                            classe,
+                            URBAN_COMMUNITY_LABEL,
+                            box["xmin"],
+                            box["ymin"],
+                            box["xmax"],
+                            box["ymax"],
+                        )
+                    )
+                rejected.extend(
+                    RejectedLabel(
+                        URBAN_COMMUNITY_LABEL,
+                        "candidata sem autorização: " + ", ".join(box["blocking_gates"]),
+                    )
+                    for box in barradas[stem]
+                )
+        else:
+            for box in linha["boxes"]:
+                nome = URBAN_COMMUNITY_CLASS_IDS.get(box["class_id"])
+                if nome is None:
+                    rejected.append(
+                        RejectedLabel(str(box["class_id"]), "id fora do mapa inferido das pastas")
+                    )
+                    continue
+                mapping = map_urban_community_label(nome)
+                rejected.append(RejectedLabel(nome, mapping.reason or ""))
+            if not linha["boxes"]:
+                # `good_road`: .txt vazio. A fonte não publica protocolo de
+                # anotação, então a ausência de caixa não prova que alguém olhou
+                # e não havia nada. Retida, nunca negativa de treino.
+                negative_status = NEGATIVE_SEMANTICS_UNVERIFIED
+
+        yield AnnotatedImage(
+            dataset_id="urban_community",
+            image_path=linha["image_relpath"].split("urban_community/", 1)[-1],
+            width=linha["image_width"],
+            height=linha["image_height"],
+            group=pasta,
+            boxes=tuple(boxes),
+            rejected=tuple(rejected),
+            negative_status=negative_status,
+        )
 
 
 # ------------------------------------------------------------- UNIVALI / DNIT
@@ -310,7 +508,16 @@ def read_univali_br(root: Path) -> Iterator[MaskSample]:
 
 
 def univali_group(directory_name: str) -> str:
-    """Extrai o trecho de rodovia do nome da pasta; devolve o nome inteiro se não der."""
+    """Extrai o trecho de rodovia do nome da pasta; devolve o nome inteiro se não der.
+
+    As quatro pastas com um campo extra antes da posição
+    (`1050564_DF_080_080BDF0050_1_00368`) caem aqui como
+    `DF_080_080BDF0050_1`, um trecho distinto de `DF_080_080BDF0050`. Se os dois
+    nomeiam o mesmo trecho, a fonte não diz — e supor que sim uniria grupos sem
+    evidência. O split do UNIVALI agrupa por rodovia justamente por isso: no
+    nível de rodovia os dois ficam juntos sem ninguém precisar adivinhar
+    (ver `scripts/datasets/make_univali_splits.py`).
+    """
     parts = directory_name.split("_")
     return "_".join(parts[1:-1]) if len(parts) > 2 else directory_name
 
@@ -725,6 +932,17 @@ ADAPTERS: dict[str, DatasetReader] = {
     "global_streetscapes": read_global_streetscapes,
 }
 """Chave do campo `adapter` do catálogo → leitor. Fonte adiada não aparece aqui."""
+
+DERIVED_ONLY_ADAPTERS: frozenset[str] = frozenset({"urban_community"})
+"""Adaptadores que não abrem nenhum arquivo dentro de `raw/`.
+
+Eles leem apenas artefato derivado — manifesto de varredura e derivada
+autorizada, ambos pequenos e versionados. A trava do §4.4 que bloqueia a
+varredura inteira quando existe marcador do OneDrive foi escrita porque os
+adaptadores navegam por glob e abrem imagem a imagem; para estes, abrir nada do
+raw é justamente o desenho. Bloqueá-los faria o relatório dizer "não medido"
+sobre uma medição que não depende de hidratar byte nenhum.
+"""
 
 
 def read_records(adapter: str | None, root: Path) -> Iterator[DatasetRecord]:

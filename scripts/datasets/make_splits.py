@@ -13,6 +13,7 @@ from _core import (
     configure_stdout,
     file_sha256,
     require_local,
+    timestamp,
     write_json_report,
     write_text_safe,
 )
@@ -154,6 +155,20 @@ def main():
     result, components, score = dividir(rows, dup, (a.train, a.val, a.test), a.seed)
     checks = verify_splits(result, dup)
     report = {
+        # Proveniencia exigida de toda derivada
+        # (artifact_contract.yaml#derived_manifest_contract).
+        "script": "scripts/datasets/make_splits.py",
+        "source_dataset": "rdd2022",
+        "source_version": "figshare-21431547-v1 (2022-crddc)",
+        "generated_at": timestamp(),
+        "inputs": {"images": len(rows)},
+        # Split é partição, não filtro: toda imagem do manifesto cai em
+        # exatamente um lado. O campo fica explícito para não confundir
+        # "nada foi descartado" com "ninguém contou".
+        "dropped": {"images": 0},
+        "drop_reasons": {
+            "none": "partição: toda imagem do manifesto de seleção entra em um split"
+        },
         "algorithm_version": 4,
         "seed": a.seed,
         "source_manifest_sha256": file_sha256(SELECTION),

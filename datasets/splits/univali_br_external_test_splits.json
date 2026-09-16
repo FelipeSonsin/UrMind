@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "artifact_kind": "derived_split_manifest",
+  "usage": "CANDIDATE_EXTERNAL_TEST_BR",
+  "scope": "partição do UNIVALI dentro de EXTERNAL_TEST_BR. Nenhuma amostra entra em treino. Lista caminhos; não copia imagem.",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "partição por grupo com holdout brasileiro congelado",
+  "params": {
+    "group_by": "road",
+    "group_field": "group_road",
+    "holdout_ratio": 0.5,
+    "seed": 20260910,
+    "duplicate_union": true
+  },
+  "script": "scripts/datasets/make_univali_splits.py",
+  "generated_at": "2026-09-10T16:55:33-03:00",
+  "inputs": 2235,
+  "outputs": 2235,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+    "validated_by": {
+      "report": "datasets/reports/univali_box_validation.json",
+      "report_sha256": "c5883b6607dadd630f38d1e32fb76c6013166d4c61a6a4f261a10770c9cb74a0",
+      "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+      "passed": true,
+      "exact_duplicate_groups": 1,
+      "near_duplicate_pairs": 4,
+      "generated_at": "2026-09-10T16:52:52-03:00",
+      "cross_source": {
+        "performed": true,
+        "compared_against": "datasets/manifests/rdd2022_inventory.jsonl",
+        "inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+        "inventory_records": 47420,
+        "exact_sha256_matches": 0,
+        "nearest_dhash_distance": 15,
+        "threshold": 4
+      }
+    }
+  },
+  "raw_modified": false,
+  "grouping": {
+    "level": "road",
+    "basis": "identificador publicado no nome da pasta pela fonte (UF, rodovia, trecho). Não é inferência visual.",
+    "independent_groups": 11,
+    "groups_merged_by_duplicates": 0,
+    "why_not_pixel_similarity": "Capturas do mesmo trecho são sequenciais mas visualmente distintas: o dHash encontra pouquíssimos pares entre elas. Agrupar por similaridade deixaria passar o parentesco real."
+  },
+  "splits": {
+    "holdout_br_frozen": {
+      "images": 1115,
+      "positive_mask_images": 195,
+      "empty_mask_images": 920,
+      "empty_mask_status": "EMPTY_MASK_SEMANTICS_UNRESOLVED",
+      "usable_for_metrics": 195,
+      "usable_note": "só as positivas têm caixa. As vazias viajam com o grupo para não vazarem depois, mas não medem falso positivo enquanto a semântica delas estiver pendente.",
+      "boxes": 442,
+      "groups": [
+        "DF_060",
+        "DF_251",
+        "ES_101",
+        "ES_259",
+        "ES_482",
+        "RS_386"
+      ],
+      "group_count": 6,
+      "segments": [
+        "DF_060_060BDF0010",
+        "DF_060_060BDF0012",
+        "DF_060_060BDF0030",
+        "DF_060_060BDF0050",
+        "DF_251_251BDF0052",
+        "DF_251_251BDF0490",
+        "DF_251_251BDF0525",
+        "DF_251_251BDF0530",
+        "ES_101_101ES000000",
+        "ES_259_259ES000000",
+        "ES_482_482ES014500",
+        "RS_386_386RS124739",
+        "RS_386_386RS169832",
+        "RS_386_386RS191729",
+        "RS_386_386RS289112"
+      ],
+      "ufs": [
+        "DF",
+        "ES",
+        "RS"
+      ],
+      "class_counts": {
+        "UNIVALI_POTHOLE": 442
+      },
+      "size_tiers": {
+        "small": 184,
+        "medium_small": 105,
+        "medium_large": 83,
+        "large": 70
+      }
+    },
+    "external_test_br": {
+      "images": 1120,
+      "positive_mask_images": 369,
+      "empty_mask_images": 751,
+      "empty_mask_status": "EMPTY_MASK_SEMANTICS_UNRESOLVED",
+      "usable_for_metrics": 369,
+      "usable_note": "só as positivas têm caixa. As vazias viajam com o grupo para não vazarem depois, mas não medem falso positivo enquanto a semântica delas estiver pendente.",
+      "boxes": 1048,
+      "groups": [
+        "DF_010",
+        "DF_020",
+        "DF_070",
+        "DF_080",
+        "RS_290"
+      ],
+      "group_count": 5,
+      "segments": [
+        "DF_010_010BDF0010",
+        "DF_010_010BDF0018",
+        "DF_010_010BDF0030_1",
+        "DF_020_020BDF0070",
+        "DF_070_070BDF0010",
+        "DF_070_070BDF0050",
+        "DF_080_080BDF0032",
+        "DF_080_080BDF0050",
+        "DF_080_080BDF0050_1",
+        "DF_080_080BDF0070",
+        "DF_080_080BDF0090",
+        "RS_290_290RS070691",
+        "RS_290_290RS150131",
+        "RS_290_290RS294095"
+      ],
+      "ufs": [
+        "DF",
+        "RS"
+      ],
+      "class_counts": {
+        "UNIVALI_POTHOLE": 1048
+      },
+      "size_tiers": {
+        "large": 303,
+        "medium_small": 268,
+        "medium_large": 288,
+        "small": 189
+      }
+    }
+  },
+  "achieved_ratios": {
+    "holdout_br_frozen": 0.4989,
+    "external_test_br": 0.5011
+  },
+  "leakage_check": {
+    "performed": true,
+    "duplicate_validation": "REQUIRED_AND_PRESENT",
+    "duplicate_validation_evidence": {
+      "report": "datasets/reports/univali_box_validation.json",
+      "report_sha256": "c5883b6607dadd630f38d1e32fb76c6013166d4c61a6a4f261a10770c9cb74a0",
+      "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+      "passed": true,
+      "exact_duplicate_groups": 1,
+      "near_duplicate_pairs": 4,
+      "generated_at": "2026-09-10T16:52:52-03:00",
+      "cross_source": {
+        "performed": true,
+        "compared_against": "datasets/manifests/rdd2022_inventory.jsonl",
+        "inventory_sha256": "73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d",
+        "inventory_records": 47420,
+        "exact_sha256_matches": 0,
+        "nearest_dhash_distance": 15,
+        "threshold": 4
+      }
+    },
+    "checks": [
+      "validação de duplicatas presente, aprovada e ligada a este manifesto",
+      "grupos ligados por duplicata unidos antes da partição",
+      "nenhum grupo em mais de um lado",
+      "nenhuma amostra em mais de um lado",
+      "nenhum trecho cruzando os lados",
+      "nenhum lado vazio"
+    ],
+    "problems": [],
+    "passed": true
+  },
+  "holdout_policy": {
+    "frozen_side": "holdout_br_frozen",
+    "rule": "Congelado antes de qualquer treino. Medido uma vez, sem reajuste depois de observar resultado. Não participa de escolha de limiar, de hiperparâmetro nem de seleção de modelo.",
+    "training_use": "PROIBIDO em qualquer lado; a fonte inteira é EXTERNAL_TEST_BR"
+  },
+  "evaluation_readiness": {
+    "is_detection_evaluation_ready": false,
+    "usage": "CANDIDATE_EXTERNAL_TEST_BR",
+    "blockers": [
+      "instance_semantics_validated=false: componente conexo não foi verificado como objeto independente",
+      "canonical_mapping_validated=false: urmind_class continua null",
+      "empty_mask_semantics_validated=false: máscaras vazias sem significado declarado, então falso positivo não é medível",
+      "cobertura: só as imagens com máscara positiva têm caixa; o conjunto mede localização em positivos, não desempenho no domínio"
+    ],
+    "training_allowed": false
+  },
+  "limitations": [
+    "Mede rodovia federal brasileira em poucas UFs e rodovias; não representa via urbana brasileira nem o Brasil inteiro.",
+    "O rótulo da caixa continua sendo UNIVALI_POTHOLE: a correspondência com URMIND_ROAD_D40 não foi verificada de forma independente.",
+    "A fonte não publica GPS, sessão nem vídeo; trecho é o agrupamento mais fino disponível."
+  ]
+}

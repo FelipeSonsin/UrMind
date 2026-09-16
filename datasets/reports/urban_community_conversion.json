@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "artifact_kind": "derived_dataset_version",
+  "usage": "CANDIDATE_TRAIN_REINFORCEMENT",
+  "scope": "conversão YOLO→caixa da pasta `pothole` como reforço de treino. Não treina, não altera raw e nunca entra em avaliação.",
+  "source_dataset": "urban_community",
+  "source_version": "kaggle-2025",
+  "transform": "YOLO normalizado → caixa em pixels, somente a pasta pothole",
+  "params": {
+    "source_folder": "pothole",
+    "source_class_id": 3,
+    "urmind_class": "URMIND_ROAD_D40",
+    "tiny_floor_percentile": 1,
+    "tiny_floor_px": 236,
+    "cross_folder_duplicates_blocked": [
+      "202",
+      "212",
+      "237",
+      "239",
+      "254",
+      "258",
+      "31",
+      "54",
+      "84",
+      "89"
+    ],
+    "scan_manifest_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e"
+  },
+  "script": "scripts/datasets/convert_urban_community.py",
+  "generated_at": "2026-09-12T17:03:02-03:00",
+  "inputs": 300,
+  "outputs": 290,
+  "dropped": 10,
+  "drop_reasons": {
+    "imagem bloqueada por duplicata (entre pastas ou cópia interna)": 10
+  },
+  "integrity": {
+    "scan_manifest_sha256": "a9c47a1dce1918e0cf750e6f3de6c3414d3693a8b8a2ff487cac9d69d4db986e",
+    "audit_report_sha256": "1d904e92e37ad34800a14d0d71d09731b5bf97decc82744211e904653dce07f8",
+    "boxes_manifest": "datasets/manifests/urban_community_boxes.jsonl",
+    "boxes_manifest_sha256": "e37507409c3d9a3a06a6b5409c8b7fb95c8273ddd7668af865306652cbe1e39c"
+  },
+  "raw_modified": false,
+  "counts": {
+    "source_images_all_folders": 2518,
+    "source_images_pothole": 300,
+    "source_boxes_pothole": 478,
+    "boxes_on_blocked_duplicate_images": 22,
+    "manifest_images": 290,
+    "geometrically_valid_boxes": 456,
+    "quarantined_boxes": 5,
+    "semantic_candidate_boxes": 451,
+    "human_reviewed_boxes": 0,
+    "human_approved_boxes": 0,
+    "stale_human_reviews": 0,
+    "duplicate_rejected_images": 0,
+    "pending_duplicate_review_images": 8,
+    "d40_authorized_boxes": 0,
+    "training_authorized_boxes": 0,
+    "semantic_candidates_per_image": {
+      "1": 218,
+      "2": 41,
+      "3": 15,
+      "4": 5,
+      "5": 2,
+      "6": 1,
+      "7": 2,
+      "8": 3,
+      "9": 1,
+      "10": 1,
+      "13": 1
+    }
+  },
+  "gates": {
+    "required": [
+      "geometry_valid",
+      "source_category_validated",
+      "taxonomy_mapping_validated",
+      "not_quarantined",
+      "duplicate_check_passed",
+      "duplicate_review_resolved",
+      "cross_source_check_passed",
+      "box_semantic_validation_passed",
+      "image_annotation_complete"
+    ],
+    "blocking_counts": {
+      "box_semantic_validation_passed": 456,
+      "cross_source_check_passed": 456,
+      "duplicate_check_passed": 456,
+      "duplicate_review_resolved": 10,
+      "image_annotation_complete": 456,
+      "not_quarantined": 5
+    },
+    "rule": "backend/app/datasets/authorization.py#evaluate_gates",
+    "policy": "conjunção: uma caixa só recebe URMIND_ROAD_D40 quando TODOS os portões passam. Portão sem resposta reprova — ausência de evidência não é evidência de ausência de problema.",
+    "conversion_time_checks": {
+      "taxonomy_mapping_validated": true,
+      "duplicate_check_passed": false,
+      "cross_source_check_passed": false
+    },
+    "human_decision_binding": "decisão humana só é aplicada quando o sha256 do scan auditado, a imagem, o rótulo de origem e as coordenadas da caixa conferem. `stem#index` é identificador reutilizável e sozinho não prova nada: divergência vira STALE_HUMAN_REVIEW e o portão semântico continua fechado.",
+    "recomputed_by_consumer": "duplicata e contaminação cruzada só existem depois da validação, que roda após esta etapa. O adaptador reavalia os portões contra o relatório de validação da versão corrente, com a mesma função."
+  },
+  "mapping": {
+    "source_label": "pothole",
+    "urmind_class": "URMIND_ROAD_D40",
+    "semantic_mapping_approved": true,
+    "box_level_human_validation_complete": false,
+    "approved": true,
+    "approved_scope": "o mapeamento do rótulo para a classe — não a corretude individual das caixas",
+    "basis": "definição canônica, não semelhança visual entre classes",
+    "justification": [
+      "taxonomy.yaml define URMIND_ROAD_D40 como 'buraco / pothole', origem RDD2022 D40. O rótulo de origem é literalmente `pothole`: a correspondência é entre um nome e a definição oficial da classe, não entre duas aparências.",
+      "A inspeção estratificada de 48 recortes confirmou que o conteúdo predominante da pasta é cavidade de pavimento — buraco —, e não outra categoria de dano.",
+      "class_mapping.yaml já declarava esta correspondência; aqui ela deixa de ser herdada e passa a ter evidência anexada."
+    ],
+    "limits": [
+      "A inspeção foi assistida por modelo, não é revisão humana registrada. Ela sustenta a categoria; não certifica caixa a caixa.",
+      "Foi observada contaminação na pasta: apareceram trinca sem cavidade e um bueiro aberto entre os recortes rotulados como buraco. Geometria não detecta isso — só revisão humana.",
+      "Foi observada anotação incompleta: imagem com vários buracos visíveis e só parte deles com caixa, o que ensina falso negativo.",
+      "O mapa id→classe continua inferido das pastas; o pacote não traz data.yaml e o Kaggle não publica checksum."
+    ],
+    "refused_labels": {
+      "cracks": {
+        "kind": "taxonomia",
+        "reason": "classe única de trinca. A inspeção visual confirmou o problema em vez de só declará-lo: a mesma pasta traz trinca em malha, longitudinal e transversal. Escolher entre D00/D10/D20 seria inventar o subtipo (§8.2)."
+      },
+      "open_manhole": {
+        "kind": "taxonomia",
+        "reason": "URMIND_MANHOLE é classe futura bloqueada; exige dataset e protocolo de anotação próprios (§8.2). 152 imagens herdadas não substituem isso."
+      },
+      "good_road": {
+        "kind": "sem_anotacao",
+        "reason": "100 imagens com .txt vazio, RETIDAS como NEGATIVE_SEMANTICS_UNVERIFIED. A ausência de caixa não prova que a imagem seja negativa confiável: enquanto o protocolo de anotação da fonte não estiver comprovado, ela também é compatível com anotador que simplesmente não anotou — e treinar com isso ensina o detector que o objeto não estava ali. Não entram em treino agora."
+      },
+      "animal": {
+        "kind": "escopo",
+        "reason": "Animal em via não é dano de infraestrutura: é ocorrência transitória, e o UrMind detecta condição do pavimento e do mobiliário urbano. Não existe classe da V1 nem futura que corresponda, então não há o que desbloquear. 1.113 caixas que o detector não deve aprender a procurar."
+      },
+      "traffic_lights": {
+        "kind": "taxonomia",
+        "reason": "URMIND_SIGNAGE é classe futura bloqueada (§8.2)."
+      },
+      "waste_container": {
+        "kind": "escopo",
+        "reason": "Contêiner de lixo é mobiliário urbano em estado normal, não avaria. O escopo do §0 cita buraco, calçada, bueiro e sinalização; coleta de resíduo não está lá e não tem classe futura reservada. 1.112 caixas fora do domínio."
+      }
+    },
+    "good_road": {
+      "status": "NEGATIVE_SEMANTICS_UNVERIFIED",
+      "images": 100,
+      "decision": "retidas; não incorporadas ao treino nesta etapa",
+      "enforced_by": "app.datasets.adapters.read_urban_community marca o registro, e app.datasets.readiness as conta em `unverified_negative_images`, fora de `negative_images`",
+      "what_would_unlock": "protocolo de anotação da fonte comprovado, ou exame humano registrado das 100 imagens declarando que não há dano visível"
+    }
+  },
+  "human_validation": {
+    "human_review_status": "PENDING",
+    "acceptance_protocol": "datasets/reports/urban_community_human_audit_status.json#status.acceptance_protocol — declarado ANTES da revisão, para que 'aprovada' não seja definida depois de olhar o resultado",
+    "box_level_human_validation_complete": false,
+    "boxes_with_individual_human_decision": 0,
+    "boxes_without_individual_human_decision": 451,
+    "sheet": "datasets/annotations/urban_community_box_audit_v1.jsonl",
+    "status_report": "datasets/reports/urban_community_human_audit_status.json",
+    "why": "A inspeção que sustentou o mapeamento foi assistida por modelo e estratificada por área: ela responde pela categoria da pasta, não por cada caixa. Nenhuma das caixas aceitas foi conferida individualmente por humano, e a fonte já exibiu trinca sem cavidade, bueiro aberto e imagem com buracos não anotados. Até a folha de auditoria ser preenchida, estas caixas são candidatas a TRAIN_REINFORCEMENT — não ground truth humano certificado."
+  },
+  "quarantine": {
+    "policy": "Caixa em quarentena NÃO entra em treino e sai com urmind_class null. Todos os critérios de hoje são HEURÍSTICOS: são fatos geométricos e um piso de área tirado da distribuição da própria pasta. Nenhum deles observa o conteúdo da caixa.",
+    "heuristic_vs_semantic": {
+      "heuristic_quarantine": "a caixa é atípica no conjunto. Fica retida para análise e não entra em treino, mas NÃO foi declarada inválida.",
+      "semantic_rejection": "a caixa viola a definição da classe. Exige olhar o conteúdo; nenhum critério automático deste script produz esse veredito.",
+      "threshold_caveat": "O piso de 236 px² é o percentil 1 da pasta: reproduzível, e só isso. Ele separa 224 px² de 240 px² — 7% de área — e não há evidência de que caixa abaixo dele seja inválida; um buraco distante é pequeno sem ser errado. Por isso o percentil NÃO é regra definitiva da classe URMIND_ROAD_D40: é gatilho de revisão. Promovê-lo a critério de validade inventaria um limite de tamanho que a definição da classe não tem.",
+      "semantic_rejections_applied": 0
+    },
+    "boxes": 5,
+    "reasons": {
+      "área abaixo do percentil 1 da pasta (236 px²)": 5
+    },
+    "kinds": {
+      "heuristic": 5
+    },
+    "not_detectable_here": "contaminação de classe (trinca ou bueiro rotulado como buraco) e anotação faltante; ambas exigem revisão humana"
+  },
+  "duplicate_removal": {
+    "cross_folder_conflicts": [
+      {
+        "sha256": "6e873d89c02243b8147e6506ef03d53b9d25e32dd0edb9ae5002254681aac8ef",
+        "members": [
+          [
+            "cracks",
+            "536"
+          ],
+          [
+            "pothole",
+            "202"
+          ]
+        ]
+      }
+    ],
+    "cross_folder_rule": "imagem idêntica em duas pastas recebe dois rótulos diferentes; é contradição e sai do reforço",
+    "within_folder_redundant": [
+      {
+        "sha256": "2b2cc547fa484d5a026101d0f473cffbab5065092b06f19cdfea2e5b40e553e6",
+        "kept": "234",
+        "dropped": [
+          "254"
+        ]
+      },
+      {
+        "sha256": "3103ea16dcf6d907eaee661cf39690aff1cc6eb2f6c948ff582643dc66e88832",
+        "kept": "230",
+        "dropped": [
+          "54"
+        ]
+      },
+      {
+        "sha256": "4822c70b7513d4b8f21358378b7cf43a0ab04b084f1ee0764526503ae26a544d",
+        "kept": "240",
+        "dropped": [
+          "89"
+        ]
+      },
+      {
+        "sha256": "65c90aa92bf70a1c8ec494d295d18e022fa6519d9711d15783aa62d3af41c084",
+        "kept": "39",
+        "dropped": [
+          "84"
+        ]
+      },
+      {
+        "sha256": "8d434a196fb01e284d1128149ecab07b4266033adc5128027421c02d363da494",
+        "kept": "231",
+        "dropped": [
+          "239"
+        ]
+      },
+      {
+        "sha256": "9588a22fb6dcb5f488a784f18d5278241c1e5f65509960846ac533d582df3a82",
+        "kept": "236",
+        "dropped": [
+          "258"
+        ]
+      },
+      {
+        "sha256": "9c248cf594bfc9abac1ec91582c11d7cb421772a228068f07515b2b31f3d3d7a",
+        "kept": "190",
+        "dropped": [
+          "212",
+          "31"
+        ]
+      },
+      {
+        "sha256": "e5b341e3e6359d58634b49ab68f66cabae2e68d2e9e45e32f3157d04d2da47ec",
+        "kept": "228",
+        "dropped": [
+          "237"
+        ]
+      }
+    ],
+    "within_folder_rule": "cópia byte a byte da mesma cena dentro de `pothole`; fica a primeira em ordem alfabética e as demais saem. Determinístico: a mesma entrada produz sempre a mesma escolha.",
+    "blocked_pothole_stems": [
+      "202",
+      "212",
+      "237",
+      "239",
+      "254",
+      "258",
+      "31",
+      "54",
+      "84",
+      "89"
+    ],
+    "diversity_note": "Remover cópia idêntica não reduz diversidade: a imagem removida é a mesma que ficou, bit a bit."
+  },
+  "evaluation_policy": {
+    "usage": "CANDIDATE_TRAIN_REINFORCEMENT",
+    "training_status": "BLOCKED_PENDING_BOX_VALIDATION",
+    "training_use": "BLOQUEADO: nenhuma caixa passou pelos portões. A fonte volta a ser reforço de treino quando houver caixa com decisão humana `approved_pothole` e os portões de conjunto satisfeitos — não antes, e não por amostragem.",
+    "test_use": "FORBIDDEN",
+    "external_test_use": "FORBIDDEN",
+    "reason": "O único agrupamento disponível é a pasta de classe, que não separa cena. Um conjunto avaliado com esta fonte não sustentaria a garantia do §8.4, e a procedência das imagens não é declarada.",
+    "training_allowed_after": "esta derivada é reforço declarado; nenhum treino foi executado"
+  }
+}

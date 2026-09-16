@@ -1,253 +1,677 @@
 {
-  "version": 1,
-  "scope": "local data and formats, not model performance",
+  "version": 2,
+  "generated_at": "2026-09-13T01:15:43+00:00",
+  "generated_by": "scripts/datasets/refresh_readiness.py",
+  "source_of_truth": "backend/app/datasets/catalog.py",
+  "scope": "estado local, formato e contagem de anotações. NÃO mede desempenho de detecção: nenhum treino ou inferência foi executado.",
+  "checksums_verified": false,
   "raw_modified": false,
-  "univali_br": {
-    "images": 2235,
-    "decoded_masks": {
-      "CRACK": 2235,
-      "LANE": 2235,
-      "POTHOLE": 2235
-    },
-    "issues": [],
-    "orphan_masks": [],
-    "format_valid": true,
-    "use": "segmentation originals; derived bounding boxes not prepared",
-    "note": "v1 is the preserved local folder name; upstream version is Mendeley v4"
+  "units": "bytes; GB decimal = 1.000.000.000 bytes",
+  "definitions": {
+    "box_annotations": "caixas aceitas na taxonomia V1 (§8.2). É o único número que o detector YOLOX da V1 treina.",
+    "mask_annotations": "máscaras aceitas na taxonomia V1. Anotação humana real, em outra geometria; exige conversão registrada antes de virar treino.",
+    "negative_images": "imagem sem nenhuma anotação aceita e sem nenhuma recusada: a fonte olhou e não havia nada. Material legítimo de treino (taxonomy.yaml). Só é interpretável como negativo de treino em fonte que produz anotação da V1 — em fonte de contexto significa apenas 'sem anotação nenhuma'.",
+    "geo_kinds": "vocabulário próprio dos registros com coordenada. Não é rótulo recusado: é categoria da fonte que nunca se candidatou a classe.",
+    "out_of_scope_images": "imagem cuja anotação existia e foi recusada por estar fora do §8.2. NÃO é negativa: tratá-la como tal ensinaria o detector que aquele objeto não existe.",
+    "unverified_negative_images": "imagem sem anotação cuja ausência a fonte NÃO comprova ser negativa: não há protocolo de anotação declarado. Fica retida e fora de `negative_images` — contá-la como negativa ensinaria o detector que o objeto não estava lá.",
+    "unmeasured_mask_samples": "amostra cuja máscara foi anexada por existir em disco, sem que o pixel fosse lido. Usabilidade desconhecida, não confirmada: fica fora de `usable_samples` até alguém medir o conteúdo.",
+    "feeds_detector": "produz ao menos uma caixa na taxonomia V1.",
+    "cloud_only_files": "arquivos que existem como marcador do OneDrive, sem conteúdo local. `exists()` diz True e o tamanho é o da nuvem; abrir cada um dispara download. `locally_available: false` significa que a fonte NÃO está pronta para treino offline."
   },
-  "urban_community": {
-    "by_folder": {
-      "animal": {
-        "images": 600,
-        "labels": 600,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "0": 1113
-        },
-        "orphan_labels": []
-      },
-      "cracks": {
-        "images": 166,
-        "labels": 166,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "4": 194
-        },
-        "orphan_labels": []
-      },
-      "good_road": {
-        "images": 100,
-        "labels": 100,
-        "missing_labels": 0,
-        "empty_labels": 100,
-        "valid_objects_by_original_id": {},
-        "orphan_labels": []
-      },
-      "open_manhole": {
-        "images": 152,
-        "labels": 152,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "5": 154
-        },
-        "orphan_labels": []
-      },
-      "pothole": {
-        "images": 300,
-        "labels": 300,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "3": 478
-        },
-        "orphan_labels": []
-      },
-      "traffic_lights": {
-        "images": 600,
-        "labels": 600,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "1": 2522
-        },
-        "orphan_labels": []
-      },
-      "waste_container": {
-        "images": 600,
-        "labels": 600,
-        "missing_labels": 0,
-        "empty_labels": 0,
-        "valid_objects_by_original_id": {
-          "2": 1112
-        },
-        "orphan_labels": []
-      }
+  "totals": {
+    "sources": 9,
+    "stored_bytes": 35391196567,
+    "stored_gb_decimal": 35.391,
+    "samples": 43083,
+    "box_annotations": 0,
+    "mask_annotations": 2235,
+    "class_counts_boxes": {},
+    "class_counts_masks": {
+      "URMIND_ROAD_D40": 2235
     },
-    "issues": [],
-    "class_id_mapping": "inferred_not_official",
-    "use": "quarantine from automatic training until class IDs and annotations reviewed",
-    "format_valid": true
-  },
-  "camber": {
-    "detections": 9,
-    "human_confirmed": 0,
-    "gpx_trackpoints": 51,
-    "mp4_top_level_boxes": [
-      "ftyp",
-      "moov",
-      "free",
-      "mdat"
+    "trainable_sources": [],
+    "trainable_stored_bytes": 0,
+    "trainable_stored_gb_decimal": 0.0,
+    "trainable_usable_samples": 0,
+    "unmeasured_sources": [
+      "global_streetscapes",
+      "rdd2022",
+      "rtk_br"
     ],
-    "container_valid": true,
-    "video_frames_decoded": false,
-    "local_checksums": [
-      {
-        "path": "datasets/raw/camber/detections/detections_50.csv",
-        "sha256": "c670a10cca33a3e3e8ca4115b54a149fa1f0c7f1c0165a5ac86db0508e082dc8"
-      },
-      {
-        "path": "datasets/raw/camber/routes/ride_1778861898555.gpx",
-        "sha256": "9aa30b0bddcbc7287429f9f27ad6364fce7c305238fd35cae2ecde4bfcc93cb8"
-      },
-      {
-        "path": "datasets/raw/camber/videos/video_1778861897924_compressed.mp4",
-        "sha256": "1ed0453d3ef78f7bea971b7305795d11b05a9b1981ecfd56bc4a77b197c5177b"
-      }
+    "unmeasured_reasons": {
+      "rdd2022": "CLOUD_ONLY_SKIP",
+      "rtk_br": "NO_ADAPTER",
+      "global_streetscapes": "CLOUD_ONLY_SKIP"
+    },
+    "non_contributing_sources": [
+      "bdd100k",
+      "camber",
+      "global_streetscapes",
+      "project_sidewalk",
+      "rampnet",
+      "rdd2022",
+      "rtk_br",
+      "univali_br",
+      "urban_community"
     ],
-    "use": "historical/georeferenced model outputs; not human ground truth"
+    "non_contributing_stored_gb_decimal": 35.391,
+    "cloud_only_files": 7180,
+    "cloud_only_gb_decimal": 7.244,
+    "sources_not_fully_local": [
+      "global_streetscapes",
+      "rdd2022"
+    ],
+    "divergences": {
+      "rdd2022": [
+        "fonte não medida (CLOUD_ONLY_SKIP): 6984 arquivo(s) cloud-only (7183198939 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.; contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação"
+      ],
+      "univali_br": [
+        "2235 amostra(s) de máscara com conteúdo não medido: o arquivo existe e o pixel não foi lido, então a usabilidade é desconhecida, não confirmada"
+      ],
+      "urban_community": [
+        "100 imagem(ns) sem anotação retidas como NEGATIVE_SEMANTICS_UNVERIFIED: a fonte não comprova o protocolo de anotação, então a ausência de caixa não vale como negativa"
+      ],
+      "global_streetscapes": [
+        "fonte não medida (CLOUD_ONLY_SKIP): 196 arquivo(s) cloud-only (60709013 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.; contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação"
+      ]
+    },
+    "read_errors": {}
   },
-  "unacquired_sources": {
-    "project_sidewalk": {
-      "files": [
-        "datasets/raw/project_sidewalk/labels/README.md"
-      ],
-      "non_readme_files": [],
-      "status": "no_dataset_data"
-    },
-    "rampnet": {
-      "files": [
-        "datasets/raw/rampnet/README.md"
-      ],
-      "non_readme_files": [],
-      "status": "no_dataset_data"
-    },
-    "bdd100k": {
-      "files": [
-        "datasets/raw/bdd100k/README.md"
-      ],
-      "non_readme_files": [],
-      "status": "no_dataset_data"
-    },
-    "mapillary_msls": {
-      "files": [
-        "datasets/raw/mapillary_msls/README.md"
-      ],
-      "non_readme_files": [],
-      "status": "no_dataset_data"
-    }
-  },
-  "local_sizes": {
-    "bdd100k": {
-      "path": "datasets/raw/bdd100k",
-      "logical_size": 254,
-      "logical_size_human": "254,00 B",
-      "size_on_disk": 254,
-      "size_on_disk_human": "254,00 B",
-      "file_count": 1,
-      "dir_count": 0,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
-    },
-    "camber": {
-      "path": "datasets/raw/camber",
-      "logical_size": 95830501,
-      "logical_size_human": "91,39 MiB",
-      "size_on_disk": 95830501,
-      "size_on_disk_human": "91,39 MiB",
-      "file_count": 8,
-      "dir_count": 3,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
-    },
-    "mapillary_msls": {
-      "path": "datasets/raw/mapillary_msls",
-      "logical_size": 368,
-      "logical_size_human": "368,00 B",
-      "size_on_disk": 368,
-      "size_on_disk_human": "368,00 B",
-      "file_count": 1,
-      "dir_count": 0,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
-    },
-    "project_sidewalk": {
-      "path": "datasets/raw/project_sidewalk",
-      "logical_size": 288,
-      "logical_size_human": "288,00 B",
-      "size_on_disk": 288,
-      "size_on_disk_human": "288,00 B",
-      "file_count": 1,
-      "dir_count": 1,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
-    },
-    "rampnet": {
-      "path": "datasets/raw/rampnet",
-      "logical_size": 391,
-      "logical_size_human": "391,00 B",
-      "size_on_disk": 391,
-      "size_on_disk_human": "391,00 B",
-      "file_count": 1,
-      "dir_count": 0,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
-    },
+  "datasets": {
     "rdd2022": {
+      "dataset_id": "rdd2022",
+      "title": "RDD2022 — Road Damage Dataset (CRDDC 2022)",
       "path": "datasets/raw/rdd2022",
-      "logical_size": 27099910750,
-      "logical_size_human": "25,24 GiB",
-      "size_on_disk": 27099910750,
-      "size_on_disk_human": "25,24 GiB",
-      "file_count": 85811,
-      "dir_count": 48,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
+      "role": "training_v1",
+      "usage": [
+        "TRAIN",
+        "VALIDATION",
+        "TEST"
+      ],
+      "annotation_format": "pascal_voc_xml",
+      "state": "ready",
+      "stored_bytes": 13671317053,
+      "stored_gb_decimal": 13.671,
+      "file_count": 85474,
+      "local_files": 78490,
+      "cloud_only_files": 6984,
+      "cloud_only_bytes": 7183198939,
+      "locally_available": false,
+      "scan_performed": false,
+      "scan_outcome": "CLOUD_ONLY_SKIP",
+      "scan_skipped_reason": "6984 arquivo(s) cloud-only (7183198939 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.",
+      "files_scanned": 0,
+      "files_skipped_to_avoid_hydration": 85474,
+      "counts_measured_this_run": false,
+      "counts_meaning": "NÃO medido: contagens em zero por ausência de medição, não por ausência de anotação",
+      "samples": 0,
+      "images": 0,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 0,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {},
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 0,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [
+        "fonte não medida (CLOUD_ONLY_SKIP): 6984 arquivo(s) cloud-only (7183198939 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.; contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação"
+      ],
+      "catalog": {
+        "homepage": "https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547",
+        "license": "CC BY 4.0",
+        "version": "2022-crddc",
+        "adapter": "rdd2022",
+        "usage_note": "Única fonte que produz caixa na taxonomia V1. Os três splits saem daqui, isolados por país (datasets/splits/), então o `TEST` mede generalização entre países — não desempenho no domínio do piloto.",
+        "potential_usage": [],
+        "unlock_requirement": "",
+        "planned_step": "§25 passo 7 — baseline YOLOX",
+        "taxonomy_note": "Fonte das quatro classes da V1 (§8.2). D00/D10/D20/D40 entram; D01, D11, D43, D44 e D50 são recusados com motivo em app.ml.taxonomy.",
+        "group_note": "Grupo = país de origem, e o split oficial train/test é preservado. O diretório test/ não traz anotação, então só train/ produz amostra rotulada; a validação sai de dentro de train/ (§8.3 passos 4-7).",
+        "caveats": [
+          "13,2 GB. O §4.4 proíbe copiar o raw inteiro para o Supabase Free.",
+          "Seis países; desempenho no Brasil não é herdado da métrica global."
+        ]
+      }
+    },
+    "rtk_br": {
+      "dataset_id": "rtk_br",
+      "title": "Road Traversing Knowledge (RTK) — UFSC",
+      "path": "datasets/raw/rtk_br",
+      "role": "training_v1",
+      "usage": [
+        "UNUSABLE"
+      ],
+      "annotation_format": "semantic_class_mask_png",
+      "state": "ready",
+      "stored_bytes": 104842893,
+      "stored_gb_decimal": 0.105,
+      "file_count": 1405,
+      "local_files": 1405,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": false,
+      "scan_outcome": "NO_ADAPTER",
+      "scan_skipped_reason": "fonte sem adaptador declarado: nada a ler",
+      "files_scanned": 0,
+      "files_skipped_to_avoid_hydration": 1405,
+      "counts_measured_this_run": false,
+      "counts_meaning": "NÃO medido: contagens em zero por ausência de medição, não por ausência de anotação",
+      "samples": 0,
+      "images": 0,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 0,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {},
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 0,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [],
+      "catalog": {
+        "homepage": "https://data.mendeley.com/datasets/hssswvmjwf/1",
+        "license": "CC BY 4.0",
+        "version": "mendeley-hssswvmjwf-v1",
+        "adapter": null,
+        "usage_note": "Conectado e auditado, mas bloqueado para treino e avaliação: mapping canônico por anotação, semântica de instância e isolamento de grupos ainda não foram demonstrados.",
+        "potential_usage": [
+          "TRAIN",
+          "EXTERNAL_TEST"
+        ],
+        "unlock_requirement": "Protocolo humano/versionado para classe pothole, validação de semântica dos componentes e evidência de grupos/isolamento contra splits protegidos.",
+        "planned_step": "candidato brasileiro para detector V1 após fechamento dos gates",
+        "taxonomy_note": "Class-map sem IDs de instância. Pothole é candidato semântico a D40, mas nenhum componente ou bbox é autorizado até a semântica de instância da transformação ser validada. Crack genérico não distingue D00/D10/D20; as demais classes ficam sem mapping canônico V1.",
+        "group_note": "Frames foram capturados de veículo em movimento em Santa Catarina; rota, sessão e sequência por frame não estão publicadas no pacote. Preservar o split oficial não prova isolamento por grupo.",
+        "caveats": [
+          "Máscara semântica não é anotação de instância nem bbox pronta.",
+          "Lineage de rota/sessão não acompanha os 701 frames."
+        ]
+      }
     },
     "univali_br": {
+      "dataset_id": "univali_br",
+      "title": "Cracks and Potholes in Road Images (UNIVALI/DNIT)",
       "path": "datasets/raw/univali_br",
-      "logical_size": 483203492,
-      "logical_size_human": "460,82 MiB",
-      "size_on_disk": 483203492,
-      "size_on_disk_human": "460,82 MiB",
+      "role": "training_v1",
+      "usage": [
+        "UNUSABLE"
+      ],
+      "annotation_format": "segmentation_mask_png",
+      "state": "ready",
+      "stored_bytes": 483203492,
+      "stored_gb_decimal": 0.483,
       "file_count": 8943,
-      "dir_count": 2236,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
+      "local_files": 8943,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 8943,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 2235,
+      "images": 2235,
+      "box_annotations": 0,
+      "mask_annotations": 2235,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 0,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 2235,
+      "class_counts_boxes": {},
+      "class_counts_masks": {
+        "URMIND_ROAD_D40": 2235
+      },
+      "rejected_counts": {
+        "CRACK": 2235,
+        "LANE": 2235
+      },
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 29,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [
+        "2235 amostra(s) de máscara com conteúdo não medido: o arquivo existe e o pixel não foi lido, então a usabilidade é desconhecida, não confirmada"
+      ],
+      "catalog": {
+        "homepage": "https://data.mendeley.com/datasets/t576ydh9v8/4",
+        "license": "conferir a licença na ficha Mendeley antes de publicar resultado",
+        "version": "v4",
+        "adapter": "univali_br",
+        "usage_note": "NOT_EVALUATION_READY. A derivada em caixas existe (`datasets/manifests/univali_br_boxes.jsonl`), mas ter caixa não é ter avaliação, e declarar EXTERNAL_TEST prometeria uma medição que este artefato ainda não sustenta. Três bloqueios, todos abertos: a hipótese componente conexo = objeto nunca foi verificada por revisão humana; `urmind_class` continua null, então não há classe-alvo para comparar com a saída do detector; e 1.671 das 2.235 máscaras estão vazias sem significado declarado, de modo que falso positivo não é medível no domínio. O que existe hoje mede localização em imagens sabidamente positivas — é candidato a teste externo, não teste externo. Treino continua PROIBIDO em qualquer hipótese.",
+        "potential_usage": [
+          "EXTERNAL_TEST"
+        ],
+        "unlock_requirement": "Três evidências, nesta ordem e todas versionadas: (1) auditoria humana da folha `datasets/annotations/univali_instance_audit_v1.jsonl` resolvendo se componente conexo é objeto independente; (2) semântica das máscaras vazias declarada pela documentação oficial da UNIVALI/DNIT — negativo examinado ou quadro não anotado muda a métrica em direções opostas; (3) verificação do significado da máscara POTHOLE contra a definição canônica de D40, que então habilita `convert_univali_masks.py --assert-v1-mapping`. Sem as três, o conjunto permanece candidato.",
+        "planned_step": "§25 passo 6 — derivada candidata; avaliação depende das três verificações",
+        "taxonomy_note": "Rodovias federais brasileiras — o contexto mais próximo do uso real. Máscara POTHOLE vira URMIND_ROAD_D40; CRACK é trinca genérica e é recusada, porque o §8.2 proíbe escolher entre D00/D10/D20 por semelhança.",
+        "group_note": "Grupo = trecho de rodovia extraído do nome da pasta (1007599_RS_386_386RS289112_28920 → RS_386_386RS289112). Fotos do mesmo trecho são quase duplicadas e não podem se separar (§8.4).",
+        "caveats": [
+          "Anotação é máscara PNG, não caixa. A conversão existe como versão derivada registrada (`datasets/manifests/univali_br_boxes.jsonl`), não acontece na leitura e não sobrescreve nada em raw/.",
+          "A caixa derivada carrega o rótulo nativo `UNIVALI_POTHOLE`, não `URMIND_ROAD_D40`. A correspondência é declarada pela fonte e ainda não foi verificada contra documentação oficial nem inspeção humana; promovê-la seria mapear por nome, que é o que o §8.2 proíbe.",
+          "Rodovia federal em 3 UFs e 12 rodovias. Não representa via urbana brasileira nem o Brasil inteiro."
+        ]
+      }
     },
     "urban_community": {
+      "dataset_id": "urban_community",
+      "title": "Urban Community Issues (Kaggle)",
       "path": "datasets/raw/urban_community",
-      "logical_size": 1491788588,
-      "logical_size_human": "1,39 GiB",
-      "size_on_disk": 1491788588,
-      "size_on_disk_human": "1,39 GiB",
+      "role": "training_v1",
+      "usage": [
+        "UNUSABLE"
+      ],
+      "annotation_format": "yolo_txt",
+      "state": "ready",
+      "stored_bytes": 1491788588,
+      "stored_gb_decimal": 1.492,
       "file_count": 5038,
-      "dir_count": 23,
-      "cloud_only_count": 0,
-      "cloud_only_logical": 0,
-      "errors": []
+      "local_files": 5038,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 5038,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 2518,
+      "images": 2518,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 2418,
+      "unverified_negative_images": 100,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {
+        "animal": 1113,
+        "cracks": 194,
+        "open_manhole": 154,
+        "pothole": 478,
+        "traffic_lights": 2522,
+        "waste_container": 1112
+      },
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 7,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [
+        "100 imagem(ns) sem anotação retidas como NEGATIVE_SEMANTICS_UNVERIFIED: a fonte não comprova o protocolo de anotação, então a ausência de caixa não vale como negativa"
+      ],
+      "catalog": {
+        "homepage": "https://www.kaggle.com/datasets/rajeevpaudel1/urban-community-issues",
+        "license": "CC0 conforme a ficha do Kaggle; a origem das imagens não é declarada",
+        "version": "kaggle-2025",
+        "adapter": "urban_community",
+        "usage_note": "UNUSABLE hoje, por decisão de segurança e não por defeito de formato. Só a pasta `pothole` entra, como reforço de URMIND_ROAD_D40; as outras seis foram reexaminadas e seguem recusadas. Nunca TEST nem VALIDATION: o único agrupamento disponível é a pasta de classe, que não separa cena, então esta fonte no lado avaliado não sustentaria a garantia do §8.4. A derivada está em `datasets/manifests/urban_community_boxes.jsonl`: 290 imagens e 451 candidatas semânticas e **zero** autorizadas a treinar, depois de bloquear 10 imagens duplicadas (22 caixas) e pôr 5 caixas em quarentena heurística. O mapeamento `pothole → URMIND_ROAD_D40` está sustentado no nível da CLASSE; nenhuma das 451 caixas foi conferida por pessoa, e a pasta já exibiu trinca sem cavidade, bueiro aberto e imagem com buracos não anotados. Enquanto isso, `urmind_class` sai null e `feeds_training` é falso. Verificação cruzada contra o teste do RDD2022 e o holdout do UNIVALI: sem contaminação detectável.",
+        "potential_usage": [
+          "TRAIN"
+        ],
+        "unlock_requirement": "Revisão humana caixa a caixa com protocolo de aceitação declarado ANTES das decisões (datasets/annotations/urban_community_box_audit_v1.jsonl). Uma caixa só recebe URMIND_ROAD_D40 quando todos os portões de app.datasets.authorization passam — inclusive `approved_pothole` registrado por pessoa e completude de anotação confirmada na imagem. A amostra de 50 estima a qualidade da fonte; ela não promove as outras 401 caixas.",
+        "planned_step": "§25 passo 7 — reforço de D40 no conjunto de treino",
+        "taxonomy_note": "Sete pastas de classe; só `pothole` entra como URMIND_ROAD_D40. `open_manhole` NÃO vira URMIND_MANHOLE (§8.2) e `cracks` é genérica.",
+        "group_note": "Não há sessão, rota nem local no pacote. Grupo = pasta de classe, o que é fraco: imagens da mesma pasta podem vir da mesma cena sem que o dataset diga. Usar como reforço, não como conjunto de teste.",
+        "caveats": [
+          "O pacote não traz `data.yaml`; o mapa id→nome foi inferido das pastas e conferido contra os ids dos .txt (app.ml.taxonomy).",
+          "A ficha registra pesos .pt de um treino de terceiros dentro do ZIP. Nenhum código do pipeline os referencia — busca por `.pt` em backend/app e scripts/ não encontra uso —, então são artefato externo desnecessário para o funcionamento atual. A conferência do conteúdo do ZIP segue PENDENTE por decisão explícita: inspecioná-lo exige `--inspect-package`, nunca acontece sozinho, e peso de terceiro não entra em model_versions (§9) de qualquer forma.",
+          "O Kaggle não publica checksum deste pacote: dá para conferir a integridade pelo CRC interno do ZIP, não contra a fonte."
+        ]
+      }
+    },
+    "project_sidewalk": {
+      "dataset_id": "project_sidewalk",
+      "title": "Project Sidewalk — recorte RampNet round 1 (rampas de calçada)",
+      "path": "datasets/raw/project_sidewalk",
+      "role": "geo_reference",
+      "usage": [
+        "CONTEXT_ONLY"
+      ],
+      "annotation_format": "parquet_embedded_image_and_pixel_keypoints",
+      "state": "ready",
+      "stored_bytes": 5364439538,
+      "stored_gb_decimal": 5.364,
+      "file_count": 10,
+      "local_files": 10,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 10,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 11108,
+      "images": 11108,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 11108,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {
+        "curb_ramp": 11108
+      },
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 14303,
+      "groups": 11108,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [],
+      "catalog": {
+        "homepage": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1",
+        "license": "MIT declarada na ficha oficial do dataset",
+        "version": "521f74ff752d57824400c8f7d5ca4717efa7bf16",
+        "adapter": "project_sidewalk",
+        "usage_note": "Não é GEO_REFERENCE apesar do papel declarado: o pacote traz o ponto em pixels da imagem e **não** publica latitude/longitude, então não exercita nenhuma consulta espacial. O que ele oferece é referência visual de rampa de calçada para a futura tarefa de acessibilidade.",
+        "potential_usage": [
+          "TRAIN"
+        ],
+        "unlock_requirement": "Só com URMIND_SIDEWALK aprovada no §8.2 — o que exige dataset e protocolo de anotação próprios — e com uma tarefa de keypoint, não de caixa. Não é conversão: é outra tarefa de visão.",
+        "planned_step": "nenhuma etapa do §25 atual o consome; reserva para V2 (acessibilidade)",
+        "taxonomy_note": "Recorte de panorâmica com rampa marcada como keypoint em pixels. Ponto não é caixa: sai como KeypointSample e é recusado para a V1, porque o §8.2 não tem classe de acessibilidade e inventar extensão em volta do ponto seria fabricar anotação.",
+        "group_note": "Grupo = `crop_uid`, a panorâmica de origem. Vários recortes saem da mesma panorâmica; agrupar pelo `crop_id` vazaria vizinhança (§8.4).",
+        "caveats": [
+          "Recorte oficial de 5 shards (5,36 GB) dos 13,4 GB publicados; cada arquivo confere com o SHA-256 da fonte.",
+          "As imagens vêm do Google Street View: a licença MIT cobre o pacote, não redistribuição da imagem original.",
+          "Os splits são os oficiais da fonte; não foram reavaliados contra vazamento entre si."
+        ]
+      }
+    },
+    "rampnet": {
+      "dataset_id": "rampnet",
+      "title": "RampNet — rampas de calçada em panorâmicas com coordenada real",
+      "path": "datasets/raw/rampnet",
+      "role": "geo_reference",
+      "usage": [
+        "GEO_REFERENCE",
+        "CONTEXT_ONLY"
+      ],
+      "annotation_format": "parquet_embedded_image_normalized_keypoints_and_wgs84_coords",
+      "state": "ready",
+      "stored_bytes": 6841369819,
+      "stored_gb_decimal": 6.841,
+      "file_count": 10,
+      "local_files": 10,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 10,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 17162,
+      "images": 3183,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 621,
+      "out_of_scope_images": 2562,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {
+        "curb_ramp": 2562
+      },
+      "geo_kinds": {
+        "curb_ramp": 13979
+      },
+      "geo_records": 13979,
+      "keypoints": 12693,
+      "groups": 3183,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [],
+      "catalog": {
+        "homepage": "https://huggingface.co/datasets/projectsidewalk/rampnet-dataset",
+        "license": "MIT declarada na ficha oficial do dataset",
+        "version": "ee882e3f3c779dc13182f307bca616e50d9b8c5c",
+        "adapter": "rampnet",
+        "usage_note": "É a única fonte com coordenada real e rótulo humano em volume: serve para exercitar ST_DWithin/ST_ClosestPoint e o snap à via do §11.2 com dado que não é inventado, antes de existir Capture real. O keypoint na panorâmica é CONTEXT_ONLY, pelo motivo do Project Sidewalk.",
+        "potential_usage": [],
+        "unlock_requirement": "",
+        "planned_step": "§25 passo 5 — exercitar PostGIS/snap antes de haver captura real",
+        "taxonomy_note": "Duas anotações da mesma rampa: o ponto na panorâmica, normalizado, e a coordenada real. O ponto vira KeypointSample recusado para a V1; a coordenada vira GeoRecord e é o único dado desta fonte que exercita consulta espacial de verdade.",
+        "group_note": "Grupo = `pano_id`, a captura panorâmica (§8.4).",
+        "caveats": [
+          "Recorte oficial de 5 shards (6,84 GB) dos 462 GB publicados; cada arquivo confere com o SHA-256 da fonte.",
+          "Coordenadas majoritariamente norte-americanas: exercitam PostGIS, não representam a área de operação do Scout.",
+          "GeoRecord não é observação do sistema e não vira Capture/Detection."
+        ]
+      }
+    },
+    "camber": {
+      "dataset_id": "camber",
+      "title": "CAMBER — European Road Infrastructure Monitoring",
+      "path": "datasets/raw/camber",
+      "role": "geo_reference",
+      "usage": [
+        "GEO_REFERENCE"
+      ],
+      "annotation_format": "csv_model_detections_plus_gpx_track",
+      "state": "declared_only",
+      "stored_bytes": 95830501,
+      "stored_gb_decimal": 0.096,
+      "file_count": 8,
+      "local_files": 8,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 8,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 60,
+      "images": 0,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 0,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {},
+      "geo_kinds": {
+        "camber_malfunction_0": 9,
+        "camber_track_point": 51
+      },
+      "geo_records": 60,
+      "keypoints": 0,
+      "groups": 2,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [],
+      "catalog": {
+        "homepage": "https://zenodo.org/records/21361827",
+        "license": "conferir por registro no Zenodo",
+        "version": "zenodo-21361827",
+        "adapter": "camber",
+        "usage_note": "Um trajeto GPX com detecções datadas ao longo dele é a única amostra que o projeto tem do formato de uma sessão de coleta do Scout: serve para modelar Mission/rota e recorrência por RoadSegment. As detecções são saída de um YOLO de terceiros e nunca viram rótulo.",
+        "potential_usage": [],
+        "unlock_requirement": "",
+        "planned_step": "§25 passo 5 — modelar Mission/rota e recorrência por trecho",
+        "taxonomy_note": "As detecções do CSV vêm de um YOLO de terceiros e a coluna `user_confirmed` está vazia na amostra. Isso é saída de modelo, não ground truth: não vira rótulo de treino nem ocorrência real (§8.3).",
+        "group_note": "Grupo = rota, que corresponde a uma sessão de coleta.",
+        "caveats": [
+          "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
+          "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real."
+        ]
+      }
+    },
+    "global_streetscapes": {
+      "dataset_id": "global_streetscapes",
+      "title": "Global Streetscapes — imagem street-level aberta (substitui o MSLS)",
+      "path": "datasets/raw/global_streetscapes",
+      "role": "geo_reference",
+      "usage": [
+        "CONTEXT_ONLY",
+        "GEO_REFERENCE"
+      ],
+      "annotation_format": "csv_scene_context_labels_with_wgs84_coords",
+      "state": "declared_only",
+      "stored_bytes": 6066739223,
+      "stored_gb_decimal": 6.067,
+      "file_count": 15205,
+      "local_files": 15009,
+      "cloud_only_files": 196,
+      "cloud_only_bytes": 60709013,
+      "locally_available": false,
+      "scan_performed": false,
+      "scan_outcome": "CLOUD_ONLY_SKIP",
+      "scan_skipped_reason": "196 arquivo(s) cloud-only (60709013 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.",
+      "files_scanned": 0,
+      "files_skipped_to_avoid_hydration": 15205,
+      "counts_measured_this_run": false,
+      "counts_meaning": "NÃO medido: contagens em zero por ausência de medição, não por ausência de anotação",
+      "samples": 0,
+      "images": 0,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 0,
+      "out_of_scope_images": 0,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {},
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 0,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [
+        "fonte não medida (CLOUD_ONLY_SKIP): 196 arquivo(s) cloud-only (60709013 bytes) nesta fonte; abrir qualquer um dispara download do OneDrive. Varredura bloqueada: as contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação. Hidrate a fonte sob autorização explícita para medi-la.; contagens de anotação ficam em zero por AUSÊNCIA DE MEDIÇÃO, não por ausência de anotação"
+      ],
+      "catalog": {
+        "homepage": "https://huggingface.co/datasets/NUS-UAL/global-streetscapes",
+        "license": "CC BY-SA 4.0 declarada na ficha oficial do dataset",
+        "version": "manual_labels-2024",
+        "adapter": "global_streetscapes",
+        "usage_note": "Os rótulos humanos descrevem a **condição da captura** — clima, iluminação, reflexo, brilho, qualidade — que é exatamente o vetor de `Capture.quality` do §5 e o fator de qualidade da evidência que o §14.2 usa na prioridade. Também traz coordenada, o que a torna utilizável como GEO_REFERENCE.",
+        "potential_usage": [],
+        "unlock_requirement": "",
+        "planned_step": "§25 passos 3 e 11 — vocabulário de Capture.quality e fator de evidência",
+        "taxonomy_note": "Contexto urbano street-level com rótulo humano de cena — clima, iluminação, plataforma da via, qualidade, reflexo, brilho e direção de vista. Nenhum desses é classe do §8.2: descrevem a condição da captura, não o dano. Entram como atributo de contexto, e o §8.2 continua sem classe de calçada.",
+        "group_note": "Grupo = `sequence_id`, a sequência de captura. Fotos consecutivas da mesma rua são a mesma sessão e não podem cair em lados opostos do split (§8.4).",
+        "caveats": [
+          "Substitui o Mapillary MSLS, cujo portal oficial exige login. 58.147 das 60.146 imagens rotuladas vêm do próprio Mapillary e 1.999 do KartaView, aqui redistribuídas sob CC BY-SA 4.0 — é a via pública e gratuita para a mesma imagem.",
+          "Recorte de 3 dos 7 tarballs oficiais. Cada tarball é uma partição uniforme do mesmo corpus, então o recorte não é um viés geográfico: cobre os seis continentes.",
+          "O Hugging Face não publica SHA-256 consultável destes tarballs. Cada JPEG gravado tem SHA-256 próprio no CSV de rótulos, o que prova integridade local e não autenticidade da origem.",
+          "CC BY-SA 4.0 é compartilhamento pela mesma licença: derivar desta imagem obriga a atribuir e a manter a licença."
+        ]
+      }
+    },
+    "bdd100k": {
+      "dataset_id": "bdd100k",
+      "title": "BDD100K — recorte 10K com mapas de segmentação",
+      "path": "datasets/raw/bdd100k",
+      "role": "geo_reference",
+      "usage": [
+        "CONTEXT_ONLY"
+      ],
+      "annotation_format": "zip_images_plus_semantic_segmentation_maps",
+      "state": "ready",
+      "stored_bytes": 1271665460,
+      "stored_gb_decimal": 1.272,
+      "file_count": 3,
+      "local_files": 3,
+      "cloud_only_files": 0,
+      "cloud_only_bytes": 0,
+      "locally_available": true,
+      "scan_performed": true,
+      "scan_outcome": "SUCCESS",
+      "scan_skipped_reason": null,
+      "files_scanned": 3,
+      "files_skipped_to_avoid_hydration": 0,
+      "counts_measured_this_run": true,
+      "counts_meaning": "medido nesta execução",
+      "samples": 10000,
+      "images": 10000,
+      "box_annotations": 0,
+      "mask_annotations": 0,
+      "usable_samples": 0,
+      "negative_images": 2000,
+      "out_of_scope_images": 8000,
+      "unverified_negative_images": 0,
+      "unmeasured_mask_samples": 0,
+      "class_counts_boxes": {},
+      "class_counts_masks": {},
+      "rejected_counts": {
+        "bdd100k_semantic_segmentation": 8000
+      },
+      "geo_kinds": {},
+      "geo_records": 0,
+      "keypoints": 0,
+      "groups": 3,
+      "feeds_detector": false,
+      "read_error": null,
+      "divergences": [],
+      "catalog": {
+        "homepage": "https://doc.bdd100k.com/download.html",
+        "license": "BDD100K license; conferir antes de publicar resultado",
+        "version": "v1-10k",
+        "adapter": "bdd100k",
+        "usage_note": "Percepção de condução — via, veículo, pedestre. Nenhuma classe do §8.2, e a fonte não publica coordenada, então também não é GEO_REFERENCE. O uso previsto é o módulo separado do §23 (movimentação do Scout: área trafegável e obstáculo), que ainda não começou.",
+        "potential_usage": [],
+        "unlock_requirement": "",
+        "planned_step": "§23 — visão para movimentação do Scout, posterior ao §25; nenhuma etapa atual o consome",
+        "taxonomy_note": "Percepção de condução: via, veículo, pedestre. Nenhuma classe do §8.2 aparece aqui, então toda amostra sai com `masks` vazio e a segmentação registrada em `rejected`. É contexto de navegação, não dado de treino da V1.",
+        "group_note": "Grupo = split oficial. O pacote não publica sessão nem rota.",
+        "caveats": [
+          "O MD5 publicado na documentação oficial tem 31 dígitos hexadecimais e é inválido; a integridade aqui é CRC do ZIP mais SHA-256 local, o que não prova autenticidade da origem. Ver reports/acquisition_result_bdd100k.json.",
+          "Os ZIPs não são extraídos: o adaptador lê as entradas fechadas para não duplicar 1,27 GB em disco.",
+          "Os mapas de segmentação cobrem train e val; o split test do 10K vem sem máscara e sai sem `rejected`."
+        ]
+      }
     }
   },
-  "rdd_audit_sha256": "4a91b507f93ac40e84e995076c94916563197ff05d3a9473036753fdb8d7f184",
-  "all_requested_datasets_present": false,
-  "identification_runtime_verified": false
+  "format_audit": {
+    "path": "datasets/reports/dataset_format_audit.json",
+    "sha256": "6891251369a4e66779028ef128434e06b3e1c1677d3ff1ea50c7ea7abbda652e"
+  }
 }

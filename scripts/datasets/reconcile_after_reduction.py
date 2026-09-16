@@ -159,7 +159,12 @@ def main() -> int:
 
     doc = json.loads(SPLITS_JSON.read_text(encoding="utf-8"))
     doc["splits"] = {
-        name: {**doc["splits"].get(name, {}), **stats[name]} for name in SPLIT_NAMES
+        name: {
+            **doc["splits"].get(name, {}),
+            **stats[name],
+            "manifest_sha256": hashlib.sha256(_split_path(name).read_bytes()).hexdigest(),
+        }
+        for name in SPLIT_NAMES
     }
     doc["leakage_check"] = leak
     doc["source_manifest_sha256"] = hashlib.sha256(SELECTION.read_bytes()).hexdigest()
@@ -191,11 +196,47 @@ def main() -> int:
         json.dumps(
             {
                 "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                # Proveniencia exigida de toda derivada
+                # (artifact_contract.yaml#derived_manifest_contract).
+                "script": "scripts/datasets/reconcile_after_reduction.py",
+                "source_dataset": "rdd2022",
+                "source_version": "figshare-21431547-v1 (2022-crddc)",
+                "transform": (
+                    "remocao das linhas orfas dos manifestos e splits apos a poda "
+                    "autorizada da Norway; nenhuma imagem muda de split"
+                ),
+                "params": {
+                    "seed": None,
+                    "reason": "operacao deterministica: nao ha sorteio a reproduzir",
+                    "splits_preserved": True,
+                    "grouping": "country",
+                },
+                "inputs": {name: len(kept[name]) + len(dropped[name]) for name in SPLIT_NAMES},
+                "outputs": {name: len(kept[name]) for name in SPLIT_NAMES},
                 "dropped": {name: len(dropped[name]) for name in SPLIT_NAMES},
+                "drop_reasons": {
+                    "referencia_quebrada": (
+                        "a linha citava uma imagem removida pela poda autorizada da "
+                        "Norway; o objeto anotado nao se perdeu, todas eram negativas"
+                    ),
+                    "unknown_paths": (
+                        "caminho presente no split e ausente do manifesto de selecao"
+                    ),
+                },
                 "kept": {name: len(kept[name]) for name in SPLIT_NAMES},
                 "unknown_paths": len(unknown),
                 "leakage_check": leak,
                 "stats": stats,
+                "integrity": {
+                    "selection_sha256": hashlib.sha256(SELECTION.read_bytes()).hexdigest(),
+                    "split_report_sha256_before_report_write": hashlib.sha256(
+                        SPLITS_JSON.read_bytes()
+                    ).hexdigest(),
+                    "split_manifests_sha256": {
+                        name: hashlib.sha256(_split_path(name).read_bytes()).hexdigest()
+                        for name in SPLIT_NAMES
+                    },
+                },
             },
             ensure_ascii=False,
             indent=2,

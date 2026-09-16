@@ -73,6 +73,17 @@ class GroundTruth:
     image_id: str
     label: str
     box: Box
+    class_id: int | None = None
+    source_fingerprint: str | None = None
+    annotation_fingerprint: str | None = None
+
+    @property
+    def class_name(self) -> str:
+        return self.label
+
+    @property
+    def bbox(self) -> Box:
+        return self.box
 
 
 @dataclass(frozen=True)
@@ -81,6 +92,21 @@ class Prediction:
     label: str
     box: Box
     score: float
+    class_id: int | None = None
+    objectness: float | None = None
+    class_confidence: float | None = None
+
+    @property
+    def class_name(self) -> str:
+        return self.label
+
+    @property
+    def confidence(self) -> float:
+        return self.score
+
+    @property
+    def bbox(self) -> Box:
+        return self.box
 
 
 @dataclass(frozen=True)
@@ -108,6 +134,8 @@ class ClassMetrics:
 @dataclass(frozen=True)
 class EvaluationResult:
     per_class: dict[str, ClassMetrics]
+    precision: float | None
+    recall: float | None
     map50: float | None
     map50_95: float | None
     confusion: dict[str, dict[str, int]]
@@ -122,6 +150,8 @@ class EvaluationResult:
         return {
             "score_threshold": self.score_threshold,
             "iou_threshold": self.iou_threshold,
+            "precision": self.precision,
+            "recall": self.recall,
             "map50": self.map50,
             "map50_95": self.map50_95,
             "measured_classes": self.measured_classes,
@@ -358,8 +388,25 @@ def evaluate(
         present = [v for v in values if v is not None]
         return round(sum(present) / len(present), 6) if present else None
 
+    total_true_positives = sum(per_class[label].true_positives for label in labels)
+    total_predictions = sum(
+        per_class[label].true_positives + per_class[label].false_positives
+        for label in labels
+    )
+    total_support = sum(per_class[label].support for label in labels)
+
     return EvaluationResult(
         per_class=per_class,
+        precision=(
+            round(total_true_positives / total_predictions, 6)
+            if total_predictions
+            else (0.0 if total_support else None)
+        ),
+        recall=(
+            round(total_true_positives / total_support, 6)
+            if total_support
+            else None
+        ),
         map50=_mean([per_class[label].ap50 for label in measurable]),
         map50_95=_mean([per_class[label].ap50_95 for label in measurable]),
         confusion=_confusion_matrix(confident, ground_truths, labels, iou_threshold),

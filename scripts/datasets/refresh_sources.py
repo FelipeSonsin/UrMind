@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 import csv
 import json
+from datetime import UTC, datetime
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "datasets/raw"
@@ -40,6 +41,23 @@ def size_of(name: str) -> int:
 
 
 ROWS = [
+    {
+        "dataset_name": "rtk_br",
+        "official_source_url": "https://data.mendeley.com/datasets/hssswvmjwf/1",
+        "version": "mendeley-hssswvmjwf-v1",
+        "license": "CC BY 4.0",
+        "purpose": "road_damage",
+        "download_status": "downloaded_extracted",
+        "checksum_algo": "sha256 (arquivo oficial RTK.zip)",
+        "checksum_verified": "sim",
+        "relevant_classes": "pothole(candidate only); cracks(unmapped)",
+        "adapter": "",
+        "notes": (
+            "701 imagens e class-masks oficiais. Pothole permanece candidato sem "
+            "mapping/autorizacao; class-map nao prova semantica de instancia. ZIP "
+            "temporario removido apos extracao; SHA-256 registrado na proveniencia."
+        ),
+    },
     {
         "dataset_name": "rdd2022",
         "official_source_url": (
@@ -196,7 +214,9 @@ for row in ROWS:
     name = row["dataset_name"]
     row["local_path_relative"] = f"datasets/raw/{name}"
     row["local_size_bytes"] = size_of(name)
-    row["date_accessed"] = "2026-09-08"
+    # Data de acesso é quando ESTA execução olhou o disco. Fixá-la republicava
+    # "2026-09-08" a cada regeneração, o que é falso em toda execução menos uma.
+    row["date_accessed"] = datetime.now(UTC).date().isoformat()
 
 out = ROOT / "datasets/metadata/sources.csv"
 with out.open("w", encoding="utf-8", newline="") as fh:

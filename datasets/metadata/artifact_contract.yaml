@@ -4,6 +4,49 @@ project_root_detection: parents_of_script_containing_docs_datasets_scripts
 path_base: project_root
 path_separator: slash
 raw_policy: read_only
+
+# Fonte de verdade da cobertura do registry. Os caminhos usados diretamente
+# pelos blocos de pipeline abaixo são descobertos automaticamente; esta lista
+# preserva artefatos de integridade, redução e split que também são críticos,
+# sem duplicar a lista no gerador. Ausência de item required reprova --check.
+artifact_registry_contract:
+  required:
+    - backend/ml-stack.json
+    - datasets/manifests/camber.json
+    - datasets/manifests/rdd2022.json
+    - datasets/manifests/rtk_br.json
+    - datasets/manifests/rtk_br_scan.jsonl
+    - datasets/manifests/rdd2022_norway_kept.jsonl
+    - datasets/manifests/rdd2022_norway_removed.jsonl
+    - datasets/manifests/univali_br.json
+    - datasets/metadata/global_streetscapes_acquisition_plan.json
+    - datasets/metadata/licenses.md
+    - datasets/metadata/removed_sources.json
+    - datasets/metadata/storage_budget.yaml
+    - datasets/metadata/yolox_model_v1.json
+    - datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv
+    - datasets/reports/acquisition_result_global_streetscapes.json
+    - datasets/reports/norway_profile.jsonl
+    - datasets/reports/rdd2022_norway_partial_restore.json
+    - datasets/reports/rdd2022_pre_reduction_baseline.json
+    - datasets/reports/rdd2022_reconciliation.json
+    - datasets/reports/rdd2022_reduction.json
+    - datasets/reports/rdd2022_legacy_artifact_status.json
+    - datasets/annotations/rdd2022_split_authorization_v1.json
+    - datasets/reports/rdd2022_split_authorization_review.json
+    - datasets/reports/rdd2022_split_authorization_status.json
+    - datasets/reports/rtk_br_audit.json
+    - datasets/reports/rtk_br_provenance.json
+    - datasets/reports/pre_training_readiness.json
+    - datasets/reports/detection_loader_smoke.json
+    - datasets/manifests/detection_train_authorized.jsonl
+    - datasets/manifests/detection_validation_authorized.jsonl
+    - datasets/manifests/detection_test_authorized.jsonl
+    - datasets/manifests/detection_external_test.jsonl
+    - datasets/splits/rdd2022_subset_test.txt
+    - datasets/splits/rdd2022_subset_train.txt
+    - datasets/splits/rdd2022_subset_validation.txt
+  optional: []
 authorized_exceptions:
   - new_registered_downloads_in_acquired_20260908
   - verified_redundant_rdd_zip_release_reported_separately
@@ -18,14 +61,301 @@ artifact_pipeline:
   selection: datasets/manifests/rdd2022_subset_selection.jsonl
   split_report: datasets/splits/rdd2022_subset_splits.json
   verification: datasets/reports/pipeline_verification.json
-legacy_backend:
+
+# Autoridade independente para a população usada na comparação cross-source.
+# A lista nominal é um anexo oficial do release e não é produzida a partir do
+# inventário JSONL. O validador deriva dela a cardinalidade de imagens e exige
+# que identidade, versão, população, caminho e fingerprints coincidam.
+rdd2022_cross_source_reference:
+  dataset_id: rdd2022
+  version: 2022-crddc
+  population_id: crddc2022-official-all-images-train-test
+  source_definition: datasets/manifests/rdd2022.json
+  source_definition_sha256: 7a5e992d46b9d3b52107978dfd049c6c99c781bdde2e3bf1ef0248a5a1e983d8
+  source_index: datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt
+  source_index_sha256: 56180db30512f57ae8e63af7ae5bbe391ad9f8617f8c64e8064b2dd084b638b4
+  expected_records: 47420
+  inventory: datasets/manifests/rdd2022_inventory.jsonl
+  inventory_sha256: 73c601f8e451279fa3fe66944eae3890a27a8fa0ee19330d190513947f4a0e7d
+
+# Pipeline da versao derivada do UNIVALI/DNIT. Cada etapa consome a anterior e
+# grava o SHA-256 do que consumiu, para que a cadeia seja conferivel de ponta a
+# ponta. Nenhuma delas escreve em raw/ e nenhuma copia imagem.
+univali_derived_pipeline:
+  order:
+    # Ordem por dependencia real, nao por conveniencia: cada etapa consome o
+    # artefato da anterior e grava o SHA-256 do que consumiu.
+    #
+    # mascaras -> caixas candidatas -> validacao tecnica -> evidencia visual
+    # -> preparo da auditoria humana -> status da auditoria -> split candidato
+    #
+    # `prepare_univali_human_audit.py` entra DEPOIS da evidencia visual porque a
+    # folha aponta para os paineis que o revisor abre, e ANTES do split porque a
+    # elegibilidade do conjunto candidato depende do status que ela publica.
+    # Ficava de fora do contrato enquanto o validador de proveniencia ja cobrava
+    # o artefato dela: artefato obrigatorio sem produtor declarado.
+    - scripts/datasets/audit_univali_masks.py
+    - scripts/datasets/audit_univali_cracks.py
+    - scripts/datasets/convert_univali_masks.py
+    - scripts/datasets/validate_univali_boxes.py
+    - scripts/datasets/render_univali_audit.py
+    - scripts/datasets/prepare_univali_human_audit.py
+    - scripts/datasets/make_univali_splits.py
+  mask_scan: datasets/manifests/univali_br_mask_scan.jsonl
+  # Inventario das mascaras que o pipeline NAO consome (CRACK, LANE). Existe para
+  # que dado em disco seja dado conhecido: 1.921 anotacoes humanas brasileiras de
+  # trinca estavam invisiveis a qualquer manifesto. Registrar nao e autorizar -
+  # urmind_class continua null e as duas elegibilidades continuam falsas.
+  unmapped_mask_scan: datasets/manifests/univali_br_crack_scan.jsonl
+  unmapped_mask_report: datasets/reports/univali_crack_inventory.json
+  semantics_report: datasets/reports/univali_mask_semantics.json
+  boxes: datasets/manifests/univali_br_boxes.jsonl
+  conversion_report: datasets/reports/univali_conversion.json
+  validation: datasets/reports/univali_box_validation.json
+  visual_audit: datasets/reports/univali_visual_audit.json
+  visual_audit_panels: datasets/processed/univali_br/visual_audit
+  human_audit_sheet: datasets/annotations/univali_instance_audit_v1.jsonl
+  human_audit_status: datasets/reports/univali_human_audit_status.json
+  splits: datasets/splits/univali_br_external_test_splits.json
+  # Candidato, nao operacional. O catalogo declara a fonte UNUSABLE com
+  # EXTERNAL_TEST apenas como potential_usage, e o proprio split gerado se
+  # rotula CANDIDATE_EXTERNAL_TEST_BR com quatro bloqueadores abertos. Declarar
+  # EXTERNAL_TEST_BR aqui fazia deste arquivo a unica fonte que dizia "pronto",
+  # e um consumidor que o tomasse como autoridade mediria com caixa cuja
+  # semantica de instancia, mapeamento canonico e semantica de mascara vazia
+  # continuam sem verificacao.
+  usage: CANDIDATE_EXTERNAL_TEST_BR
+  evaluation_ready: false
+  evaluation_blockers_source: datasets/splits/univali_br_external_test_splits.json#evaluation_readiness
+  derived_label: UNIVALI_POTHOLE
+  urmind_class: null
+  taxonomy_note: >-
+    A caixa derivada NAO recebe URMIND_ROAD_D40. A correspondencia e declarada
+    pela fonte e nao foi verificada de forma independente; promove-la exigiria
+    `--assert-v1-mapping <evidencia>` em convert_univali_masks.py.
+  training_use: forbidden
+
+# Pipeline da versao derivada do Urban Community. Reforco de treino e mais nada:
+# a fonte e declarada evaluation_forbidden em backend/app/datasets/catalog.py, e
+# o bloqueio e executado por app.ml.splits, nao apenas escrito aqui.
+urban_community_derived_pipeline:
+  order:
+    - scripts/datasets/audit_urban_community.py
+    - scripts/datasets/render_urban_community_audit.py
+    - scripts/datasets/convert_urban_community.py
+    - scripts/datasets/validate_urban_community.py
+    - scripts/datasets/prepare_urban_community_human_audit.py
+  scan: datasets/manifests/urban_community_scan.jsonl
+  audit_report: datasets/reports/urban_community_audit.json
+  visual_audit: datasets/reports/urban_community_visual_audit.json
+  boxes: datasets/manifests/urban_community_boxes.jsonl
+  conversion_report: datasets/reports/urban_community_conversion.json
+  validation: datasets/reports/urban_community_validation.json
+  human_audit_sheet: datasets/annotations/urban_community_box_audit_v1.jsonl
+  duplicate_audit_sheet: datasets/annotations/urban_community_duplicate_audit_v1.jsonl
+  human_audit_status: datasets/reports/urban_community_human_audit_status.json
+  usage: CANDIDATE_TRAIN_REINFORCEMENT
+  training_status: BLOCKED_PENDING_BOX_VALIDATION
+  evaluation_use: FORBIDDEN
+  derived_label: URBAN_COMMUNITY_POTHOLE
+  # A classe que a caixa RECEBERIA se passasse por todos os portoes. Enquanto
+  # nao passa, o manifesto grava urmind_class null, e e isso que o adaptador le.
+  urmind_class_when_authorized: URMIND_ROAD_D40
+  urmind_class: null
+  authorization_rule: backend/app/datasets/authorization.py#evaluate_gates
+  authorized_manifest: datasets/manifests/urban_community_boxes.jsonl
+  # Duas afirmacoes distintas, e confundi-las seria o erro caro aqui.
+  semantic_mapping_approved: true
+  box_level_human_validation_complete: false
+  boxes_authorized_for_training: 0
+  taxonomy_note: >-
+    `semantic_mapping_approved` diz que o rotulo de origem `pothole` corresponde
+    a definicao canonica de URMIND_ROAD_D40. Nao diz que cada uma das 451 caixas
+    esta correta: a propria fonte apresentou trinca sem cavidade, bueiro aberto e
+    anotacao incompleta entre os recortes rotulados como buraco. Enquanto
+    `box_level_human_validation_complete` for falso, estas caixas sao candidatas a
+    reforco, nao ground truth humano certificado - e o manifesto sai com
+    urmind_class null para que nenhum consumidor as treine por engano.
+  gates:
+    - geometry_valid
+    - source_category_validated
+    - taxonomy_mapping_validated
+    - not_quarantined
+    - duplicate_check_passed
+    - cross_source_check_passed
+    - box_semantic_validation_passed
+    - image_annotation_complete
+  gate_policy: >-
+    conjuncao. Portao sem resposta reprova: ausencia de evidencia nao e evidencia
+    de ausencia de problema. O adaptador operacional recalcula os portoes contra
+    o relatorio de validacao da versao corrente e falha fechado se a cadeia de
+    hashes divergir - nunca cai de volta no raw.
+  good_road: NEGATIVE_SEMANTICS_UNVERIFIED
+  good_road_note: >-
+    100 imagens com .txt vazio. Retidas: sem protocolo de anotacao comprovado, a
+    ausencia de caixa nao prova negativa confiavel. Nao entram em treino.
+  third_party_weights: PENDING_EXPLICIT_AUTHORIZATION
+  third_party_weights_note: >-
+    Nenhum codigo do pipeline referencia os pesos .pt do pacote; sao artefato
+    externo desnecessario para o funcionamento atual. A inspecao do ZIP exige
+    `--inspect-package` e nunca acontece automaticamente.
+# Contrato do leitor lógico de manifests. Não inclui transforms, DataLoader,
+# trainer ou qualquer elo Dataset -> YOLOX.
+rtk_derived_pipeline:
+  order:
+    - scripts/datasets/audit_rtk.py
+  source_definition: datasets/manifests/rtk_br.json
+  scan: datasets/manifests/rtk_br_scan.jsonl
+  audit: datasets/reports/rtk_br_audit.json
+  provenance: datasets/reports/rtk_br_provenance.json
+  usage: BLOCKED
+  training_status: BLOCKED_SEMANTIC_INSTANCE_AND_GROUP_EVIDENCE
+  evaluation_status: BLOCKED_SEMANTIC_INSTANCE_AND_GROUP_EVIDENCE
+
+unified_detection_pipeline:
+  producer: scripts/datasets/build_detection_manifests.py
+  train: datasets/manifests/detection_train_authorized.jsonl
+  validation: datasets/manifests/detection_validation_authorized.jsonl
+  test: datasets/manifests/detection_test_authorized.jsonl
+  external_test: datasets/manifests/detection_external_test.jsonl
+  readiness: datasets/reports/pre_training_readiness.json
+  smoke_test: datasets/reports/detection_loader_smoke.json
+  smoke_test_producer: scripts/datasets/smoke_detection_loader.py
+  consumer: backend/app/ml/detection_dataset.py
+  fail_closed: true
+  record_granularity: image
+  schema_version: 2
+  boxes_representation: list
+  negative_image_representation: "boxes: []"
+  yolox_image_output: "float32 CHW BGR, padding 114, no normalization"
+  yolox_target_output: "max_labels x 5 [class, cx, cy, width, height]"
+  official_preprocessing:
+    - backend/third_party/YOLOX/yolox/data/data_augment.py#preproc
+    - backend/third_party/YOLOX/yolox/utils/boxes.py#xyxy2cxcywh
+  dataloader: torch.utils.data.DataLoader
+  windows_default_num_workers: 0
+  split_authority: datasets/splits/rdd2022_subset_splits.json
+  authorization_authority: datasets/reports/rdd2022_split_authorization_status.json
+  model_configuration: datasets/metadata/yolox_model_v1.json
+
+rdd2022_training_authorization:
+  producer: scripts/datasets/prepare_rdd_split_authorization.py
+  decision_sheet: datasets/annotations/rdd2022_split_authorization_v1.json
+  review: datasets/reports/rdd2022_split_authorization_review.json
+  status: datasets/reports/rdd2022_split_authorization_status.json
+  allowed_decisions:
+    - APPROVED_FOR_MODEL_V1
+    - REJECTED
+    - REVISE_REQUIRED
+  binding_fields:
+    - dataset_id
+    - dataset_version
+    - population_id
+    - split_manifest_sha256
+    - selection_manifest_sha256
+  fail_closed: true
+
+rdd2022_legacy_artifacts:
+  producer: scripts/datasets/audit_rdd2022_legacy_artifacts.py
+  status: datasets/reports/rdd2022_legacy_artifact_status.json
+
+detection_manifest_consumer_contract:
+  implemented: true
+  planned_step: "§25 passo 7 - baseline YOLOX"
+  module: backend/app/ml/detection_dataset.py
+  what_it_must_consume:
+    # A unica porta de entrada permitida. Ler raw/ direto e o defeito que o
+    # adaptador do Urban Community ja teve e que foi eliminado.
+    - datasets/manifests/detection_train_authorized.jsonl
+  what_it_must_never_do:
+    - ler datasets/raw/ diretamente para obter rotulo
+    - recalcular mapeamento class_id -> URMIND_* por conta propria
+    - consumir caixa com urmind_class null
+    - consumir caixa com training_allowed false
+    - consumir fonte com evaluation_forbidden em validation/test/external_test
+    - tratar imagem NEGATIVE_SEMANTICS_UNVERIFIED como negativa de treino
+    - hidratar arquivo cloud-only
+  guarantees_already_available:
+    # O que os manifestos e portoes ja entregam, para que o consumidor futuro
+    # nao precise reimplementar nenhuma decisao semantica.
+    authorization_rule: backend/app/datasets/authorization.py#evaluate_gates
+    detection_manifest_record: one_image
+    boxes_field: list
+    authorized_negative: "boxes: []"
+    per_box_fields:
+      - urmind_class          # null enquanto os portoes nao passam
+      - training_allowed      # false enquanto os portoes nao passam
+      - blocking_gates        # quais portoes faltam, por caixa
+      - semantic_status
+      - human_review_status
+      - quarantine_reasons
+      - quarantine_kind
+    per_image_fields:
+      - annotation_completeness
+      - group                 # chave de split que nao pode se dividir (§8.4)
+      - negative_status
+    split_guarantee: app.ml.splits.split_by_group + assert_no_forbidden_evaluation
+    fail_closed: artefato ausente, desatualizado ou com hash divergente levanta AdapterError
+  current_state:
+    sources_authorized_for_manifest: 1
+    data_manifest_schema_ready: true
+    data_model_interface_ready: true
+    training_engine_ready: true
+    evaluator_ready: true
+    checkpointing_ready: true
+    mlflow_ready: true
+    dvc_ready: true
+    reason: >-
+      O split RDD2022 está autorizado pelos fingerprints vinculados; RTK,
+      univali_br e urban_community permanecem bloqueados por seus gates. O leitor
+      lógico converte o manifest para a interface oficial YOLOX e o DataLoader
+      PyTorch conservador. O training engine e o evaluator de VALIDATION oficiais
+      existem; checkpoint/resume completo e tracking MLflow local estendem o training engine.
+      DVC local está inicializado sem remote e sem copiar datasets; nenhuma epoch foi executada.
+
+# Contrato de proveniencia de TODA versao derivada de dataset (§10.2).
+#
+# Derivada = qualquer artefato produzido a partir de raw/: poda, subconjunto,
+# split, reconciliacao, conversao de mascara em caixa. O original nunca e
+# sobrescrito; a derivada e um arquivo novo que precisa dizer de onde veio.
+#
+# Sem estes campos a derivada nao e reproduzivel nem contestavel, que e o
+# proposito inteiro de versionar dataset.
+derived_manifest_contract:
+  version: 1
+  validator: scripts/datasets/validate_manifests.py
+  required_fields:
+    source_dataset: id da fonte em backend/app/datasets/catalog.py
+    source_version: versao da fonte, nao do recorte
+    transform: o que foi feito, em uma frase
+    params: parametros que governaram a transformacao, incluindo a semente
+    script: caminho relativo do script que gerou o artefato
+    generated_at: instante da geracao, com fuso
+    inputs: quantidade de entradas consideradas
+    outputs: quantidade de saidas produzidas
+    dropped: quantidade descartada
+    drop_reasons: motivo de cada descarte, agregado por motivo
+    integrity: checksum ou mecanismo equivalente ja suportado pelo projeto
+  rules:
+    - raw nunca e sobrescrito; derivada e sempre arquivo novo
+    - descarte sem motivo registrado invalida a derivada
+    - semente ausente em selecao aleatoria invalida a reproducao
+    - manifesto de split cita caminho, nunca copia imagem
+
+backend_integration:
   taxonomy_ids: compatible
   path_default: datasets/raw
-  external_override: exists_in_backend_not_used_by_dataset_scripts
-  consumes_current_selection: false
-  keeps_negative_examples: false
-  integration_status: future_work_outside_current_scope
-  registration_manifests: historical_not_current_selection
+  external_override: URMIND_DATASETS_DIR, escape para maquina sem disco
+  # As oito fontes tem adaptador em backend/app/datasets/adapters.py e sao lidas
+  # por `python -m app.datasets.cli inventory|read|register`. O bloco anterior
+  # (`legacy_backend`) dizia integration_status: future_work e
+  # consumes_current_selection: false — ambos deixaram de valer.
+  sources_readable_by_backend: 8
+  integration_status: active
+  state_report: datasets/reports/dataset_readiness.json
+  state_report_generator: scripts/datasets/refresh_readiness.py
+  keeps_negative_examples: true
+  consumes_current_selection: false  # o split de datasets/splits/ ainda nao e lido pelo backend
 future_preparation:
   image_copy_required: false
   derived_annotations_location: datasets/processed

@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "contract": "datasets/metadata/artifact_contract.yaml#derived_manifest_contract",
+  "generated_by": "scripts/datasets/validate_manifests.py",
+  "scope": "presença dos campos de proveniência exigidos, conferida no caminho em que o contrato os espera — não em qualquer profundidade. Não valida o conteúdo deles, e não corrige artefato histórico.",
+  "matching": "por caminho declarado (`a.b`), nunca por chave solta aninhada",
+  "compliant": 15,
+  "total": 16,
+  "artifacts": [
+    {
+      "path": "datasets/reports/rdd2022_reduction.json",
+      "fields": {
+        "source_dataset": "source.dataset",
+        "source_version": "source.version",
+        "transform": "algorithm",
+        "params": "seed",
+        "script": null,
+        "generated_at": "generated_at",
+        "inputs": "before",
+        "outputs": "after",
+        "dropped": "removed",
+        "drop_reasons": null,
+        "integrity": "integrity_ok"
+      },
+      "missing": [
+        "script",
+        "drop_reasons"
+      ],
+      "declared_null": [],
+      "compliant": false
+    },
+    {
+      "path": "datasets/reports/rdd2022_reconciliation.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/rdd2022_subset_proposal.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "manifest_sha256"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/splits/rdd2022_subset_splits.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "algorithm",
+        "params": "seed",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "splits",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "leakage_check"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_mask_semantics.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_conversion.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_box_validation.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_visual_audit.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_human_audit_status.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/univali_crack_inventory.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/splits/univali_br_external_test_splits.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/urban_community_audit.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/urban_community_conversion.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/urban_community_validation.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/urban_community_visual_audit.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    },
+    {
+      "path": "datasets/reports/urban_community_human_audit_status.json",
+      "fields": {
+        "source_dataset": "source_dataset",
+        "source_version": "source_version",
+        "transform": "transform",
+        "params": "params",
+        "script": "script",
+        "generated_at": "generated_at",
+        "inputs": "inputs",
+        "outputs": "outputs",
+        "dropped": "dropped",
+        "drop_reasons": "drop_reasons",
+        "integrity": "integrity"
+      },
+      "missing": [],
+      "declared_null": [],
+      "compliant": true
+    }
+  ]
+}

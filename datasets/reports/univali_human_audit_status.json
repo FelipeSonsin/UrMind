@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "scope": "estado da auditoria humana da hipótese componente conexo = instância. Este artefato NÃO contém decisão gerada por máquina.",
+  "source_dataset": "univali_br",
+  "source_version": "mendeley-v4",
+  "transform": "preparação de folha de auditoria humana estratificada",
+  "params": {
+    "per_stratum": 6,
+    "strata": [
+      "single_component",
+      "multi_component",
+      "many_components",
+      "tiny_component",
+      "single_pixel",
+      "large_component",
+      "touches_border",
+      "overlapping_boxes"
+    ],
+    "selection": "determinística por ordenação de área; sem sorteio",
+    "audit_version": "univali-instance-audit-v1"
+  },
+  "script": "scripts/datasets/prepare_univali_human_audit.py",
+  "generated_at": "2026-09-10T16:53:15-03:00",
+  "inputs": 32,
+  "outputs": 32,
+  "dropped": 0,
+  "drop_reasons": {},
+  "integrity": {
+    "boxes_manifest_sha256": "d5ee41e0f4593bfd05c492d05307b1a1642f5e00a9beadb2ee848f2722d74ff9",
+    "sheet_sha256": "2d5ff1037272c8e0c8a6a411cfa5b5fbeebab5b0e03a5217658fa14a34756bf0"
+  },
+  "raw_modified": false,
+  "status": {
+    "audit_version": "univali-instance-audit-v1",
+    "sheet": "datasets/annotations/univali_instance_audit_v1.jsonl",
+    "rows": 32,
+    "reviewed": 0,
+    "pending": 32,
+    "decision_counts": {
+      "None": 32
+    },
+    "invalid_decisions": [],
+    "allowed_decisions": [
+      "independent_object",
+      "fragment_of_same_object",
+      "noise",
+      "ambiguous",
+      "invalid_annotation",
+      "other_problem"
+    ],
+    "complete": false,
+    "instance_semantics_validated": false,
+    "why_not_validated": "Nenhuma decisão humana foi registrada por este script. Ele monta a folha; quem preenche é pessoa. Enquanto houver linha pendente, a hipótese componente=instância continua sem verificação."
+  },
+  "stratum_population": {
+    "single_component": 276,
+    "multi_component": 872,
+    "many_components": 342,
+    "tiny_component": 15,
+    "single_pixel": 12,
+    "large_component": 373,
+    "touches_border": 6,
+    "overlapping_boxes": 178
+  },
+  "how_to_fill": "Para cada linha, abra a evidência visual, decida entre ['independent_object', 'fragment_of_same_object', 'noise', 'ambiguous', 'invalid_annotation', 'other_problem'] e preencha `decision`, `note`, `reviewed_by` e `reviewed_at`. Não deixe decisão fora do vocabulário: ela é contada como inválida e a auditoria não fecha."
+}

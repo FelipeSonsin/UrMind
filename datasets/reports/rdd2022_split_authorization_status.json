@@ -1,0 +1,13 @@
+{
+  "dataset_id": "rdd2022",
+  "dataset_version": "2022-crddc",
+  "population_id": "crddc2022-official-all-images-train-test",
+  "split_manifest_sha256": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
+  "selection_manifest_sha256": "34126fd8bbbd9ecacc0f40e35f89241ad52c5d3379468aa1d51aba53f4e8b600",
+  "sheet": "datasets/annotations/rdd2022_split_authorization_v1.json",
+  "sheet_sha256": "dc5db296f105be2b7aa47ccabe4637550a364ef0d3f59a509701944baab1973e",
+  "decision": "APPROVED_FOR_MODEL_V1",
+  "status": "AUTHORIZED_FOR_MODEL_V1",
+  "binding_mismatches": [],
+  "attributable": true
+}
