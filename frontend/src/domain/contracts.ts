@@ -57,3 +57,91 @@ export function parseCoordinate(latitude: string, longitude: string): Coordinate
     throw new Error('Coordenadas inválidas: latitude de −90 a 90 e longitude de −180 a 180.');
   return result.data;
 }
+
+export const uploadResultSchema = z.object({
+  id: z.string().uuid(),
+  capture_key: z.string(),
+  created: z.boolean(),
+  storage_path: z.string().nullable(),
+  requires_manual_location: z.boolean(),
+  location_source: z.string().optional(),
+  exif_status: z.string().optional(),
+});
+export type UploadResult = z.infer<typeof uploadResultSchema>;
+
+const detectionSchema = z.object({
+  id: z.string().uuid(),
+  urmind_class: z.string(),
+  confidence: z.number().min(0).max(1),
+  bbox: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+  model_version_id: z.string().uuid().nullable(),
+});
+export const eventDetailSchema = eventSchema.extend({
+  image_url: z.string().url().nullable(),
+  capture: z
+    .object({
+      id: z.string().uuid(),
+      capture_key: z.string(),
+      source: z.string(),
+      source_location: z.string(),
+      captured_at: z.string(),
+      storage_path: z.string().nullable(),
+    })
+    .nullable(),
+  detections: z.array(detectionSchema),
+  risk: z
+    .object({
+      severity: z.string(),
+      priority_score: z.number().nullable(),
+      uncertainty: z.number().nullable(),
+      factors: z.record(z.string(), z.unknown()),
+      created_at: z.string(),
+    })
+    .nullable(),
+  responsibility: z
+    .union([
+      z.object({ responsible: z.string(), source: z.string(), version: z.string() }),
+      z.literal('requires_triage'),
+    ])
+    .nullable(),
+  action: z.object({ code: z.string(), label: z.string(), version: z.string() }).nullable(),
+  report: z.string().nullable(),
+  context: z
+    .array(
+      z.object({
+        source: z.string(),
+        status: z.string(),
+        fetched_at: z.string(),
+        data: z.record(z.string(), z.unknown()),
+        error: z.string().nullable().optional(),
+      }),
+    )
+    .default([]),
+  reviews: z.array(
+    z.object({
+      decision: z.enum(['confirm', 'correct', 'reject']),
+      corrected_class: z.string().nullable(),
+      notes: z.string().nullable(),
+      reviewer: z.string(),
+      created_at: z.string(),
+    }),
+  ),
+});
+export type EventDetail = z.infer<typeof eventDetailSchema>;
+
+export type ReviewPayload =
+  | { decision: 'confirm' | 'reject'; notes?: string }
+  | {
+      decision: 'correct';
+      corrected_class?: keyof typeof classes;
+      corrected_location?: Coordinate;
+      notes?: string;
+    };
+
+export const severities: Record<string, string> = {
+  unknown: 'Não determinada',
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  critical: 'Crítica',
+};

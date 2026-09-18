@@ -22,7 +22,13 @@ function newDraft(): CaptureDraft {
     status: 'local_draft',
   };
 }
-export function CapturePage({ initial, onSaved }: { initial?: CaptureDraft; onSaved: () => void }) {
+export function CapturePage({
+  initial,
+  onSaved,
+}: {
+  initial?: CaptureDraft;
+  onSaved: (draft: CaptureDraft) => void | Promise<void>;
+}) {
   const [draft, setDraft] = useState<CaptureDraft>(() => initial || newDraft());
   const [latitude, setLatitude] = useState(initial?.coordinate?.latitude.toString() || '');
   const [longitude, setLongitude] = useState(initial?.coordinate?.longitude.toString() || '');
@@ -114,7 +120,7 @@ export function CapturePage({ initial, onSaved }: { initial?: CaptureDraft; onSa
       if (!draft.photo.size) throw new Error('Selecione ou tire uma foto antes de salvar.');
       const coordinate =
         latitude.trim() || longitude.trim() ? parseCoordinate(latitude, longitude) : null;
-      await drafts.save({
+      const saved: CaptureDraft = {
         ...draft,
         coordinate:
           coordinate && draft.source_location === 'gps_device' ? draft.coordinate : coordinate,
@@ -123,8 +129,9 @@ export function CapturePage({ initial, onSaved }: { initial?: CaptureDraft; onSa
             ? 'gps_device'
             : 'manual'
           : 'unknown',
-      });
-      onSaved();
+      };
+      await drafts.save(saved);
+      await onSaved(saved);
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -282,7 +289,7 @@ export function CapturePage({ initial, onSaved }: { initial?: CaptureDraft; onSa
             </p>
           )}
           <button type="submit" disabled={busy || locating}>
-            <Save size={17} /> {busy ? 'Salvando…' : 'Salvar rascunho local'}
+            <Save size={17} /> {busy ? 'Enviando…' : 'Salvar e enviar'}
           </button>
         </section>
       </form>
