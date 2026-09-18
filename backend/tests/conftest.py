@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -20,6 +22,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="session")
+def event_loop_policy() -> asyncio.AbstractEventLoopPolicy:
+    """psycopg async não roda no ProactorEventLoop, padrão do Windows (ver app/__main__.py)."""
+    if sys.platform == "win32":
+        return asyncio.WindowsSelectorEventLoopPolicy()
+    return asyncio.DefaultEventLoopPolicy()
+
+
+@pytest.fixture(scope="session")
 def repo_root() -> Path:
     return REPO_ROOT
 
@@ -34,5 +44,8 @@ def client() -> Iterator[TestClient]:
     """Cliente HTTP sobre a aplicação em memória. Não sobe servidor."""
     from app.main import app
 
+    if sys.platform == "win32":
+        # O portal do TestClient roda o app num loop próprio; psycopg async exige Selector.
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     with TestClient(app) as test_client:
         yield test_client

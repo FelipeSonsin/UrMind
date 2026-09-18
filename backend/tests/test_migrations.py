@@ -2,6 +2,7 @@
 
 import pytest
 from alembic.script import ScriptDirectory
+from sqlalchemy import Computed
 
 from app.config import ALEMBIC_VERSIONS_DIR
 from app.db.migrate import alembic_config, head_revision
@@ -91,3 +92,24 @@ def test_modelos_orm_cobrem_as_tabelas_das_migrations():
     ):
         assert table in mapped
         assert f"create table if not exists public.{table} " in SQL
+
+
+def test_road_segments_geog_e_computed_persistida():
+    road_segments = next(
+        table for table in Base.metadata.tables.values() if table.name == "road_segments"
+    )
+    geog = road_segments.c.geog
+    assert isinstance(geog.computed, Computed)
+    assert geog.computed.persisted is True
+    assert str(geog.computed.sqltext) == "geom::geography"
+
+
+def test_transicao_parte_da_revisao_remota_sem_drop_table():
+    script = ScriptDirectory.from_config(alembic_config())
+    revision = script.get_revision("0002_align_urmind_core")
+    assert revision is not None
+    assert revision.down_revision == "0001_core"
+    migration_path = ALEMBIC_VERSIONS_DIR / "0002_align_urmind_core.py"
+    upgrade_sql = migration_path.read_text(encoding="utf-8").split("def downgrade()", 1)[0].lower()
+    assert "drop table" not in upgrade_sql
+    assert "drop trigger" not in upgrade_sql

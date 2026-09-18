@@ -383,3 +383,59 @@ def test_windows_safe_module_entrypoint_is_guarded() -> None:
     assert "MLflowTracker" in source
     assert "tensorboard" not in source.lower()
     assert "wandb" not in source.lower()
+
+
+class _OverflowGrad(torch.autograd.Function):
+    """Loss finita com gradient infinito: o overflow fp16 que o GradScaler absorve."""
+
+    @staticmethod
+    def forward(ctx, value):
+        return value.clone()
+
+    @staticmethod
+    def backward(ctx, grad):
+        return grad * float("inf")
+
+
+class _OverflowModel(_FakeModel):
+    def forward(self, images, targets):
+        outputs = super().forward(images, targets)
+        total = _OverflowGrad.apply(outputs["total_loss"])
+        return {**outputs, "total_loss": total}
+
+
+def _amp_engine(model):
+    engine = _engine(model, amp=True)
+    engine.scaler = torch.amp.GradScaler("cpu", enabled=True, init_scale=128.0)
+    return engine
+
+
+def test_amp_overflow_pula_o_passo_sem_abortar_o_treino() -> None:
+    model = _OverflowModel()
+    engine = _amp_engine(model)
+    before = model.weight.detach().clone()
+    scale = engine.scaler.get_scale()
+    batch = (torch.ones((1, 3, 32, 32)), torch.zeros((1, 1, 5)), (), ())
+    engine.train_step(batch, epoch=0, iteration=0)
+    assert torch.equal(before, model.weight.detach())  # passo pulado, peso intacto
+    assert engine.scaler.get_scale() < scale  # escala reduzida pelo GradScaler
+
+
+def test_overflow_amp_em_sequencia_declara_divergencia() -> None:
+    from app.ml.training import MAX_CONSECUTIVE_AMP_SKIPS
+
+    model = _OverflowModel()
+    engine = _amp_engine(model)
+    batch = (torch.ones((1, 3, 32, 32)), torch.zeros((1, 1, 5)), (), ())
+    for iteration in range(MAX_CONSECUTIVE_AMP_SKIPS):
+        engine.train_step(batch, epoch=0, iteration=iteration)
+    with pytest.raises(FloatingPointError, match="divergente"):
+        engine.train_step(batch, epoch=0, iteration=MAX_CONSECUTIVE_AMP_SKIPS)
+
+
+def test_gradient_infinito_sem_amp_continua_abortando() -> None:
+    model = _OverflowModel()
+    engine = _engine(model, amp=False)
+    batch = (torch.ones((1, 3, 32, 32)), torch.zeros((1, 1, 5)), (), ())
+    with pytest.raises(FloatingPointError, match="gradient"):
+        engine.train_step(batch, epoch=0, iteration=0)

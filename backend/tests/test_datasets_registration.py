@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 import pytest
 
@@ -12,6 +13,7 @@ from app.datasets.records import AnnotatedImage, BoundingBox, GeoRecord, Rejecte
 from app.datasets.registration import (
     RegistrationRefused,
     build_dataset_version,
+    preserve_manifest_metadata,
     summarize,
 )
 from app.ml.splits import split_by_group
@@ -194,6 +196,41 @@ def test_payload_carrega_ressalvas_e_estado_do_disco(tmp_path):
     assert payload["split"]["caveats"] == ["13,2 GB não vai para o Supabase Free"]
     assert payload["split"]["inventory"]["checksums_verified"] is True
     assert payload["split"]["taxonomy_note"] == "nota"
+
+
+def test_manifest_writer_preserva_metadata_valida_e_timestamp_sem_mudanca(tmp_path):
+    inventory = _pronta(tmp_path)
+    registros = [_imagem(f"g{g}", i) for g in range(6) for i in range(4)]
+    split = split_by_group(registros, group_key=lambda r: r.group)
+    payload = build_dataset_version(
+        _fonte(), inventory, summarize("fonte_teste", registros), split
+    )
+    existing = json.loads(json.dumps(payload))
+    existing["audit_stage_status"] = "human_audit_complete"
+    existing["path_base"] = "project_root"
+    existing["split"]["generated_at"] = "2026-09-08T00:00:00+00:00"
+
+    regenerated = preserve_manifest_metadata(payload, existing)
+
+    assert regenerated["audit_stage_status"] == "human_audit_complete"
+    assert regenerated["path_base"] == "project_root"
+    assert regenerated["split"]["generated_at"] == "2026-09-08T00:00:00+00:00"
+
+
+def test_manifest_writer_nao_preserva_metadata_invalida(tmp_path):
+    inventory = _pronta(tmp_path)
+    registros = [_imagem(f"g{g}", i) for g in range(6) for i in range(4)]
+    split = split_by_group(registros, group_key=lambda r: r.group)
+    payload = build_dataset_version(
+        _fonte(), inventory, summarize("fonte_teste", registros), split
+    )
+
+    regenerated = preserve_manifest_metadata(
+        payload, {"audit_stage_status": None, "path_base": ""}
+    )
+
+    assert "audit_stage_status" not in regenerated
+    assert "path_base" not in regenerated
 
 
 def test_geo_reference_registra_sem_split(tmp_path):

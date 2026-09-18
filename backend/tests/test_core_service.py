@@ -13,7 +13,13 @@ from app.schemas.core import (
     LocationSource,
     UrmindClass,
 )
-from app.services.core import CoreService, DuplicateKeyError, decide_status
+from app.services.core import (
+    ACTION_BY_SEVERITY,
+    CoreService,
+    DuplicateKeyError,
+    decide_status,
+)
+from app.services.risk import Severity
 
 NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
 SP = Coordinate(latitude=-23.5505, longitude=-46.6333, accuracy_m=6)
@@ -148,3 +154,23 @@ def test_imagem_sem_localizacao_exige_triagem():
 def test_sensor_sem_camera_gera_candidato_para_revisao():
     payload = event(evidence_mode=EvidenceMode.SENSOR_ONLY, visual_confidence=None)
     assert decide_status(payload, SNAP) is EventStatus.REVIEW
+
+
+@pytest.mark.parametrize(
+    ("severity", "esperado"),
+    [
+        (Severity.CRITICAL, "sinalizacao_temporaria"),
+        (Severity.HIGH, "sinalizacao_temporaria"),
+        (Severity.MEDIUM, "inspecao_tecnica"),
+        (Severity.LOW, "inspecao_tecnica"),
+        (Severity.UNKNOWN, None),
+    ],
+)
+def test_acao_sugerida_acompanha_a_severidade(severity, esperado) -> None:
+    """Defeito grave pede proteção do ponto; sem severidade, nada é sugerido."""
+    assert ACTION_BY_SEVERITY.get(severity) == esperado
+
+
+def test_reparo_definitivo_nunca_e_sugerido_pelo_sistema() -> None:
+    # A intervenção definitiva é decisão do órgão após inspeção (§14.4).
+    assert "reparo_pavimento" not in ACTION_BY_SEVERITY.values()
