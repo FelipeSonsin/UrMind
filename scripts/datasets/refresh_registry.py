@@ -212,7 +212,14 @@ def main(argv: list[str] | None = None) -> int:
     registry["scripts"] = _entries(scripts)
     registry["artifacts"] = _entries(artifacts)
     registry["updated"] = time.strftime("%Y-%m-%d")
-    REG.write_text(json.dumps(registry, ensure_ascii=False, indent=2), encoding="utf-8")
+    # O registry e byte-addressed e esta sob ``-text`` em .gitattributes. O
+    # blob historico/contratado usa LF sem newline final; explicita-lo evita
+    # que o Windows transforme todas as linhas do artefato em CRLF.
+    REG.write_text(
+        json.dumps(registry, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+        newline="\n",
+    )
     print(f"registro: {len(scripts)} scripts, {len(artifacts)} artefatos")
     return 0
 

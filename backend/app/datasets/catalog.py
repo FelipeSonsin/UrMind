@@ -296,7 +296,7 @@ SOURCES: tuple[DatasetSource, ...] = (
         id="univali_br",
         title="Cracks and Potholes in Road Images (UNIVALI/DNIT)",
         homepage="https://data.mendeley.com/datasets/t576ydh9v8/4",
-        license="conferir a licença na ficha Mendeley antes de publicar resultado",
+        license="CC BY 4.0",
         role=DatasetRole.TRAINING_V1,
         version="v4",
         adapter="univali_br",
@@ -367,7 +367,11 @@ SOURCES: tuple[DatasetSource, ...] = (
         id="urban_community",
         title="Urban Community Issues (Kaggle)",
         homepage="https://www.kaggle.com/datasets/rajeevpaudel1/urban-community-issues",
-        license="CC0 conforme a ficha do Kaggle; a origem das imagens não é declarada",
+        license=(
+            "CC0 declarada pelo uploader no Kaggle, NÃO válida para todo o conteúdo: "
+            "há imagens de terceiros do Open Images (listadas como CC BY 2.0); "
+            "publicação BLOQUEADA (RED)"
+        ),
         role=DatasetRole.TRAINING_V1,
         version="kaggle-2025",
         adapter="urban_community",
@@ -398,6 +402,21 @@ SOURCES: tuple[DatasetSource, ...] = (
             (
                 "O Kaggle não publica checksum deste pacote: dá para conferir a "
                 "integridade pelo CRC interno do ZIP, não contra a fonte."
+            ),
+            (
+                "Publicação: RED — BLOCKED_LICENSE / BLOCKED_PROVENANCE (revisão de "
+                "2026-09-16). 1.800 das 2.518 imagens (animal, traffic_lights, "
+                "waste_container) têm nome compatível com o ID de 16 hex do Open "
+                "Images — INFERÊNCIA pelo padrão de ID, não verificação individual. "
+                "9 foram verificadas diretamente contra o espelho oficial "
+                "(s3.amazonaws.com/open-images-dataset/train): 9/9 existem com o "
+                "mesmo tamanho em bytes. O Open Images lista as imagens como "
+                "CC BY 2.0 e não garante a licença individual de cada uma. As "
+                "outras 718 imagens (pothole, cracks, open_manhole, good_road) "
+                "seguem sem origem comprovada. A CC0 do uploader não substitui o "
+                "direito dos autores originais: NÃO republicar este pacote. "
+                "Reconstruir a partir do Open Images seria OUTRO dataset, com "
+                "outra proveniência."
             ),
         ),
         annotation_format="yolo_txt",
@@ -586,7 +605,10 @@ SOURCES: tuple[DatasetSource, ...] = (
         id="camber",
         title="CAMBER — European Road Infrastructure Monitoring",
         homepage="https://zenodo.org/records/21361827",
-        license="conferir por registro no Zenodo",
+        license=(
+            "CC BY 4.0 no depósito Zenodo (detections_50.csv, video_50_metadata.txt); "
+            "licença explícita do MP4/GPX externos NÃO demonstrada"
+        ),
         role=DatasetRole.GEO_REFERENCE,
         version="zenodo-21361827",
         adapter="camber",
@@ -599,6 +621,27 @@ SOURCES: tuple[DatasetSource, ...] = (
         caveats=(
             "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
             "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real.",
+            (
+                "Publicação: YELLOW — REVIEW_REQUIRED, bloqueio "
+                "EXTERNAL_HEAVY_MEDIA_LICENSE_NOT_ESTABLISHED (revisão de 2026-09-16). "
+                "Zenodo 21361827, DOI 10.5281/zenodo.21361827, versão 1.0: o depósito "
+                "é CC BY 4.0 e cobre detections_50.csv e video_50_metadata.txt. O MP4 "
+                "e o GPX estão em S3 externo (isense-s3.iccs.gr) sem licença "
+                "explícita demonstrada. Integridade verificada: MD5 do GPX local == "
+                "ETag remoto; ETag multipart do MP4 (8 MiB x 12) == remoto; os bytes "
+                "locais correspondem aos objetos publicados."
+            ),
+            (
+                "A metadata depositada declara 'Privacy-Blurred Video File Access': é "
+                "declaração do publicador, sem verificação visual independente. O "
+                "Zenodo cita o Grant Agreement 101156387; o CORDIS registra o CAMBER "
+                "como 101146800 — divergência não resolvida."
+            ),
+            (
+                "Desbloqueio da publicação: confirmação escrita do publicador "
+                "(data@camber-project.eu) de que MP4 e GPX são CC BY 4.0, OU depósito "
+                "oficial desses objetos com licença explícita."
+            ),
         ),
         annotation_format="csv_model_detections_plus_gpx_track",
         usage=(DatasetUsage.GEO_REFERENCE,),
@@ -614,7 +657,10 @@ SOURCES: tuple[DatasetSource, ...] = (
         id="global_streetscapes",
         title="Global Streetscapes — imagem street-level aberta (substitui o MSLS)",
         homepage="https://huggingface.co/datasets/NUS-UAL/global-streetscapes",
-        license="CC BY-SA 4.0 declarada na ficha oficial do dataset",
+        license=(
+            "CC BY-SA 4.0: metadata na ficha oficial; imagens Mapillary e KartaView "
+            "também CC BY-SA 4.0 na origem"
+        ),
         role=DatasetRole.GEO_REFERENCE,
         version="manual_labels-2024",
         adapter="global_streetscapes",
@@ -650,6 +696,17 @@ SOURCES: tuple[DatasetSource, ...] = (
             (
                 "CC BY-SA 4.0 é compartilhamento pela mesma licença: derivar "
                 "desta imagem obriga a atribuir e a manter a licença."
+            ),
+            (
+                "Publicação: YELLOW — REVIEW_REQUIRED / BLOCKED_ATTRIBUTION, bloqueio "
+                "ATTRIBUTION_INCOMPLETE + MASS_REDISTRIBUTION_TERMS_UNRESOLVED (revisão "
+                "de 2026-09-16). As fotografias são CC BY-SA 4.0 na origem (Mapillary e "
+                "KartaView), mas o Mapillary exige crédito ao fotógrafo de cada imagem e "
+                "a seleção local traz source, orig_id, sequence_id e sha256, sem campo "
+                "de autor. Cerca de 15 mil imagens exigiriam mecanismo de atribuição; o "
+                "share-alike precisa ser respeitado; os termos do Mapillary para "
+                "extração e republicação em massa seguem sem resolução. No UrMind a "
+                "fonte continua CONTEXT_ONLY."
             ),
         ),
         annotation_format="csv_scene_context_labels_with_wgs84_coords",

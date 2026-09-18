@@ -90,7 +90,7 @@ O que está no disco e verificado:
 
 - **Fundação do backend e do banco.** O caminho `API → domínio → persistência →
   Supabase/PostGIS` está montado e testado.
-- **Núcleo geoespacial** na revisão `0001_core_geospatial`: capturas,
+- **Núcleo geoespacial** na revisão `0002_align_urmind_core`: capturas,
   detecções, eventos, snap à via, busca por raio e auditoria.
 - **Leitura de EXIF** (§6.3): coordenada, precisão e instante extraídos do
   arquivo, com estado explícito quando faltam.
@@ -112,7 +112,9 @@ O que está no disco e verificado:
   embutida, SHA-256 oficial), BDD100K (ZIP lido fechado), CAMBER e Global
   Streetscapes. Estado e limitações por fonte em `datasets/STATUS.md`.
 - 230 testes offline passando; os 3 de integração contra PostGIS real existem e
-  ficam pulados enquanto `DATABASE_URL` não estiver preenchida.
+  ficam pulados enquanto `MIGRATION_DATABASE_URL` e `DATABASE_POOLER_URL` não estiverem
+  exportadas no shell. A suíte não lê `backend/.env`, então a integração é
+  sempre opt-in e nunca escreve no banco por acidente.
 
 O que ainda **não** existe: projeto Supabase provisionado, Storage e Auth,
 importação da malha OSM, detector visual treinado, Worker e
@@ -147,9 +149,10 @@ sobre o split do RDD2022 (passo 7).
     ├── .env.example                modelo de ambiente
     ├── alembic.ini                  configuração do Alembic (sem credenciais)
     ├── alembic/
-    │   ├── env.py                   lê DATABASE_URL do Settings; ignora objetos PostGIS
+    │   ├── env.py                   lê MIGRATION_DATABASE_URL (Session Pooler) do Settings; ignora objetos PostGIS
     │   └── versions/
-    │       └── 0001_core_geospatial.py  núcleo canônico (MASTER_PLAN §5)
+    │       ├── 0001_core.py             marco histórico legado
+    │       └── 0002_align_urmind_core.py transição incremental canônica (§5)
     ├── app/
     │   ├── main.py                 aplicação FastAPI e ciclo de vida
     │   ├── config.py               configuração única, lida do ambiente
@@ -204,7 +207,7 @@ Fronteiras que o código respeita:
 | Sessão | `app/db/session.py` | Engine assíncrona psycopg 3, pool e unidade de trabalho |
 | Migrations | `alembic/versions/` + `app/db/migrate.py` | Alembic; o módulo só embrulha os comandos para uso em testes |
 
-A revisão `0001_core_geospatial` cria os objetos lógicos do MASTER_PLAN §5 —
+A revisão `0002_align_urmind_core` cria ou alinha os objetos lógicos do MASTER_PLAN §5 —
 `missions`, `devices`, `captures`, `sensor_assets`, `detections`, `events`,
 `road_segments`, `event_context`, `risk_assessments`, `responsibility_rules`,
 `actions_catalog`, `predictions`, `reviews`, `model_versions`,
@@ -374,13 +377,29 @@ por `.gitignore`, como o §10.2 pede. O estado detalhado de cada fonte está em
 Pré-requisitos: Python 3.12 e um projeto Supabase com a extensão PostGIS
 disponível.
 
-1. Copie `backend/.env.example` para `backend/.env` e preencha `DATABASE_URL` —
-   connection string do Postgres do projeto (Supabase → Project Settings →
-   Database → session pooler). Sem ela a API sobe, mas `/api/v1/health` reporta
-   `database: not_configured` e as rotas de domínio não operam.
-   `SUPABASE_URL` e `SUPABASE_SECRET_KEY` ainda não são lidas por nenhum código;
-   passam a ser obrigatórias no passo 3 do §25 (Storage). A chave secret fica
-   **somente** no backend e nunca é enviada ao navegador (§17).
+1. Copie `backend/.env.example` para `backend/.env` e preencha as conexões do
+   Supabase PostgreSQL, o banco oficial. Tudo roda em Python nativo
+   (`backend/.venv`), sem Docker. Runtime e migrations têm papéis separados e
+   não caem uma na outra:
+   - `DATABASE_POOLER_URL` — **Session Pooler** (Supavisor, session mode,
+     porta 5432), usado pelo runtime do FastAPI. Sem ela a API sobe, mas
+     `/api/v1/health` reporta `database: not_configured` e as rotas de domínio
+     respondem 503.
+   - `MIGRATION_DATABASE_URL` — usada pelo Alembic, com prioridade. Em rede
+     só IPv4 (o caso atual), aponta também para o **Session Pooler 5432**.
+   - `DATABASE_URL` — **opcional**: conexão direta `db.<ref>.supabase.co:5432`,
+     que só funciona com IPv6. Nunca é usada pelo runtime; o Alembic só a lê
+     como fallback legado se `MIGRATION_DATABASE_URL` estiver vazia.
+
+   O transaction pooler (porta 6543) não faz parte da arquitetura e é recusado
+   tanto pelo runtime quanto pelas migrations.
+
+   Host do Supabase recebe `sslmode=require`; `sslmode` que admita texto claro é
+   recusado. `SUPABASE_URL` (só a base, sem `/rest/v1`), `SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY` e `SUPABASE_JWKS_URL` são carregadas e validadas, mas
+   ainda não são usadas por nenhum código: Storage e Auth chegam no passo 3 do
+   §25. A chave secret fica **somente** no backend e nunca vai ao navegador
+   (§17); JWT de usuário deve ser validado pelo JWKS, nunca pela secret.
 
 2. No PowerShell, a partir da raiz do projeto:
 
@@ -389,7 +408,7 @@ disponível.
 Set-Location backend
 .venv\Scripts\python.exe -m alembic upgrade head  # aplica as migrations pendentes
 .venv\Scripts\python.exe -m pytest -q
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+.venv\Scripts\python.exe -m app
 ```
 
 Essa automação foi validada para Windows x86-64 com GPU NVIDIA e driver
@@ -432,7 +451,7 @@ manualmente, porque o Alembic não os descreve (§18.2).
 
 ```powershell
 .venv\Scripts\python.exe -m pytest -q                       # suíte offline
-.venv\Scripts\python.exe -m pytest tests/test_db_integration.py   # exige DATABASE_URL
+.venv\Scripts\python.exe -m pytest tests/test_db_integration.py   # exige MIGRATION_DATABASE_URL e DATABASE_POOLER_URL no shell
 .venv\Scripts\python.exe -m ruff check app tests
 .venv\Scripts\python.exe -m mypy app
 ```
@@ -450,13 +469,107 @@ criou.
 | POST | `/api/v1/events` | Consolida o evento, faz o snap à via e define o status |
 | GET | `/api/v1/events` | Lista eventos, com filtro por classe e status |
 | GET | `/api/v1/events/nearby` | Eventos num raio, do mais próximo ao mais distante |
-| GET | `/api/v1/events/{id}` | Detalhe do evento |
+| GET | `/api/v1/events/{id}` | Detalhe: captura, detecções, risco, competência, ação, contexto e relatório |
+| GET | `/api/v1/me` | Identidade e papel do usuário decididos no servidor (`can_review`) |
+| POST | `/api/v1/captures/photo` | Upload validado da foto → Storage privado → Capture |
+| POST | `/api/v1/captures/{id}/consolidate` | Detections → Events deduplicados, com risco |
+| POST | `/api/v1/events/{id}/reviews` | Revisão humana (confirmar, corrigir classe/local, rejeitar) |
+
+Todas as rotas de domínio exigem JWT do Supabase Auth; `/health` é pública.
+
+### Painel público (somente leitura, sem token)
+
+| Método | Rota | O que devolve |
+|--------|------|---------------|
+| GET | `/api/v1/public/status` | Estado por componente (API, banco, detector, Scout), área piloto e totais |
+| GET | `/api/v1/public/scout` | Estado do Scout e modo real da câmera |
+| GET | `/api/v1/public/events` | Ocorrências publicadas, com filtro por classe, estado, período e bbox |
+| GET | `/api/v1/public/events/{id}` | Diagnóstico completo: detecções, risco explicado, ação, contexto, previsão e rastro |
+| GET | `/api/v1/public/transparency` | Modelo, métricas medidas, latência, dataset, fontes e limites |
+| GET | `/api/v1/public/scout/frame` | Último quadro da câmera, quando houver fonte configurada |
+| GET | `/api/v1/public/scout/stream` | Repasse do vídeo, com limite de espectadores simultâneos |
+
+O que sai por aqui é definido por allowlist explícita em `app/schemas/public.py`
+(`extra="forbid"`): nenhum ORM é serializado direto, e campo interno — caminho no
+Storage, id de usuário, revisor, relatório operacional, configuração — não tem
+lugar no contrato. A imagem só é publicada quando a captura registra
+`privacy_redacted`; sem isso sai apenas o dado estruturado, com o motivo. Previsão
+só aparece quando existe `Prediction` real: avaliação de risco não vira projeção.
+Nenhuma etapa usa LLM.
+
+As rotas de câmera respondem 503 enquanto não houver fonte configurada — o painel
+mostra "sem câmera conectada" em vez de simular transmissão.
+
+## Operação (Worker, contexto, modelo e revisão)
+
+```powershell
+.venv\Scripts\python.exe -m app.worker                  # consome a fila de inferência
+.venv\Scripts\python.exe -m app.worker --once           # processa o que houver e sai
+.venv\Scripts\python.exe -m app.worker --stats          # fila, resultados, retries e latência
+.venv\Scripts\python.exe -m app.ml.serving export       # checkpoint validado → ONNX + paridade
+.venv\Scripts\python.exe -m app.ml.serving register --manifest <json> --promote
+.venv\Scripts\python.exe -m app.ml.serving evaluate     # VALIDATION completa do modelo promovido
+.venv\Scripts\python.exe -m app.ml.serving benchmark    # latência/FPS do ONNX no hardware atual
+.venv\Scripts\python.exe -m app.services.review_export  # revisões confirmadas → candidatos
+.venv\Scripts\python.exe -m app.services.osm_import --bbox S W N E --label <piloto> [--commit]
+```
+
+O Worker enriquece cada evento novo com contexto externo (§13): Nominatim
+(endereço), Overpass (escola, saúde e travessia até 300 m) e Open-Meteo (chuva nas
+24 h anteriores). Cada provider tem timeout, cache e atribuição; quando falha, o
+evento continua existindo e o contexto fica `context_unavailable`. O endereço é
+contexto e nunca substitui a coordenada original.
+
+## HTTPS, CORS e tempo real
+
+Câmera e Geolocation exigem contexto seguro (§6.1). Em `localhost` o navegador já
+considera seguro; para testar no celular pela rede local:
+
+```powershell
+$env:VITE_DEV_HTTPS = "1"; npm run dev -- --host 0.0.0.0   # certificado local de desenvolvimento
+```
+
+Teste móvel que continua manual: abrir o endereço HTTPS no celular, aceitar o
+certificado de desenvolvimento e confirmar câmera, GPS e instalação do PWA. O
+restante do fluxo é coberto pelo E2E automatizado sobre HTTPS.
+
+### Produção: PWA e API na mesma origem, sob TLS
+
+A forma mais simples que atende ao §3.1 (sem Docker, sem proxy extra) é o próprio
+FastAPI servir o PWA compilado. Mesma origem: sem CORS e sem mixed content.
+
+```powershell
+cd frontend; npm run build                      # gera frontend/dist
+cd ..; .venv\Scripts\python.exe scripts\dev_https_cert.py --host <ip-da-maquina>
+$env:SERVE_FRONTEND_DIR = "<repo>rontend\dist"
+cd backend
+.venv\Scripts\python.exe -m app --host 0.0.0.0 --port 8443 `
+  --ssl-certfile ..\certs\dev-cert.pem --ssl-keyfile ..\certs\dev-key.pem
+.venv\Scripts\python.exe -m app.worker           # Worker é processo Python separado
+```
+
+O certificado gerado por `scripts/dev_https_cert.py` é **de desenvolvimento**: em
+produção use o certificado do provedor escolhido (`--ssl-certfile/--ssl-keyfile`) ou
+termine o TLS no servidor à frente. Nada disso fixa hospedagem: qualquer host com
+Python 3.12 serve, e o Worker continua sendo processo Python à parte — não há
+serviço gerenciado obrigatório nem custo embutido.
+
+Se o PWA for hospedado separado da API (CDN estático, por exemplo), declare
+`CORS_ALLOWED_ORIGINS` no backend: a configuração recusa `*` e exige `https` fora
+de localhost. Sem essa variável, nenhum CORS é liberado.
+
+O tempo real usa **Postgres Changes** nas tabelas `events` e `risk_assessments`
+(§16.1), que o Realtime entrega respeitando a RLS. A mudança só avisa a interface
+para recarregar pelo HTTP: nada de evento duplicado, e sem Realtime o botão
+Atualizar continua funcionando. Broadcast fica para quando o volume justificar.
 
 ## Segurança
 
-- Todas as tabelas têm RLS ativada e o acesso de `anon`/`authenticated` é
-  revogado; hoje apenas o backend opera dados. As policies do §17 entram quando
-  a PWA passar a ler o Data API diretamente.
+- Todas as tabelas têm RLS ativada e `anon` não tem nenhum acesso. `authenticated`
+  recebe apenas `SELECT` em `events` e `risk_assessments`, o mínimo para o
+  Realtime; escrita continua exclusivamente pelo backend.
+- Quem revisa é decidido no servidor, pelo `app_metadata.urmind_role` do JWT: o
+  frontend só exibe o que `/api/v1/me` responder.
 - A chave secret do Supabase existe só no servidor; o frontend nunca a recebe.
 - Nenhum reconhecimento facial e nenhuma identificação de pessoas ou placas, em
   nenhuma versão.

@@ -210,7 +210,16 @@ def main() -> int:
         "evaluator_ready": model_readiness["evaluator_ready"],
         "checkpointing_ready": model_readiness["checkpointing_ready"],
         "system_ready_for_training": model_readiness["system_ready_for_training"],
-        "reason": None if total else "BLOCKED_NO_AUTHORIZED_DATA",
+        # O flag do contrato é marco manual: `validate_readiness` não o exige para `--run`.
+        # Quando há dado e o flag está falso, o relatório diz isso em vez de ficar mudo.
+        "reason": (
+            "BLOCKED_NO_AUTHORIZED_DATA"
+            if not total
+            else None
+            if model_readiness["system_ready_for_training"]
+            else "READINESS_MILESTONE_NOT_PROMOTED: yolox_model_v1.json mantém "
+            "system_ready_for_training=false; não bloqueia `app.ml.training --run`"
+        ),
         "accepted_model_v1_risks": [
             "RDD2022 não publica rota/sessão por imagem",
             "domain shift forte por país no split",

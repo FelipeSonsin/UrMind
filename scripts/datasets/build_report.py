@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import io
 import json
 from datetime import UTC, datetime
 
@@ -92,15 +91,21 @@ def main():
             .splitlines()
         )
     )
-    for row in sources:
-        key = row["dataset_name"]
-        if key in storage["by_dataset"]:
-            row["local_size_bytes"] = str(storage["by_dataset"][key]["logical_size"])
-    buffer = io.StringIO(newline="")
-    writer = csv.DictWriter(buffer, fieldnames=list(sources[0]))
-    writer.writeheader()
-    writer.writerows(sources)
-    write_text_safe(DATASETS_DIR / "metadata" / "sources.csv", buffer.getvalue())
+    # ``refresh_sources.py`` is the single writer of sources.csv. This report only
+    # consumes it and refuses to publish numbers that disagree with the storage
+    # audit instead of patching the CSV through a second producer.
+    divergent = sorted(
+        row["dataset_name"]
+        for row in sources
+        if row["dataset_name"] in storage["by_dataset"]
+        and row["local_size_bytes"]
+        != str(storage["by_dataset"][row["dataset_name"]]["logical_size"])
+    )
+    if divergent:
+        raise RuntimeError(
+            "sources.csv diverge de storage_audit.json em "
+            f"{', '.join(divergent)}; rode refresh_sources.py"
+        )
     total = audit["totals"]
     selected = subset["subset"]
     rdd = storage["by_dataset"]["rdd2022"]

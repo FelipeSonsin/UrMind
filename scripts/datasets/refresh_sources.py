@@ -4,12 +4,11 @@ Gerado, nao escrito a mao: o numero publicado tem de vir do disco e dos
 relatorios, senao a documentacao envelhece sem ninguem perceber.
 """
 
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
+import argparse
 import csv
 import json
-from datetime import UTC, datetime
+from datetime import date
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "datasets/raw"
@@ -31,7 +30,6 @@ COLS = [
     "adapter",
     "notes",
 ]
-
 
 def size_of(name: str) -> int:
     d = RAW / name
@@ -105,7 +103,10 @@ ROWS = [
             "https://www.kaggle.com/datasets/rajeevpaudel1/urban-community-issues"
         ),
         "version": "kaggle-2025",
-        "license": "CC0 declarada pelo publicador; procedencia das imagens nao declarada",
+        "license": (
+            "CC0 declarada pelo uploader; NAO valida para todo o conteudo "
+            "(imagens do Open Images listadas como CC BY 2.0)"
+        ),
         "purpose": "urban_damage",
         "download_status": "downloaded_extracted",
         "checksum_algo": "sha256 (local)",
@@ -115,7 +116,12 @@ ROWS = [
         "notes": (
             "Sem checksum oficial publicado. O pacote nao traz data.yaml; o mapa "
             "id->classe foi inferido das pastas. Agrupamento fraco: usar como reforco, "
-            "nao como conjunto de teste."
+            "nao como conjunto de teste. PUBLICACAO RED (BLOCKED_LICENSE / "
+            "BLOCKED_PROVENANCE): 1.800/2.518 imagens com nome compativel com ID do "
+            "Open Images (inferido pelo padrao); 9 verificadas diretamente, 9/9 iguais "
+            "em tamanho; Open Images lista CC BY 2.0 sem garantir cada imagem; 718 sem "
+            "origem comprovada. CC0 do uploader nao substitui o direito dos autores. "
+            "Nao republicar."
         ),
     },
     {
@@ -158,7 +164,10 @@ ROWS = [
         "dataset_name": "camber",
         "official_source_url": "https://zenodo.org/records/21361827",
         "version": "zenodo-21361827",
-        "license": "CC BY 4.0 declarada no snapshot; abrangencia ao MP4/GPX externo a revisar",
+        "license": (
+            "CC BY 4.0 no deposito Zenodo (CSV e TXT); licenca explicita do MP4/GPX "
+            "externos nao demonstrada"
+        ),
         "purpose": "longitudinal_risk",
         "download_status": "downloaded_sample",
         "checksum_algo": "md5 (anexos oficiais)",
@@ -168,7 +177,11 @@ ROWS = [
         "notes": (
             "Amostra de um registro (video 50 e rota 51). As deteccoes do CSV vem de um "
             "YOLO de terceiros com user_confirmed vazio: e saida de modelo, nao ground "
-            "truth, e nao vira rotulo de treino."
+            "truth, e nao vira rotulo de treino. PUBLICACAO YELLOW (REVIEW_REQUIRED, "
+            "EXTERNAL_HEAVY_MEDIA_LICENSE_NOT_ESTABLISHED): DOI 10.5281/zenodo.21361827, "
+            "v1.0. MP4/GPX em S3 externo; GPX MD5 == ETag e MP4 == ETag multipart. "
+            "Metadata declara video com blur (sem verificacao independente). Grant: "
+            "Zenodo 101156387 vs CORDIS 101146800."
         ),
     },
     {
@@ -192,7 +205,7 @@ ROWS = [
         "dataset_name": "global_streetscapes",
         "official_source_url": "https://huggingface.co/datasets/NUS-UAL/global-streetscapes",
         "version": "manual_labels-2024",
-        "license": "CC BY-SA 4.0 declarada na ficha oficial",
+        "license": "CC BY-SA 4.0 (metadata; imagens Mapillary/KartaView tambem na origem)",
         "purpose": "urban_context",
         "download_status": "downloaded_subset",
         "checksum_algo": "sha256 por imagem (local)",
@@ -205,20 +218,82 @@ ROWS = [
             "gating e sem custo. Recorte estratificado por continente x plataforma da "
             "via x clima x iluminacao, espalhado por cidade e sequencia: 108 paises, "
             "398 cidades, 1.946 sequencias. Streaming seletivo: nada foi baixado para "
-            "depois ser apagado. CC BY-SA obriga atribuicao e mesma licenca em derivados."
+            "depois ser apagado. CC BY-SA obriga atribuicao e mesma licenca em derivados. "
+            "PUBLICACAO YELLOW (REVIEW_REQUIRED / BLOCKED_ATTRIBUTION): sem campo de "
+            "fotografo na selecao local (source, orig_id, sequence_id, sha256); "
+            "termos do Mapillary para republicacao em massa nao resolvidos."
         ),
     },
 ]
 
+out = ROOT / "datasets/metadata/sources.csv"
+
+
+def previous_rows(path: Path) -> dict[str, dict[str, str]]:
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8-sig", newline="") as fh:
+        return {row["dataset_name"]: row for row in csv.DictReader(fh)}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--reviewed",
+        action="append",
+        default=[],
+        choices=[row["dataset_name"] for row in ROWS],
+        help="fonte cuja evidencia foi efetivamente revisada nesta execucao",
+    )
+    parser.add_argument(
+        "--review-date",
+        type=date.fromisoformat,
+        help="data ISO da revisao; obrigatoria quando --reviewed for usado",
+    )
+    args = parser.parse_args()
+    if bool(args.reviewed) != bool(args.review_date):
+        parser.error("--reviewed e --review-date devem ser usados juntos")
+    return args
+
+
+def resolve_date_accessed(
+    row: dict, previous: dict[str, str] | None, reviewed: set[str], review_date: date | None
+) -> str:
+    """Preserva a data; so uma revisao explicitamente declarada pode altera-la."""
+    if row["dataset_name"] in reviewed and review_date is not None:
+        return review_date.isoformat()
+    if not previous or not previous.get("date_accessed"):
+        raise RuntimeError(
+            f"{row['dataset_name']}: fonte nova exige --reviewed e --review-date"
+        )
+    evidence_columns = set(COLS) - {
+        "date_accessed",
+        "local_path_relative",
+        "local_size_bytes",
+    }
+    changed = sorted(
+        column
+        for column in evidence_columns
+        if str(row.get(column, "")) != previous.get(column, "")
+    )
+    if changed:
+        raise RuntimeError(
+            f"{row['dataset_name']}: evidencia mudou em {', '.join(changed)}; "
+            "declare --reviewed e --review-date"
+        )
+    return previous["date_accessed"]
+
+
+args = parse_args()
+anteriores = previous_rows(out)
 for row in ROWS:
     name = row["dataset_name"]
     row["local_path_relative"] = f"datasets/raw/{name}"
     row["local_size_bytes"] = size_of(name)
-    # Data de acesso é quando ESTA execução olhou o disco. Fixá-la republicava
-    # "2026-09-08" a cada regeneração, o que é falso em toda execução menos uma.
-    row["date_accessed"] = datetime.now(UTC).date().isoformat()
+    row["date_accessed"] = resolve_date_accessed(
+        row, anteriores.get(name), set(args.reviewed), args.review_date
+    )
 
-out = ROOT / "datasets/metadata/sources.csv"
 with out.open("w", encoding="utf-8", newline="") as fh:
     writer = csv.DictWriter(fh, fieldnames=COLS)
     writer.writeheader()
