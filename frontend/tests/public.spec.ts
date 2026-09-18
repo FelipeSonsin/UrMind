@@ -4,6 +4,7 @@ import {
   eventDetail,
   publicEvents,
   publicStatus,
+  scoutOffline,
   scoutSnapshots,
   stubPublicApi,
 } from './fixtures';
@@ -227,4 +228,32 @@ test('estado do sistema é auditável na rota pública dedicada', async ({ page 
   await expect(page.getByLabel('Scout')).toContainText('nenhum dispositivo registrado');
   await expect(page.getByLabel('Scout')).not.toContainText('no_device');
   await expect(page.getByLabel('Cobertura')).toContainText('832');
+});
+
+test('sem ocorrência e sem câmera, o painel parece proposital e não quebrado', async ({
+  page,
+}, testInfo) => {
+  // Estado real de hoje: nenhuma captura publicada e nenhum Scout registrado.
+  await stubPublicApi(page, {
+    events: [],
+    scout: scoutOffline,
+    status: { ...publicStatus, events_total: 0, last_event_at: null },
+  });
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
+  ).toBeVisible();
+
+  const diagnosis = page.getByLabel('Diagnóstico da ocorrência selecionada');
+  await expect(
+    diagnosis.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
+  ).toBeVisible();
+  await expect(diagnosis).toContainText('Quando uma evidência for processada');
+
+  await expect(page.getByLabel('Câmera do Scout')).toContainText('Câmera do Scout indisponível');
+  await expect(page.getByLabel('Ocorrências recentes')).toContainText('0 registros');
+  await expect(page.getByRole('status').first()).toContainText('nenhuma ainda');
+  // Nenhum número aparece sem origem: zero é zero, não um traço decorativo.
+  await expect(page.locator('body')).not.toContainText('NaN');
+  await page.screenshot({ path: testInfo.outputPath('vazio.png'), fullPage: true });
 });

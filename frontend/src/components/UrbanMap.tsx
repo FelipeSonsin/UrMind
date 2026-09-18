@@ -142,12 +142,20 @@ export default function UrbanMap({
   const located = events.filter((event) => event.latitude != null && event.longitude != null);
   return (
     <section className="panel map-panel">
-      <div
-        className="map"
-        ref={container}
-        role="img"
-        aria-label={`Mapa com ${located.length} de ${events.length} ocorrências localizadas`}
-      />
+      <div className="map-wrap">
+        <div
+          className="map"
+          ref={container}
+          role="img"
+          aria-label={`Mapa com ${located.length} de ${events.length} ocorrências localizadas`}
+        />
+        {!located.length && (
+          <p className="map-empty">
+            Nenhuma ocorrência com coordenada publicada nesta área ainda. A malha viária do piloto
+            já está carregada e o mapa passa a marcar os pontos assim que houver evidência.
+          </p>
+        )}
+      </div>
       {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
       <ul className="sr-only">
         {located.map((event) => (

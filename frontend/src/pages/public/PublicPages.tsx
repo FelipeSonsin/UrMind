@@ -157,6 +157,9 @@ export function PublicHome({
                 Quando uma evidência for processada, o diagnóstico aparece aqui com confiança,
                 severidade, prioridade e ação sugerida.
               </p>
+              <a className="text-button" href="#/transparency">
+                Ver como o UrMind analisa
+              </a>
             </div>
           )}
         </section>

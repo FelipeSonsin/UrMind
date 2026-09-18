@@ -512,7 +512,51 @@ mostra "sem câmera conectada" em vez de simular transmissão.
 .venv\Scripts\python.exe -m app.ml.serving benchmark    # latência/FPS do ONNX no hardware atual
 .venv\Scripts\python.exe -m app.services.review_export  # revisões confirmadas → candidatos
 .venv\Scripts\python.exe -m app.services.osm_import --bbox S W N E --label <piloto> [--commit]
+.venv\Scripts\python.exe -m app.pilot_check            # cadeia completa de uma captura real
 ```
+
+### Observabilidade (§19)
+
+Sem pilha de monitoramento separada: tudo abaixo lê o que já existe.
+
+```powershell
+.venv\Scripts\python.exe -m app.worker --stats         # fila, resultados, retries e latência
+.venv\Scripts\python.exe -m app.worker --slow-queries  # SQL caro (pg_stat_statements)
+.venv\Scripts\python.exe -m app.worker --lineage       # dataset → treino → ONNX → modelo → detecção
+.venv\Scripts\python.exe -m app.worker --drift         # há amostra para falar de drift?
+```
+
+As mesmas métricas de fila e latência estão em `GET /api/v1/ops/metrics`, atrás
+do papel de revisor — é informação de operação, não do painel público.
+
+Os logs são JSON estruturado (structlog). Cada requisição carrega
+`correlation_id` (devolvido no cabeçalho `X-Correlation-ID`), a API registra
+`capture_stored`, `capture_consolidated` e `event_reviewed` com os ids do
+domínio, e o Worker registra `inference_completed` com `job_id`, `capture_id`,
+`detection_ids` e `event_ids`. Com isso, uma foto é rastreável da requisição
+HTTP até o evento publicado. Quem revisou fica no `audit_log`, não no log de
+aplicação.
+
+Drift responde `DRIFT_NOT_ENOUGH_DATA` enquanto a amostra de produção for menor
+que o mínimo declarado: o UrMind não publica gráfico de ruído como
+monitoramento.
+
+### Gateway do Scout (§21)
+
+O Scout ainda não existe fisicamente. A fundação de software já existe e usa o
+mesmo núcleo — sem banco, fila ou backend próprios:
+
+```powershell
+$env:URMIND_GATEWAY_TOKEN = "<jwt>"   # o token nunca vai na linha de comando
+.venv\Scripts\python.exe -m app.gateway --device SCOUT-01 --source http://<esp32-cam>/capture `
+    --core https://<api> --interval 5
+```
+
+Sem `--source`, o Gateway informa `no_device` e sai. O quadro vai para
+`POST /api/v1/captures/photo` com `source=scout`, o mesmo caminho da foto de
+operador, e o carimbo de tempo declara `clock_source=gateway_receipt` enquanto
+o TIMEPULSE do NEO-M8N (§21.2) não estiver ligado — ninguém confunde relógio do
+Gateway com hora de GPS.
 
 O Worker enriquece cada evento novo com contexto externo (§13): Nominatim
 (endereço), Overpass (escola, saúde e travessia até 300 m) e Open-Meteo (chuva nas
