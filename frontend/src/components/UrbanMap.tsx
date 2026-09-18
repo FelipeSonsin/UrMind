@@ -1,13 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { UrbanEvent } from '../domain/contracts';
-import { classes } from '../domain/contracts';
+import { labelFor, severityOf } from '../domain/public';
 
-export default function UrbanMap({ events }: { events: UrbanEvent[] }) {
+/** Mínimo que o mapa precisa. `UrbanEvent` e o resumo público satisfazem isto. */
+export interface MapMarker {
+  id: string;
+  urmind_class: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  severity?: string | null;
+  road_name?: string | null;
+}
+
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: '#7f1d1d',
+  high: '#b45309',
+  medium: '#a16207',
+  low: '#123f36',
+  unknown: '#66766f',
+};
+const LEGEND = ['critical', 'high', 'medium', 'low', 'unknown'];
+
+export default function UrbanMap({
+  events,
+  selectedId,
+  onSelect,
+}: {
+  events: MapMarker[];
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
+}) {
   const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map>(null);
   const [error, setError] = useState('');
   const style = import.meta.env.VITE_MAP_STYLE_URL;
+
   useEffect(() => {
     if (!container.current) return;
     let map: maplibregl.Map | undefined;
@@ -25,6 +53,7 @@ export default function UrbanMap({ events }: { events: UrbanEvent[] }) {
         center: [0, 0],
         zoom: 1,
       });
+      mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
       map.on('error', () =>
         setError(
@@ -43,7 +72,13 @@ export default function UrbanMap({ events }: { events: UrbanEvent[] }) {
                 type: 'Point' as const,
                 coordinates: [event.longitude!, event.latitude!],
               },
-              properties: { label: classes[event.urmind_class], id: event.id },
+              properties: {
+                id: event.id,
+                label: labelFor(event.urmind_class),
+                severity: severityOf(event.severity).label,
+                color: SEVERITY_COLOR[severityOf(event.severity).level],
+                road: event.road_name ?? '',
+              },
             })),
           },
         });
@@ -52,19 +87,29 @@ export default function UrbanMap({ events }: { events: UrbanEvent[] }) {
           type: 'circle',
           source: 'events',
           paint: {
-            'circle-radius': 7,
-            'circle-color': '#123f36',
-            'circle-stroke-color': '#c9f17d',
+            'circle-radius': ['case', ['==', ['get', 'id'], selectedId ?? ''], 11, 7],
+            'circle-color': ['get', 'color'],
+            'circle-stroke-color': '#f5f6f2',
             'circle-stroke-width': 3,
           },
         });
         map.on('click', 'events', (event) => {
           const feature = event.features?.[0];
-          if (feature?.geometry.type === 'Point' && map)
-            new maplibregl.Popup()
-              .setLngLat(feature.geometry.coordinates as [number, number])
-              .setText(String(feature.properties?.label || 'Ocorrência'))
-              .addTo(map);
+          if (feature?.geometry.type !== 'Point' || !map) return;
+          const properties = feature.properties as Record<string, string>;
+          new maplibregl.Popup()
+            .setLngLat(feature.geometry.coordinates as [number, number])
+            .setText(
+              `${properties.label} · severidade ${properties.severity}${properties.road ? ` · ${properties.road}` : ''}`,
+            )
+            .addTo(map);
+          onSelect?.(properties.id);
+        });
+        map.on('mouseenter', 'events', () => {
+          if (map) map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'events', () => {
+          if (map) map.getCanvas().style.cursor = '';
         });
         if (located.length) {
           const bounds = new maplibregl.LngLatBounds();
@@ -75,16 +120,56 @@ export default function UrbanMap({ events }: { events: UrbanEvent[] }) {
     } catch {
       setError('Mapa indisponível: verifique o suporte a WebGL do navegador.');
     }
-    return () => map?.remove();
+    return () => {
+      mapRef.current = null;
+      map?.remove();
+    };
+    // selectedId muda só o raio do círculo; recriar o mapa por isso seria desperdício.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, style]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.getLayer?.('events')) return;
+    map.setPaintProperty('events', 'circle-radius', [
+      'case',
+      ['==', ['get', 'id'], selectedId ?? ''],
+      11,
+      7,
+    ]);
+  }, [selectedId]);
+
+  const located = events.filter((event) => event.latitude != null && event.longitude != null);
   return (
     <section className="panel map-panel">
       <div
         className="map"
         ref={container}
-        aria-label="Mapa de coordenadas originais das ocorrências"
+        role="img"
+        aria-label={`Mapa com ${located.length} de ${events.length} ocorrências localizadas`}
       />
+      {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
+      <ul className="sr-only">
+        {located.map((event) => (
+          <li key={event.id}>
+            {labelFor(event.urmind_class)} · severidade {severityOf(event.severity).label} ·{' '}
+            {event.road_name ?? 'via não associada'} · {event.latitude}, {event.longitude}
+          </li>
+        ))}
+      </ul>
+      <ul className="map-legend" aria-label="Legenda de severidade">
+        {LEGEND.map((level) => {
+          const presentation = severityOf(level);
+          return (
+            <li key={level}>
+              <i aria-hidden="true" style={{ background: SEVERITY_COLOR[level] }} />
+              <span aria-hidden="true">{presentation.shape}</span> {presentation.label}
+            </li>
+          );
+        })}
+      </ul>
       <p className="map-caption">
+        {located.length} de {events.length} ocorrências têm coordenada publicada.{' '}
         {style
           ? 'Coordenadas originais. O ponto ajustado à via permanece separado.'
           : 'Base cartográfica não configurada. Somente coordenadas reais são exibidas; nenhuma rua é simulada.'}

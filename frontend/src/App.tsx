@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowUpRight,
   Camera,
   ChartNoAxesCombined,
-  CircleHelp,
   ClipboardList,
-  Database,
   FileImage,
   LayoutDashboard,
   Map,
@@ -17,23 +14,72 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { CapturePage } from './pages/CapturePage';
 import { EventsPage } from './pages/EventsPage';
 import { Photo } from './components/Photo';
-import { api } from './services/api';
+import { api, UnauthorizedError } from './services/api';
+import { auth, subscribeToEventChanges, type RealtimeStatus } from './services/auth';
+import { SignIn } from './components/SignIn';
+import {
+  PublicEventDetailPage,
+  PublicEventsPage,
+  PublicHome,
+  PublicLive,
+  PublicMapPage,
+  PublicSystemPage,
+  PublicTransparencyPage,
+  usePublicEvents,
+  useScout,
+  useSystemStatus,
+} from './pages/public/PublicPages';
+import type { Session } from '@supabase/supabase-js';
 import { drafts, type CaptureDraft } from './services/drafts';
 import type { UrbanEvent } from './domain/contracts';
 
+/** Releitura do painel público: curta o bastante para parecer vivo, longa o bastante
+ * para não pesar na API. */
+const PUBLIC_REFRESH_MS = 30_000;
+
 const navigation = [
-  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
-  { id: 'capture', label: 'Registrar evidência', icon: Camera },
-  { id: 'drafts', label: 'Rascunhos locais', icon: FileImage },
-  { id: 'events', label: 'Ocorrências', icon: ClipboardList },
-  { id: 'map', label: 'Gêmeo digital 2D', icon: Map },
-  { id: 'analysis', label: 'Análises e previsões', icon: ChartNoAxesCombined },
-  { id: 'settings', label: 'Integrações', icon: Settings2 },
+  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard, href: '#/', section: 'público' },
+  { id: 'live', label: 'Ao vivo', icon: Radio, href: '#/live', section: 'público' },
+  { id: 'map', label: 'Mapa operacional', icon: Map, href: '#/map', section: 'público' },
+  { id: 'events', label: 'Ocorrências', icon: ClipboardList, href: '#/events', section: 'público' },
+  {
+    id: 'analysis',
+    label: 'Transparência',
+    icon: ChartNoAxesCombined,
+    href: '#/transparency',
+    section: 'público',
+  },
+  { id: 'settings', label: 'Sistema', icon: Settings2, href: '#/system', section: 'público' },
+  {
+    id: 'capture',
+    label: 'Registrar evidência',
+    icon: Camera,
+    href: '#/capture',
+    section: 'operação',
+  },
+  {
+    id: 'drafts',
+    label: 'Rascunhos locais',
+    icon: FileImage,
+    href: '#/drafts',
+    section: 'operação',
+  },
+  { id: 'review', label: 'Revisão', icon: ScanLine, href: '#/review', section: 'operação' },
 ] as const;
-type Page = (typeof navigation)[number]['id'];
-function currentPage(): Page {
-  const id = location.hash.slice(1);
-  return navigation.find((item) => item.id === id)?.id || 'overview';
+type Page = (typeof navigation)[number]['id'] | 'event-detail';
+interface Route {
+  page: Page;
+  eventId?: string;
+}
+/** Rotas por hash: `#/`, `#/live`, `#/events`, `#/events/<id>`… sem dependência nova. */
+function parseRoute(): Route {
+  const [, first = '', second = ''] = location.hash.replace(/^#\/?/, '/').split('/');
+  const path = `#/${first}`;
+  if (first === 'events' && second) return { page: 'event-detail', eventId: second };
+  if (first === 'transparency') return { page: 'analysis' };
+  if (first === 'system') return { page: 'settings' };
+  const found = navigation.find((item) => item.href === path);
+  return { page: found?.id ?? 'overview' };
 }
 function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -49,25 +95,40 @@ function useOnline() {
   return online;
 }
 export default function App() {
-  const [page, setPage] = useState<Page>(currentPage);
+  const [route, setRoute] = useState<Route>(parseRoute);
+  const page = route.page;
+  const [publicFilters, setPublicFilters] = useState({ urmind_class: '', status: '' });
   const [localDrafts, setLocalDrafts] = useState<CaptureDraft[]>([]);
   const [draftError, setDraftError] = useState('');
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [editing, setEditing] = useState<CaptureDraft>();
   const [notice, setNotice] = useState('');
   const [events, setEvents] = useState<UrbanEvent[] | null>(null);
-  const [health, setHealth] = useState('Ainda não consultado');
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [publicRevision, setPublicRevision] = useState(0);
+  const [session, setSession] = useState<Session | null>(null);
+  const [realtime, setRealtime] = useState<RealtimeStatus>('unavailable');
+  const [changed, setChanged] = useState<{ eventId: string | null; at: number }>({
+    eventId: null,
+    at: 0,
+  });
+  const [sending, setSending] = useState('');
   const online = useOnline();
+  const { data: publicStatus, error: statusError } = useSystemStatus(publicRevision);
+  const { data: scout } = useScout(publicRevision);
+  const {
+    data: publicEvents,
+    loading: publicLoading,
+    error: publicError,
+  } = usePublicEvents(publicRevision, publicFilters);
   const {
     needRefresh: [needRefresh],
-    offlineReady: [offlineReady],
     updateServiceWorker,
   } = useRegisterSW();
   useEffect(() => {
-    const change = () => setPage(currentPage());
+    const change = () => setRoute(parseRoute());
     addEventListener('hashchange', change);
     return () => removeEventListener('hashchange', change);
   }, []);
@@ -87,6 +148,29 @@ export default function App() {
     void reloadDrafts();
   }, [reloadDrafts]);
   useEffect(() => {
+    void auth.session().then(setSession);
+    return auth.onChange(setSession);
+  }, []);
+  useEffect(() => {
+    if (!session) {
+      setRealtime('unavailable');
+      return;
+    }
+    let timer: number | undefined;
+    const unsubscribe = subscribeToEventChanges(({ eventId }) => {
+      // Rajadas (evento + risco + contexto) viram uma única recarga HTTP.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        setRevision((value) => value + 1);
+        setChanged({ eventId, at: Date.now() });
+      }, 600);
+    }, setRealtime);
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [session]);
+  useEffect(() => {
     const controller = new AbortController();
     async function load() {
       setLoading(true);
@@ -95,23 +179,16 @@ export default function App() {
       try {
         const result = await api.health(controller.signal);
         if (controller.signal.aborted) return;
-        setHealth(
-          result.database === 'not_configured'
-            ? 'Banco não configurado'
-            : result.database === 'connected'
-              ? 'API e banco disponíveis'
-              : `API: ${result.status} · Banco: ${result.database || 'não informado'}`,
-        );
         if (result.database === 'not_configured') {
           setApiError('O Supabase/PostGIS ainda não está configurado.');
           return;
         }
+        if (!session) return;
         const data = await api.events(controller.signal);
         if (!controller.signal.aborted) setEvents(data);
       } catch (error) {
         if (!controller.signal.aborted) {
           setApiError(error instanceof Error ? error.message : 'Falha ao consultar API.');
-          setHealth('Conexão indisponível');
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -119,15 +196,56 @@ export default function App() {
     }
     void load();
     return () => controller.abort();
-  }, [revision]);
+  }, [revision, session]);
+  // O Realtime do Supabase exige sessão (as políticas de SELECT valem para
+  // `authenticated`), então o visitante público não recebe aviso de mudança.
+  // Uma releitura periódica cobre isso; pausada com a aba oculta para não
+  // consultar a API em segundo plano por horas.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setPublicRevision((value) => value + 1);
+    }, PUBLIC_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+  // Quem tem sessão recebe o aviso do Realtime: o painel público acompanha na hora.
+  useEffect(() => setPublicRevision((value) => value + 1), [revision]);
   function navigate(next: Page) {
-    location.hash = next;
-    setPage(next);
+    const target = navigation.find((item) => item.id === next);
+    location.hash = target?.href ?? '#/';
+    setRoute({ page: next });
     setNotice('');
   }
   function newCapture() {
     setEditing(undefined);
     navigate('capture');
+  }
+  async function send(draft: CaptureDraft) {
+    if (!session) {
+      setNotice('Rascunho guardado neste navegador. Entre para enviar ao UrMind.');
+      return;
+    }
+    setSending(draft.id);
+    setDraftError('');
+    try {
+      const result = await api.uploadPhoto(draft);
+      await drafts.remove(draft.id);
+      await reloadDrafts();
+      setNotice(
+        result.requires_manual_location
+          ? 'Foto enviada. Sem localização: marque o ponto antes que ela vire ocorrência.'
+          : result.created
+            ? 'Foto enviada e registrada. A detecção roda no processamento do backend.'
+            : 'Esta foto já estava registrada; nada foi duplicado.',
+      );
+      setRevision((value) => value + 1);
+    } catch (reason) {
+      if (reason instanceof UnauthorizedError) setSession(null);
+      setDraftError(
+        `${(reason as Error).message} O rascunho continua salvo neste navegador para reenviar.`,
+      );
+    } finally {
+      setSending('');
+    }
   }
   async function remove(draft: CaptureDraft) {
     if (
@@ -171,7 +289,7 @@ export default function App() {
           {navigation.map((item) => (
             <a
               key={item.id}
-              href={`#${item.id}`}
+              href={item.href}
               aria-current={page === item.id ? 'page' : undefined}
               onClick={() => {
                 setNotice('');
@@ -202,12 +320,24 @@ export default function App() {
         <header className="topbar">
           <span>
             Observatório urbano <span className="topbar-separator">/</span>{' '}
-            <strong>{navigation.find((item) => item.id === page)?.label}</strong>
+            <strong>
+              {navigation.find((item) => item.id === page)?.label ?? 'Análise da ocorrência'}
+            </strong>
           </span>
           <span className="network">
             <i className={online ? 'online' : ''} />
             {online ? 'Rede disponível' : 'Sem rede'}
           </span>
+          {session && (
+            <span className="network" title="Supabase Realtime (Postgres Changes)">
+              <i className={realtime === 'connected' ? 'online' : ''} />
+              {realtime === 'connected'
+                ? 'Tempo real ativo'
+                : realtime === 'connecting'
+                  ? 'Conectando tempo real…'
+                  : 'Tempo real indisponível: use Atualizar'}
+            </span>
+          )}
         </header>
         <main id="main" tabIndex={-1}>
           {needRefresh && (
@@ -229,120 +359,49 @@ export default function App() {
             </p>
           )}
           {page === 'overview' && (
-            <>
-              <div className="page-heading">
-                <div>
-                  <p className="eyebrow">OBSERVAR. COMPREENDER. AGIR.</p>
-                  <h1>Um olhar atento à cidade.</h1>
-                  <p>Da evidência à decisão, com rastreabilidade em cada etapa.</p>
-                </div>
-                <button onClick={newCapture}>
-                  <Camera size={17} /> Registrar evidência
-                </button>
-              </div>
-              <section className="hero">
-                <div>
-                  <span className="hero-label">
-                    <span /> FASE ATUAL · FOTO-FIRST
-                  </span>
-                  <h2>
-                    A transformação começa
-                    <br />
-                    com uma observação.
-                  </h2>
-                  <p>
-                    Registre fotografias e organize evidências enquanto as integrações do projeto
-                    são preparadas.
-                  </p>
-                  <button className="light-button" onClick={newCapture}>
-                    Criar primeiro registro <ArrowUpRight size={17} />
-                  </button>
-                </div>
-                <div className="city-art" aria-hidden="true">
-                  <div className="city-grid" />
-                  <div className="building b1" />
-                  <div className="building b2" />
-                  <div className="building b3" />
-                  <div className="building b4" />
-                  <div className="scan-target">
-                    <ScanLine size={54} strokeWidth={1} />
-                  </div>
-                  <span className="city-label">EVIDÊNCIA → DECISÃO</span>
-                </div>
-              </section>
-              <div className="metrics">
-                <Metric
-                  label="Rascunhos neste navegador"
-                  value={draftsLoaded ? String(localDrafts.length) : '—'}
-                  caption="Fotos salvas localmente"
-                  icon={<FileImage size={19} />}
-                />
-                <Metric
-                  label="Ocorrências consultadas"
-                  value={events ? String(events.length) : '—'}
-                  caption={events ? 'Até 500 registros recentes' : 'Aguardando conexão com o banco'}
-                  icon={<ClipboardList size={19} />}
-                />
-                <Metric
-                  label="Aguardando revisão"
-                  value={
-                    events
-                      ? String(events.filter((event) => event.status === 'review').length)
-                      : '—'
-                  }
-                  caption="No conjunto consultado"
-                  icon={<ScanLine size={19} />}
-                />
-              </div>
-              <div className="overview-grid">
-                <section className="panel">
-                  <div className="section-heading">
-                    <h2>Do registro à decisão</h2>
-                    <span className="badge">Fluxo do projeto</span>
-                  </div>
-                  <div className="pipeline">
-                    {[
-                      ['01', 'Capturar', 'Foto e localização', true],
-                      ['02', 'Detectar', 'YOLOX + dados reais', false],
-                      ['03', 'Compreender', 'Contexto e regras', false],
-                      ['04', 'Agir', 'Revisão e ação sugerida', false],
-                    ].map(([step, title, text, active]) => (
-                      <div className={active ? 'active' : ''} key={String(step)}>
-                        <span>{step}</span>
-                        <h3>{title}</h3>
-                        <p>{text}</p>
-                        <small>
-                          {active ? 'Rascunho local disponível' : 'Integração pendente'}
-                        </small>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <section className="panel readiness">
-                  <Database size={23} />
-                  <h2>Ambiente em preparação</h2>
-                  <p>{loading ? 'Consultando backend…' : health}</p>
-                  <p className="muted">
-                    Supabase, detector e APIs externas serão conectados nas próximas etapas.
-                  </p>
-                  <button className="text-button" onClick={() => navigate('settings')}>
-                    Ver integrações <ArrowUpRight size={17} />
-                  </button>
-                </section>
-              </div>
-            </>
+            <PublicHome
+              revision={publicRevision}
+              status={publicStatus}
+              events={publicEvents ?? []}
+              scout={scout}
+              loading={publicLoading}
+              error={publicError || statusError}
+            />
+          )}
+          {page === 'live' && (
+            <PublicLive revision={publicRevision} scout={scout} events={publicEvents ?? []} />
+          )}
+          {page === 'map' && <PublicMapPage events={publicEvents ?? []} />}
+          {page === 'events' && (
+            <PublicEventsPage
+              events={publicEvents ?? []}
+              loading={publicLoading}
+              error={publicError}
+              filters={publicFilters}
+              onFilters={setPublicFilters}
+            />
+          )}
+          {page === 'event-detail' && route.eventId && (
+            <PublicEventDetailPage id={route.eventId} revision={publicRevision} />
+          )}
+          {page === 'analysis' && <PublicTransparencyPage revision={publicRevision} />}
+          {page === 'settings' && (
+            <PublicSystemPage
+              status={publicStatus}
+              scout={scout}
+              error={statusError}
+              onReload={() => setPublicRevision((value) => value + 1)}
+            />
           )}
           {page === 'capture' && (
             <CapturePage
               key={editing?.id || 'new'}
               initial={editing}
-              onSaved={() => {
-                void reloadDrafts();
+              onSaved={async (saved) => {
                 setEditing(undefined);
                 navigate('drafts');
-                setNotice(
-                  'Rascunho salvo neste navegador. Envio e processamento ainda não realizados.',
-                );
+                await reloadDrafts();
+                await send(saved);
               }}
             />
           )}
@@ -357,9 +416,10 @@ export default function App() {
                 <button onClick={newCapture}>Novo rascunho</button>
               </div>
               <p className="notice">
-                Envio indisponível até integrar Auth e Storage. Estes rascunhos não são ocorrências
-                nem detecções. Limpar os dados do navegador remove as fotos.
+                Fotos que ainda não chegaram ao UrMind: sem sessão ou sem rede. Rascunho não é
+                ocorrência nem detecção. Limpar os dados do navegador remove as fotos.
               </p>
+              {!session && <SignIn />}
               {!localDrafts.length ? (
                 <section className="panel empty">
                   <FileImage size={32} />
@@ -399,6 +459,12 @@ export default function App() {
                           >
                             Continuar edição
                           </button>
+                          <button
+                            disabled={!session || sending === draft.id}
+                            onClick={() => void send(draft)}
+                          >
+                            {sending === draft.id ? 'Enviando…' : 'Enviar'}
+                          </button>
                           <button className="text-button danger" onClick={() => void remove(draft)}>
                             Excluir
                           </button>
@@ -410,114 +476,16 @@ export default function App() {
               )}
             </>
           )}
-          {(page === 'events' || page === 'map') && (
+          {page === 'review' && !session && <SignIn />}
+          {page === 'review' && session && (
             <EventsPage
-              key={page}
+              key="review"
               events={events}
               loading={loading}
               error={apiError}
               onReload={() => setRevision((value) => value + 1)}
-              map={page === 'map'}
+              changed={changed}
             />
-          )}
-          {page === 'analysis' && (
-            <>
-              <div className="page-heading">
-                <div>
-                  <p className="eyebrow">DECISÃO / ANÁLISES</p>
-                  <h1>Descrever, priorizar e orientar.</h1>
-                  <p>Cada resultado precisa de evidência, origem e limites explícitos.</p>
-                </div>
-                <span className="badge">Integração pendente</span>
-              </div>
-              <div className="analysis-grid">
-                {[
-                  [
-                    'Descrição',
-                    'Relatórios estruturados',
-                    'O backend já possui templates Jinja2. A exibição depende de um contrato HTTP para o relatório de cada ocorrência.',
-                  ],
-                  [
-                    'Prescrição',
-                    'Prioridade e ação sugerida',
-                    'O motor de severidade e prioridade existe no backend. Responsável e ação exigem regras e catálogo verificáveis, além da integração HTTP.',
-                  ],
-                  [
-                    'Previsão',
-                    'Histórico antes de projeções',
-                    'Ainda indisponível. Recorrência, risco de trecho e evolução precisam de histórico suficiente, validação temporal, horizonte e incerteza.',
-                  ],
-                ].map(([label, title, text]) => (
-                  <section className="panel analysis-card" key={label}>
-                    <span className="eyebrow">{label}</span>
-                    <h2>{title}</h2>
-                    <p>{text}</p>
-                    <span className="badge">Sem resultado disponível</span>
-                  </section>
-                ))}
-              </div>
-              <section className="panel principle">
-                <CircleHelp size={24} />
-                <div>
-                  <h2>Uma ausência também é uma informação.</h2>
-                  <p>
-                    A interface não calcula prioridades paralelas ao backend, não inventa
-                    responsáveis e não apresenta previsões sem histórico. Os resultados serão
-                    exibidos a partir dos contratos oficiais.
-                  </p>
-                </div>
-              </section>
-            </>
-          )}
-          {page === 'settings' && (
-            <>
-              <div className="page-heading">
-                <div>
-                  <p className="eyebrow">PROJETO / AMBIENTE</p>
-                  <h1>Integrações e disponibilidade</h1>
-                  <p>O que já funciona localmente e o que depende das próximas etapas.</p>
-                </div>
-                <button
-                  className="secondary"
-                  disabled={loading}
-                  onClick={() => setRevision((value) => value + 1)}
-                >
-                  Verificar backend
-                </button>
-              </div>
-              <section className="panel">
-                <dl className="integration-list">
-                  <dt>API FastAPI</dt>
-                  <dd>{loading ? 'Consultando…' : health}</dd>
-                  <dt>Rascunhos no navegador</dt>
-                  <dd>{draftsLoaded ? 'Disponível · IndexedDB' : 'Indisponível ou carregando'}</dd>
-                  <dt>Aplicativo offline</dt>
-                  <dd>
-                    {offlineReady
-                      ? 'Pronto neste navegador'
-                      : 'Disponível após instalação do service worker no build de produção'}
-                  </dd>
-                  <dt>Supabase Auth / Storage / Realtime</dt>
-                  <dd>Integração pendente</dd>
-                  <dt>YOLOX / datasets / Worker</dt>
-                  <dd>Integração pendente · sem inferência</dd>
-                  <dt>Base cartográfica OSM</dt>
-                  <dd>
-                    {import.meta.env.VITE_MAP_STYLE_URL
-                      ? 'Estilo configurado · requer rede'
-                      : 'Não configurada · mapa sem requisições externas'}
-                  </dd>
-                  <dt>Contexto / APIs externas</dt>
-                  <dd>Integração pendente</dd>
-                  <dt>Scout / sensores</dt>
-                  <dd>Fase futura</dd>
-                </dl>
-              </section>
-              <p className="notice">
-                Nenhuma credencial de servidor deve ser inserida no frontend. A configuração de
-                desenvolvimento está documentada em frontend/README.md.
-              </p>
-            </>
           )}
           <footer>
             UrMind <span>Percepção e decisão urbana auditável.</span>
@@ -526,27 +494,5 @@ export default function App() {
         </main>
       </div>
     </div>
-  );
-}
-function Metric({
-  label,
-  value,
-  caption,
-  icon,
-}: {
-  label: string;
-  value: string;
-  caption: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <section className="panel metric">
-      <div>
-        <span>{label}</span>
-        {icon}
-      </div>
-      <strong>{value}</strong>
-      <p>{caption}</p>
-    </section>
   );
 }
