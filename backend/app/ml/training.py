@@ -85,6 +85,10 @@ CHECKPOINT_REQUIRED_KEYS = {
 }
 
 
+# Pulos de passo por overflow AMP tolerados em sequência antes de declarar divergência.
+MAX_CONSECUTIVE_AMP_SKIPS = 10
+
+
 class TrainingGateError(RuntimeError):
     """Um contrato obrigatório bloqueou a construção do engine."""
 
@@ -547,15 +551,38 @@ class TrainingEngine:
         non_finite = [
             name for name, gradient in gradients if not torch.isfinite(gradient).all()
         ]
-        if not gradients or non_finite:
+        amp_overflow = (
+            bool(non_finite) and bool(gradients) and self.config.amp and self.scaler.is_enabled()
+        )
+        if not gradients or (non_finite and not amp_overflow):
             self.optimizer.zero_grad(set_to_none=True)
             detail = ", ".join(non_finite[:8]) or "nenhum gradient produzido"
             raise FloatingPointError(
                 f"gradient ausente ou não finito ({detail}); optimizer.step abortado"
             )
+        if amp_overflow:
+            # Overflow fp16 com loss finita é o caso previsto do GradScaler: o
+            # scaler.step pula o passo e o update reduz a escala. Só uma sequência
+            # longa de pulos indica divergência real, e aí o treino para.
+            self.consecutive_amp_skips = getattr(self, "consecutive_amp_skips", 0) + 1
+            if self.consecutive_amp_skips > MAX_CONSECUTIVE_AMP_SKIPS:
+                self.optimizer.zero_grad(set_to_none=True)
+                raise FloatingPointError(
+                    f"{self.consecutive_amp_skips} passos AMP seguidos com gradient não finito "
+                    f"({', '.join(non_finite[:4])}); treino divergente"
+                )
+            logger.warning(
+                "amp_overflow_step_skipped epoch={} iteration={} scale={} tensors={}",
+                epoch,
+                iteration,
+                self.scaler.get_scale(),
+                len(non_finite),
+            )
+        else:
+            self.consecutive_amp_skips = 0
         self.scaler.step(self.optimizer)
         self.scaler.update()
-        if self.ema is not None:
+        if self.ema is not None and not amp_overflow:
             self.ema.update(self.model)
         progress = epoch * self.scheduler.iters_per_epoch + iteration + 1
         lr = self.scheduler.update_lr(progress)

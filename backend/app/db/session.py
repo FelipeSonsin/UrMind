@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -15,7 +17,11 @@ from app.config import Settings, get_settings
 
 
 class DatabaseNotConfiguredError(RuntimeError):
-    """DATABASE_URL ausente: a camada de persistência direta está desligada."""
+    """DATABASE_POOLER_URL ausente: a persistência do runtime está desligada."""
+
+
+#: sslmode que de fato exigem TLS. `prefer`/`allow` aceitam cair para texto claro.
+SECURE_SSLMODES = frozenset({"require", "verify-ca", "verify-full"})
 
 
 def normalize_database_url(url: str) -> str:
@@ -27,20 +33,65 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
+def _is_supabase_host(host: str | None) -> bool:
+    return host is not None and host.endswith((".supabase.co", ".supabase.com"))
+
+
+def connect_args(url: str) -> dict[str, Any]:
+    """Argumentos do psycopg 3 para a conexão. Nunca inclui a URL em mensagem.
+
+    Runtime e migrations usam o Supavisor em session mode (5432), que mantém uma
+    conexão de servidor por cliente: prepared statements do psycopg funcionam e
+    não há ajuste de pooler aqui. Host do Supabase exige TLS: sem `sslmode` na
+    URL, aplica `require`; um `sslmode` explícito que admite texto claro é
+    recusado. Host local fica com o padrão do libpq.
+    """
+    parts = urlsplit(url)
+    args: dict[str, Any] = {}
+    if _is_supabase_host(parts.hostname):
+        explicit = parse_qs(parts.query).get("sslmode", [None])[-1]
+        if explicit is None:
+            args["sslmode"] = "require"
+        elif explicit not in SECURE_SSLMODES:
+            raise ValueError(
+                "sslmode inseguro para host do Supabase; use require, verify-ca ou verify-full"
+            )
+    return args
+
+
+def is_transaction_pooler_port(url: str) -> bool:
+    """Porta 6543 é o transaction pooler do Supabase, fora da arquitetura oficial."""
+    return urlsplit(url).port == 6543
+
+
 class Database:
-    """Engine + sessionmaker do PostgreSQL/PostGIS do Supabase."""
+    """Engine + sessionmaker do runtime, sobre o Supavisor em session mode (5432).
+
+    O runtime usa DATABASE_POOLER_URL e nada mais: sem ela a persistência fica
+    desligada e a API responde 503 (§26), em vez de cair em silêncio para outra
+    conexão.
+    """
 
     def __init__(self, settings: Settings) -> None:
-        if not settings.database_url:
+        if not settings.database_pooler_url:
             raise DatabaseNotConfiguredError(
-                "DATABASE_URL não configurada; defina a connection string do Supabase."
+                "DATABASE_POOLER_URL não configurada; o runtime usa o Session Pooler "
+                "do Supabase (porta 5432)."
+            )
+        url = settings.database_pooler_url
+        if is_transaction_pooler_port(url):
+            # Transaction mode não preserva prepared statements entre transações.
+            raise DatabaseNotConfiguredError(
+                "DATABASE_POOLER_URL aponta para o transaction pooler (porta 6543); "
+                "o runtime usa o Session Pooler do Supabase (porta 5432)."
             )
         self.engine: AsyncEngine = create_async_engine(
-            normalize_database_url(settings.database_url),
+            normalize_database_url(url),
             pool_size=settings.db_pool_size,
             max_overflow=settings.db_max_overflow,
             pool_pre_ping=True,
             echo=settings.db_echo,
+            connect_args=connect_args(url),
         )
         self.sessionmaker = async_sessionmaker(
             self.engine, expire_on_commit=False, autoflush=False

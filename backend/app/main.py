@@ -3,9 +3,12 @@ from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.core import router as core_router
+from app.api.v1.public import router as public_router
 from app.api.v1.routes import router as api_router
 from app.config import get_settings
 from app.db.session import Database, DatabaseNotConfiguredError
@@ -21,7 +24,7 @@ async def lifespan(app: FastAPI):
     try:
         app.state.database = Database(settings)
     except DatabaseNotConfiguredError:
-        # Sem DATABASE_URL a API sobe, mas /health declara `not_configured` e
+        # Sem DATABASE_POOLER_URL a API sobe, mas /health declara `not_configured` e
         # as rotas de domínio respondem 503 — nada é simulado (§26).
         app.state.database = None
         log.warning("database_not_configured")
@@ -57,5 +60,23 @@ async def database_not_configured_handler(_request: Request, exc: DatabaseNotCon
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
+if get_settings().cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Correlation-ID"],
+    )
+
 app.include_router(api_router)
 app.include_router(core_router)
+app.include_router(public_router)
+
+# O PWA vai por último: as rotas /api/v1 já estão registradas e o StaticFiles(html=True)
+# responde index.html para as rotas do app (navegação client-side).
+_frontend = get_settings().serve_frontend_dir
+if _frontend:
+    app.mount("/", StaticFiles(directory=_frontend, html=True), name="pwa")
+    log.info("frontend_served", directory=_frontend)

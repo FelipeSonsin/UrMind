@@ -1,4 +1,4 @@
-"""Modelos ORM do núcleo do UrMind (espelham migrations/0001_core_geospatial.sql).
+"""Modelos ORM do núcleo do UrMind (espelham 0002_align_urmind_core).
 
 As migrations SQL continuam sendo a fonte da verdade do esquema; estes modelos
 existem para consultas tipadas e para o teste de paridade em tests/test_migrations.py.
@@ -13,6 +13,7 @@ from typing import Any
 from geoalchemy2 import Geography, Geometry
 from sqlalchemy import (
     Boolean,
+    Computed,
     DateTime,
     Float,
     ForeignKey,
@@ -145,7 +146,11 @@ class RoadSegment(Base):
     highway: Mapped[str | None] = mapped_column(Text)
     jurisdiction: Mapped[str | None] = mapped_column(Text)
     geom = mapped_column(Geometry("LINESTRING", srid=4326), nullable=False)
-    geog = mapped_column(Geography("LINESTRING", srid=4326), nullable=True)
+    geog = mapped_column(
+        Geography("LINESTRING", srid=4326),
+        Computed("geom::geography", persisted=True),
+        nullable=True,
+    )
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = _created_at()
 

@@ -152,6 +152,13 @@ class EvaluationResult:
             "iou_threshold": self.iou_threshold,
             "precision": self.precision,
             "recall": self.recall,
+            "f1": (
+                None
+                if self.precision is None or self.recall is None
+                else round(2 * self.precision * self.recall / (self.precision + self.recall), 6)
+                if (self.precision + self.recall) > 0
+                else 0.0
+            ),
             "map50": self.map50,
             "map50_95": self.map50_95,
             "measured_classes": self.measured_classes,
@@ -281,9 +288,7 @@ def _confusion_matrix(
     virar um falso positivo e um falso negativo sem relação.
     """
     rows = [*labels, BACKGROUND]
-    matrix: dict[str, dict[str, int]] = {
-        row: dict.fromkeys(rows, 0) for row in rows
-    }
+    matrix: dict[str, dict[str, int]] = {row: dict.fromkeys(rows, 0) for row in rows}
 
     by_image: dict[str, list[GroundTruth]] = defaultdict(list)
     for truth in ground_truths:
@@ -390,8 +395,7 @@ def evaluate(
 
     total_true_positives = sum(per_class[label].true_positives for label in labels)
     total_predictions = sum(
-        per_class[label].true_positives + per_class[label].false_positives
-        for label in labels
+        per_class[label].true_positives + per_class[label].false_positives for label in labels
     )
     total_support = sum(per_class[label].support for label in labels)
 
@@ -402,11 +406,7 @@ def evaluate(
             if total_predictions
             else (0.0 if total_support else None)
         ),
-        recall=(
-            round(total_true_positives / total_support, 6)
-            if total_support
-            else None
-        ),
+        recall=(round(total_true_positives / total_support, 6) if total_support else None),
         map50=_mean([per_class[label].ap50 for label in measurable]),
         map50_95=_mean([per_class[label].ap50_95 for label in measurable]),
         confusion=_confusion_matrix(confident, ground_truths, labels, iou_threshold),
@@ -415,3 +415,63 @@ def evaluate(
         measured_classes=measurable,
         skipped_classes=skipped,
     )
+
+
+def hard_cases(
+    predictions: list[Prediction],
+    ground_truths: list[GroundTruth],
+    *,
+    score_threshold: float,
+    iou_threshold: float,
+    high_confidence: float = 0.5,
+    limit: int = 25,
+) -> dict[str, object]:
+    """Imagens que mais erram no ponto de operação, para inspeção humana (§18.3).
+
+    Usa o mesmo casamento guloso de `evaluate`, por imagem e por classe. Não é
+    métrica agregada: é a lista do que olhar primeiro.
+    """
+    confident = [p for p in predictions if p.score >= score_threshold]
+    preds_by: dict[tuple[str, str], list[Prediction]] = defaultdict(list)
+    truths_by: dict[tuple[str, str], list[GroundTruth]] = defaultdict(list)
+    for prediction in confident:
+        preds_by[(prediction.image_id, prediction.label)].append(prediction)
+    for truth in ground_truths:
+        truths_by[(truth.image_id, truth.label)].append(truth)
+
+    false_positives: dict[str, int] = defaultdict(int)
+    false_negatives: dict[str, int] = defaultdict(int)
+    high_fp: list[tuple[float, str, str]] = []
+    for key in set(preds_by) | set(truths_by):
+        image_id, label = key
+        preds, truths = preds_by.get(key, []), truths_by.get(key, [])
+        hits, matched = _match_greedy(preds, truths, iou_threshold)
+        false_positives[image_id] += len(preds) - matched
+        false_negatives[image_id] += len(truths) - matched
+        ordered = sorted(preds, key=lambda p: p.score, reverse=True)
+        for prediction, hit in zip(ordered, hits, strict=True):
+            if not hit and prediction.score >= high_confidence:
+                high_fp.append((prediction.score, image_id, label))
+
+    images = set(false_positives) | set(false_negatives)
+    worst = sorted(images, key=lambda i: false_positives[i] + false_negatives[i], reverse=True)
+    return {
+        "images_evaluated": len(
+            {t.image_id for t in ground_truths} | {p.image_id for p in confident}
+        ),
+        "score_threshold": score_threshold,
+        "iou_threshold": iou_threshold,
+        "worst_images": [
+            {
+                "image_id": i,
+                "false_positives": false_positives[i],
+                "false_negatives": false_negatives[i],
+            }
+            for i in worst[:limit]
+        ],
+        "high_confidence_false_positives": [
+            {"image_id": image_id, "label": label, "score": round(score, 4)}
+            for score, image_id, label in sorted(high_fp, reverse=True)[:limit]
+        ],
+        "images_with_missed_ground_truth": sum(1 for i in images if false_negatives[i] > 0),
+    }

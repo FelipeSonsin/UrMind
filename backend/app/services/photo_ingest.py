@@ -68,6 +68,7 @@ def ingest_photo(
     image_bytes: bytes,
     received_at: datetime,
     manual_coordinate: Coordinate | None = None,
+    manual_location_source: LocationSource = LocationSource.MANUAL,
     client_timezone: tzinfo | None = None,
     storage_path: str | None = None,
     source: CaptureSource = CaptureSource.EXIF_UPLOAD,
@@ -89,7 +90,9 @@ def ingest_photo(
     exif = read_exif_location(image_bytes)
     captured_at, captured_at_source = _resolve_captured_at(exif, received_at, client_timezone)
 
-    coordinate, location_source = _resolve_location(exif, manual_coordinate)
+    if manual_location_source not in (LocationSource.MANUAL, LocationSource.GPS_DEVICE):
+        raise ValueError("coordenada informada só pode ser manual ou GPS do dispositivo")
+    coordinate, location_source = _resolve_location(exif, manual_coordinate, manual_location_source)
 
     quality: dict[str, object] = {
         "exif_status": exif.status.value,
@@ -146,9 +149,10 @@ def _resolve_captured_at(
 def _resolve_location(
     exif: ExifLocation,
     manual_coordinate: Coordinate | None,
+    manual_location_source: LocationSource = LocationSource.MANUAL,
 ) -> tuple[Coordinate | None, LocationSource]:
     if manual_coordinate is not None:
-        return manual_coordinate, LocationSource.MANUAL
+        return manual_coordinate, manual_location_source
     if exif.usable and exif.coordinate is not None:
         return exif.coordinate, LocationSource.EXIF
     # Sem GPS e sem marcação: a captura existe, mas ainda não tem lugar no mundo.

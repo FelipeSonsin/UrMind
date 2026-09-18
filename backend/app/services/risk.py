@@ -39,6 +39,7 @@ uso operacional.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -451,3 +452,74 @@ def _uncertainty(
 
     value = 0.5 * from_coverage + 0.3 * from_confidence + 0.2 * from_location
     return round(min(1.0, max(0.0, value)), 4)
+
+
+#: Nome público de cada fator da prioridade. Sem isto a tela mostraria a chave técnica.
+FACTOR_LABELS: dict[str, str] = {
+    "severity": "severidade da classe",
+    "confidence": "confiança da detecção",
+    "sensitive_proximity": "proximidade de escola, saúde ou travessia",
+    "accessibility": "impacto em acessibilidade",
+    "recurrence": "recorrência no trecho",
+    "environment": "condição ambiental (chuva)",
+}
+
+
+def explain_priority(persisted_factors: Mapping[str, Any]) -> dict[str, Any]:
+    """Traduz os fatores gravados em "o que subiu e o que desceu" a prioridade.
+
+    Função pura sobre o que `as_persisted()` guardou: nenhuma LLM participa e nada
+    é inferido. Um fator empurra a prioridade para cima quando seu valor (0–1) está
+    acima da média ponderada dos fatores disponíveis, e para baixo quando está
+    abaixo — é a mesma conta que produziu a nota, só apresentada por item.
+    """
+    contributions = dict(persisted_factors.get("contributions") or {})
+    weights = dict(persisted_factors.get("weights") or {})
+    unavailable = dict(persisted_factors.get("unavailable") or {})
+    if not contributions:
+        return {
+            "increased": [],
+            "decreased": [],
+            "unavailable": [
+                {"factor": name, "label": FACTOR_LABELS.get(name, name), "reason": str(reason)}
+                for name, reason in sorted(unavailable.items())
+            ],
+            "baseline": None,
+        }
+    total_weight = sum(weights.get(name, 0.0) for name in contributions) or 1.0
+    baseline = (
+        sum(weights.get(name, 0.0) * value for name, value in contributions.items()) / total_weight
+    )
+    increased: list[dict[str, Any]] = []
+    decreased: list[dict[str, Any]] = []
+    for name, value in contributions.items():
+        weight = weights.get(name, 0.0)
+        item = {
+            "factor": name,
+            "label": FACTOR_LABELS.get(name, name),
+            "value": round(float(value), 4),
+            "weight": round(float(weight), 4),
+            "delta": round(float(value) - baseline, 4),
+        }
+        (increased if value > baseline else decreased).append(item)
+    order = lambda item: -abs(float(item["delta"])) * float(item["weight"])
+    return {
+        "increased": sorted(increased, key=order),
+        "decreased": sorted(decreased, key=order),
+        "unavailable": [
+            {"factor": name, "label": FACTOR_LABELS.get(name, name), "reason": str(reason)}
+            for name, reason in sorted(unavailable.items())
+        ],
+        "baseline": round(baseline, 4),
+    }
+
+
+def uncertainty_band(value: float | None) -> str:
+    """Faixa legível da incerteza declarada. Não é probabilidade calibrada."""
+    if value is None:
+        return "desconhecida"
+    if value < 0.25:
+        return "baixa"
+    if value < 0.5:
+        return "média"
+    return "alta"

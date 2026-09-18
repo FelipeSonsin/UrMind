@@ -167,3 +167,31 @@ class NearbyQuery(BaseModel):
     longitude: float = Field(ge=-180, le=180)
     radius_m: float = Field(default=500, gt=0, le=20000)
     limit: int = Field(default=100, gt=0, le=500)
+
+
+class ReviewDecision(StrEnum):
+    CONFIRM = "confirm"
+    CORRECT = "correct"
+    REJECT = "reject"
+
+
+class ReviewCreate(BaseModel):
+    """Revisão humana (§16.2). A inferência original nunca é sobrescrita."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: ReviewDecision
+    corrected_class: UrmindClass | None = None
+    corrected_location: Coordinate | None = None
+    """Ponto corrigido pelo revisor. O ponto original do Event permanece intacto."""
+
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def correction_has_content(self) -> ReviewCreate:
+        correcting = self.corrected_class is not None or self.corrected_location is not None
+        if self.decision is ReviewDecision.CORRECT and not correcting:
+            raise ValueError("correção exige corrected_class e/ou corrected_location")
+        if self.decision is not ReviewDecision.CORRECT and correcting:
+            raise ValueError("corrected_class/corrected_location só valem para decision=correct")
+        return self
