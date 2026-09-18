@@ -7,11 +7,17 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 
 from app.auth import CurrentUser, require_user
 from app.config import get_settings
-from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
+from app.repositories.core import (
+    CaptureRepository,
+    DecisionRepository,
+    EventRepository,
+    InferenceRepository,
+)
 from app.schemas.core import (
     CaptureCreate,
     CaptureSource,
@@ -36,6 +42,15 @@ from app.services.storage import (
 )
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_user)])
+log = structlog.get_logger()
+
+
+async def get_inference_repository(request: Request) -> AsyncIterator[InferenceRepository]:
+    database = getattr(request.app.state, "database", None)
+    if database is None:
+        raise HTTPException(status_code=503, detail="Banco do runtime não configurado")
+    async with database.session() as session:
+        yield InferenceRepository(session)
 
 
 async def get_core_service(request: Request) -> AsyncIterator[CoreService]:
@@ -58,7 +73,21 @@ def get_storage() -> StorageClient:
 
 
 Core = Annotated[CoreService, Depends(get_core_service)]
+Inference = Annotated[InferenceRepository, Depends(get_inference_repository)]
 Storage = Annotated[StorageClient, Depends(get_storage)]
+
+
+@router.get("/ops/metrics")
+async def ops_metrics(user: CurrentUser, inference: Inference) -> dict[str, Any]:
+    """Métricas do Worker e da fila (§19), medidas na hora — nenhuma é estimada.
+
+    Fica atrás do papel de revisor: é informação de operação, não do painel
+    público. Quem prefere o terminal tem o mesmo dado em `python -m app.worker
+    --stats`.
+    """
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Métricas de operação exigem papel de revisor")
+    return await inference.stats()
 
 
 @router.get("/me")
@@ -86,12 +115,20 @@ async def upload_photo(
     tz_offset_minutes: Annotated[int | None, Form(ge=-840, le=840)] = None,
 ) -> dict[str, Any]:
     """Foto real → Storage privado → Capture (§6.1, §6.3). Reenvio da mesma foto não duplica."""
-    if source not in (CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD):
-        raise HTTPException(status_code=422, detail="source deve ser pwa_photo ou exif_upload")
+    if source not in (CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD, CaptureSource.SCOUT):
+        raise HTTPException(
+            status_code=422, detail="source deve ser pwa_photo, exif_upload ou scout"
+        )
     if (latitude is None) != (longitude is None):
         raise HTTPException(status_code=422, detail="informe latitude e longitude juntas")
-    if location_source not in (LocationSource.GPS_DEVICE, LocationSource.MANUAL):
-        raise HTTPException(status_code=422, detail="location_source deve ser gps_device ou manual")
+    if location_source not in (
+        LocationSource.GPS_DEVICE,
+        LocationSource.MANUAL,
+        LocationSource.GPS_SCOUT,
+    ):
+        raise HTTPException(
+            status_code=422, detail="location_source deve ser gps_device, manual ou gps_scout"
+        )
 
     data = await file.read(MAX_BYTES + 1)
     try:
@@ -114,7 +151,9 @@ async def upload_photo(
         manual_coordinate=coordinate,
         manual_location_source=location_source,
         client_timezone=(
-            timezone(timedelta(minutes=tz_offset_minutes)) if tz_offset_minutes is not None else None
+            timezone(timedelta(minutes=tz_offset_minutes))
+            if tz_offset_minutes is not None
+            else None
         ),
         storage_path=path,
         source=source,
@@ -131,6 +170,11 @@ async def upload_photo(
     )
     existing = await service.captures.get_by_key(ingest.capture.capture_key)
     if existing is not None:
+        log.info(
+            "capture_deduplicated",
+            capture_id=str(existing.id),
+            requires_manual_location=existing.point is None,
+        )
         return {
             "id": existing.id,
             "capture_key": existing.capture_key,
@@ -143,6 +187,15 @@ async def upload_photo(
     except StorageError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     result = await service.register_capture(ingest.capture)
+    log.info(
+        "capture_stored",
+        capture_id=str(result["id"]),
+        source=source.value,
+        location_source=ingest.capture.source_location.value,
+        exif_status=ingest.exif.status.value,
+        requires_manual_location=ingest.requires_manual_location,
+        bytes=len(image.data),
+    )
     return {
         **result,
         "storage_path": path,
@@ -182,9 +235,7 @@ async def events_nearby(
     radius_m: float = Query(default=500, gt=0, le=20000),
     limit: int = Query(default=100, gt=0, le=500),
 ) -> list[dict[str, Any]]:
-    query = NearbyQuery(
-        latitude=latitude, longitude=longitude, radius_m=radius_m, limit=limit
-    )
+    query = NearbyQuery(latitude=latitude, longitude=longitude, radius_m=radius_m, limit=limit)
     return await service.events_nearby(query)
 
 
@@ -192,9 +243,16 @@ async def events_nearby(
 async def consolidate_capture(capture_id: uuid.UUID, service: Core) -> dict[str, Any]:
     """Detections da captura → Events deduplicados com risco (§25 passos 9 e 11)."""
     try:
-        return await service.consolidate_capture(capture_id)
+        consolidated = await service.consolidate_capture(capture_id)
     except EventNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    log.info(
+        "capture_consolidated",
+        capture_id=str(capture_id),
+        event_ids=[str(item["event_id"]) for item in consolidated["events"]],
+        created=[str(i["event_id"]) for i in consolidated["events"] if i.get("created")],
+    )
+    return consolidated
 
 
 @router.get("/events/{event_id}")
@@ -220,6 +278,15 @@ async def review_event(
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
     try:
-        return await service.review_event(event_id, payload, reviewer=user.id)
+        review = await service.review_event(event_id, payload, reviewer=user.id)
     except EventNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    # Quem revisou fica no audit_log, não no log de aplicação: identificar a
+    # pessoa em log de operação seria dado pessoal sem necessidade (§17).
+    log.info(
+        "event_reviewed",
+        event_id=str(event_id),
+        decision=payload.decision.value,
+        status=review["status"],
+    )
+    return review

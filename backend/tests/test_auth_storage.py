@@ -84,6 +84,8 @@ def test_rotas_de_dominio_exigem_autenticacao(client) -> None:
         ("post", "/api/v1/captures"),
         ("post", "/api/v1/captures/photo"),
         ("post", "/api/v1/events"),
+        # Métricas de operação não são públicas: sem token, nem chegam ao banco.
+        ("get", "/api/v1/ops/metrics"),
     ]:
         response = getattr(client, method)(path)
         assert response.status_code == 401, path

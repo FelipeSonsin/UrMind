@@ -150,7 +150,9 @@ class Worker:
         try:
             async with self.database.sessionmaker() as session:
                 service = CoreService(
-                    CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+                    CaptureRepository(session),
+                    EventRepository(session),
+                    DecisionRepository(session),
                 )
                 location = await service.event_location(event_id)
             if location is None:
@@ -160,7 +162,9 @@ class Worker:
             )
             async with self.database.sessionmaker() as session:
                 service = CoreService(
-                    CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+                    CaptureRepository(session),
+                    EventRepository(session),
+                    DecisionRepository(session),
                 )
                 applied = await service.apply_context(event_id, results)
                 await session.commit()
@@ -211,16 +215,26 @@ async def run(once: bool) -> int:
         await database.close()
 
 
-async def print_stats() -> int:
+async def print_report(kind: str) -> int:
+    """Relatórios de observabilidade (§19) sobre a conexão que já existe."""
     import json
+
+    from app.observability import drift_status, model_lineage, slow_queries
 
     database = Database(get_settings())
     try:
         async with database.sessionmaker() as session:
-            stats = await InferenceRepository(session).stats()
+            if kind == "stats":
+                report: dict = await InferenceRepository(session).stats()
+            elif kind == "slow-queries":
+                report = await slow_queries(session)
+            elif kind == "lineage":
+                report = await model_lineage(session)
+            else:
+                report = await drift_status(session)
     finally:
         await database.close()
-    print(json.dumps(stats, indent=2, default=str))
+    print(json.dumps(report, indent=2, default=str, ensure_ascii=False))
     return 0
 
 
@@ -228,12 +242,33 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--stats", action="store_true", help="métricas da fila e das inferências")
+    parser.add_argument(
+        "--slow-queries", action="store_true", help="SQL mais caro (pg_stat_statements)"
+    )
+    parser.add_argument(
+        "--drift", action="store_true", help="há amostra suficiente para falar de drift?"
+    )
+    parser.add_argument(
+        "--lineage", action="store_true", help="cadeia dataset → treino → ONNX → modelo → detecção"
+    )
     args = parser.parse_args(argv)
-    if args.stats:
-        coroutine = print_stats()
+    report = (
+        "stats"
+        if args.stats
+        else "slow-queries"
+        if args.slow_queries
+        else "lineage"
+        if args.lineage
+        else "drift"
+        if args.drift
+        else None
+    )
+    if report:
+        coroutine = print_report(report)
         if sys.platform == "win32":
             return asyncio.run(
-                coroutine, loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+                coroutine,
+                loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()),
             )
         return asyncio.run(coroutine)
     if sys.platform == "win32":
