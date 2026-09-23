@@ -36,7 +36,7 @@ from app.services.report import (
     render_event_report,
 )
 from app.services.review_export import REVIEW_SCHEMA_VERSION, review_resolution
-from app.services.risk import ContextInput, RiskResult, Severity, assess_features
+from app.services.risk import ContextInput, RiskResult, Severity, assess_features, replay_features
 
 # PROVISÓRIO: limiar ainda não medido contra a malha viária real do piloto.
 # §31.16 exige que ele nasça de baseline; revisar no passo 5 do §25.
@@ -574,7 +574,7 @@ class CoreService:
             raise ValueError("lineage da avaliação inconsistente")
         if snapshot.get("ruleset_version") != original.get("ruleset_version"):
             raise ValueError("versão das regras inconsistente")
-        replayed = assess_features(snapshot["features"])
+        replayed = replay_features(snapshot["features"], original)
         if replayed["ruleset_version"] != snapshot["ruleset_version"]:
             raise ValueError("versão das regras indisponível para reprodução")
         return {

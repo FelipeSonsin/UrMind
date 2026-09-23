@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import time
+import uuid
 
 import httpx
 import jwt
@@ -101,6 +102,49 @@ def test_rotas_que_bypassavam_worker_nao_estao_expostas(client) -> None:
         "/api/v1/captures/{capture_id}/consolidate",
     ):
         assert (path, "POST") not in registered
+
+
+@pytest.mark.asyncio
+async def test_upload_comum_rejeita_origem_gps_scout_antes_de_storage() -> None:
+    from fastapi import HTTPException, UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import CaptureSource, LocationSource
+
+    with pytest.raises(HTTPException) as error:
+        await upload_photo(
+            user=AuthenticatedUser(id="test-user", email=None, role="authenticated"),
+            service=None,
+            storage=None,
+            file=UploadFile(filename="fixture.jpg", file=io.BytesIO(_jpeg())),
+            source=CaptureSource.PWA_PHOTO,
+            latitude=None,
+            longitude=None,
+            accuracy_m=None,
+            location_source=LocationSource.GPS_SCOUT,
+            tz_offset_minutes=None,
+        )
+    assert error.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_usuario_comum_nao_le_eventos_internos_ou_url_privada() -> None:
+    from fastapi import HTTPException
+
+    from app.api.v1.core import event_detail, events_nearby, list_events
+    from app.auth import AuthenticatedUser
+
+    user = AuthenticatedUser(id="test-user", email=None, role="authenticated")
+    calls = (
+        list_events(service=None, user=user),
+        events_nearby(service=None, user=user, latitude=0, longitude=0, radius_m=500, limit=10),
+        event_detail(event_id=uuid.uuid4(), service=None, storage=None, user=user),
+    )
+    for call in calls:
+        with pytest.raises(HTTPException) as error:
+            await call
+        assert error.value.status_code == 403
 
 
 def test_detection_exige_lineage_de_model_version() -> None:

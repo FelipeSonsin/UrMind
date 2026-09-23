@@ -29,6 +29,10 @@ dois divergirem o desenvolvimento para até serem igualados de novo.
 Qualquer decisão de arquitetura, taxonomia, esquema de banco ou critério de
 aceitação sai desse documento. Não há documentos auxiliares concorrentes.
 
+A matriz operacional das 14 integrações externas aprovadas, incluindo estados,
+ENV e comandos não destrutivos, está em
+[`docs/EXTERNAL_INTEGRATIONS.md`](docs/EXTERNAL_INTEGRATIONS.md).
+
 ## Decisões de infraestrutura desta fase
 
 | Decisão | Consequência |
@@ -60,10 +64,14 @@ A fila assíncrona será o Supabase Queues/pgmq (§7), não Celery/Redis.
 | Testes | pytest |
 | Lint | ruff |
 
-Previstas pelo MASTER_PLAN §28 e ainda **não** presentes no código: ONNX Runtime,
-ExifTool, SciPy, librosa, XGBoost, SHAP,
-Supabase Storage/Auth/Queues e Evidently. DVC e MLflow estão integrados
-exclusivamente em modo local, sem remote ou serviço SaaS obrigatório.
+O backend canônico é `backend/`. O Urmind DEV valida a cadeia Alembic única até
+`0019_context_retention` e as Fases 4–6 (FeatureBuilder, avaliação por regras e
+revisão humana). Eventos novos usam `assess_features()`; `assess()` permanece
+somente como motor legado. A Fase 3 segue `BLOCKED_DATA`: o candidato rejeitado
+no Frozen Test não foi promovido e sua evidência científica permanece preservada.
+
+ExifTool, SciPy, librosa, XGBoost, SHAP e Evidently permanecem fora do fluxo
+operacional atual. DVC e MLflow são locais; não há remote/serviço SaaS obrigatório.
 
 ### Estado comprovado da fundação YOLOX
 

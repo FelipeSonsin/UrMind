@@ -125,11 +125,8 @@ async def upload_photo(
     if location_source not in (
         LocationSource.GPS_DEVICE,
         LocationSource.MANUAL,
-        LocationSource.GPS_SCOUT,
     ):
-        raise HTTPException(
-            status_code=422, detail="location_source deve ser gps_device, manual ou gps_scout"
-        )
+        raise HTTPException(status_code=422, detail="location_source deve ser gps_device ou manual")
 
     data = await file.read(MAX_BYTES + 1)
     try:
@@ -245,10 +242,13 @@ async def create_event(payload: EventCreate, service: Core) -> dict[str, Any]:
 @router.get("/events")
 async def list_events(
     service: Core,
+    user: CurrentUser,
     urmind_class: UrmindClass | None = None,
     status: EventStatus | None = None,
     limit: int = Query(default=100, gt=0, le=500),
 ) -> list[dict[str, Any]]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Leitura interna exige papel de revisor")
     return await service.list_events(
         urmind_class=urmind_class.value if urmind_class else None,
         status=status.value if status else None,
@@ -259,11 +259,14 @@ async def list_events(
 @router.get("/events/nearby")
 async def events_nearby(
     service: Core,
+    user: CurrentUser,
     latitude: float = Query(ge=-90, le=90),
     longitude: float = Query(ge=-180, le=180),
     radius_m: float = Query(default=500, gt=0, le=20000),
     limit: int = Query(default=100, gt=0, le=500),
 ) -> list[dict[str, Any]]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Leitura interna exige papel de revisor")
     query = NearbyQuery(latitude=latitude, longitude=longitude, radius_m=radius_m, limit=limit)
     return await service.events_nearby(query)
 
@@ -288,7 +291,11 @@ async def consolidate_capture(
 
 
 @router.get("/events/{event_id}")
-async def event_detail(event_id: uuid.UUID, service: Core, storage: Storage) -> dict[str, Any]:
+async def event_detail(
+    event_id: uuid.UUID, service: Core, storage: Storage, user: CurrentUser
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Leitura interna exige papel de revisor")
     try:
         dossier = await service.event_dossier(event_id)
     except EventNotFoundError as exc:

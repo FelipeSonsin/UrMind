@@ -7,7 +7,7 @@ from types import SimpleNamespace as Row
 from uuid import uuid4
 
 from app.services.features import SCHEMA_VERSION, FeatureInput, build_features
-from app.services.risk import FeatureRules, assess_features
+from app.services.risk import FeatureRules, assess_features, replay_features
 
 WHEN = datetime(2026, 9, 1, tzinfo=UTC)
 
@@ -265,6 +265,26 @@ def test_phase5_requires_new_version_when_rules_change():
 
     with pytest.raises(ValueError, match="new ruleset version"):
         assess_features(build_features(fixture()), rules=FeatureRules(min_visual_confidence=0.9))
+
+
+def test_phase5_replay_uses_only_registered_unchanged_ruleset():
+    import copy
+
+    import pytest
+
+    features = build_features(fixture())
+    original = assess_features(features)
+    assert replay_features(features, original) == original
+
+    unknown = copy.deepcopy(original)
+    unknown["ruleset_version"] = "urmind-risk-rules-future"
+    with pytest.raises(ValueError, match="versão de regras indisponível"):
+        replay_features(features, unknown)
+
+    tampered = copy.deepcopy(original)
+    tampered["decision_trace"]["provisional_parameters"]["min_visual_confidence"] = 0.9
+    with pytest.raises(ValueError, match="parâmetros do ruleset persistido divergentes"):
+        replay_features(features, tampered)
 
 
 def test_phase5_partial_context_remains_partial():

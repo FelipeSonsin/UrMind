@@ -42,6 +42,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Any
 
 from app.schemas.core import EvidenceMode, UrmindClass
@@ -535,6 +536,31 @@ class FeatureRules:
 
 
 DEFAULT_FEATURE_RULES = FeatureRules()
+# Keep prior implementations/parameters registered when a future ruleset ships.
+# An unknown version must fail closed instead of replaying under the new default.
+FEATURE_RULESETS: Mapping[str, FeatureRules] = MappingProxyType(
+    {DEFAULT_FEATURE_RULES.version: DEFAULT_FEATURE_RULES}
+)
+
+
+def replay_features(features: Mapping[str, Any], recorded: Mapping[str, Any]) -> dict[str, Any]:
+    """Replay a persisted assessment only with its registered, unchanged ruleset."""
+    version = recorded.get("ruleset_version")
+    rules = FEATURE_RULESETS.get(version) if isinstance(version, str) else None
+    if rules is None:
+        raise ValueError("versão de regras indisponível para reprodução")
+    recorded_parameters = (recorded.get("decision_trace") or {}).get("provisional_parameters")
+    expected_parameters = {
+        "min_visual_confidence": rules.min_visual_confidence,
+        "max_location_accuracy_m": rules.max_location_accuracy_m,
+        "calibration_required": rules.calibration_required,
+        "class_severity": dict(rules.class_severity),
+    }
+    if not isinstance(recorded_parameters, Mapping) or any(
+        recorded_parameters.get(key) != value for key, value in expected_parameters.items()
+    ):
+        raise ValueError("parâmetros do ruleset persistido divergentes")
+    return assess_features(features, rules=rules)
 
 
 def assess_features(
