@@ -26,10 +26,11 @@ depends_on: str | Sequence[str] | None = None
 ROAD_SEGMENTS_TRANSITION = r"""
 -- Preserva a tabela legado e a evolui in-place. Em banco vazio, cria diretamente
 -- a representação canônica antes do restante do núcleo.
--- No Supabase o PostGIS vive em `extensions`; o DDL abaixo usa tipos sem schema.
+-- Supabase installs PostGIS in `extensions`. Explicit placement is required:
+-- pg_catalog leads the function search_path and cannot hold extension objects.
 set local search_path = pg_catalog, public, extensions;
-create extension if not exists postgis;
-create extension if not exists pgcrypto;
+create extension if not exists postgis with schema extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.road_segments (
     id uuid primary key default gen_random_uuid(),

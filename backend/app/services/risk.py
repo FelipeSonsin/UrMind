@@ -45,6 +45,7 @@ from enum import StrEnum
 from typing import Any
 
 from app.schemas.core import EvidenceMode, UrmindClass
+from app.services.features import SCHEMA_VERSION
 
 __all__ = [
     "PROVISIONAL_THRESHOLDS",
@@ -192,8 +193,8 @@ class RiskResult:
 
     severity: Severity
     priority_score: float | None
-    uncertainty: float
-    coverage: float
+    uncertainty: float | None
+    coverage: float | None
     """Fração do peso total que tinha dado disponível. Baixa = pouco embasamento."""
 
     factors: dict[str, Any]
@@ -255,9 +256,7 @@ def _severity_from_visual(payload: RiskInput, limitations: list[str]) -> tuple[S
     elif confidence < PROVISIONAL_THRESHOLDS["min_confidence_for_base_severity"]:
         severity = _shift_severity(severity, -1)
         detail["downgraded_by_low_confidence"] = True
-        limitations.append(
-            "confiança visual abaixo do limiar; severidade rebaixada um nível"
-        )
+        limitations.append("confiança visual abaixo do limiar; severidade rebaixada um nível")
 
     # Agravantes só se a detecção for confiável — não se agrava no escuro.
     confident = confidence is not None and (
@@ -289,8 +288,9 @@ def _severity_from_visual(payload: RiskInput, limitations: list[str]) -> tuple[S
 
 
 def assess(payload: RiskInput) -> RiskResult:
-    """Calcula severidade, prioridade e incerteza a partir do que existe.
+    """DEPRECATED: motor legado para leitura/testes de registros históricos.
 
+    Eventos novos usam FeatureBuilder + assess_features(); não chamar neste fluxo.
     Nunca levanta exceção por dado faltando: a ausência é o resultado.
     """
     limitations: list[str] = []
@@ -316,9 +316,7 @@ def assess(payload: RiskInput) -> RiskResult:
         # A prioridade do §14.2 parte de classe e severidade. Sem classe
         # afirmável não existe nota a dar — e um número aqui seria exatamente o
         # tipo de precisão fabricada que o §27 proíbe. Vai para triagem humana.
-        limitations.append(
-            "sem severidade de classe, a prioridade não é calculada; requer triagem"
-        )
+        limitations.append("sem severidade de classe, a prioridade não é calculada; requer triagem")
         return RiskResult(
             severity=Severity.UNKNOWN,
             priority_score=None,
@@ -400,9 +398,7 @@ def assess(payload: RiskInput) -> RiskResult:
 
     missing = [name for name, value in contributions.items() if value is None]
     if missing:
-        limitations.append(
-            "prioridade calculada sem os fatores: " + ", ".join(sorted(missing))
-        )
+        limitations.append("prioridade calculada sem os fatores: " + ", ".join(sorted(missing)))
 
     uncertainty = _uncertainty(payload, coverage, severity, limitations)
 
@@ -523,3 +519,214 @@ def uncertainty_band(value: float | None) -> str:
     if value < 0.5:
         return "média"
     return "alta"
+
+
+# Phase 5 domain contract. These declared rules are provisional until measured
+# against reviewed pilot events; changing a parameter requires a new version.
+@dataclass(frozen=True)
+class FeatureRules:
+    version: str = "urmind-risk-rules-v1"
+    min_visual_confidence: float = PROVISIONAL_THRESHOLDS["min_confidence_for_base_severity"]
+    max_location_accuracy_m: float = 30.0  # existing CoreService provisional limit
+    calibration_required: bool = True
+    class_severity: tuple[tuple[str, str], ...] = tuple(
+        sorted((key.value, value.value) for key, value in _BASE_SEVERITY.items())
+    )
+
+
+DEFAULT_FEATURE_RULES = FeatureRules()
+
+
+def assess_features(
+    features: Mapping[str, Any], *, rules: FeatureRules = DEFAULT_FEATURE_RULES
+) -> dict[str, Any]:
+    """Evaluate impact, severity, risk and attention order from Phase 4 facts.
+
+    This pure domain path does not persist, select an owner/action, or predict.
+    The output contains every input group, fired rule and provisional parameter.
+    """
+    if features.get("feature_schema_version") != SCHEMA_VERSION:
+        raise ValueError("unsupported feature schema version")
+    if rules.version == DEFAULT_FEATURE_RULES.version and rules != DEFAULT_FEATURE_RULES:
+        raise ValueError("changed rules require a new ruleset version")
+    if (
+        not rules.version
+        or not 0 <= rules.min_visual_confidence <= 1
+        or rules.max_location_accuracy_m <= 0
+    ):
+        raise ValueError("invalid or unversioned ruleset")
+
+    visual = features["visual"]
+    location = features["location"]
+    event = features["event"]
+    context = features["context"]
+    history = features["history"]
+    missing: list[str] = []
+    evaluated: list[dict[str, Any]] = []
+
+    def record(rule: str, fired: bool, inputs: dict[str, Any]) -> None:
+        evaluated.append({"rule": rule, "fired": fired, "inputs": inputs})
+
+    classes = visual.get("detection_classes") or []
+    confidences = visual.get("detection_confidences") or []
+    event_class = event.get("event_class")
+    valid = [
+        confidence
+        for cls, confidence in zip(classes, confidences, strict=True)
+        if cls == event_class
+        and isinstance(confidence, (int, float))
+        and not isinstance(confidence, bool)
+        and 0 <= confidence <= 1
+    ]
+    confidence = max(valid) if valid else None
+    if confidence is None:
+        missing.append("visual.matching_detection_confidence")
+    trustworthy = confidence is not None and confidence >= rules.min_visual_confidence
+    record(
+        "visual_confidence_gate",
+        trustworthy,
+        {"confidence": confidence, "threshold": rules.min_visual_confidence},
+    )
+
+    try:
+        class_key = UrmindClass(event_class)
+    except (ValueError, TypeError):
+        class_key = None
+    base_value = dict(rules.class_severity).get(event_class)
+    base = Severity(base_value) if base_value is not None else None
+    severity = base if trustworthy and base is not None else Severity.UNKNOWN
+    record(
+        "class_severity",
+        severity is not Severity.UNKNOWN,
+        {"event_class": event_class, "base": base.value if base else None},
+    )
+    impact = []
+    if severity is not Severity.UNKNOWN and class_key in {
+        UrmindClass.ROAD_D00,
+        UrmindClass.ROAD_D10,
+        UrmindClass.ROAD_D20,
+        UrmindClass.ROAD_D40,
+    }:
+        impact = ["mobility", "infrastructure"]
+    record("road_damage_potential_impact", bool(impact), {"event_class": event_class})
+    if not impact:
+        missing.append("impact.evidence")
+
+    school = context.get("near_school")
+    health = context.get("near_health_unit")
+    crossing = context.get("crossing_nearby")
+    for name, value in (
+        ("near_school", school),
+        ("near_health_unit", health),
+        ("crossing_nearby", crossing),
+    ):
+        if value is None:
+            missing.append(f"context.{name}")
+    proximity = any(value is True for value in (school, health, crossing))
+    if all(value is None for value in (school, health, crossing)):
+        missing.append("context.sensitive_proximity")
+    record(
+        "sensitive_proximity",
+        proximity,
+        {"near_school": school, "near_health_unit": health, "crossing_nearby": crossing},
+    )
+    previous = history.get("previous_events_same_segment")
+    recurrence = isinstance(previous, int) and not isinstance(previous, bool) and previous > 0
+    if previous is None:
+        missing.append("history.previous_events_same_segment")
+    record("observed_recurrence", recurrence, {"previous_events_same_segment": previous})
+
+    accuracy = location.get("accuracy_m")
+    if location.get("has_original_location") is not True:
+        missing.append("location.original_location")
+    if location.get("road_segment_id") is None:
+        missing.append("location.road_segment_id")
+    reliable_location = (
+        location.get("has_original_location") is True
+        and isinstance(accuracy, (int, float))
+        and not isinstance(accuracy, bool)
+        and accuracy >= 0
+        and accuracy <= rules.max_location_accuracy_m
+    )
+    if accuracy is None:
+        missing.append("location.accuracy_m")
+    record(
+        "location_precision_gate",
+        reliable_location,
+        {"accuracy_m": accuracy, "threshold_m": rules.max_location_accuracy_m},
+    )
+
+    # Ordinal potential, not a calibrated probability. Context can raise concern
+    # but cannot manufacture a class-specific severity from a missing detection.
+    risk = severity.value if severity is not Severity.UNKNOWN else "unknown"
+    if risk == "low" and (proximity or recurrence):
+        risk = "medium"
+    elif risk == "medium" and proximity and recurrence:
+        risk = "high"
+    record(
+        "risk_context_escalation",
+        risk != severity.value,
+        {"severity": severity.value, "sensitive_proximity": proximity, "recurrence": recurrence},
+    )
+
+    # Priority is an attention lane. Uncertain evidence is sent for review even
+    # when its potential risk appears high; no owner or action is selected here.
+    priority = (
+        "review_required"
+        if not trustworthy or not reliable_location
+        else {
+            "low": "routine",
+            "medium": "elevated",
+            "high": "expedited",
+            "critical": "expedited",
+        }.get(risk, "review_required")
+    )
+    record(
+        "priority_attention_lane",
+        True,
+        {"risk": risk, "visual_gate": trustworthy, "location_gate": reliable_location},
+    )
+    uncertainty = {
+        "level": "high"
+        if not trustworthy or not reliable_location
+        else ("partial" if missing else "lower"),
+        "missing_factors": sorted(set(missing)),
+        "not_probability": True,
+    }
+    return {
+        "ruleset_version": rules.version,
+        "feature_schema_version": SCHEMA_VERSION,
+        "event_occurred_at": event.get("occurred_at"),
+        "snapshot_semantics": "uses supplied persisted context; not an event-time historical snapshot",
+        "feature_provenance": features.get("provenance"),
+        "provider_status": context.get("provider_status", {}),
+        "impact": {
+            "potential_domains": impact,
+            "status": "inferred_from_class" if impact else "unknown",
+        },
+        "severity": severity.value,
+        "risk": {"ordinal_level": risk, "calibrated_probability": None},
+        "priority": {"attention_lane": priority},
+        "uncertainty": uncertainty,
+        "factors_used": {
+            "event_class": event_class,
+            "visual_confidence": confidence,
+            "accuracy_m": accuracy,
+            "near_school": school,
+            "near_health_unit": health,
+            "crossing_nearby": crossing,
+            "previous_events_same_segment": previous,
+        },
+        "factors_missing": sorted(set(missing)),
+        "decision_trace": {
+            "evaluated_rules": evaluated,
+            "provisional_parameters": {
+                "min_visual_confidence": rules.min_visual_confidence,
+                "max_location_accuracy_m": rules.max_location_accuracy_m,
+                "calibration_required": rules.calibration_required,
+                "class_severity": dict(rules.class_severity),
+                "risk_escalation": "low+proximity_or_recurrence=medium; medium+both=high",
+                "priority_lanes": {"low": "routine", "medium": "elevated", "high": "expedited"},
+            },
+        },
+    }

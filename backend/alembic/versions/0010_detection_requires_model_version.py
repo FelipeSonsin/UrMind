@@ -1,18 +1,16 @@
-"""Toda Detection deve apontar para um ModelVersion existente.
+"""Require each Detection to reference a real ModelVersion.
 
-Revision ID: 0010_detection_requires_model_version
+Revision ID: 0010_detection_model_version
 Revises: 0009_authenticated_schema_usage
-Create Date: 2026-09-22
 
-A migration falha antes de alterar o schema se houver legado sem lineage. Isso
-evita atribuir artificialmente detecções antigas a um modelo qualquer.
+Legacy rows lacking lineage must be quarantined manually; no model is invented.
 """
 
 from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0010_detection_requires_model_version"
+revision: str = "0010_detection_model_version"
 down_revision: str | None = "0009_authenticated_schema_usage"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -24,15 +22,13 @@ def upgrade() -> None:
         do $$
         begin
           if exists (select 1 from public.detections where model_version_id is null) then
-            raise exception 'detections sem model_version_id exigem quarentena manual';
+            raise exception 'detections without model_version_id require manual quarantine';
           end if;
         end
         $$;
         """
     )
-    op.execute(
-        "alter table public.detections alter column model_version_id set not null"
-    )
+    op.execute("alter table public.detections alter column model_version_id set not null")
     op.execute(
         "alter table public.detections drop constraint if exists detections_model_version_id_fkey"
     )
@@ -43,6 +39,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError(
-        "0010 é forward-only: Detection sem lineage de modelo viola o gate científico"
-    )
+    raise RuntimeError("0010 is forward-only: Detection without model lineage is invalid")

@@ -12,11 +12,13 @@ from typing import Any
 
 from geoalchemy2 import Geography, Geometry
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Computed,
     DateTime,
     Float,
     ForeignKey,
+    Identity,
     Integer,
     String,
     Text,
@@ -211,8 +213,8 @@ class Detection(Base):
     urmind_class: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     bbox: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    model_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        _UUID, ForeignKey("public.model_versions.id", ondelete="SET NULL")
+    model_version_id: Mapped[uuid.UUID] = mapped_column(
+        _UUID, ForeignKey("public.model_versions.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = _created_at()
 
@@ -223,6 +225,11 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[uuid.UUID] = _pk()
+    event_sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
     event_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     capture_id: Mapped[uuid.UUID | None] = mapped_column(
         _UUID, ForeignKey("public.captures.id", ondelete="SET NULL")
@@ -269,6 +276,9 @@ class EventContext(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     fetched_at: Mapped[datetime] = _created_at()
+    ingested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
 
     event: Mapped[Event] = relationship(back_populates="context")
 
@@ -277,6 +287,13 @@ class RiskAssessment(Base):
     __tablename__ = "risk_assessments"
 
     id: Mapped[uuid.UUID] = _pk()
+    assessment_sequence: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), nullable=False
+    )
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
     event_id: Mapped[uuid.UUID] = mapped_column(
         _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=False
     )
@@ -322,6 +339,11 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id: Mapped[uuid.UUID] = _pk()
+    review_sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
     event_id: Mapped[uuid.UUID] = mapped_column(
         _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=False
     )

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from geoalchemy2 import Geometry
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import (
@@ -131,6 +131,13 @@ class EventRepository:
     async def get(self, event_id: uuid.UUID) -> Event | None:
         return await self.session.get(Event, event_id)
 
+    async def get_for_review(self, event_id: uuid.UUID) -> Event | None:
+        """Serialize votes and status changes for one event in the caller transaction."""
+        result = await self.session.execute(
+            select(Event).where(Event.id == event_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_key(self, event_key: str) -> Event | None:
         result = await self.session.execute(select(Event).where(Event.event_key == event_key))
         return result.scalar_one_or_none()
@@ -214,6 +221,38 @@ class EventRepository:
         )
         return int(result.scalar_one())
 
+    async def previous_event_times(self, event: Event) -> tuple[list[datetime] | None, str]:
+        """Only use insert-order evidence when all candidates have trusted provenance."""
+        if event.road_segment_id is None:
+            return None, "no_road_segment"
+        if event.order_source != "serialized_commit_order" or event.commit_order is None:
+            return None, "legacy_order_uncertain"
+        result = await self.session.execute(
+            select(Event.occurred_at, Event.order_source).where(
+                Event.road_segment_id == event.road_segment_id,
+                Event.id != event.id,
+                Event.occurred_at < event.occurred_at,
+                (Event.order_source == "legacy_backfill")
+                | (Event.commit_order < event.commit_order),
+            )
+        )
+        rows = result.all()
+        if any(row.order_source != "serialized_commit_order" for row in rows):
+            return None, "legacy_order_uncertain"
+        return [row.occurred_at for row in rows], "serialized_commit_order"
+
+    async def evidence_detections(self, event: Event) -> list[Detection]:
+        ids = (event.factors or {}).get("evidence", {}).get("detection_ids") or []
+        if not ids or event.capture_id is None:
+            return []
+        result = await self.session.execute(
+            select(Detection).where(
+                Detection.id.in_([uuid.UUID(value) for value in ids]),
+                Detection.capture_id == event.capture_id,
+            )
+        )
+        return list(result.scalars())
+
     async def coordinates(self, event_id: uuid.UUID) -> dict[str, Any]:
         """Ponto original e ajustado em lat/lon, para relatório e mapa."""
         snapped = func.cast(Event.snapped_point, GEOM_CAST)
@@ -231,10 +270,13 @@ class EventRepository:
         """Upsert por (event_id, source): reconsulta substitui, nunca duplica."""
         await self.session.execute(
             text(
-                "insert into public.event_context (event_id, source, payload, fetched_at) "
-                "values (:event_id, :source, cast(:payload as jsonb), now()) "
+                "insert into public.event_context "
+                "(event_id, source, payload, fetched_at, ingested_at) "
+                "values (:event_id, :source, cast(:payload as jsonb), "
+                "clock_timestamp(), clock_timestamp()) "
                 "on conflict (event_id, source) do update "
-                "set payload = excluded.payload, fetched_at = excluded.fetched_at"
+                "set payload = excluded.payload, fetched_at = excluded.fetched_at, "
+                "ingested_at = excluded.ingested_at"
             ),
             {
                 "event_id": event_id,
@@ -248,6 +290,7 @@ class EventRepository:
             select(EventContext)
             .where(EventContext.event_id == event_id)
             .order_by(EventContext.source)
+            .execution_options(populate_existing=True)
         )
         return list(result.scalars())
 
@@ -383,10 +426,16 @@ class DecisionRepository:
         result = await self.session.execute(
             select(RiskAssessment)
             .where(RiskAssessment.event_id == event_id)
-            .order_by(RiskAssessment.created_at.desc())
+            .order_by(
+                RiskAssessment.commit_order.desc().nulls_last(),
+                RiskAssessment.assessment_sequence.desc(),
+            )
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def get_risk(self, assessment_id: uuid.UUID) -> RiskAssessment | None:
+        return await self.session.get(RiskAssessment, assessment_id)
 
     async def responsibility(
         self, *, jurisdiction: str | None, asset_type: str, urmind_class: str
@@ -460,12 +509,21 @@ class DecisionRepository:
         await self.session.flush()
         return entry
 
+    async def audit_by_event_hash(self, event_hash: str) -> AuditLog | None:
+        result = await self.session.execute(
+            select(AuditLog).where(AuditLog.event_hash == event_hash).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def dataset_candidates(self) -> list[dict[str, Any]]:
         """Revisões confirmadas/corrigidas com toda a linhagem da inferência original."""
         result = await self.session.execute(
             text(
                 "select r.id as review_id, r.decision, r.corrected_class, r.reviewer, r.notes, "
-                "r.created_at as reviewed_at, "
+                "r.created_at as reviewed_at, r.review_sequence, r.order_source, r.commit_order, "
+                "a.after_data->>'reviewer_role' as reviewer_role, "
+                "a.after_data->>'review_schema_version' as review_schema_version, "
+                "coalesce(a.after_data->>'adjudicated', 'false') = 'true' as adjudicated, "
                 "ST_Y(r.corrected_point::geometry) as corrected_latitude, "
                 "ST_X(r.corrected_point::geometry) as corrected_longitude, "
                 "e.id as event_id, e.event_key, e.urmind_class as inferred_class, "
@@ -473,40 +531,68 @@ class DecisionRepository:
                 "ST_Y(e.point::geometry) as latitude, ST_X(e.point::geometry) as longitude, "
                 "c.id as capture_id, c.capture_key, c.storage_path, c.source, c.source_location, "
                 "c.captured_at, c.quality->>'sha256' as image_sha256, "
-                "m.name as model_name, m.version as model_version, m.checksum as model_checksum, "
+                "m.id as model_version_id, m.name as model_name, m.version as model_version, "
+                "m.checksum as model_checksum, d.id as dataset_version_id, "
                 "d.name as dataset_name, d.version as dataset_version "
                 "from public.reviews r "
+                "left join public.audit_log a on a.after_data->>'review_id' = r.id::text "
+                "and a.operation = 'review' "
                 "join public.events e on e.id = r.event_id "
                 "left join public.captures c on c.id = e.capture_id "
                 "left join public.model_versions m on m.id = e.model_version_id "
                 "left join public.dataset_versions d on d.id = m.dataset_version_id "
-                "where r.decision in ('confirm', 'correct') "
-                "order by r.created_at"
+                "order by r.commit_order nulls first, r.review_sequence"
             )
         )
         rows = [dict(row) for row in result.mappings()]
+        all_ids = {
+            uuid.UUID(i)
+            for row in rows
+            for i in (row.get("evidence") or {}).get("detection_ids", [])
+        }
+        detections = await self.session.execute(select(Detection).where(Detection.id.in_(all_ids)))
+        by_id = {str(d.id): d for d in detections.scalars()}
         for row in rows:
             ids = (row.get("evidence") or {}).get("detection_ids", [])
-            detections = await self.session.execute(
-                select(Detection).where(Detection.id.in_([uuid.UUID(i) for i in ids]))
-            )
             row["original_detections"] = [
                 {
                     "id": str(d.id),
+                    "capture_id": str(d.capture_id),
                     "urmind_class": d.urmind_class,
                     "confidence": d.confidence,
                     "bbox": d.bbox,
                     "model_version_id": str(d.model_version_id) if d.model_version_id else None,
                 }
-                for d in detections.scalars()
+                for value in ids
+                if (d := by_id.get(value)) is not None
             ]
         return rows
 
     async def reviews(self, event_id: uuid.UUID) -> list[Review]:
         result = await self.session.execute(
-            select(Review).where(Review.event_id == event_id).order_by(Review.created_at)
+            select(Review)
+            .where(Review.event_id == event_id)
+            .order_by(Review.commit_order.asc().nulls_first(), Review.review_sequence)
         )
         return list(result.scalars())
+
+    async def review_votes(self, event_id: uuid.UUID) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                "select r.id as review_id, r.decision, r.corrected_class, r.reviewer, "
+                "r.order_source, r.commit_order, "
+                "ST_Y(r.corrected_point::geometry) as corrected_latitude, "
+                "ST_X(r.corrected_point::geometry) as corrected_longitude, "
+                "a.after_data->>'reviewer_role' as reviewer_role, "
+                "coalesce(a.after_data->>'adjudicated', 'false') = 'true' as adjudicated "
+                "from public.reviews r left join public.audit_log a "
+                "on a.after_data->>'review_id' = r.id::text and a.operation = 'review' "
+                "where r.event_id = :event_id "
+                "order by r.commit_order nulls first, r.review_sequence"
+            ),
+            {"event_id": event_id},
+        )
+        return [dict(row) for row in result.mappings()]
 
     async def get_rule(self, rule_id: uuid.UUID | None) -> ResponsibilityRule | None:
         return await self.session.get(ResponsibilityRule, rule_id) if rule_id else None
@@ -535,12 +621,6 @@ class InferenceRepository:
         await self.session.execute(
             text("select pgmq.archive(:queue, cast(:msg_id as bigint))"),
             {"queue": self.QUEUE, "msg_id": msg_id},
-        )
-
-    async def enqueue(self, capture_id: uuid.UUID) -> None:
-        await self.session.execute(
-            text("select pgmq.send(:queue, jsonb_build_object('capture_id', cast(:id as text)))"),
-            {"queue": self.QUEUE, "id": str(capture_id)},
         )
 
     async def pending(self) -> int:
@@ -603,14 +683,23 @@ class InferenceRepository:
     async def dataset_version(self, dataset_version_id: uuid.UUID) -> DatasetVersion | None:
         return await self.session.get(DatasetVersion, dataset_version_id)
 
+    async def model_version_for_update(self, model_version_id: uuid.UUID) -> ModelVersion | None:
+        result = await self.session.execute(
+            select(ModelVersion).where(ModelVersion.id == model_version_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def promoted_vision_model(self) -> ModelVersion | None:
         result = await self.session.execute(
             select(ModelVersion)
             .where(ModelVersion.kind == "vision", ModelVersion.promoted_at.is_not(None))
             .order_by(ModelVersion.promoted_at.desc())
-            .limit(1)
+            .limit(2)
         )
-        return result.scalar_one_or_none()
+        models = result.scalars().all()
+        if len(models) > 1:
+            raise RuntimeError("múltiplos modelos vision promovidos")
+        return models[0] if models else None
 
     async def has_detections_from(self, capture_id: uuid.UUID, model_version_id: uuid.UUID) -> bool:
         result = await self.session.execute(
@@ -654,6 +743,20 @@ class InferenceRepository:
         await self.session.flush()
         return model
 
+    async def promote_exclusive(self, model: ModelVersion, *, promoted_at: datetime) -> None:
+        """Promove uma versão e despromove qualquer outra da mesma função."""
+        await self.session.execute(
+            text("select pg_advisory_xact_lock(hashtext(:lock_key))"),
+            {"lock_key": f"urmind:model-promotion:{model.kind}"},
+        )
+        await self.session.execute(
+            update(ModelVersion)
+            .where(ModelVersion.kind == model.kind, ModelVersion.id != model.id)
+            .values(promoted_at=None)
+        )
+        model.promoted_at = promoted_at
+        await self.session.flush()
+
 
 class PublicRepository:
     """Leitura do painel público (§17): só o que o contrato público expõe.
@@ -672,12 +775,13 @@ class PublicRepository:
         "ST_Y(e.snapped_point::geometry) as snapped_latitude, "
         "ST_X(e.snapped_point::geometry) as snapped_longitude, "
         "r.name as road_name, r.highway as road_highway, r.jurisdiction as road_jurisdiction, "
-        "e.road_segment_id, risk.severity, risk.priority_score "
+        "e.road_segment_id, risk.severity, risk.priority_score, risk.factors "
         "from public.events e "
         "left join public.road_segments r on r.id = e.road_segment_id "
         "left join lateral ("
-        "  select severity, priority_score from public.risk_assessments a "
-        "  where a.event_id = e.id order by a.created_at desc limit 1"
+        "  select severity, priority_score, factors from public.risk_assessments a "
+        "  where a.event_id = e.id "
+        "  order by a.commit_order desc nulls last, a.assessment_sequence desc limit 1"
         ") risk on true "
     )
 

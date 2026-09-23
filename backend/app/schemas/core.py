@@ -84,7 +84,7 @@ class DetectionCreate(BaseModel):
     urmind_class: UrmindClass
     confidence: float = Field(ge=0, le=1)
     bbox: BoundingBox
-    model_version_id: uuid.UUID | None = None
+    model_version_id: uuid.UUID
 
 
 class CaptureCreate(BaseModel):
@@ -186,6 +186,7 @@ class ReviewCreate(BaseModel):
     """Ponto corrigido pelo revisor. O ponto original do Event permanece intacto."""
 
     notes: str | None = Field(default=None, max_length=2000)
+    adjudicate: bool = False
 
     @model_validator(mode="after")
     def correction_has_content(self) -> ReviewCreate:

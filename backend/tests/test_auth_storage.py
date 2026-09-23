@@ -81,9 +81,7 @@ def test_rotas_de_dominio_exigem_autenticacao(client) -> None:
     for method, path in [
         ("get", "/api/v1/events"),
         ("get", "/api/v1/events/nearby?latitude=0&longitude=0"),
-        ("post", "/api/v1/captures"),
         ("post", "/api/v1/captures/photo"),
-        ("post", "/api/v1/events"),
         # Métricas de operação não são públicas: sem token, nem chegam ao banco.
         ("get", "/api/v1/ops/metrics"),
     ]:
@@ -91,6 +89,31 @@ def test_rotas_de_dominio_exigem_autenticacao(client) -> None:
         assert response.status_code == 401, path
     bad = client.get("/api/v1/events", headers={"Authorization": "Bearer nao.e.jwt"})
     assert bad.status_code in (401, 503)
+
+
+def test_rotas_que_bypassavam_worker_nao_estao_expostas(client) -> None:
+    from app.api.v1.core import router
+
+    registered = {(route.path, method) for route in router.routes for method in route.methods}
+    for path in (
+        "/api/v1/captures",
+        "/api/v1/events",
+        "/api/v1/captures/{capture_id}/consolidate",
+    ):
+        assert (path, "POST") not in registered
+
+
+def test_detection_exige_lineage_de_model_version() -> None:
+    from pydantic import ValidationError
+
+    from app.schemas.core import DetectionCreate, UrmindClass
+
+    with pytest.raises(ValidationError, match="model_version_id"):
+        DetectionCreate(
+            urmind_class=UrmindClass.ROAD_D40,
+            confidence=0.9,
+            bbox={"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2},
+        )
 
 
 def _jpeg(size=(32, 24)) -> bytes:
@@ -129,6 +152,73 @@ def test_path_e_gerado_pelo_sistema_sem_nome_do_cliente() -> None:
     assert ".." not in path
 
 
+def test_upload_id_isolates_storage_compensation() -> None:
+    from datetime import UTC, datetime
+
+    image = validate_image(_jpeg())
+    moment = datetime(2026, 9, 16, tzinfo=UTC)
+    first = object_path("reviewer", image, moment, upload_id="a" * 32)
+    second = object_path("reviewer", image, moment, upload_id="b" * 32)
+    assert first != second
+    assert image.sha256 in first and image.sha256 in second
+
+
+@pytest.mark.asyncio
+async def test_storage_object_removed_when_capture_db_fails() -> None:
+    from fastapi import UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import CaptureSource, LocationSource
+
+    class Session:
+        rolled_back = False
+
+        async def rollback(self) -> None:
+            self.rolled_back = True
+
+    class Captures:
+        session = Session()
+
+        async def get_by_key(self, _key):
+            return None
+
+    class Service:
+        captures = Captures()
+
+        async def register_capture(self, _capture):
+            raise RuntimeError("controlled DB failure")
+
+    class Storage:
+        uploaded = None
+        deleted = None
+
+        async def upload(self, path, _image):
+            self.uploaded = path
+            return True
+
+        async def delete(self, path):
+            self.deleted = path
+
+    service = Service()
+    storage = Storage()
+    with pytest.raises(RuntimeError, match="controlled DB failure"):
+        await upload_photo(
+            user=AuthenticatedUser(id="test-user", email=None, role="authenticated"),
+            service=service,
+            storage=storage,
+            file=UploadFile(filename="fixture.jpg", file=io.BytesIO(_jpeg())),
+            source=CaptureSource.PWA_PHOTO,
+            latitude=None,
+            longitude=None,
+            accuracy_m=None,
+            location_source=LocationSource.GPS_DEVICE,
+            tz_offset_minutes=None,
+        )
+    assert service.captures.session.rolled_back
+    assert storage.deleted == storage.uploaded
+
+
 @pytest.mark.asyncio
 async def test_upload_repetido_nao_e_erro() -> None:
     calls: list[httpx.Request] = []
@@ -150,9 +240,13 @@ async def test_upload_repetido_nao_e_erro() -> None:
 def test_papel_de_revisor_vem_de_app_metadata() -> None:
     from app.auth import AuthenticatedUser
 
-    assert AuthenticatedUser(id="u", email=None, role="authenticated", urmind_role="reviewer").can_review
+    assert AuthenticatedUser(
+        id="u", email=None, role="authenticated", urmind_role="reviewer"
+    ).can_review
     assert not AuthenticatedUser(id="u", email=None, role="authenticated").can_review
-    assert not AuthenticatedUser(id="u", email=None, role="authenticated", urmind_role="viewer").can_review
+    assert not AuthenticatedUser(
+        id="u", email=None, role="authenticated", urmind_role="viewer"
+    ).can_review
 
 
 def test_registro_de_modelo_recusa_export_sem_metrica(tmp_path) -> None:
@@ -165,3 +259,102 @@ def test_registro_de_modelo_recusa_export_sem_metrica(tmp_path) -> None:
     manifest.write_text(json.dumps({"validation_metrics": None, "parity": {"passed": True}}))
     with pytest.raises(ValueError, match="VALIDATION"):
         asyncio.run(register_model(manifest, promote=True))
+
+
+def test_gate_de_promocao_exige_fechamento_completo_do_modelo() -> None:
+    from app.ml.serving import validate_registration_manifest
+
+    record = {
+        "stage": "baseline_early",
+        "checkpoint_sha256": "a" * 64,
+        "onnx_sha256": "b" * 64,
+        "validation_metrics": {"map50_95": 0.1},
+        "parity": {"passed": True},
+        "training": {"completed_epochs": 30, "contract_max_epoch": 300},
+    }
+
+    with pytest.raises(ValueError, match="TRAINING_NOT_COMPLETE"):
+        validate_registration_manifest(record, promote=True)
+
+
+def test_gate_de_promocao_exige_selecao_calibracao_e_test() -> None:
+    from app.ml.serving import validate_registration_manifest
+
+    record = {
+        "stage": "final",
+        "checkpoint": "best",
+        "checkpoint_sha256": "a" * 64,
+        "onnx_sha256": "b" * 64,
+        "validation_metrics": {"map50_95": 0.1},
+        "parity": {"passed": True},
+        "training": {"completed_epochs": 300, "contract_max_epoch": 300},
+    }
+
+    with pytest.raises(ValueError, match="PROMOTION_GATE_FAIL"):
+        validate_registration_manifest(record, promote=True)
+
+
+def test_gate_de_promocao_recusa_json_legado_sem_closure_canonico() -> None:
+    from app.ml.serving import validate_registration_manifest
+
+    checkpoint_hash = "a" * 64
+    per_class = {label: {"ap50_95": 0.1} for label in ("D00", "D10", "D20", "D40")}
+    record = {
+        "stage": "final",
+        "checkpoint": "best",
+        "checkpoint_sha256": checkpoint_hash,
+        "onnx_sha256": "b" * 64,
+        "model_contract_sha256": "c" * 64,
+        "config_fingerprint": "d" * 64,
+        "dataset_fingerprint": "e" * 64,
+        "split_fingerprint": "f" * 64,
+        "class_mapping_fingerprint": "1" * 64,
+        "onnx_path": "models/serving/model.onnx",
+        "opset": 17,
+        "input_size": [640, 640],
+        "class_names": [
+            "URMIND_ROAD_D00",
+            "URMIND_ROAD_D10",
+            "URMIND_ROAD_D20",
+            "URMIND_ROAD_D40",
+        ],
+        "validation_metrics": {"map50_95": 0.1, "per_class": per_class},
+        "final_test_metrics": {"map50_95": 0.09, "per_class": per_class},
+        "parity": {"passed": True},
+        "training": {
+            "completed_epochs": 300,
+            "contract_max_epoch": 300,
+            "run": {
+                "mlflow_run_id": "run-1",
+                "status": "FINISHED",
+                "latest_train_epoch": 299.0,
+            },
+        },
+        "checkpoint_selection": {
+            "source": "VALIDATION",
+            "primary_metric": "map50_95",
+            "checkpoint_sha256": checkpoint_hash,
+            "value": 0.1,
+            "epoch": 29,
+            "global_step": 89370,
+        },
+        "operating_point": {
+            "source": "VALIDATION",
+            "confidence_threshold": 0.2,
+            "nms_threshold": 0.65,
+        },
+        "serving_score_threshold": 0.2,
+    }
+
+    with pytest.raises(ValueError, match="TRAINING_CONTRACT_MISMATCH|OPERATING_POINT_LOCK_INVALID"):
+        validate_registration_manifest(record, promote=True)
+
+
+def test_stage_final_depende_do_run_completo_nao_da_epoca_do_best() -> None:
+    from app.ml.serving import training_contract_complete
+
+    finished = {"status": "FINISHED", "latest_train_epoch": 299.0}
+    running = {"status": "RUNNING", "latest_train_epoch": 299.0}
+
+    assert training_contract_complete(finished, max_epoch=300)
+    assert not training_contract_complete(running, max_epoch=300)

@@ -147,6 +147,30 @@ def test_resumo_publico_nao_tem_campos_internos() -> None:
     assert not fields & {"capture_id", "storage_path", "reviewer", "factors", "uploaded_by"}
 
 
+def test_phase5_publica_niveis_ordinais_sem_inventar_score() -> None:
+    factors = {
+        "phase5": {
+            "ruleset_version": "urmind-risk-rules-v1",
+            "risk": {"ordinal_level": "medium"},
+            "priority": {"attention_lane": "elevated"},
+            "decision_trace": {"provisional_parameters": {"calibration_required": True}},
+        }
+    }
+    summary = public_view.summary({**ROW, "priority_score": None, "factors": factors})
+    risk = public_view.risk_public(
+        {"severity": "low", "priority_score": None, "uncertainty": None, "factors": factors}
+    )
+    assert summary.risk_level == "medium"
+    assert summary.priority_lane == "elevated"
+    assert summary.priority_score is None
+    assert risk is not None
+    assert risk.risk_level == "medium"
+    assert risk.priority_lane == "elevated"
+    assert risk.ruleset_version == "urmind-risk-rules-v1"
+    assert risk.thresholds_are_calibrated is False
+    assert risk.priority_score is None
+
+
 # ------------------------------------------------------------------ estados honestos
 
 
