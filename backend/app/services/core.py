@@ -10,7 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import timedelta
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
@@ -27,13 +28,15 @@ from app.schemas.core import (
     UrmindClass,
 )
 from app.services.context import POI_RADIUS_M, STATUS_OK, ContextResult
+from app.services.features import FeatureInput, build_features
 from app.services.report import (
     ActionSuggestion,
     ReportInput,
     ResponsibilitySuggestion,
     render_event_report,
 )
-from app.services.risk import ContextInput, RiskInput, RiskResult, Severity, assess
+from app.services.review_export import REVIEW_SCHEMA_VERSION, review_resolution
+from app.services.risk import ContextInput, RiskResult, Severity, assess_features
 
 # PROVISÓRIO: limiar ainda não medido contra a malha viária real do piloto.
 # §31.16 exige que ele nasça de baseline; revisar no passo 5 do §25.
@@ -202,39 +205,42 @@ class CoreService:
                     },
                 )
             )
-            risk = await self.assess_event(
-                created["id"],
-                apparent_extent=max(d.bbox["width"] * d.bbox["height"] for d in detections),
-                detection_count=len(detections),
-            )
+            risk = await self.assess_event(created["id"])
             outcomes.append(
                 {"event_id": created["id"], "created": True, "deduplicated": False, "risk": risk}
             )
         return {"capture_id": capture_id, "events": outcomes}
 
-    async def assess_event(
-        self, event_id: uuid.UUID, *, apparent_extent: float | None, detection_count: int
-    ) -> dict[str, Any]:
+    async def assess_event(self, event_id: uuid.UUID) -> dict[str, Any]:
         """Severidade/prioridade por regras versionadas e competência por tabela (§14)."""
         if self.decisions is None:
             raise RuntimeError("CoreService sem DecisionRepository")
         event = await self.events.get(event_id)
         if event is None:
             raise EventNotFoundError("Evento não encontrado")
-        result = assess(
-            RiskInput(
-                urmind_class=UrmindClass(event.urmind_class),
-                evidence_mode=EvidenceMode(event.evidence_mode),
-                visual_confidence=event.visual_confidence,
-                apparent_extent=apparent_extent,
-                detection_count=detection_count,
-                location_accuracy_m=event.location_accuracy_m,
-                context=context_input(
-                    await self.events.contexts(event.id),
-                    recurrence_on_segment=await self.events.recurrence_on_segment(event),
-                ),
+        features, context_records = await self._feature_snapshot(event_id)
+        previous_assessment = await self.decisions.latest_risk(event_id)
+        if previous_assessment is not None:
+            features["provenance"]["history_snapshot_assessment_id"] = str(previous_assessment.id)
+            previous_features = (
+                (previous_assessment.factors or {}).get("phase4_snapshot", {}).get("features")
             )
-        )
+            if previous_features is None:
+                features["history"] = {
+                    "previous_events_same_segment": None,
+                    "recent_events_same_segment_30d": None,
+                    "has_previous_event_same_segment": None,
+                    "order_status": "legacy_snapshot_unavailable",
+                }
+                features["missingness"]["history_unavailable"] = True
+            else:
+                features["history"] = deepcopy(previous_features["history"])
+                features["missingness"]["history_unavailable"] = previous_features["missingness"][
+                    "history_unavailable"
+                ]
+        result = assess_features(features)
+        assessment_id = uuid.uuid4()
+        severity = Severity(result["severity"])
         segment = (
             await self.events.segment(event.road_segment_id) if event.road_segment_id else None
         )
@@ -243,9 +249,27 @@ class CoreService:
             asset_type=ASSET_TYPE_PAVEMENT,
             urmind_class=event.urmind_class,
         )
-        action_code = ACTION_BY_SEVERITY.get(result.severity)
+        action_code = ACTION_BY_SEVERITY.get(severity)
         action = await self.decisions.action(action_code) if action_code else None
-        persisted = result.as_persisted()
+        # Legacy score columns remain nullable. An ordinal attention lane is
+        # neither a calibrated numeric score nor a probability.
+        persisted: dict[str, Any] = {
+            "severity": severity.value,
+            "priority_score": None,
+            "uncertainty": None,
+            "factors": {
+                "phase5": result,
+                "phase4_snapshot": {
+                    "assessment_id": str(assessment_id),
+                    "event_id": str(event_id),
+                    "feature_schema_version": features["feature_schema_version"],
+                    "ruleset_version": result["ruleset_version"],
+                    "collected_at": datetime.now(UTC).isoformat(),
+                    "context_records": context_records,
+                    "features": features,
+                },
+            },
+        }
         persisted["factors"]["responsibility"] = (
             {"rule_id": str(rule.id), "responsible": rule.responsible, "source": rule.source}
             if rule
@@ -254,7 +278,7 @@ class CoreService:
         persisted["factors"]["action"] = (
             {
                 "code": action.code,
-                "reason": f"severidade {result.severity.value}",
+                "reason": f"severidade {severity.value}",
                 "rule": ACTION_RULE_VERSION,
             }
             if action
@@ -263,17 +287,21 @@ class CoreService:
         assessment = await self.decisions.add_risk(
             event.id,
             persisted,
+            id=assessment_id,
             responsibility_rule_id=rule.id if rule else None,
             action_id=action.id if action else None,
             model_version_id=event.model_version_id,
         )
-        if result.severity is Severity.UNKNOWN and event.status == EventStatus.DETECTED.value:
+        if severity is Severity.UNKNOWN and event.status == EventStatus.DETECTED.value:
             await self.events.set_status(event, EventStatus.TRIAGE_REQUIRED.value)
         return {
             "assessment_id": assessment.id,
             "severity": assessment.severity,
             "priority_score": assessment.priority_score,
             "uncertainty": assessment.uncertainty,
+            "risk": result["risk"],
+            "priority": result["priority"],
+            "ruleset_version": result["ruleset_version"],
             "responsible": rule.responsible if rule else None,
             "action": action.code if action else None,
         }
@@ -384,12 +412,19 @@ class CoreService:
         }
 
     async def review_event(
-        self, event_id: uuid.UUID, payload: ReviewCreate, *, reviewer: str
+        self,
+        event_id: uuid.UUID,
+        payload: ReviewCreate,
+        *,
+        reviewer: str,
+        reviewer_role: str | None = None,
     ) -> dict[str, Any]:
         """Confirma, corrige ou rejeita. Original preservado; mudança vira Review + AuditLog."""
         if self.decisions is None:
             raise RuntimeError("CoreService sem DecisionRepository")
-        event = await self.events.get(event_id)
+        if payload.adjudicate and reviewer_role != "admin":
+            raise PermissionError("Adjudicação exige papel de admin")
+        event = await self.events.get_for_review(event_id)
         if event is None:
             raise EventNotFoundError("Evento não encontrado")
         original = await self.events.coordinates(event_id)
@@ -399,6 +434,7 @@ class CoreService:
             "latitude": original["latitude"],
             "longitude": original["longitude"],
         }
+        prior = await self.decisions.review_votes(event_id)
         review = await self.decisions.add_review(
             event_id=event_id,
             reviewer=reviewer,
@@ -407,12 +443,39 @@ class CoreService:
             corrected_location=payload.corrected_location,
             notes=payload.notes,
         )
-        await self.events.set_status(event, REVIEW_STATUS[payload.decision].value)
+        votes = list(prior)
+        votes.append(
+            {
+                "decision": review.decision,
+                "corrected_class": review.corrected_class,
+                "corrected_latitude": payload.corrected_location.latitude
+                if payload.corrected_location
+                else None,
+                "corrected_longitude": payload.corrected_location.longitude
+                if payload.corrected_location
+                else None,
+                "reviewer": reviewer,
+                "reviewer_role": reviewer_role,
+                "order_source": review.order_source,
+                "adjudicated": payload.adjudicate,
+            }
+        )
+        resolution = review_resolution(votes)
+        await self.events.set_status(
+            event,
+            REVIEW_STATUS[payload.decision].value
+            if resolution["status"] in {"consensus", "adjudicated"}
+            else EventStatus.REVIEW.value,
+        )
         after = {
             "status": event.status,
             "urmind_class": event.urmind_class,
             "review_id": str(review.id),
             "decision": review.decision,
+            "reviewer_role": reviewer_role,
+            "review_schema_version": REVIEW_SCHEMA_VERSION,
+            "adjudicated": payload.adjudicate,
+            "ground_truth_status": resolution["status"],
             "corrected_class": review.corrected_class,
             "corrected_location": (
                 payload.corrected_location.model_dump() if payload.corrected_location else None
@@ -432,7 +495,12 @@ class CoreService:
             after=after,
             event_hash=digest,
         )
-        return {"review_id": review.id, "event_id": event_id, "status": event.status}
+        return {
+            "review_id": review.id,
+            "event_id": event_id,
+            "status": event.status,
+            "ground_truth_status": resolution["status"],
+        }
 
     async def event_location(self, event_id: uuid.UUID) -> dict[str, Any] | None:
         """Coordenada original e instante: o que os providers de contexto precisam."""
@@ -446,6 +514,76 @@ class CoreService:
             "occurred_at": event.occurred_at,
         }
 
+    async def _feature_snapshot(
+        self, event_id: uuid.UUID
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Load each context record once for both features and the assessment archive."""
+        event = await self.events.get(event_id)
+        if event is None:
+            raise EventNotFoundError("Evento não encontrado")
+        capture = await self.captures.get(event.capture_id) if event.capture_id else None
+        segment = (
+            await self.events.segment(event.road_segment_id) if event.road_segment_id else None
+        )
+        coords = await self.events.coordinates(event_id)
+        contexts = await self.events.contexts(event_id)
+        history, history_status = await self.events.previous_event_times(event)
+        features = build_features(
+            FeatureInput(
+                event=event,
+                capture=capture,
+                detections=await self.events.evidence_detections(event),
+                road_segment=segment,
+                contexts=contexts,
+                previous_event_times=history,
+                history_status=history_status,
+                has_original_location=coords["latitude"] is not None,
+                has_snapped_point=coords["snapped_latitude"] is not None,
+            )
+        )
+        records = [
+            {
+                "id": str(row.id),
+                "source": row.source,
+                "fetched_at": row.fetched_at.isoformat(),
+                "ingested_at": row.ingested_at.isoformat() if row.ingested_at else None,
+                "temporal_status": features["provenance"]["context"][row.source]["temporal_status"],
+                "payload": deepcopy(row.payload),
+            }
+            for row in contexts
+        ]
+        return features, records
+
+    async def event_features(self, event_id: uuid.UUID) -> dict[str, Any]:
+        """Build current Phase 4 features; prior assessments use their own snapshot."""
+        features, _ = await self._feature_snapshot(event_id)
+        return features
+
+    async def reproduce_assessment(self, assessment_id: uuid.UUID) -> dict[str, Any]:
+        """Replay only the immutable saved input, never the mutable EventContext row."""
+        if self.decisions is None:
+            raise RuntimeError("CoreService sem DecisionRepository")
+        row = await self.decisions.get_risk(assessment_id)
+        if row is None:
+            raise EventNotFoundError("Avaliação não encontrada")
+        snapshot = (row.factors or {}).get("phase4_snapshot")
+        original = (row.factors or {}).get("phase5")
+        if not snapshot or not original:
+            raise ValueError("avaliação legada sem snapshot reproduzível")
+        if snapshot.get("assessment_id") != str(row.id):
+            raise ValueError("lineage da avaliação inconsistente")
+        if snapshot.get("ruleset_version") != original.get("ruleset_version"):
+            raise ValueError("versão das regras inconsistente")
+        replayed = assess_features(snapshot["features"])
+        if replayed["ruleset_version"] != snapshot["ruleset_version"]:
+            raise ValueError("versão das regras indisponível para reprodução")
+        return {
+            "assessment_id": row.id,
+            "snapshot": deepcopy(snapshot),
+            "result": deepcopy(original),
+            "replay_matches": replayed == original,
+        }
+
     async def apply_context(
         self, event_id: uuid.UUID, results: list[ContextResult]
     ) -> dict[str, Any]:
@@ -455,19 +593,7 @@ class CoreService:
         event = await self.events.get(event_id)
         if event is None:
             raise EventNotFoundError("Evento não encontrado")
-        evidence = (event.factors or {}).get("evidence", {})
-        detection_ids = set(evidence.get("detection_ids", []))
-        capture = await self.captures.get(event.capture_id) if event.capture_id else None
-        detections = [
-            d for d in (capture.detections if capture else []) if str(d.id) in detection_ids
-        ]
-        risk = await self.assess_event(
-            event_id,
-            apparent_extent=(
-                max(d.bbox["width"] * d.bbox["height"] for d in detections) if detections else None
-            ),
-            detection_count=len(detections),
-        )
+        risk = await self.assess_event(event_id)
         return {
             "event_id": event_id,
             "context": {result.source: result.status for result in results},
@@ -504,6 +630,17 @@ class CoreService:
 
 async def _risk_from_row(row) -> RiskResult:
     factors = dict(row.factors or {})
+    phase5 = factors.get("phase5")
+    if isinstance(phase5, dict):
+        return RiskResult(
+            severity=Severity(row.severity),
+            priority_score=None,
+            uncertainty=None,
+            coverage=None,
+            limitations=list(phase5.get("factors_missing", [])),
+            ruleset_version=str(phase5["ruleset_version"]),
+            factors=factors,
+        )
     return RiskResult(
         severity=Severity(row.severity),
         priority_score=row.priority_score,

@@ -29,6 +29,27 @@ def test_cadeia_de_revisoes_e_continua():
     assert len(bases) == 1
 
 
+def test_migration_de_proveniencia_nao_confunde_backfill_com_ordem_real():
+    migration = (ALEMBIC_VERSIONS_DIR / "0017_assessment_snapshot_order_provenance.py").read_text(
+        encoding="utf-8"
+    )
+    assert "set order_source = 'legacy_backfill'" in migration
+    assert "set default 'persisted_at_creation'" in migration
+    assert "assessment feature snapshot is immutable" in migration
+    serial = (ALEMBIC_VERSIONS_DIR / "0018_serialized_order_immutable_assessment.py").read_text(
+        encoding="utf-8"
+    )
+    assert "pg_advisory_xact_lock" in serial
+    assert "set order_source = 'legacy_backfill'" in serial
+    assert "snapshot assessment is immutable" in serial
+    retention = (ALEMBIC_VERSIONS_DIR / "0019_context_ingestion_assessment_retention.py").read_text(
+        encoding="utf-8"
+    )
+    assert "add column ingested_at timestamptz" in retention
+    assert "update public.event_context set ingested_at" not in retention
+    assert "archived assessment cannot be deleted" in retention
+
+
 def test_toda_revisao_tem_downgrade():
     """Sem downgrade não há como reverter uma aplicação malsucedida (§26)."""
     for path in sorted(ALEMBIC_VERSIONS_DIR.glob("*.py")):

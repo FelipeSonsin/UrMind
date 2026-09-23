@@ -21,7 +21,11 @@ BUCKET = "captures"
 MAX_BYTES = 10 * 1024 * 1024
 # Formato decodificado pelo Pillow → MIME e extensão aceitos. O Content-Type
 # declarado pelo cliente não é prova de nada: vale o que o conteúdo decodifica.
-ALLOWED_FORMATS = {"JPEG": ("image/jpeg", "jpg"), "PNG": ("image/png", "png"), "WEBP": ("image/webp", "webp")}
+ALLOWED_FORMATS = {
+    "JPEG": ("image/jpeg", "jpg"),
+    "PNG": ("image/png", "png"),
+    "WEBP": ("image/webp", "webp"),
+}
 
 
 class InvalidImageError(ValueError):
@@ -74,16 +78,25 @@ def validate_image(data: bytes) -> ValidatedImage:
     )
 
 
-def object_path(user_id: str, image: ValidatedImage, received_at: datetime) -> str:
+def object_path(
+    user_id: str, image: ValidatedImage, received_at: datetime, *, upload_id: str | None = None
+) -> str:
     """`<usuário>/<AAAA>/<MM>/<sha256>.<ext>`: determinístico e sem nome do cliente."""
     safe_user = "".join(ch for ch in user_id if ch.isalnum() or ch == "-")
     if not safe_user:
         raise ValueError("id de usuário inválido para path de Storage")
-    return f"{safe_user}/{received_at:%Y}/{received_at:%m}/{image.sha256}.{image.extension}"
+    if upload_id is not None and (
+        len(upload_id) != 32 or any(ch not in "0123456789abcdef" for ch in upload_id)
+    ):
+        raise ValueError("invalid upload_id")
+    suffix = f"-{upload_id}" if upload_id else ""
+    return f"{safe_user}/{received_at:%Y}/{received_at:%m}/{image.sha256}{suffix}.{image.extension}"
 
 
 class StorageClient:
-    def __init__(self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
         if not settings.supabase_url or not settings.supabase_secret_key:
             raise StorageNotConfiguredError("SUPABASE_URL/SUPABASE_SECRET_KEY ausentes")
         self._base = f"{settings.supabase_url}/storage/v1"
@@ -137,3 +150,11 @@ class StorageClient:
         if response.status_code != 200:
             raise StorageError(f"download recusado pelo Storage (HTTP {response.status_code})")
         return response.content
+
+    async def delete(self, path: str) -> None:
+        """Compensate a failed DB commit for an object unique to this upload."""
+        response = await self._request(
+            "DELETE", f"{self._base}/object/{BUCKET}/{path}", headers=self._headers()
+        )
+        if response.status_code not in (200, 204, 404):
+            raise StorageError(f"Storage compensation refused (HTTP {response.status_code})")

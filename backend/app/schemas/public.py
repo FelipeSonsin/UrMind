@@ -64,6 +64,8 @@ class RiskExplanationPublic(PublicModel):
 class RiskPublic(PublicModel):
     severity: str
     priority_score: float | None
+    risk_level: str | None = None
+    priority_lane: str | None = None
     uncertainty: float | None
     uncertainty_band: str
     coverage: float | None
@@ -129,6 +131,8 @@ class EventSummaryPublic(PublicModel):
     visual_confidence: float | None
     severity: str | None
     priority_score: float | None
+    risk_level: str | None = None
+    priority_lane: str | None = None
     latitude: float | None
     longitude: float | None
     snapped_latitude: float | None

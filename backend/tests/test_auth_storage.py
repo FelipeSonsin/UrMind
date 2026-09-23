@@ -129,6 +129,73 @@ def test_path_e_gerado_pelo_sistema_sem_nome_do_cliente() -> None:
     assert ".." not in path
 
 
+def test_upload_id_isolates_storage_compensation() -> None:
+    from datetime import UTC, datetime
+
+    image = validate_image(_jpeg())
+    moment = datetime(2026, 9, 16, tzinfo=UTC)
+    first = object_path("reviewer", image, moment, upload_id="a" * 32)
+    second = object_path("reviewer", image, moment, upload_id="b" * 32)
+    assert first != second
+    assert image.sha256 in first and image.sha256 in second
+
+
+@pytest.mark.asyncio
+async def test_storage_object_removed_when_capture_db_fails() -> None:
+    from fastapi import UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import CaptureSource, LocationSource
+
+    class Session:
+        rolled_back = False
+
+        async def rollback(self) -> None:
+            self.rolled_back = True
+
+    class Captures:
+        session = Session()
+
+        async def get_by_key(self, _key):
+            return None
+
+    class Service:
+        captures = Captures()
+
+        async def register_capture(self, _capture):
+            raise RuntimeError("controlled DB failure")
+
+    class Storage:
+        uploaded = None
+        deleted = None
+
+        async def upload(self, path, _image):
+            self.uploaded = path
+            return True
+
+        async def delete(self, path):
+            self.deleted = path
+
+    service = Service()
+    storage = Storage()
+    with pytest.raises(RuntimeError, match="controlled DB failure"):
+        await upload_photo(
+            user=AuthenticatedUser(id="test-user", email=None, role="authenticated"),
+            service=service,
+            storage=storage,
+            file=UploadFile(filename="fixture.jpg", file=io.BytesIO(_jpeg())),
+            source=CaptureSource.PWA_PHOTO,
+            latitude=None,
+            longitude=None,
+            accuracy_m=None,
+            location_source=LocationSource.GPS_DEVICE,
+            tz_offset_minutes=None,
+        )
+    assert service.captures.session.rolled_back
+    assert storage.deleted == storage.uploaded
+
+
 @pytest.mark.asyncio
 async def test_upload_repetido_nao_e_erro() -> None:
     calls: list[httpx.Request] = []
@@ -150,9 +217,13 @@ async def test_upload_repetido_nao_e_erro() -> None:
 def test_papel_de_revisor_vem_de_app_metadata() -> None:
     from app.auth import AuthenticatedUser
 
-    assert AuthenticatedUser(id="u", email=None, role="authenticated", urmind_role="reviewer").can_review
+    assert AuthenticatedUser(
+        id="u", email=None, role="authenticated", urmind_role="reviewer"
+    ).can_review
     assert not AuthenticatedUser(id="u", email=None, role="authenticated").can_review
-    assert not AuthenticatedUser(id="u", email=None, role="authenticated", urmind_role="viewer").can_review
+    assert not AuthenticatedUser(
+        id="u", email=None, role="authenticated", urmind_role="viewer"
+    ).can_review
 
 
 def test_registro_de_modelo_recusa_export_sem_metrica(tmp_path) -> None:

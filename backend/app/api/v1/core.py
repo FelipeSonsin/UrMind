@@ -98,6 +98,10 @@ async def me(user: CurrentUser) -> dict[str, Any]:
 
 @router.post("/captures", status_code=201)
 async def create_capture(payload: CaptureCreate, service: Core) -> dict[str, Any]:
+    if payload.detections or payload.source is CaptureSource.SCOUT:
+        raise HTTPException(
+            status_code=403, detail="Detecções e origem Scout são geradas pelo servidor"
+        )
     return await service.register_capture(payload)
 
 
@@ -115,10 +119,8 @@ async def upload_photo(
     tz_offset_minutes: Annotated[int | None, Form(ge=-840, le=840)] = None,
 ) -> dict[str, Any]:
     """Foto real → Storage privado → Capture (§6.1, §6.3). Reenvio da mesma foto não duplica."""
-    if source not in (CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD, CaptureSource.SCOUT):
-        raise HTTPException(
-            status_code=422, detail="source deve ser pwa_photo, exif_upload ou scout"
-        )
+    if source not in (CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD):
+        raise HTTPException(status_code=422, detail="source deve ser pwa_photo ou exif_upload")
     if (latitude is None) != (longitude is None):
         raise HTTPException(status_code=422, detail="informe latitude e longitude juntas")
     if location_source not in (
@@ -138,7 +140,9 @@ async def upload_photo(
         raise HTTPException(status_code=code, detail=str(exc)) from exc
 
     received_at = datetime.now(UTC)
-    path = object_path(user.id, image, received_at)
+    # A unique object per attempt makes compensation safe under concurrent
+    # uploads of identical bytes. The SHA-256 remains in the path and metadata.
+    path = object_path(user.id, image, received_at, upload_id=uuid.uuid4().hex)
     coordinate = (
         Coordinate(latitude=latitude, longitude=longitude, accuracy_m=accuracy_m)
         if latitude is not None and longitude is not None
@@ -183,10 +187,35 @@ async def upload_photo(
             "requires_manual_location": existing.point is None,
         }
     try:
-        await storage.upload(path, image)
+        uploaded = await storage.upload(path, image)
     except StorageError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    result = await service.register_capture(ingest.capture)
+    try:
+        result = await service.register_capture(ingest.capture)
+        # The dependency's deferred commit would otherwise happen after this
+        # handler returns, too late to compensate a failed DB transaction.
+        await service.captures.session.commit()
+    except BaseException:
+        try:
+            await service.captures.session.rollback()
+        finally:
+            if uploaded:
+                try:
+                    await storage.delete(path)
+                except StorageError as exc:
+                    log.error("storage_compensation_failed", error=str(exc))
+        raise
+    if not result["created"]:
+        if uploaded:
+            await storage.delete(path)
+        existing = await service.captures.get_by_key(ingest.capture.capture_key)
+        return {
+            "id": result["id"],
+            "capture_key": result["capture_key"],
+            "created": False,
+            "storage_path": existing.storage_path if existing else None,
+            "requires_manual_location": existing.point is None if existing else True,
+        }
     log.info(
         "capture_stored",
         capture_id=str(result["id"]),
@@ -207,6 +236,8 @@ async def upload_photo(
 
 @router.post("/events", status_code=201)
 async def create_event(payload: EventCreate, service: Core) -> dict[str, Any]:
+    if payload.model_version_id is not None or (payload.factors or {}).get("evidence"):
+        raise HTTPException(status_code=403, detail="Linhagem de inferência é gerada pelo servidor")
     try:
         return await service.register_event(payload)
     except DuplicateKeyError as exc:
@@ -240,8 +271,12 @@ async def events_nearby(
 
 
 @router.post("/captures/{capture_id}/consolidate")
-async def consolidate_capture(capture_id: uuid.UUID, service: Core) -> dict[str, Any]:
+async def consolidate_capture(
+    capture_id: uuid.UUID, service: Core, user: CurrentUser
+) -> dict[str, Any]:
     """Detections da captura → Events deduplicados com risco (§25 passos 9 e 11)."""
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Consolidação manual exige papel de revisor")
     try:
         consolidated = await service.consolidate_capture(capture_id)
     except EventNotFoundError as exc:
@@ -277,8 +312,12 @@ async def review_event(
 ) -> dict[str, Any]:
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
+    if payload.adjudicate and user.urmind_role != "admin":
+        raise HTTPException(status_code=403, detail="Adjudicação exige papel de admin")
     try:
-        review = await service.review_event(event_id, payload, reviewer=user.id)
+        review = await service.review_event(
+            event_id, payload, reviewer=user.id, reviewer_role=user.urmind_role
+        )
     except EventNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     # Quem revisou fica no audit_log, não no log de aplicação: identificar a

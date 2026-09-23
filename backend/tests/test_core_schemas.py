@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -54,10 +55,29 @@ def test_capture_accepts_photo_with_gps_and_detection():
                 "urmind_class": UrmindClass.ROAD_D40,
                 "confidence": 0.91,
                 "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+                "model_version_id": UUID("00000000-0000-4000-8000-000000000001"),
             }
         ],
     )
     assert capture.detections[0].urmind_class is UrmindClass.ROAD_D40
+
+
+def test_detection_without_model_lineage_is_rejected():
+    with pytest.raises(ValidationError, match="model_version_id"):
+        CaptureCreate(
+            capture_key="cap-no-model",
+            source=CaptureSource.PWA_PHOTO,
+            source_location=LocationSource.GPS_DEVICE,
+            captured_at=NOW,
+            coordinate=Coordinate(latitude=-23.55, longitude=-46.63),
+            detections=[
+                {
+                    "urmind_class": UrmindClass.ROAD_D40,
+                    "confidence": 0.91,
+                    "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+                }
+            ],
+        )
 
 
 def test_image_only_event_cannot_carry_coordinate():

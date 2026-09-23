@@ -12,12 +12,16 @@ Com Postgres+PostGIS local, sem pooler, as duas apontam para a mesma URL.
 
 from __future__ import annotations
 
+import asyncio
+import io
+import json
 import os
+import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import exc, text
 
 from app.config import get_settings
 from app.db.migrate import current_revision, head_revision, pending, upgrade
@@ -34,6 +38,7 @@ from app.schemas.core import (
     UrmindClass,
 )
 from app.services.core import CoreService
+from app.services.storage import StorageClient, object_path, validate_image
 
 pytestmark = pytest.mark.skipif(
     not (
@@ -70,6 +75,438 @@ async def test_postgis_disponivel(database):
 
 
 @pytest.mark.asyncio
+async def test_storage_real_upload_download_signed_url_and_cleanup():
+    import httpx
+    from PIL import Image
+
+    canvas = Image.new("RGB", (8, 8), (12, 34, 56))
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="JPEG")
+    image = validate_image(buffer.getvalue())
+    path = object_path("integration-fixture", image, datetime.now(UTC), upload_id=uuid.uuid4().hex)
+    storage = StorageClient(get_settings())
+    uploaded = False
+    try:
+        uploaded = await storage.upload(path, image)
+        assert uploaded
+        assert await storage.download(path) == image.data
+        signed_url = await storage.signed_url(path, expires_in=60)
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(signed_url)
+        assert response.status_code == 200
+        assert response.content == image.data
+    finally:
+        if uploaded:
+            await storage.delete(path)
+
+
+@pytest.mark.asyncio
+async def test_storage_compensates_real_db_constraint_failure(database):
+    from fastapi import UploadFile
+    from PIL import Image
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from app.services.storage import StorageError
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (21, 45, 67)).save(buffer, format="JPEG")
+    image = validate_image(buffer.getvalue())
+    capture_key = f"photo-{image.sha256}"
+    async with database.session() as session:
+        await session.execute(
+            text(
+                "insert into public.captures(capture_key, source, source_location, captured_at) "
+                "values (:key, 'pwa_photo', 'unknown', now())"
+            ),
+            {"key": capture_key},
+        )
+
+    class RecordingStorage(StorageClient):
+        uploaded_path = None
+        deleted_path = None
+
+        async def upload(self, path, payload):
+            self.uploaded_path = path
+            return await super().upload(path, payload)
+
+        async def delete(self, path):
+            self.deleted_path = path
+            await super().delete(path)
+
+    storage = RecordingStorage(get_settings())
+    try:
+        async with database.sessionmaker() as session:
+            real_repo = CaptureRepository(session)
+
+            class RaceCaptureRepository:
+                # Simulate a stale pre-upload read; the database uniqueness
+                # constraint remains the authoritative failure at flush.
+                async def get_by_key(self, _key):
+                    return None
+
+                async def create(self, payload):
+                    return await real_repo.create(payload)
+
+            captures = RaceCaptureRepository()
+            captures.session = session
+            service = CoreService(captures, EventRepository(session))
+            with pytest.raises(exc.IntegrityError):
+                await upload_photo(
+                    user=AuthenticatedUser(
+                        id="integration-fixture", email=None, role="authenticated"
+                    ),
+                    service=service,
+                    storage=storage,
+                    file=UploadFile(filename="fixture.jpg", file=io.BytesIO(image.data)),
+                    source=CaptureSource.PWA_PHOTO,
+                    latitude=None,
+                    longitude=None,
+                    accuracy_m=None,
+                    location_source=LocationSource.GPS_DEVICE,
+                    tz_offset_minutes=None,
+                )
+            assert storage.uploaded_path == storage.deleted_path
+            with pytest.raises(StorageError):
+                await storage.download(storage.uploaded_path)
+    finally:
+        async with database.session() as session:
+            await session.execute(
+                text("delete from public.captures where capture_key=:key"), {"key": capture_key}
+            )
+
+
+@pytest.mark.asyncio
+async def test_capture_trigger_queue_read_archive_and_transaction_rollback(database):
+    from app.repositories.core import InferenceRepository
+
+    async with database.sessionmaker() as session:
+        try:
+            capture_id = await session.scalar(
+                text(
+                    "insert into public.captures(capture_key, source, source_location, "
+                    "captured_at, storage_path) values (:key, 'pwa_photo', 'unknown', "
+                    "now(), :path) returning id"
+                ),
+                {
+                    "key": f"integration-queue-{uuid.uuid4().hex}",
+                    "path": f"integration-fixture/{uuid.uuid4().hex}.jpg",
+                },
+            )
+            queue = InferenceRepository(session)
+            job = await queue.read_job(visibility_timeout_s=2)
+            assert job is not None
+            assert job["message"]["capture_id"] == str(capture_id)
+            assert job["read_ct"] == 1
+            await queue.archive_job(job["msg_id"])
+            archived = await session.scalar(
+                text("select count(*) from pgmq.a_inference_jobs where msg_id = :id"),
+                {"id": job["msg_id"]},
+            )
+            assert archived == 1
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_rls_and_realtime_publication_are_narrow(database):
+    async with database.sessionmaker() as session:
+        published = (
+            (
+                await session.execute(
+                    text(
+                        "select tablename from pg_publication_tables where "
+                        "pubname='supabase_realtime' and schemaname='public'"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert set(published) == {"events", "risk_assessments"}
+        await session.execute(text("set local role anon"))
+        with pytest.raises(exc.DBAPIError):
+            await session.execute(text("select count(*) from public.events"))
+        await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_realtime_rls_reviewer_only(database):
+    async with database.sessionmaker() as session:
+        try:
+            event_id = await session.scalar(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, occurred_at) "
+                    "values (:key, 'URMIND_ROAD_D40', 'photo', now()) returning id"
+                ),
+                {"key": f"integration-rls-{uuid.uuid4().hex}"},
+            )
+            await session.execute(
+                text(
+                    "insert into public.risk_assessments(event_id, severity) values (:id, 'high')"
+                ),
+                {"id": event_id},
+            )
+            await session.execute(text("set local role authenticated"))
+            for role, expected in (("viewer", 0), ("reviewer", 1), ("admin", 1)):
+                claims = json.dumps(
+                    {"sub": str(uuid.uuid4()), "app_metadata": {"urmind_role": role}}
+                )
+                await session.execute(
+                    text("select set_config('request.jwt.claims', :claims, true)"),
+                    {"claims": claims},
+                )
+                visible_events = await session.scalar(
+                    text("select count(*) from public.events where id=:id"), {"id": event_id}
+                )
+                visible_risks = await session.scalar(
+                    text("select count(*) from public.risk_assessments where event_id=:id"),
+                    {"id": event_id},
+                )
+                assert visible_events == expected
+                assert visible_risks == expected
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_history_excludes_backdated_event_inserted_later(database):
+    async with database.sessionmaker() as session:
+        try:
+            segment_id = await session.scalar(
+                text(
+                    "insert into public.road_segments(geom) values "
+                    "(ST_SetSRID(ST_MakeLine(ST_MakePoint(:lon1,:lat), "
+                    "ST_MakePoint(:lon2,:lat)),4326)) returning id"
+                ),
+                {"lon1": LON - 0.001, "lon2": LON + 0.001, "lat": LAT},
+            )
+
+            async def insert_event(name, offset_days):
+                return await session.scalar(
+                    text(
+                        "insert into public.events(event_key, urmind_class, evidence_mode, "
+                        "occurred_at, road_segment_id) values (:key, 'URMIND_ROAD_D40', "
+                        "'photo', :occurred_at, :segment_id) returning id"
+                    ),
+                    {
+                        "key": f"integration-history-{name}-{uuid.uuid4().hex}",
+                        "occurred_at": NOW + timedelta(days=offset_days),
+                        "segment_id": segment_id,
+                    },
+                )
+
+            await insert_event("known", -2)
+            current_id = await insert_event("current", 0)
+            await insert_event("late-backdated", -1)
+            repo = EventRepository(session)
+            current = await repo.get(current_id)
+            assert current is not None
+            previous, status = await repo.previous_event_times(current)
+            assert previous == [NOW - timedelta(days=2)]
+            assert status == "serialized_commit_order"
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_legacy_order_is_not_counted_as_trusted_history(database):
+    async with database.sessionmaker() as session:
+        try:
+            segment_id = await session.scalar(
+                text(
+                    "insert into public.road_segments(geom) values "
+                    "(ST_SetSRID(ST_MakeLine(ST_MakePoint(:lon1,:lat), "
+                    "ST_MakePoint(:lon2,:lat)),4326)) returning id"
+                ),
+                {"lon1": LON - 0.001, "lon2": LON + 0.001, "lat": LAT},
+            )
+            legacy_id = await session.scalar(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, "
+                    "occurred_at, road_segment_id, order_source) values "
+                    "(:key, 'URMIND_ROAD_D40', 'photo', :occurred_at, :segment_id, "
+                    "'legacy_backfill') returning id"
+                ),
+                {
+                    "key": f"integration-legacy-{uuid.uuid4().hex}",
+                    "occurred_at": NOW - timedelta(days=2),
+                    "segment_id": segment_id,
+                },
+            )
+            current_id = await session.scalar(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, "
+                    "occurred_at, road_segment_id) values "
+                    "(:key, 'URMIND_ROAD_D40', 'photo', :occurred_at, :segment_id) returning id"
+                ),
+                {
+                    "key": f"integration-current-{uuid.uuid4().hex}",
+                    "occurred_at": NOW,
+                    "segment_id": segment_id,
+                },
+            )
+            repo = EventRepository(session)
+            legacy = await repo.get(legacy_id)
+            current = await repo.get(current_id)
+            assert legacy is not None and current is not None
+            assert legacy.order_source == "legacy_backfill"
+            assert current.order_source == "serialized_commit_order"
+            assert current.commit_order is not None
+            assert legacy.commit_order is None
+            assert await repo.previous_event_times(legacy) == (None, "legacy_order_uncertain")
+            assert await repo.previous_event_times(current) == (None, "legacy_order_uncertain")
+            with pytest.raises(Exception, match="order provenance is immutable"):
+                async with session.begin_nested():
+                    await session.execute(
+                        text(
+                            "update public.events set order_source='serialized_commit_order' where id=:id"
+                        ),
+                        {"id": legacy_id},
+                    )
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_commit_order_serializes_concurrent_event_inserts(database):
+    async with database.session() as setup:
+        segment_id = await setup.scalar(
+            text(
+                "insert into public.road_segments(geom) values "
+                "(ST_SetSRID(ST_MakeLine(ST_MakePoint(:lon1,:lat), "
+                "ST_MakePoint(:lon2,:lat)),4326)) returning id"
+            ),
+            {"lon1": LON - 0.001, "lon2": LON + 0.001, "lat": LAT},
+        )
+    first_id = second_id = None
+    try:
+        async with database.sessionmaker() as first, database.sessionmaker() as second:
+            first_id = await first.scalar(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, "
+                    "occurred_at, road_segment_id) values "
+                    "(:key, 'URMIND_ROAD_D40', 'photo', :occurred_at, :segment_id) returning id"
+                ),
+                {
+                    "key": f"integration-serial-first-{uuid.uuid4().hex}",
+                    "occurred_at": NOW - timedelta(days=2),
+                    "segment_id": segment_id,
+                },
+            )
+            second_pid = await second.scalar(text("select pg_backend_pid()"))
+            started = asyncio.Event()
+
+            async def insert_second():
+                started.set()
+                event_id = await second.scalar(
+                    text(
+                        "insert into public.events(event_key, urmind_class, evidence_mode, "
+                        "occurred_at, road_segment_id) values "
+                        "(:key, 'URMIND_ROAD_D40', 'photo', :occurred_at, :segment_id) returning id"
+                    ),
+                    {
+                        "key": f"integration-serial-second-{uuid.uuid4().hex}",
+                        "occurred_at": NOW,
+                        "segment_id": segment_id,
+                    },
+                )
+                await second.commit()
+                return event_id
+
+            task = asyncio.create_task(insert_second())
+            await asyncio.wait_for(started.wait(), timeout=5)
+            async with database.sessionmaker() as observer:
+                for _ in range(60):
+                    wait_type = await observer.scalar(
+                        text("select wait_event_type from pg_stat_activity where pid=:pid"),
+                        {"pid": second_pid},
+                    )
+                    if wait_type == "Lock":
+                        break
+                    await asyncio.sleep(0.05)
+                blocked_before_commit = wait_type == "Lock" and not task.done()
+            await first.commit()
+            second_id = await asyncio.wait_for(task, timeout=5)
+            assert blocked_before_commit
+        async with database.sessionmaker() as verify:
+            repo = EventRepository(verify)
+            earlier = await repo.get(first_id)
+            later = await repo.get(second_id)
+            assert earlier is not None and later is not None
+            assert earlier.commit_order < later.commit_order
+            assert await repo.previous_event_times(later) == (
+                [NOW - timedelta(days=2)],
+                "serialized_commit_order",
+            )
+    finally:
+        async with database.session() as cleanup:
+            for event_id in (first_id, second_id):
+                if event_id is not None:
+                    await cleanup.execute(
+                        text("delete from public.events where id=:id"), {"id": event_id}
+                    )
+            await cleanup.execute(
+                text("delete from public.road_segments where id=:id"), {"id": segment_id}
+            )
+
+
+@pytest.mark.asyncio
+async def test_supabase_auth_real_roles_login_and_jwks():
+    import httpx
+
+    from app.auth import decode_token
+
+    settings = get_settings()
+    assert settings.supabase_url and settings.supabase_secret_key
+    assert settings.supabase_publishable_key and settings.supabase_jwks_url
+    admin_headers = {
+        "apikey": settings.supabase_secret_key,
+        "Authorization": f"Bearer {settings.supabase_secret_key}",
+    }
+    public_headers = {"apikey": settings.supabase_publishable_key}
+    created_ids = []
+    async with httpx.AsyncClient(timeout=20) as client:
+        try:
+            for role in ("viewer", "reviewer", "admin"):
+                email = f"urmind-integration-{uuid.uuid4().hex}@example.invalid"
+                password = secrets.token_urlsafe(24)
+                response = await client.post(
+                    f"{settings.supabase_url}/auth/v1/admin/users",
+                    headers=admin_headers,
+                    json={
+                        "email": email,
+                        "password": password,
+                        "email_confirm": True,
+                        "app_metadata": {"urmind_role": role},
+                    },
+                )
+                assert response.status_code in (200, 201), (
+                    f"admin create HTTP {response.status_code}"
+                )
+                user_id = response.json()["id"]
+                created_ids.append(user_id)
+                login = await client.post(
+                    f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                    headers=public_headers,
+                    json={"email": email, "password": password},
+                )
+                assert login.status_code == 200, f"login HTTP {login.status_code}"
+                claims = decode_token(login.json()["access_token"], settings)
+                assert claims["sub"] == user_id
+                assert claims["app_metadata"]["urmind_role"] == role
+        finally:
+            for user_id in created_ids:
+                response = await client.delete(
+                    f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+                    headers=admin_headers,
+                )
+                assert response.status_code in (200, 204), (
+                    f"admin delete HTTP {response.status_code}"
+                )
+
+
+@pytest.mark.asyncio
 async def test_evento_faz_snap_no_trecho_viario_e_aparece_na_busca_por_raio(database):
     suffix = uuid.uuid4().hex[:8]
     async with database.session() as session:
@@ -92,13 +529,6 @@ async def test_evento_faz_snap_no_trecho_viario_e_aparece_na_busca_por_raio(data
                 source_location=LocationSource.GPS_DEVICE,
                 captured_at=NOW,
                 coordinate=Coordinate(latitude=LAT + 0.00005, longitude=LON, accuracy_m=6),
-                detections=[
-                    {
-                        "urmind_class": UrmindClass.ROAD_D40,
-                        "confidence": 0.93,
-                        "bbox": {"x": 0.2, "y": 0.3, "width": 0.2, "height": 0.2},
-                    }
-                ],
             )
         )
         assert capture["created"] is True
@@ -118,9 +548,7 @@ async def test_evento_faz_snap_no_trecho_viario_e_aparece_na_busca_por_raio(data
         assert event["distance_to_road_m"] < 20
         assert event["status"] == "detected"
 
-        nearby = await service.events_nearby(
-            NearbyQuery(latitude=LAT, longitude=LON, radius_m=200)
-        )
+        nearby = await service.events_nearby(NearbyQuery(latitude=LAT, longitude=LON, radius_m=200))
         found = next(row for row in nearby if row["event_key"] == f"evt-{suffix}")
         # A coordenada original é preservada; o snap vive em snapped_*.
         assert found["latitude"] == pytest.approx(LAT + 0.00005, abs=1e-6)
@@ -143,6 +571,7 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
     """Capture→Detection→Event→risco→revisão no banco real, tudo desfeito no fim."""
     from app.repositories.core import DecisionRepository
     from app.schemas.core import DetectionCreate, ReviewCreate, ReviewDecision
+    from app.services.context import ContextResult
 
     suffix = uuid.uuid4().hex[:8]
     async with database.sessionmaker() as session:
@@ -158,6 +587,20 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             service = CoreService(
                 CaptureRepository(session), EventRepository(session), DecisionRepository(session)
             )
+            dataset_id = await session.scalar(
+                text(
+                    "insert into public.dataset_versions(name, version, source) "
+                    "values (:name, 'integration', 'test_fixture') returning id"
+                ),
+                {"name": f"test-dataset-{suffix}"},
+            )
+            model_id = await session.scalar(
+                text(
+                    "insert into public.model_versions(name, kind, version, dataset_version_id) "
+                    "values (:name, 'vision', 'integration', :dataset_id) returning id"
+                ),
+                {"name": f"test-model-{suffix}", "dataset_id": dataset_id},
+            )
 
             def capture(n: int, lat_offset: float) -> CaptureCreate:
                 return CaptureCreate(
@@ -171,11 +614,13 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
                             urmind_class=UrmindClass.ROAD_D40,
                             confidence=0.91,
                             bbox={"x": 0.3, "y": 0.4, "width": 0.3, "height": 0.2},
+                            model_version_id=model_id,
                         ),
                         DetectionCreate(
                             urmind_class=UrmindClass.ROAD_D00,
                             confidence=0.10,  # abaixo do mínimo: não vira evento
                             bbox={"x": 0.1, "y": 0.1, "width": 0.1, "height": 0.1},
+                            model_version_id=model_id,
                         ),
                     ],
                 )
@@ -186,11 +631,138 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             assert outcome["created"] is True
             assert outcome["risk"]["severity"] in {"low", "medium", "high"}
             assert outcome["risk"]["responsible"].startswith("DNIT")
-            assert outcome["risk"]["action"] == "inspecao_tecnica"
+            assert outcome["risk"]["action"] == "sinalizacao_temporaria"
+            assert outcome["risk"]["ruleset_version"] == "urmind-risk-rules-v1"
+            before_context = await service.event_features(outcome["event_id"])
+            assert before_context["feature_schema_version"] == "urmind-features-v1"
+            assert before_context["context"]["near_school"] is None
+            assert before_context["history"]["previous_events_same_segment"] == 0
+            refreshed = await service.apply_context(
+                outcome["event_id"],
+                [
+                    ContextResult(
+                        source="overpass_pois",
+                        status="ok",
+                        fetched_at=NOW.isoformat(),
+                        provenance={"provider": "integration_fixture"},
+                        data={
+                            "nearest": {
+                                "school": {"distance_m": 80},
+                                "health": None,
+                                "crossing": None,
+                            }
+                        },
+                    ),
+                    ContextResult(
+                        source="open_meteo_rain",
+                        status="context_unavailable",
+                        fetched_at=NOW.isoformat(),
+                        provenance={"provider": "integration_fixture"},
+                        data={},
+                        error="controlled_fixture_unavailable",
+                    ),
+                ],
+            )
+            assert refreshed["risk"]["ruleset_version"] == "urmind-risk-rules-v1"
+            with_context = await service.event_features(outcome["event_id"])
+            assert with_context["context"]["near_school"] is True
+            assert with_context["context"]["rain_mm_24h"] is None
+            assert with_context["missingness"]["context_unavailable"]["open_meteo_rain"]
+            stored_risk = await service.decisions.latest_risk(outcome["event_id"])
+            assert stored_risk.factors["phase5"]["feature_schema_version"] == "urmind-features-v1"
+            assert stored_risk.priority_score is None
+            initial = await service.reproduce_assessment(outcome["risk"]["assessment_id"])
+            assert initial["replay_matches"] is True
+            assert initial["snapshot"]["context_records"] == []
+            observed = await service.reproduce_assessment(refreshed["risk"]["assessment_id"])
+            assert observed["replay_matches"] is True
+            assert observed["snapshot"]["features"]["context"]["near_school"] is True
+            assert observed["snapshot"]["context_records"][1]["payload"]["status"] == "ok"
+            assert (
+                observed["snapshot"]["context_records"][0]["payload"]["status"]
+                == "context_unavailable"
+            )
+            assert observed["snapshot"]["context_records"][1]["ingested_at"] is not None
+            changed = await service.apply_context(
+                outcome["event_id"],
+                [
+                    ContextResult(
+                        source="overpass_pois",
+                        status="ok",
+                        fetched_at=(NOW + timedelta(days=1)).isoformat(),
+                        provenance={"provider": "integration_fixture"},
+                        data={"nearest": {"school": None, "health": None, "crossing": None}},
+                    )
+                ],
+            )
+            updated = await service.reproduce_assessment(changed["risk"]["assessment_id"])
+            assert updated["replay_matches"] is True
+            assert updated["snapshot"]["features"]["context"]["near_school"] is False
+            assert (
+                updated["snapshot"]["context_records"][1]["temporal_status"] == "post_event_context"
+            )
+            assert (
+                updated["snapshot"]["features"]["history"]
+                == observed["snapshot"]["features"]["history"]
+            )
+            assert (
+                await service.reproduce_assessment(refreshed["risk"]["assessment_id"])
+            ) == observed
+            assert initial["assessment_id"] != observed["assessment_id"] != updated["assessment_id"]
+            historical = await service.apply_context(
+                outcome["event_id"],
+                [
+                    ContextResult(
+                        source="open_meteo_rain",
+                        status="ok",
+                        fetched_at=(NOW + timedelta(days=2)).isoformat(),
+                        provenance={"provider": "integration_fixture"},
+                        data={
+                            "endpoint": "archive",
+                            "window_start": (NOW - timedelta(days=1)).isoformat(),
+                            "window_end": NOW.isoformat(),
+                            "rain_mm_24h": 2.0,
+                        },
+                    )
+                ],
+            )
+            historical_snapshot = await service.reproduce_assessment(
+                historical["risk"]["assessment_id"]
+            )
+            assert historical_snapshot["replay_matches"] is True
+            assert (
+                historical_snapshot["snapshot"]["context_records"][0]["temporal_status"]
+                == "historical_source"
+            )
+            assert observed["snapshot"]["features"]["context"]["rain_mm_24h"] is None
+            with pytest.raises(Exception, match="snapshot assessment is immutable"):
+                async with session.begin_nested():
+                    await session.execute(
+                        text(
+                            "update public.risk_assessments set factors = "
+                            "jsonb_set(factors, '{phase4_snapshot,feature_schema_version}', "
+                            "'\"fabricated\"'::jsonb) where id=:id"
+                        ),
+                        {"id": observed["assessment_id"]},
+                    )
+            with pytest.raises(Exception, match="snapshot assessment is immutable"):
+                async with session.begin_nested():
+                    await session.execute(
+                        text("update public.risk_assessments set severity='low' where id=:id"),
+                        {"id": observed["assessment_id"]},
+                    )
+            with pytest.raises(Exception, match="archived assessment cannot be deleted"):
+                async with session.begin_nested():
+                    await session.execute(
+                        text("delete from public.events where id=:id"),
+                        {"id": outcome["event_id"]},
+                    )
 
             again = await service.consolidate_capture(first["id"])
             assert again["events"][0] == {
-                "event_id": outcome["event_id"], "created": False, "deduplicated": False
+                "event_id": outcome["event_id"],
+                "created": False,
+                "deduplicated": False,
             }
 
             second = await service.register_capture(capture(2, 0.00005))  # ~2 m do primeiro
@@ -202,14 +774,21 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             assert len(dossier["factors"]["evidence"]["capture_ids"]) == 2
             assert dossier["road_segment_id"] is not None
             assert "DNIT" in dossier["report"]
-            assert dossier["detections"] and all(d["confidence"] >= 0.25 for d in dossier["detections"])
+            assert "Regra aplicada: urmind-risk-rules-v1" in dossier["report"]
+            assert "Incerteza:" not in dossier["report"]
+            assert "Fatores disponíveis:" not in dossier["report"]
+            assert dossier["detections"] and all(
+                d["confidence"] >= 0.25 for d in dossier["detections"]
+            )
 
             review = await service.review_event(
                 outcome["event_id"],
                 ReviewCreate(decision=ReviewDecision.CORRECT, corrected_class=UrmindClass.ROAD_D20),
                 reviewer="revisor-teste",
+                reviewer_role="reviewer",
             )
-            assert review["status"] == "confirmed"
+            assert review["status"] == "review"
+            assert review["ground_truth_status"] == "requires_second_review"
             audit = await session.execute(
                 text("select before_data, after_data from public.audit_log where entity_id = :id"),
                 {"id": outcome["event_id"]},
@@ -219,3 +798,259 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             assert after["corrected_class"] == "URMIND_ROAD_D20"
         finally:
             await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_ground_truth_consensus_export_with_real_storage(database, tmp_path):
+    from PIL import Image
+
+    from app.repositories.core import DecisionRepository
+    from app.schemas.core import DetectionCreate, ReviewCreate, ReviewDecision
+    from app.services.review_export import (
+        eligible_candidates,
+        verify_candidate_objects,
+        write_batch,
+    )
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (90, 20, 10)).save(buffer, format="JPEG")
+    image = validate_image(buffer.getvalue())
+    path = object_path("integration-fixture", image, datetime.now(UTC), upload_id=uuid.uuid4().hex)
+    storage = StorageClient(get_settings())
+    uploaded = await storage.upload(path, image)
+    assert uploaded
+    async with database.sessionmaker() as session:
+        try:
+            suffix = uuid.uuid4().hex
+            dataset_id = await session.scalar(
+                text(
+                    "insert into public.dataset_versions(name, version, source) "
+                    "values (:name, 'integration', 'test_fixture') returning id"
+                ),
+                {"name": f"test-dataset-{suffix}"},
+            )
+            model_id = await session.scalar(
+                text(
+                    "insert into public.model_versions(name, kind, version, dataset_version_id) "
+                    "values (:name, 'vision', 'integration', :dataset_id) returning id"
+                ),
+                {"name": f"test-model-{suffix}", "dataset_id": dataset_id},
+            )
+            service = CoreService(
+                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+            )
+            capture = await service.register_capture(
+                CaptureCreate(
+                    capture_key=f"integration-gt-{suffix}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.GPS_DEVICE,
+                    captured_at=NOW,
+                    storage_path=path,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON, accuracy_m=5),
+                    quality={"sha256": image.sha256, "integration_fixture": True},
+                    detections=[
+                        DetectionCreate(
+                            urmind_class=UrmindClass.ROAD_D40,
+                            confidence=0.91,
+                            bbox={"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+                            model_version_id=model_id,
+                        )
+                    ],
+                )
+            )
+            detection_id = await session.scalar(
+                text("select id from public.detections where capture_id=:capture_id"),
+                {"capture_id": capture["id"]},
+            )
+            event = await service.register_event(
+                EventCreate(
+                    event_key=f"integration-gt-event-{suffix}",
+                    capture_id=capture["id"],
+                    urmind_class=UrmindClass.ROAD_D40,
+                    evidence_mode=EvidenceMode.PHOTO,
+                    occurred_at=NOW,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON, accuracy_m=5),
+                    visual_confidence=0.91,
+                    model_version_id=model_id,
+                    factors={
+                        "evidence": {
+                            "capture_ids": [str(capture["id"])],
+                            "detection_ids": [str(detection_id)],
+                        }
+                    },
+                )
+            )
+            first = await service.review_event(
+                event["id"],
+                ReviewCreate(decision=ReviewDecision.CONFIRM),
+                reviewer=f"integration-reviewer-1-{suffix}",
+                reviewer_role="reviewer",
+            )
+            assert first["ground_truth_status"] == "requires_second_review"
+            assert eligible_candidates(await service.decisions.dataset_candidates()) == []
+            second = await service.review_event(
+                event["id"],
+                ReviewCreate(decision=ReviewDecision.CONFIRM),
+                reviewer=f"integration-reviewer-2-{suffix}",
+                reviewer_role="reviewer",
+            )
+            assert second["ground_truth_status"] == "consensus"
+            records = eligible_candidates(await service.decisions.dataset_candidates())
+            assert len(records) == 1
+            assert records[0]["label"]["inferred_class"] == UrmindClass.ROAD_D40.value
+            assert records[0]["inference_lineage"]["model_version_id"] == model_id
+            assert records[0]["inference_lineage"]["dataset_version_id"] == dataset_id
+            await verify_candidate_objects(records, storage)
+            manifest = write_batch(records, tmp_path)
+            assert manifest["records"] == 1
+            assert manifest["retraining_triggered"] is False
+            assert (tmp_path / manifest["file"]).is_file()
+            conflicting = await service.review_event(
+                event["id"],
+                ReviewCreate(
+                    decision=ReviewDecision.CORRECT,
+                    corrected_class=UrmindClass.ROAD_D20,
+                ),
+                reviewer=f"integration-reviewer-3-{suffix}",
+                reviewer_role="reviewer",
+            )
+            assert conflicting["ground_truth_status"] == "conflicted"
+            assert eligible_candidates(await service.decisions.dataset_candidates()) == []
+            adjudicated = await service.review_event(
+                event["id"],
+                ReviewCreate(decision=ReviewDecision.CONFIRM, adjudicate=True),
+                reviewer=f"integration-admin-{suffix}",
+                reviewer_role="admin",
+            )
+            assert adjudicated["ground_truth_status"] == "adjudicated"
+            assert len(eligible_candidates(await service.decisions.dataset_candidates())) == 1
+        finally:
+            await session.rollback()
+            await storage.delete(path)
+
+
+@pytest.mark.asyncio
+async def test_realtime_delivers_event_change_to_reviewer(database):
+    import httpx
+    from websockets.asyncio.client import connect
+
+    settings = get_settings()
+    assert settings.supabase_url and settings.supabase_secret_key
+    assert settings.supabase_publishable_key
+    admin_headers = {
+        "apikey": settings.supabase_secret_key,
+        "Authorization": f"Bearer {settings.supabase_secret_key}",
+    }
+    email = f"urmind-integration-realtime-{uuid.uuid4().hex}@example.invalid"
+    password = secrets.token_urlsafe(24)
+    user_id = None
+    event_key = f"integration-realtime-{uuid.uuid4().hex}"
+    async with httpx.AsyncClient(timeout=20) as client:
+        try:
+            created = await client.post(
+                f"{settings.supabase_url}/auth/v1/admin/users",
+                headers=admin_headers,
+                json={
+                    "email": email,
+                    "password": password,
+                    "email_confirm": True,
+                    "app_metadata": {"urmind_role": "reviewer"},
+                },
+            )
+            assert created.status_code in (200, 201)
+            user_id = created.json()["id"]
+            login = await client.post(
+                f"{settings.supabase_url}/auth/v1/token?grant_type=password",
+                headers={"apikey": settings.supabase_publishable_key},
+                json={"email": email, "password": password},
+            )
+            assert login.status_code == 200
+            token = login.json()["access_token"]
+            websocket_url = (
+                settings.supabase_url.replace("https://", "wss://")
+                + "/realtime/v1/websocket?vsn=1.0.0&apikey="
+                + settings.supabase_publishable_key
+            )
+            stage = "connect"
+            try:
+                async with connect(websocket_url, open_timeout=10) as socket:
+                    stage = "join"
+                    await socket.send(
+                        json.dumps(
+                            {
+                                "topic": "realtime:urmind-integration",
+                                "event": "phx_join",
+                                "payload": {
+                                    "config": {
+                                        "postgres_changes": [
+                                            {
+                                                "event": "INSERT",
+                                                "schema": "public",
+                                                "table": "events",
+                                            }
+                                        ]
+                                    },
+                                    "access_token": token,
+                                },
+                                "ref": "1",
+                                "join_ref": "1",
+                            }
+                        )
+                    )
+                    reply = json.loads(await asyncio.wait_for(socket.recv(), timeout=10))
+                    assert reply["event"] == "phx_reply"
+                    assert reply["payload"]["status"] == "ok"
+                    stage = "subscription_ready"
+                    subscribed = False
+                    for _ in range(10):
+                        try:
+                            status_message = json.loads(
+                                await asyncio.wait_for(socket.recv(), timeout=2)
+                            )
+                        except TimeoutError:
+                            continue
+                        if (
+                            status_message.get("event") == "system"
+                            and status_message.get("payload", {}).get("status") == "ok"
+                            and status_message.get("payload", {}).get("extension")
+                            == "postgres_changes"
+                        ):
+                            subscribed = True
+                            break
+                    assert subscribed, "Realtime subscription did not become ready"
+                    stage = "insert"
+                    async with database.session() as session:
+                        event_id = await session.scalar(
+                            text(
+                                "insert into public.events(event_key, urmind_class, "
+                                "evidence_mode, occurred_at) values "
+                                "(:key, 'URMIND_ROAD_D40', 'photo', now()) returning id"
+                            ),
+                            {"key": event_key},
+                        )
+                    delivered = False
+                    stage = "receive_change"
+                    for _ in range(12):
+                        try:
+                            message = json.loads(await asyncio.wait_for(socket.recv(), timeout=3))
+                        except TimeoutError:
+                            continue
+                        if message.get("event") == "postgres_changes":
+                            record = message["payload"]["data"]["record"]
+                            if record.get("id") == str(event_id):
+                                delivered = True
+                                break
+                    assert delivered, "Realtime did not deliver committed event"
+            except (OSError, TimeoutError) as exc:
+                raise AssertionError(f"Realtime {stage} failed: {type(exc).__name__}") from None
+        finally:
+            async with database.session() as session:
+                await session.execute(
+                    text("delete from public.events where event_key=:key"), {"key": event_key}
+                )
+            if user_id:
+                deleted = await client.delete(
+                    f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+                    headers=admin_headers,
+                )
+                assert deleted.status_code in (200, 204)

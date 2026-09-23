@@ -63,6 +63,7 @@ def class_label(urmind_class: str) -> str:
 
 
 def summary(row: dict[str, Any]) -> EventSummaryPublic:
+    phase5 = (row.get("factors") or {}).get("phase5") or {}
     return EventSummaryPublic(
         id=row["id"],
         occurred_at=row["occurred_at"],
@@ -72,6 +73,8 @@ def summary(row: dict[str, Any]) -> EventSummaryPublic:
         visual_confidence=row["visual_confidence"],
         severity=row.get("severity"),
         priority_score=row.get("priority_score"),
+        risk_level=(phase5.get("risk") or {}).get("ordinal_level"),
+        priority_lane=(phase5.get("priority") or {}).get("attention_lane"),
         latitude=row.get("latitude"),
         longitude=row.get("longitude"),
         snapped_latitude=row.get("snapped_latitude"),
@@ -136,15 +139,28 @@ def risk_public(row: dict[str, Any] | None) -> RiskPublic | None:
     if row is None:
         return None
     factors = dict(row.get("factors") or {})
-    explanation = explain_priority(factors)
+    phase5 = factors.get("phase5") or {}
+    explanation = (
+        explain_priority(factors)
+        if not phase5
+        else {"increased": [], "decreased": [], "unavailable": [], "baseline": None}
+    )
     return RiskPublic(
         severity=row["severity"],
         priority_score=row.get("priority_score"),
+        risk_level=(phase5.get("risk") or {}).get("ordinal_level"),
+        priority_lane=(phase5.get("priority") or {}).get("attention_lane"),
         uncertainty=row.get("uncertainty"),
         uncertainty_band=uncertainty_band(row.get("uncertainty")),
         coverage=factors.get("coverage"),
-        ruleset_version=factors.get("ruleset_version"),
-        thresholds_are_calibrated=bool(factors.get("thresholds_are_calibrated", False)),
+        ruleset_version=phase5.get("ruleset_version") or factors.get("ruleset_version"),
+        thresholds_are_calibrated=not bool(
+            (phase5.get("decision_trace") or {})
+            .get("provisional_parameters", {})
+            .get("calibration_required", True)
+        )
+        if phase5
+        else bool(factors.get("thresholds_are_calibrated", False)),
         explanation=RiskExplanationPublic.model_validate(explanation),
         limitations=list(factors.get("limitations") or []),
         assessed_at=row.get("created_at"),
@@ -228,7 +244,7 @@ def decision_trace(
             detail=(
                 {
                     "severidade": risk.severity,
-                    "prioridade": risk.priority_score,
+                    "prioridade": risk.priority_lane or risk.priority_score,
                     "incerteza": risk.uncertainty_band,
                 }
                 if risk
