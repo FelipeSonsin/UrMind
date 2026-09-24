@@ -239,13 +239,15 @@ async def public_events(
     return [public_view.summary(row) for row in rows]
 
 
-@router.get("/events/{event_id}", response_model=EventDetailPublic)
+@router.get("/events/{public_id}", response_model=EventDetailPublic)
 async def public_event(
-    event_id: uuid.UUID, repos: Repos, response: Response, user: OptionalUser
+    public_id: str, repos: Repos, response: Response, user: OptionalUser
 ) -> EventDetailPublic:
-    row = await repos["public"].event(event_id, owner_id=user.id if user else None)
+    row = await repos["public"].event(public_id, owner_id=user.id if user else None)
     if row is None:
         raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
+    public_id = row["public_id"]
+    event_id = uuid.UUID(str(row["id"]))
     try:
         dossier = await repos["service"].event_dossier(event_id)
     except EventNotFoundError as exc:  # pragma: no cover - corrida improvável
@@ -271,7 +273,7 @@ async def public_event(
     )
     image = public_view.image_availability(capture, image_quality)
     if image.available:
-        image = image.model_copy(update={"url": f"/api/v1/public/events/{event_id}/image"})
+        image = image.model_copy(update={"url": f"/api/v1/public/events/{public_id}/image"})
     detections = [
         DetectionPublic(
             urmind_class=item["urmind_class"],
@@ -328,7 +330,7 @@ async def public_event(
     detail = EventDetailPublic(
         **base.model_dump(),
         distance_to_road_m=row.get("distance_to_road_m"),
-        location_accuracy_m=row.get("location_accuracy_m"),
+        location_accuracy_m=None,
         road=(
             RoadPublic(
                 name=row.get("road_name"),
@@ -364,9 +366,9 @@ async def public_event(
     return detail.model_copy(update={"analysis": build_urban_analysis(detail)})
 
 
-@router.get("/events/{event_id}/image")
+@router.get("/events/{public_id}/image")
 async def public_event_image(
-    event_id: uuid.UUID,
+    public_id: str,
     repos: Repos,
     storage: Annotated[StorageClient, Depends(get_storage)],
     request: Request,
@@ -380,9 +382,10 @@ async def public_event_image(
         else f"peer:{request.client.host if request.client else 'unknown'}"
     )
     await _admit_image(quota, caller)
-    row = await repos["public"].event(event_id)
+    row = await repos["public"].event(public_id)
     if row is None or not row.get("capture_id"):
         raise HTTPException(status_code=404, detail="Imagem não disponível")
+    event_id = uuid.UUID(str(row["id"]))
     capture = await repos["service"].captures.get(row["capture_id"])
     quality = (capture.quality or {}) if capture else {}
     derivative = row.get("publication_image")

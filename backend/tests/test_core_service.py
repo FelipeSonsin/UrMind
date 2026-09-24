@@ -196,6 +196,7 @@ def capture() -> CaptureCreate:
 async def test_capture_reenvio_e_idempotente():
     existing = FakeEventRow()
     existing.capture_key = "cap-0001"
+    existing.protocol_code = "URM-7K3Q9XYZ"
     service = CoreService(FakeCaptureRepo(existing=existing), FakeEventRepo())
     result = await service.register_capture(capture())
     assert result["created"] is False
@@ -276,6 +277,7 @@ async def test_capture_marker_without_model_has_no_invented_analysis():
 
     row = {
         "id": "capture",
+        "public_id": "a732cb867fd24d188f0f234afde8a664",
         "latitude": -23,
         "longitude": -46,
         "processing_status": "model_not_available",
@@ -525,3 +527,33 @@ async def test_owner_report_list_retains_unlocated_capture_without_inventing_a_p
     captures.report_markers.assert_awaited_once_with(
         "owner", False, public=False, include_unlocated=True
     )
+
+
+@pytest.mark.asyncio
+async def test_generic_public_marker_uses_independent_identity_and_rounded_location():
+    internal_id = uuid4()
+    captures = SimpleNamespace(
+        report_markers=AsyncMock(
+            return_value=[
+                {
+                    "id": internal_id,
+                    "public_id": "K7HZP3XQ9M4RT6WY",
+                    "latitude": -23.123456,
+                    "longitude": -46.654321,
+                    "accuracy_m": 3,
+                    "user_description": "private",
+                    "protocol_code": "URM-7K3Q9",
+                }
+            ]
+        )
+    )
+    result = await CoreService(captures, SimpleNamespace()).capture_markers("", public=True)
+    assert result == [
+        {
+            "id": "K7HZP3XQ9M4RT6WY",
+            "latitude": -23.1235,
+            "longitude": -46.6543,
+            "report_status": "received",
+        }
+    ]
+    assert str(internal_id) not in str(result)

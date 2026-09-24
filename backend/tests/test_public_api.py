@@ -114,6 +114,7 @@ def test_public_image_db_quota_failure_is_closed_and_redacted(client):
 
 ROW = {
     "id": "0b0e4c7e-1111-4222-8333-944445555666",
+    "public_id": "a732cb867fd24d188f0f234afde8a664",
     "occurred_at": NOW,
     "urmind_class": "URMIND_ROAD_D40",
     "status": "detected",
@@ -136,6 +137,14 @@ FACTORS = {
     "contributions": {"severity": 0.25, "confidence": 0.61, "recurrence": 0.0},
     "unavailable": {"environment": "indisponível: sem dado meteorológico"},
 }
+
+
+def test_public_summary_does_not_expose_internal_identity_or_precise_coordinates():
+    result = public_view.summary({**ROW, "latitude": -23.1234567, "longitude": -46.1234567})
+    assert result.id == ROW["public_id"]
+    assert ROW["id"] not in result.model_dump_json()
+    assert result.latitude == -23.1235 and result.longitude == -46.1235
+    assert result.snapped_latitude is None and result.snapped_longitude is None
 
 
 def _settings(**overrides: str) -> Settings:

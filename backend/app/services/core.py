@@ -108,9 +108,19 @@ class CoreService:
         existing = await self.captures.get_by_key(payload.capture_key)
         if existing is not None:
             # Reenvio idempotente: devolve o que já existe em vez de duplicar.
-            return {"id": existing.id, "capture_key": existing.capture_key, "created": False}
+            return {
+                "id": existing.id,
+                "capture_key": existing.capture_key,
+                "protocol_code": existing.protocol_code,
+                "created": False,
+            }
         capture = await self.captures.create(payload)
-        return {"id": capture.id, "capture_key": capture.capture_key, "created": True}
+        return {
+            "id": capture.id,
+            "capture_key": capture.capture_key,
+            "protocol_code": capture.protocol_code,
+            "created": True,
+        }
 
     async def capture_markers(
         self,
@@ -133,6 +143,9 @@ class CoreService:
             }
             if public:
                 # Opt-in public layer is deliberately generic: no analysis, owner, EXIF or media.
+                marker["id"] = row["public_id"]
+                marker["latitude"] = round(row["latitude"], 4)
+                marker["longitude"] = round(row["longitude"], 4)
                 markers.append(marker)
                 continue
             status = row.get("processing_status")
@@ -155,8 +168,11 @@ class CoreService:
                         "user_description",
                         "location_conflict",
                         "event_id",
+                        "event_public_id",
                         "created_at",
                         "photo_gate",
+                        "protocol_code",
+                        "public_id",
                     )
                 }
             )
@@ -220,9 +236,13 @@ class CoreService:
             status = CaptureProcessingStatus.QUEUED
         return {
             "capture_id": capture.id,
+            "protocol_code": getattr(capture, "protocol_code", None),
             "status": status.value,
             "requires_manual_location": capture.point is None,
             "event_ids": [event.id for event in events],
+            "event_public_ids": [
+                event.public_id for event in events if getattr(event, "public_id", None)
+            ],
             "model_version_id": inference.get("model_version_id"),
             "model_status": inference.get("model_status"),
             "updated_at": inference.get("completed_at") or inference.get("at"),

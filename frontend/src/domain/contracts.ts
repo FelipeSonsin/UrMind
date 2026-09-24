@@ -60,6 +60,7 @@ export function parseCoordinate(latitude: string, longitude: string): Coordinate
 }
 
 export const uploadResultSchema = z.object({
+  protocol_code: z.string().optional(),
   id: z.string().uuid(),
   capture_key: z.string(),
   created: z.boolean(),
@@ -70,6 +71,8 @@ export const uploadResultSchema = z.object({
 export type UploadResult = z.infer<typeof uploadResultSchema>;
 
 export const captureProcessingSchema = z.object({
+  protocol_code: z.string().nullable().optional(),
+  event_public_ids: z.array(z.string()).default([]),
   capture_id: z.string().uuid(),
   status: z.enum([
     'received',
@@ -97,7 +100,9 @@ export const captureProcessingSchema = z.object({
 export type CaptureProcessing = z.infer<typeof captureProcessingSchema>;
 
 export const captureMarkerSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(12),
+  protocol_code: z.string().nullable().optional(),
+  public_id: z.string().nullable().optional(),
   latitude: z.number().finite().min(-90).max(90).nullable(),
   longitude: z.number().finite().min(-180).max(180).nullable(),
   created_at: z.string().nullable().optional(),
@@ -119,6 +124,7 @@ export const captureMarkerSchema = z.object({
     'location_required',
   ]),
   event_id: z.string().uuid().nullable().optional(),
+  event_public_id: z.string().nullable().optional(),
   user_description: z.string().nullable().optional(),
   location_source: z.string().optional(),
   location_conflict: z.boolean().nullable().optional(),

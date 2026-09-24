@@ -76,6 +76,45 @@ async def test_postgis_disponivel(database):
 
 
 @pytest.mark.asyncio
+async def test_report_identity_unique_server_generated_and_owner_lookup(database):
+    import re
+
+    owner = str(uuid.uuid4())
+    async with database.session() as session:
+        repo = CaptureRepository(session)
+        identities, protocols = set(), set()
+        for _ in range(20):
+            row = await repo.create(
+                CaptureCreate(
+                    capture_key=f"identity-test-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.UNKNOWN,
+                    captured_at=NOW,
+                    quality={"uploaded_by": owner},
+                )
+            )
+            assert re.fullmatch(r"[a-f0-9]{32}", row.public_id)
+            assert row.public_id != row.id.hex
+            assert re.fullmatch(r"URM-[2-9A-HJ-NP-Z]{8}", row.protocol_code)
+            assert row.public_id not in identities and row.protocol_code not in protocols
+            identities.add(row.public_id)
+            protocols.add(row.protocol_code)
+        assert await repo.get_by_protocol(row.protocol_code, owner) is row
+        assert await repo.get_by_protocol(row.protocol_code, str(uuid.uuid4())) is None
+        # Constraints remain the final protection, even for direct runtime SQL.
+        with pytest.raises(exc.IntegrityError):
+            async with session.begin_nested():
+                await session.execute(
+                    text("update public.captures set protocol_code=:code where public_id=:id"),
+                    {
+                        "code": row.protocol_code,
+                        "id": next(value for value in identities if value != row.public_id),
+                    },
+                )
+        await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_photo_report_marker_exif_storage_owner_and_missing_location(database):
     """Real Storage + PostGIS + queue + RLS. No Auth change, model or fake Event."""
     from fastapi import UploadFile

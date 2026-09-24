@@ -118,14 +118,19 @@ interface Route {
   page: Page;
   eventId?: string;
   captureId?: string;
+  protocol?: string;
 }
 /** Rotas por hash: `#/`, `#/live`, `#/events`, `#/events/<id>`… sem dependência nova. */
 function parseRoute(): Route {
-  const [, first = '', second = '', third = ''] = location.hash.replace(/^#\/?/, '/').split('/');
+  const [, first = '', second = '', third = ''] = location.hash
+    .split('?')[0]
+    .replace(/^#\/?/, '/')
+    .split('/');
   const path = `#/${first}`;
   if ((first === 'events' || first === 'resultado') && second)
     return { page: 'event-detail', eventId: second };
   if (first === 'processando' && second) return { page: 'processing', captureId: second };
+  if (first === 'relato' && second) return { page: 'processing', protocol: second };
   if (first === 'registrar') return { page: 'capture' };
   if (first === 'mapa') return { page: 'map' };
   if (first === 'transparency') return { page: 'analysis' };
@@ -539,6 +544,22 @@ export default function App() {
       window.clearInterval(timer);
     };
   }, [route.page, route.captureId, session, processingRetry]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (route.protocol && session) {
+      api
+        .captureByProtocol(route.protocol, controller.signal)
+        .then((report) => {
+          if (!controller.signal.aborted)
+            setRoute((current) => ({ ...current, captureId: report.capture_id }));
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setNotice('Relato não encontrado nesta sessão.');
+        });
+    }
+    return () => controller.abort();
+  }, [route.protocol, session]);
   function navigate(next: Page) {
     const target = navigation.find((item) => item.id === next);
     location.hash = target?.href ?? '#/';
@@ -753,12 +774,28 @@ export default function App() {
                 <h1>Processamento da foto</h1>
                 {!session ? <p>Recuperando sessão segura desta captura…</p> : null}
                 {captureStatus && <p role="status">Etapa: {captureStatus.status}</p>}
+                {captureStatus?.protocol_code && (
+                  <p>
+                    Protocolo: <strong>{captureStatus.protocol_code}</strong>{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(captureStatus.protocol_code!).then(
+                          () => setNotice('Protocolo copiado.'),
+                          () => setNotice('Selecione o protocolo e copie manualmente.'),
+                        );
+                      }}
+                    >
+                      Copiar protocolo
+                    </button>
+                  </p>
+                )}
                 {captureStatus?.model_status === 'EXPERIMENTAL_SHADOW' && (
                   <p className="notice">Análise experimental — modelo rejeitado para produção.</p>
                 )}
                 {captureStatus &&
                   ['completed', 'needs_review'].includes(captureStatus.status) &&
-                  captureStatus.event_ids.map((id) => (
+                  captureStatus.event_public_ids.map((id) => (
                     <p key={id}>
                       <a href={`#/resultado/${id}`}>Ver ocorrência no mapa</a>
                     </p>
@@ -856,6 +893,9 @@ export default function App() {
                         {reportLabels[report.report_status]}
                       </button>
                       {report.user_description && <p>{report.user_description}</p>}
+                      {report.protocol_code && (
+                        <a href={`#/relato/${report.protocol_code}`}>{report.protocol_code}</a>
+                      )}
                       {report.created_at && (
                         <time dateTime={report.created_at}>
                           {new Date(report.created_at).toLocaleString('pt-BR')}
@@ -867,8 +907,8 @@ export default function App() {
                       {report.location_conflict && (
                         <p>GPS do dispositivo e EXIF divergentes — necessita revisão.</p>
                       )}
-                      {report.event_id && (
-                        <a href={`#/resultado/${report.event_id}`}>Ver análise</a>
+                      {report.event_public_id && (
+                        <a href={`#/resultado/${report.event_public_id}`}>Ver análise</a>
                       )}
                     </li>
                   ))}

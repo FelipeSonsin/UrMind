@@ -167,6 +167,17 @@ async def capture_processing(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.get("/captures/by-protocol/{protocol}")
+async def capture_by_protocol(
+    protocol: str, user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    response.headers["Cache-Control"] = "private, no-store"
+    capture = await service.captures.get_by_protocol(protocol, user.id)
+    if capture is None:
+        raise HTTPException(status_code=404, detail="Relato não encontrado")
+    return {"capture_id": capture.id, "protocol_code": capture.protocol_code}
+
+
 @router.get("/captures/markers")
 async def capture_markers(
     user: CurrentUser,
@@ -438,6 +449,7 @@ async def _deduplicated_capture(
     )
     return {
         "id": existing.id,
+        "protocol_code": existing.protocol_code,
         "capture_key": existing.capture_key,
         "created": False,
         "requires_manual_location": existing.point is None,

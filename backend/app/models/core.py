@@ -17,6 +17,7 @@ from sqlalchemy import (
     CheckConstraint,
     Computed,
     DateTime,
+    FetchedValue,
     Float,
     ForeignKey,
     Identity,
@@ -207,6 +208,8 @@ class Capture(Base):
     __tablename__ = "captures"
 
     id: Mapped[uuid.UUID] = _pk()
+    public_id: Mapped[str] = mapped_column(Text, unique=True, server_default=FetchedValue())
+    protocol_code: Mapped[str] = mapped_column(Text, unique=True, server_default=FetchedValue())
     capture_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     mission_id: Mapped[uuid.UUID | None] = mapped_column(
         _UUID, ForeignKey("public.missions.id", ondelete="SET NULL")
@@ -272,6 +275,9 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[uuid.UUID] = _pk()
+    public_id: Mapped[str] = mapped_column(
+        Text, unique=True, server_default=func.replace(func.gen_random_uuid().cast(Text), "-", "")
+    )
     event_sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
     commit_order: Mapped[int | None] = mapped_column(BigInteger)
     order_source: Mapped[str] = mapped_column(

@@ -1,5 +1,17 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Continuação — identidade, 24/09/2026
+
+- Base anterior preservada no commit `e8853c7` (`feat(base): meus-relatos, sobre, mapa, porteiro técnico`). Os cinco arquivos locais em datasets/reports não entraram.
+- Migration `0023_report_identity`: public_id aleatório independente em Capture/Event, protocolo URM sem caracteres ambíguos, backfill, índices únicos e geração server-side com repetição limitada e advisory lock por candidato. Downgrade recusa descartar identidades já emitidas.
+- DEV impm…ggy: upgrade → downgrade → upgrade executados; banco sem Capture/Event antes da operação. Nenhum `.env` ou Auth alterado.
+- Consulta por protocolo vinculada ao proprietário, rota `#/relato/:protocolo`, protocolo copiável e recuperável após refresh. APIs públicas de Event/imagem resolvem identificador público; DTOs não devolvem UUID interno. Camada pública genérica usa public_id e coordenada arredondada. Links do resultado do proprietário usam event_public_ids.
+- Reuso: CaptureRepository, CoreService, rotas existentes, schemas e UrbanMap; nenhuma API de upload, fila ou mapa paralela.
+- Teste novo reproduziu UUID/coordenada precisa públicos antes da correção. Backend full: **1248 passed / 22 skipped** (21 DEV opt-in + 1 provider externo). DEV focado: **2 passed / 19 deselected**, Storage/EXIF/marcador e 20 identidades com isolamento por proprietário e constraint de colisão; fixtures limpas.
+- Frontend: **45 Vitest passed; 108 Playwright passed / 2 real-E2E skipped**. Quatro falhas iniciais de fixtures que ainda usavam event_ids internos foram corrigidas para event_public_ids, sem fallback público ao UUID interno. Build/TypeScript/Ruff/mypy/diff check passaram.
+- Limite: retry aleatório de colisão está implementado; a integração exercitou a constraint de colisão, não forçou a RNG a repetir um candidato. E2E sem modelo → revisão → publicação pertence ao bloco seguinte e ainda não está comprovado. Os blocos 2–6 não são considerados concluídos por esta evidência.
+
+
 ## Checkpoint
 
 Branch `feature/areas-mapa-porteiro`; checkpoint `63d730d` preserva trabalho anterior, não comprova novas funcionalidades. 134 arquivos; 26906 inserções e 1582 exclusões preexistentes. Nenhum push. Inclui alterações preexistentes em contratos Scout, sem alteração nesta tarefa. Excluídos os cinco relatórios/imagens locais em datasets/reports; nenhum raw, peso, .env real, cache ou build adicionado. Busca de padrões de tokens/segredos nos candidatos não encontrou ocorrências; isso não é certificação exaustiva de segurança.

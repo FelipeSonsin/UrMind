@@ -170,7 +170,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
     timeout: 180_000,
   });
   const eventHref = await eventLink.getAttribute('href');
-  const eventId = /^#\/resultado\/([0-9a-f-]{36})$/i.exec(eventHref ?? '')?.[1];
+  const eventId = /^#\/resultado\/([0-9a-f]{32})$/i.exec(eventHref ?? '')?.[1];
   if (!eventId) throw new Error('Capture concluída sem Event identificável');
   const unpublished = await request.get(`/api/v1/public/events/${eventId}`);
   expect(unpublished.status()).toBe(404);

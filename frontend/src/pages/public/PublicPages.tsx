@@ -283,7 +283,9 @@ export function PublicMapPage({
   events: PublicEvent[];
   reports?: CaptureMarker[];
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() =>
+    new URLSearchParams(location.hash.split('?')[1] ?? '').get('ponto'),
+  );
   const [pointDetail, setPointDetail] = useState<PublicEventDetail | null>(null);
   const [pointError, setPointError] = useState('');
   useEffect(() => {
@@ -304,8 +306,8 @@ export function PublicMapPage({
   }, [selected, events]);
   const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
   const markers = useMemo(() => {
-    const reportIds = new Set(reports.map((report) => report.id));
-    const eventIds = new Set(reports.map((report) => report.event_id));
+    const reportIds = new Set(reports.map((report) => report.public_id));
+    const eventIds = new Set(reports.map((report) => report.event_public_id));
     return [
       ...events.filter((event) => !eventIds.has(event.id)),
       ...(generic ?? []).filter((report) => !reportIds.has(report.id)),
@@ -325,7 +327,12 @@ export function PublicMapPage({
         <UrbanMap
           events={markers}
           selectedId={selected}
-          onSelect={setSelected}
+          onSelect={(id) => {
+            setSelected(id);
+            if (events.some((event) => event.id === id)) {
+              history.replaceState(null, '', `#/mapa?ponto=${encodeURIComponent(id)}`);
+            }
+          }}
           onCloseDetail={() => setSelected(null)}
           detail={
             selected && (

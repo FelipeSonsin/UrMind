@@ -122,6 +122,7 @@ test('recupera a captura pela URL após refresh sem antecipar análise', async (
   await signedIn(page);
   const captureId = '2b120c24-7ff1-4f58-bda8-c2f82a94fc05';
   const eventId = 'cc12fe42-66d6-4791-a6c3-5a6f2a8734b9';
+  const publicId = 'a732cb867fd24d188f0f234afde8a664';
   let stage: 'detection_completed' | 'completed' = 'detection_completed';
   let reads = 0;
   await page.route(`**/api/v1/captures/${captureId}/processing`, async (route) => {
@@ -132,6 +133,8 @@ test('recupera a captura pela URL após refresh sem antecipar análise', async (
         status: stage,
         requires_manual_location: false,
         event_ids: [eventId],
+        event_public_ids: [publicId],
+        protocol_code: 'URM-7K3Q9XYZ',
         model_version_id: null,
         model_status: 'EXPERIMENTAL_SHADOW',
         updated_at: null,
@@ -149,7 +152,7 @@ test('recupera a captura pela URL após refresh sem antecipar análise', async (
   await page.reload();
   await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveAttribute(
     'href',
-    `#/resultado/${eventId}`,
+    `#/resultado/${publicId}`,
   );
 });
 
@@ -161,6 +164,34 @@ test('rota de captura alheia mostra acesso negado', async ({ page }) => {
   );
   await page.goto(`/#/processando/${captureId}`);
   await expect(page.getByRole('alert')).toContainText('Captura não encontrada ou sem acesso');
+});
+
+test('protocolo recupera apenas o relato da sessão e sobrevive ao refresh', async ({ page }) => {
+  await signedIn(page);
+  const captureId = '2b120c24-7ff1-4f58-bda8-c2f82a94fc05';
+  await page.route('**/api/v1/captures/by-protocol/URM-7K3Q9XYZ', (route) =>
+    route.fulfill({ json: { capture_id: captureId, protocol_code: 'URM-7K3Q9XYZ' } }),
+  );
+  await page.route(`**/api/v1/captures/${captureId}/processing`, (route) =>
+    route.fulfill({
+      json: {
+        capture_id: captureId,
+        protocol_code: 'URM-7K3Q9XYZ',
+        status: 'model_not_available',
+        requires_manual_location: false,
+        event_ids: [],
+        event_public_ids: [],
+        model_version_id: null,
+        model_status: null,
+        updated_at: null,
+      },
+    }),
+  );
+  await page.goto('/#/relato/URM-7K3Q9XYZ');
+  await expect(page.getByRole('button', { name: 'Copiar protocolo' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Etapa: model_not_available')).toBeVisible();
+  await expect(page.getByText('URM-7K3Q9XYZ', { exact: true })).toBeVisible();
 });
 
 test('logout em outra aba remove o resultado e interrompe consultas da captura', async ({
@@ -177,6 +208,7 @@ test('logout em outra aba remove o resultado e interrompe consultas da captura',
         status: 'completed',
         requires_manual_location: false,
         event_ids: ['cc12fe42-66d6-4791-a6c3-5a6f2a8734b9'],
+        event_public_ids: ['a732cb867fd24d188f0f234afde8a664'],
         model_version_id: null,
         model_status: 'EXPERIMENTAL_SHADOW',
         updated_at: null,

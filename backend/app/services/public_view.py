@@ -69,7 +69,7 @@ def class_label(urmind_class: str) -> str:
 def summary(row: dict[str, Any]) -> EventSummaryPublic:
     phase5 = (row.get("factors") or {}).get("phase5") or {}
     return EventSummaryPublic(
-        id=row["id"],
+        id=row["public_id"],
         occurred_at=row["occurred_at"],
         urmind_class=row["urmind_class"],
         status=row["status"],
@@ -79,10 +79,10 @@ def summary(row: dict[str, Any]) -> EventSummaryPublic:
         priority_score=row.get("priority_score"),
         risk_level=(phase5.get("risk") or {}).get("ordinal_level"),
         priority_lane=(phase5.get("priority") or {}).get("attention_lane"),
-        latitude=row.get("latitude"),
-        longitude=row.get("longitude"),
-        snapped_latitude=row.get("snapped_latitude"),
-        snapped_longitude=row.get("snapped_longitude"),
+        latitude=round(row["latitude"], 4) if row.get("latitude") is not None else None,
+        longitude=round(row["longitude"], 4) if row.get("longitude") is not None else None,
+        snapped_latitude=None,
+        snapped_longitude=None,
         road_name=row.get("road_name"),
     )
 

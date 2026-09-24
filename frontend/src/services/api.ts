@@ -95,6 +95,12 @@ async function request<T>(
 }
 
 export const api = {
+  captureByProtocol: (protocol: string, signal?: AbortSignal) =>
+    request(
+      `/captures/by-protocol/${encodeURIComponent(protocol)}`,
+      z.object({ capture_id: z.string().uuid(), protocol_code: z.string() }),
+      { signal },
+    ),
   captureMarkers: (signal?: AbortSignal, onlyMine = false) =>
     request(
       `/captures/markers${onlyMine ? '?only_mine=true&include_unlocated=true' : ''}`,

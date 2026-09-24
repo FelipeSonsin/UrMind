@@ -41,7 +41,7 @@ export type PublicScout = z.infer<typeof publicScoutSchema>;
 export type ScoutCamera = z.infer<typeof scoutCameraSchema>;
 
 export const publicEventSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(12),
   occurred_at: z.string(),
   urmind_class: z.string(),
   status: z.string(),

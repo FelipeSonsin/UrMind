@@ -11,7 +11,6 @@ disponível", nunca um valor inventado.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any, Literal
 
@@ -127,7 +126,7 @@ class TraceStep(PublicModel):
 
 
 class EventSummaryPublic(PublicModel):
-    id: uuid.UUID
+    id: str
     occurred_at: datetime
     urmind_class: str
     status: str

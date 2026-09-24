@@ -170,18 +170,20 @@ class CaptureRepository:
         rows = await self.session.execute(
             text(
                 """
-            select c.id, c.created_at, ST_Y(c.point::geometry) latitude, ST_X(c.point::geometry) longitude,
+            select c.id, c.public_id, c.protocol_code, c.created_at,
+                   ST_Y(c.point::geometry) latitude, ST_X(c.point::geometry) longitude,
                    c.source_location as location_source, c.accuracy_m, c.user_description,
                    c.quality->'location_conflict' as location_conflict,
                    c.quality->'photo_gate' as photo_gate,
                    c.quality->'inference'->>'status' as processing_status,
                    c.quality->'inference'->>'model_status' as model_status,
-                   e.id as event_id, e.urmind_class, e.status as event_status,
+                   e.id as event_id, e.public_id as event_public_id,
+                   e.urmind_class, e.status as event_status,
                    exists(select 1 from public.reviews rv where rv.event_id=e.id) as has_review,
                    risk.severity, risk.priority_score
             from public.captures c
             left join lateral (
-                select id, urmind_class, status, factors from public.events
+                select id, public_id, urmind_class, status, factors from public.events
                 where capture_id = c.id or (
                     c.quality->'inference'->'event_ids' @> to_jsonb(events.id::text)
                     and exists(select 1 from public.captures owner_capture
@@ -266,6 +268,15 @@ class CaptureRepository:
     async def get_by_key(self, capture_key: str) -> Capture | None:
         result = await self.session.execute(
             select(Capture).where(Capture.capture_key == capture_key)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_protocol(self, protocol: str, owner: str) -> Capture | None:
+        result = await self.session.execute(
+            select(Capture).where(
+                Capture.protocol_code == protocol,
+                Capture.quality["uploaded_by"].astext == owner,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -1222,7 +1233,7 @@ class PublicRepository:
     )
 
     _SUMMARY = (
-        "select e.id, e.occurred_at, e.urmind_class, e.status, e.evidence_mode, "
+        "select e.id, e.public_id, e.occurred_at, e.urmind_class, e.status, e.evidence_mode, "
         "e.visual_confidence, e.location_accuracy_m, e.distance_to_road_m, "
         "ST_Y(e.point::geometry) as latitude, ST_X(e.point::geometry) as longitude, "
         "ST_Y(e.snapped_point::geometry) as snapped_latitude, "
@@ -1273,7 +1284,7 @@ class PublicRepository:
         return [dict(row) for row in result.mappings()]
 
     async def event(
-        self, event_id: uuid.UUID, *, owner_id: str | None = None
+        self, event_id: uuid.UUID | str, *, owner_id: str | None = None
     ) -> dict[str, Any] | None:
         access = f"({self._PUBLISHED})"
         params: dict[str, Any] = {"event_id": event_id}
@@ -1285,8 +1296,9 @@ class PublicRepository:
                 "e.factors->'evidence'->'capture_ids' @> jsonb_build_array(oc.id::text)))"
             )
             params["owner_id"] = owner_id
+        identity_column = "e.id" if isinstance(event_id, uuid.UUID) else "e.public_id"
         result = await self.session.execute(
-            text(f"{self._SUMMARY} where e.id = :event_id and ({access})"), params
+            text(f"{self._SUMMARY} where {identity_column} = :event_id and ({access})"), params
         )
         row = result.mappings().first()
         return dict(row) if row else None

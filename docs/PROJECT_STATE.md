@@ -1,5 +1,13 @@
 # Estado operacional do UrMind
 
+## Continuação Áreas/Mapa/Porteiro — identidade (24/09/2026)
+
+Head DEV: `0023_report_identity`, upgrade/downgrade/upgrade verificados.
+Identidade pública independente e protocolo do proprietário implementados; detalhe no relatório AREAS_MAPA_PORTEIRO.
+Baseline desta alteração: backend 1248 passed / 22 skipped; DEV focado 2 passed;
+Vitest 45 passed; Playwright 108 passed / 2 skipped; Ruff/mypy/TypeScript/build/diff verdes.
+Ainda não representa conclusão dos blocos 2–6 nem prova de revisão/publicação real sem modelo.
+
 ## Áreas, mapa e porteiro — rodada parcial de24/09/2026
 
 Branch `feature/areas-mapa-porteiro`, checkpoint `63d730d`. Reutilizados mapa/upload/Storage/relatos.
