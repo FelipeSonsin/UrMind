@@ -1,5 +1,34 @@
 # Estado operacional do UrMind
 
+## Continuação vigente — 24/09/2026, fechamento em verificação
+
+IMPLEMENTATION_STATUS=PARTIAL. Head DEV único `0029_geocoding_coordination`, com
+upgrade/downgrade/upgrade verificados; novas tabelas de cache/lease privadas com RLS.
+Timeline allowlisted do titular, navegação mobile interna, keyset e export de relatos
+em streaming de lotes100 (teste1200), histórico/retry de endereço sem depender do
+modelo, métricas agregadas e health observado estendem os componentes existentes.
+Auth real e Realtime autorizados: titular/revisor receberam Capture em0,391s;
+visitante B não recebeu em5s; publicação humana e limpeza de fixtures comprovadas.
+Integração usa imagem sintética e funções canônicas: não é foto real/celular.
+Script HTTPS executado com API/Worker e QR externo, health/ready/CSP OK, encerrado
+automaticamente. Auth URLs/.env não alterados. CLIP/YuNet `UNCALIBRATED`,
+sem inferência real nesta continuação; fotos autorizadas
+e inspeção de desfoque ainda faltam. Gates não aprovam treinamento.
+Complemento: Models também paginados por cursor; Captures localizadas recebem
+`report_context` degradável (clima/SIDRA/via PostGIS) sem depender de Event/modelo.
+GT: contagens globais e export NDJSON em lotes de 100 passaram com 1200 Events
+sintéticos; `training_authorized=false`, sem DatasetVersion aprovada.
+Com Worker real concorrente, corrigida revalidação de publicação para aceitar
+atualizações operacionais de Capture sem afrouxar revisão/evidência; teste de fila
+conta job ativo ou arquivado. Script da feira recusa Worker preexistente.
+Regressão atual: backend 1303 passed/34 skipped; integração DEV 33 passed
+com Worker ativo; Vitest 48; Playwright 126 passed/2 skipped;
+Ruff/mypy/TypeScript/Prettier/build verdes.
+OPEN: filtros/ordenação globais da fila; recorte OSM após confirmar centro; corpus de
+calibração e celular físico. Evidências e testes finais
+no relatório `docs/audits/AREAS_MAPA_PORTEIRO_DIAGNOSIS_2026-09-24.md`.
+Registros abaixo são históricos quando contradizem esta seção.
+
 ## Áreas/Mapa/Porteiro — fechamento do bloco 6 (24/09/2026)
 
 Estado vigente acima dos registros históricos abaixo: IMPLEMENTATION_STATUS=PARTIAL;

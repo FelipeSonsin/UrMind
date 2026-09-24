@@ -1,5 +1,214 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Fechamento: evidências novas de 24/09/2026
+
+**Status vigente: PARTIAL. Não equivale a 100% nem a treinamento autorizado.**
+Esta seção substitui estados operacionais históricos abaixo, preservando evidências.
+
+### Implementação e provas
+
+| Item | Estado | Evidência / detalhe restante |
+|---|---|---|
+| A1 | DONE em código | Timeline do titular allowlisted, testes de ordenação/ownership; revisão sem identidade/notas/AuditLog bruto |
+| A2 | PARTIAL | Navegação interna em 320 px; keyset Captures/Events/Audit/GT/Models; 1200 Captures isoladas sem perda. Contagem GT global e export NDJSON em lotes passaram com 1200 Events sintéticos; faltam filtros globais/ordenação da fila. |
+| B | PARTIAL | Mapa canônico, filtros/painéis/publicação preservados; falta prova no telefone e OSM confirmado |
+| C1 | PARTIAL | Qualidade/duplicatas; taxas por motivo/período; estimativa retrospectiva de rejeição seguida por reenvio do titular em24h e confirmação humana. Não prova mesma foto nem causalidade; contestações explícitas ainda não registradas |
+| C2 | BLOCKED_INPUT | CLI com testes de scores simulados; corpus externo não fornecido; UNCALIBRATED não ativa inferência |
+| C4 | BLOCKED_INPUT | Gate de recall/FP e validação dos hashes; faltam fotos de rostos e inspeção humana |
+| D1 | DONE em código | Protocolo/public_id preservados e regressões DEV |
+| D2 | DONE em código | Anexação/desanexação canônicas preservadas; regressão/limpeza DEV |
+| D3 | DONE em código | Cache/leasePG global, revisão/manual invalidam endereço; histórico, retry Worker e CAS contra resposta tardia; duas enginesDEV concorrentes respeitaram intervalo≥1s |
+| D4 | DONE em código | ExportCSV/GeoJSON backend em streaming, lotes100 keyset, filtros; teste1200sem repetição/PII. Browser reúneBlob para download; visualização ainda paginada |
+| D5 | DONE em código | Sugestão condicional existente preservada; não envia automaticamente |
+| D6 | BLOCKED_INPUT | SanitizaçãoEXIF preservada; primitiveblur compartilhada/calibração; desfoque automático não ativado sem evidência humana/calibração |
+| D7 | DONE em código | Consentimento/RLS existentes preservados |
+| D8 | DONE em código | Taxonomia única existente; candidatos não apresentados como IA |
+| Integrações | PARTIAL | 20 entradas; 11 sondagens/provedor/metadata e 9 estados de catálogo; saúde persistida em AuditLog e painel somente leitura. Capture com ponto recebe endereço, clima, SIDRA configurado e via PostGIS mesmo sem Event; OSM persistente depende da confirmação do centro. |
+| Implantação | PARTIAL | Script HTTPS/API/Worker/QR e DryRun; recusa Worker preexistente e encerra apenas árvores próprias; falta validação física e URL vigente da feira no Auth, sem serviço permanente/restart automático |
+
+### Auth, Realtime e limpeza
+
+`test_supabase_auth_real_roles_login_and_jwks` e
+`test_realtime_delivers_event_change_to_reviewer` executados no DEV; usuários
+`urmind-e2e-*`, purpose=e2e, removidos junto com sessões. Nenhum usuário real/Auth
+config alterado. Novo `test_realtime_report_owner_isolation_and_human_publication`:
+duas sessões anônimas, reviewer e admin reais; tokens verificados por JWKS;
+Storage/Postgres/Realtime reais. Capture criada por upload canônico, Event apenas
+por confirmação humana, nunca INSERT de Detection/Event nesse teste.
+Latência após commit: autor0,391s, reviewer0,391s; B não recebeu por5s.
+Publicação inicialmente recusou corretamente revisão de outro autor (409); o
+harness passou a exigir revisão atual do publicador, sem enfraquecer a guarda.
+Limpeza comprovada por IDs exatos: users0/sessions0/Captures0/Events0 e objetosStorage
+removidos. É integração com imagem sintética/funçõesAPI, não navegador/foto real.
+
+### Nominatim / migrations
+
+`0029_geocoding_coordination` após0028, únicohead. Up/down/up DEV executados;
+cache7dias e lease30s, intervalo1s após conclusão HTTP, uma tentativa por lease.
+RLS/revokes; downgrade recusa lease ativo. Ausência/falha de coordenação não permite
+fallbackHTTP irrestrito. Worker tenta endereço pendente sem precisar do detector;
+alteração de ponto preserva histórico e usa request_id para descartar resposta velha.
+Consultas de saúde Nominatim usam o mesmo lease. Teste usa duas engines/pools,
+não dois processosOS; atomicidade exercitada emPostgreSQL real.
+
+### Calibração: ferramenta pronta, execução real não realizada
+
+`scripts/photo_gate/calibrate.py --dir EXTERNO` valida antes de inferir. Exige
+provenance/consentimento, hashes distintos e comparação com manifests científicos
+locais; não lê imagens científicas, não copia originais, não treina. `--run` explícito;
+`--activate` exige metas, versões/hashes, thresholds e confirmação visual do desfoque.
+Derivadas só emTemporaryDirectory externo, removido ao terminar. Artefato sem fotos,
+nomes pessoais ou caminhos; ativaçãoDEV registradaAuditLog. Políticas alteradas ou
+artefato ausente/malformado/stale mantêmNEEDS_REVIEW e não inferem referências.
+Gates adicionais declarados:≥20ruas semfaces paraFP,≥20negativas,≥5face_large,
+≥5face_small; recall100% emcada grupo de rosto eFP≤5%. CenaFR≤5%,FA≤15%.
+Limite: comparação de identidade depende da completude dos hashes nos manifests;
+não é prova de ausência de near-duplicates. Fotos externas ainda não fornecidas.
+Latência e métricas reais: **NOT_MEASURED**, não reutilizar benchmark sintético antigo.
+
+Referências existentes (hashes recalculados, sem inferência nesta continuação):
+
+| Modelo | Revisão / licença do registry | SHA256 / bytes |
+|---|---|---|
+| OpenCLIP ViT-B-32 laion2b_s34b_b79k |1a25a446712ba5ee05982a381eed697ef9b435cf /MIT |ac4f8c4b88af6d963118cbf40ad93176d092abbedfcb752601ae1866352656e6 /605143316 |
+| EncoderONNX derivado |mesmaorigemREFERENCE |7ed89580c61104c11a0d6ac277fde4b106258b1938d643dbaa53e65b2774b5b5 /351613650 |
+| YuNet2023mar |26cc381e4d2594bb9f47a26eb8fd96c94a13660d /MITdoarquivo |8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4 /232589 |
+
+Não são detectores urbanos nem modelos de produção. Nenhum modelo restaurado/promovido.
+
+### Saúde observada em2026-09-24T19:43:58Z
+
+| Entrada | Estado observado |
+|---|---|
+| SupabaseAuth |OK/HTTP200,481,847ms; não certifica todos os subsistemas |
+| Nominatim |OK/HTTP200,951,544ms incl.lease |
+| Open-Meteo |OK/HTTP200,969,411ms |
+| GeoSampa |OK/WFSCapabilities,119,010ms |
+| BrasilAPI |OK/HTTP200,2245,259ms |
+| ViaCEP |OK/HTTP200,497,405ms |
+| Overpass |OK após504/retry; sem inventar dado |
+| SIDRA |OK_PROVIDER;3550308jáconfigurado |
+| OpenFreeMap |OK/stylev8 |
+| Geofabrik |AVAILABLE/MD5metadata; nenhumPBFbaixado |
+| HuggingFace |OK_PUBLIC/catálogo semtoken |
+| CARTO |FRONTEND_CONFIG_UNKNOWN; fallbackOpenFreeMap coberto pelo teste existente |
+| CNEFE |PREPARED/catálogo, não sonda |
+| RDD2022 |DONE/catálogo histórico, não treinamento aprovado |
+| UNIVALI |PARTIAL/catálogo |
+| timm |PREPARED_FOR_FUTURE/catálogo |
+| YOLOX |DONE/catálogo de ferramenta, não modeloativo |
+| SAM2 |PREPARED_FOR_V2/catálogo histórico |
+| Kaggle |PREPARED/catálogo |
+| Webots |NOT_INSTALLED_PREPARED/catálogo preservado; fora de escopo, não sondado/alterado |
+
+Probes não são contexto de Capture. Novo teste502/timeout encontrou uso indevido do
+cacheSIDRA no health; corrigido com fetchsemcache apenas no live-check. Suítefocada verde.
+OSM `--center LAT,LON --radius-km N` implementado; dry-run não escreve. Importação
+aguarda confirmação. SIDRAlinha manual, já presente: `IBGE_SIDRA_MUNICIPALITY_CODE=3550308`.
+
+### HTTPS
+
+`scripts/deploy/start_fair.ps1 -DryRun` passou; execução real `-Port8765 -RunSeconds40`
+compilou, iniciou API/Worker/túnel e gerouQR externo1144bytes. GETHTTPS200 comCSP;
+readyconnected ePostGIS3.3. Corrigida corrida com log de túnel ainda vazio; nova
+execuçãoexit0 e porta liberada. QR/URLtemporários não são endereço permanente.
+Cloudflared2026.9.3 e qrcode8.2 instalados; sem editar.env/AuthURLs. Instruções no
+FAIR_RUNBOOK e USER_ACTIONS_PENDING. Nenhum merge/push.
+
+### Ground Truth global e exportação em lotes
+
+O endpoint interno `/ops/ground-truth/summary` percorre todos os cursores de
+Events revisados, agrega contagens por classe e número elegível sem limite de 500.
+`/ops/ground-truth/export` envia NDJSON em lotes de 100 pelo mesmo contrato de
+elegibilidade temporal. A interface obtém as contagens globais e baixa o arquivo
+autenticado; o navegador ainda reúne o download em Blob. Nenhuma dessas operações
+autoriza treinamento ou produz DatasetVersion científica. Teste com 1200 Events
+sintéticos não perdeu nem repetiu IDs; Playwright desktop/mobile verificou a
+contagem global e o download autenticado. A fila de revisão ainda aplica filtros
+visuais à página carregada e sua ordenação por prioridade não é global.
+
+### Complemento de código e verificação final desta rodada
+
+O registry interno de ModelVersions agora usa cursor `(created_at,id)` e limite
+validado de 1–100, em vez de devolver toda a tabela. O frontend pagina essa lista;
+o teste Playwright desktop/mobile passou. A Capture com localização agenda
+`report_context` versionado. O Worker executa Open-Meteo e SIDRA quando configurado,
+consulta `snap_to_road` em PostGIS e registra o resultado privado por fonte, inclusive
+`context_unavailable` ou `not_applicable`. Não gera Event, classe, risco ou ponto falso;
+mudança de localização invalida o contexto anterior e descarta resposta tardia por
+`request_id`. O teste DEV confirmou enriquecimento com clima indisponível e sem trecho,
+preservando o endereço e sem Event. O recorte OSM real continua aguardando confirmação.
+
+Com um Worker iniciado pelo usuário em outro terminal, a integração DEV expôs duas
+corridas que a suíte sem Worker não mostrava. Um job podia sair de
+`q_inference_jobs` e entrar em `a_inference_jobs` antes da asserção; o teste agora
+verifica exatamente uma ocorrência nas duas tabelas. Durante o I/O de publicação,
+o Worker podia atualizar `inference` ou `report_context` da Capture, provocando
+409 apesar de revisão e evidência inalteradas. A revalidação sob lock continua
+comparando todo o estado relevante da evidência/revisão, mas ignora somente os
+campos operacionais independentes (`inference`, `address`, `address_history`,
+`report_context`). Testes novos aceitam atualização operacional e recusam
+mutação de revisão durante I/O. Integração DEV repetida com Worker ativo: **33 passed**.
+O script da feira agora recusa outro Worker preexistente em vez de iniciar um segundo;
+`-DryRun` passou e a execução normal falhou fechada antes de subir serviços.
+
+Regressão após essa mudança: **1303 passed / 34 skipped** no backend offline;
+**33 passed** na integração DEV opt-in com Worker ativo (os 33 skips correspondentes
+foram executados separadamente), **48 passed** Vitest,
+**126 passed / 2 skipped** Playwright,
+Ruff, mypy 73 arquivos, TypeScript, Prettier, build e `git diff --check` passaram.
+O skip restante do backend é uma sonda externa opt-in; os dois de Playwright exigem
+foto real/E2E físico. Build avisou MapLibre > 500 kB, já carregado sob demanda.
+
+### Verificação / limites anteriores desta rodada
+
+Focadas: 113 passed (calibração/auth/health), 22 passed (OSM/health),
+24 Playwright privadas. Backend completo: **1303 passed / 34 skipped**;
+integração DEV opt-in: **33 passed**; arquitetura: **53 passed**;
+frontend Vitest: **48 passed**; Playwright completo: **126 passed / 2 skipped**.
+Os dois Playwright pulados são os E2Es com foto real; os 34 skips backend
+incluem testes DEV executados separadamente e uma sonda externa opt-in.
+TypeScript, Prettier, build, mypy (73 arquivos), Ruff e diff-check passaram.
+Avisos: FastAPI/
+Starlette deprecatedhttpx/portal e bundleMapLibre>500kB. Não houvebloqueioOneDrive.
+Cinco arquivos científicos untracked preexistentes preservados fora dos commits.
+
+Skills efetivas: no-duplicate-files, karpathy-guidelines,
+superpowers:systematic-debugging, example-skills:frontend-design,
+urmind-verification-gate, supabase:supabase. Skill de reutilização levou à extensão
+de Core/Worker/UrbanMap; novos componentes justificados: CLI de calibração consentida,
+orquestradorPowerShell da feira e migration de coordenação compartilhada.
+ConectorSupabase: documentação/advisors/consultas autorizadas; shell/web para execução
+e fontes oficiais. Sem delegação, sem ComputerUse nesta continuação.
+
+**Gate: BLOCKED** para fechamento integral (corpus/calibração/OSM/confirmação/celular),
+com pendência de código: filtros e ordenação globais da fila.
+Não atribuir essas pendências técnicas ao usuário. Correção+testes+revisão ainda
+necessários para PASS; a linha do tempo/prova de componentes não substitui E2Efísico.
+
+### Gate de verificação: escopo e evidência
+
+| Checagem | Nível | Resultado | Evidência/limite |
+|---|---|---|---|
+| Testes focados e falhas esperadas | unit/integration | PASS | Timeline/ownership, cursores 1200, lease PostgreSQL, manifesto inválido, health 502/timeout, publicação concorrente e script com Worker preexistente foram exercitados nos testes descritos acima. |
+| Regressão backend/frontend | unit/integration | PASS com skips | Backend 1303/34 skipped; DEV 33; Vitest 48; Playwright 126/2 skipped. Os 2 E2Es fotográficos continuam não executados. |
+| Lint, tipos, build, diff | inspection | PASS | Ruff, mypy, TypeScript, Prettier, build e `git diff --check`; aviso de tamanho no chunk MapLibre. |
+| Migrations/schema | integration DEV | PASS | Único head 0029, upgrade/downgrade/upgrade, RLS e coordenação entre pools; não prova dois processos OS. |
+| Manifestos, registry e hashes | inspection/unit | PASS limitado | CLI recusa manifesto faltante/malformado, colisão SHA e hash de dataset registrado; hashes dos artefatos de referência recalculados. A completude dos manifests científicos e near-duplicates não é demonstrada. |
+| Scripts/produtores/consumidores | inspection/integration | PASS limitado | `calibrate.py` invocável e guardado por `--run --activate`; script HTTPS DryRun e execução temporária; nenhum corpus real acionou a produção da calibração. |
+| Falha fechada | unit/integration | PASS limitado | Artefato ausente/stale, consentimento ausente, Auth incorreta, Worker preexistente e health degradado testados. Não equivale a teste físico completo. |
+| Órfãos e hardcodes | inspection | PASS limitado | Nenhum novo backend/frontend paralelo; centro OSM é proposta documental, não default de importação. Limiares de segurança são defaults versionados sujeitos à calibração. |
+| Nuvem, mocks e pipeline real | integration DEV / real pipeline | BLOCKED | Auth/Storage/Postgres/Realtime e publicação humana reais; foto sintética, sem CLIP/YuNet real, sem OSM confirmado, sem celular físico/URL estável. Mocks de falha não comprovam disponibilidade de provedores na feira. |
+
+**Findings por prioridade:** P1 — fila de revisão ainda filtra/ordena só a página;
+P1 — C2/C4/D6 sem corpus autorizado e calibração/inspeção; P1 — OSM real e teste
+físico/foto real não executados. P2 — download GT montado em Blob no navegador e
+estimativa de falsa rejeição não mede contestações explícitas. Nenhum dos itens
+P1 é marcado resolvido. Para PASS: corrigir fila e repetir regressão; fornecer
+corpus consentido e passar calibração/inspeção; confirmar centro/raio, importar
+recorte real; validar URL/Auth e fluxo em celular físico. Treinamento permanece fora
+de escopo. **Veredito único deste gate: BLOCKED.**
+
 ## Continuação de fechamento — linha do tempo e cursores (24/09/2026)
 
 Estado desta etapa: **PARTIAL**, sem declaração de fechamento dos sete blocos.

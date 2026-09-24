@@ -1,5 +1,12 @@
 # URMIND
 
+> **Fechamento em andamento (24/09/2026):** timeline privada e cursores, coordenação
+> global Nominatim, ferramenta de calibração consentida, health observado e teste
+> Auth/Realtime com limpeza estão implementados. Consulte o [runbook HTTPS](docs/FAIR_RUNBOOK.md)
+> e as [ações humanas pendentes](docs/USER_ACTIONS_PENDING.md). Não é declaração de
+> 100%: calibração real e teste físico permanecem pendentes; referências não calibradas
+> não são apresentadas como filtro ativo de cena/rosto.
+
 > **Limpeza autorizada (24/09/2026):** pesos/ONNX e runs antigos foram removidos.
 > O modelo DEV está ARCHIVED, sem inferência operacional disponível. Código,
 > datasets e restrições científicas preservados. Consulte PROJECT_STATE para os

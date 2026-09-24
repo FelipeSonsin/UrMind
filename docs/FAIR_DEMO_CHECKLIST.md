@@ -1,5 +1,23 @@
 # UrMind — Checklist da demonstração na feira
 
+## Continuação atual (24/09/2026)
+
+- [x] DEV: Auth descartável reviewer/admin e sessões anônimas, JWT/JWKS e remoção.
+- [x] DEV: Capture no Realtime para autor/revisor, isolamento de B, publicação humana,
+  limpeza de registros/Storage; integração sintética, não E2E fotográfico.
+- [x] DEV: migration0029 up/down/up; lease/cache Nominatim entre pools independentes.
+- [x] HTTPS: script da feira, página/CSP/API/ready/QR externo, encerramento controlado.
+- [ ] MANUAL: URL da execução vigente em Redirect URLs; Android/iPhone e rede da feira.
+- [ ] MANUAL: corpus externo/consentimento e inspeção das derivadas da calibração.
+- [ ] DEV: importação OSM real após confirmação do centro/raio.
+- [x] DEV: Capture localizada recebe contexto degradável de clima/SIDRA/via mesmo sem Event;
+  teste isolado com falhas simuladas, sem afirmar que há RoadSegment importado.
+- [x] PRODUTO: contagem GT global e exportação elegível em lotes, sem autorizar treino.
+- [ ] PRODUTO: filtros e ordenação globais da fila de revisão.
+
+Procedimento atual: [FAIR_RUNBOOK.md](FAIR_RUNBOOK.md). Não usar URL/QR do teste
+temporário já encerrado. C2/C4/D6 não calibrados não são proteção automática validada.
+
 Revisado em 24/09/2026. Ambiente: **Urmind DEV** (`impm…ggy`). Modelo visual:
 `2527af02-…` agora **ARCHIVED**, após exclusão autorizada dos artefatos antigos.
 O resultado científico permanece **rejeitado no Frozen Test**. Não há inferência
