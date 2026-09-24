@@ -237,12 +237,21 @@ class ReviewCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: ReviewDecision
-    corrected_class: UrmindClass | None = None
+    corrected_class: str | None = None
     corrected_location: Coordinate | None = None
     """Ponto corrigido pelo revisor. O ponto original do Event permanece intacto."""
 
     notes: str | None = Field(default=None, max_length=2000)
     adjudicate: bool = False
+
+    @field_validator("corrected_class")
+    @classmethod
+    def known_human_class(cls, value: str | None) -> str | None:
+        from app.schemas.issue_taxonomy import get_issue
+
+        if value is not None and get_issue(value) is None and value not in UrmindClass:
+            raise ValueError("classe humana fora da taxonomia")
+        return UrmindClass(value) if value is not None and value in UrmindClass else value
 
     @model_validator(mode="after")
     def correction_has_content(self) -> ReviewCreate:
@@ -251,4 +260,14 @@ class ReviewCreate(BaseModel):
             raise ValueError("correção exige corrected_class e/ou corrected_location")
         if self.decision is not ReviewDecision.CORRECT and correcting:
             raise ValueError("corrected_class/corrected_location só valem para decision=correct")
+        return self
+
+
+class CaptureReviewCreate(ReviewCreate):
+    duplicate_of_protocol: str | None = Field(default=None, pattern=r"^URM-[2-9A-HJ-NP-Z]{8}$")
+
+    @model_validator(mode="after")
+    def duplicate_is_not_confirmation(self) -> CaptureReviewCreate:
+        if self.duplicate_of_protocol and self.decision is not ReviewDecision.REJECT:
+            raise ValueError("duplicado exige rejeição do ponto separado")
         return self

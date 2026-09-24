@@ -2,6 +2,16 @@
 
 ## Continuação — identidade, 24/09/2026
 
+### Bloco 2 — revisão humana sem Event de modelo
+
+`0024_capture_reviews` estende a tabela Review existente com capture_id e permite Event ausente; não cria sistema paralelo. Upgrade/downgrade/upgrade DEV passaram antes das fixtures.
+APIs de revisão exigem reviewer/admin. Rejeição pode permanecer sem Event. Confirmação com classe humana explícita cria Event origin=human_review, sem Detection, confiança visual ou ModelVersion. Classes candidatas da taxonomia são aceitas apenas no contrato de revisão, não no Worker.
+Review/AuditLog, histórico, correção de localização separada, duplicado por protocolo e publicação/despublicação estão conectados no painel do mapa interno. Consenso/adjudicação continuam canônicos; uma revisão isolada não autoriza publicação nem Ground Truth.
+DEV: teste de rejeição sem Event, adjudicação posterior, preservação da coordenada original, ausência de Detection e duas Reviews passou. Falha inicial identificou cópia binária de geography que exigia Shapely; corrigida usando a representação EWKT do próprio banco, sem nova dependência.
+Playwright desktop/mobile: relato sem modelo → classe humana → adjudicação admin → atestado de privacidade → publicação → foto sanitizada no mapa público passou, com API simulada (não prova E2E real). Full backend **1250 passed / 23 skipped**; frontend **45 passed**; Playwright **110 passed / 2 skipped**; Prettier/build/TypeScript/Ruff/mypy/diff check verdes.
+Limites abertos: ainda falta prova integrada completa de Storage/publicação humana real e teste de Realtime desta ação. GT tabular mantém seu gate anterior de evidência/modelo/snapshot: não inventa linhagem para relatos puramente humanos.
+
+
 - Base anterior preservada no commit `e8853c7` (`feat(base): meus-relatos, sobre, mapa, porteiro técnico`). Os cinco arquivos locais em datasets/reports não entraram.
 - Migration `0023_report_identity`: public_id aleatório independente em Capture/Event, protocolo URM sem caracteres ambíguos, backfill, índices únicos e geração server-side com repetição limitada e advisory lock por candidato. Downgrade recusa descartar identidades já emitidas.
 - DEV impm…ggy: upgrade → downgrade → upgrade executados; banco sem Capture/Event antes da operação. Nenhum `.env` ou Auth alterado.

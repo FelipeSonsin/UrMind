@@ -48,6 +48,9 @@ const EventsPage = lazy(() =>
 const EventDetail = lazy(() =>
   import('./components/EventDetail').then((m) => ({ default: m.EventDetail })),
 );
+const CaptureReviewPanel = lazy(() =>
+  import('./components/EventDetail').then((m) => ({ default: m.CaptureReviewPanel })),
+);
 const SignIn = lazy(() => import('./components/SignIn').then((m) => ({ default: m.SignIn })));
 
 /** Releitura do painel público: curta o bastante para parecer vivo, longa o bastante
@@ -834,6 +837,13 @@ export default function App() {
                       ownReports.some((report) => report.id === selectedReport) && (
                         <>
                           <h2>Relato do cidadão</h2>
+                          {canReview && page === 'private-map' && (
+                            <CaptureReviewPanel
+                              key={selectedReport}
+                              id={selectedReport}
+                              onChanged={() => setRevision((value) => value + 1)}
+                            />
+                          )}
                           {ownReports.find((report) => report.id === selectedReport)?.photo_gate
                             ?.status === 'NEEDS_REVIEW' && (
                             <p>

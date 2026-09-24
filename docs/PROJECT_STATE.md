@@ -1,5 +1,13 @@
 # Estado operacional do UrMind
 
+## Revisão humana de relatos sem modelo (24/09/2026)
+
+DEV head `0024_capture_reviews`. Review/AuditLog canônicos atendem relatos sem Event;
+Event origin=human_review somente por ação humana, sem Detection artificial.
+Painel no mapa interno conectado a confirmação, rejeição, duplicação e publicação.
+Regressão: backend 1250 passed / 23 skipped; Vitest 45; Playwright 110 / 2 skipped.
+Publicação real completa e Realtime desta ação ainda não comprovados; blocos seguintes abertos.
+
 ## Continuação Áreas/Mapa/Porteiro — identidade (24/09/2026)
 
 Head DEV: `0023_report_identity`, upgrade/downgrade/upgrade verificados.

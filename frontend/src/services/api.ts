@@ -95,6 +95,69 @@ async function request<T>(
 }
 
 export const api = {
+  captureReview: (id: string, signal?: AbortSignal) =>
+    request(
+      `/captures/${id}/review`,
+      z.object({
+        id: z.string(),
+        protocol_code: z.string(),
+        user_description: z.string().nullable(),
+        location: z
+          .object({
+            latitude: z.number(),
+            longitude: z.number(),
+            accuracy_m: z.number().nullable(),
+          })
+          .nullable(),
+        location_source: z.string(),
+        location_conflict: z.boolean(),
+        photo_gate: z.record(z.string(), z.unknown()).nullable(),
+        human_review: z.record(z.string(), z.unknown()).nullable(),
+        events: z.array(
+          z.object({
+            id: z.string(),
+            public_id: z.string(),
+            status: z.string(),
+            origin: z.string(),
+          }),
+        ),
+        reviews: z.array(
+          z.object({
+            id: z.string(),
+            decision: z.string(),
+            corrected_class: z.string().nullable(),
+            notes: z.string().nullable(),
+            created_at: z.string(),
+          }),
+        ),
+      }),
+      { signal },
+    ),
+  reviewCapture: (id: string, payload: Record<string, unknown>) =>
+    request(
+      `/captures/${id}/reviews`,
+      z.object({
+        review_id: z.string(),
+        event_id: z.string().nullable(),
+        status: z.string(),
+        ground_truth_status: z.string(),
+      }),
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      },
+    ),
+  publishEvent: (id: string, payload: Record<string, unknown>) =>
+    request(
+      `/events/${id}/publication`,
+      z.object({ event_id: z.string(), publication_status: z.string() }),
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      },
+    ),
   captureByProtocol: (protocol: string, signal?: AbortSignal) =>
     request(
       `/captures/by-protocol/${encodeURIComponent(protocol)}`,

@@ -59,6 +59,121 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test('relato sem modelo recebe revisão humana e publicação sanitizada', async ({ page }) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: true } }),
+  );
+  const captureId = '2b120c24-7ff1-4f58-bda8-c2f82a94fc05';
+  const publicId = 'a732cb867fd24d188f0f234afde8a664';
+  const reviewId = '5a120c24-7ff1-4f58-bda8-c2f82a94fc05';
+  let reviewed = false;
+  let published = false;
+  await page.route('**/api/v1/captures/markers*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: captureId,
+          public_id: publicId,
+          protocol_code: 'URM-7K3Q9XYZ',
+          latitude: -23.55,
+          longitude: -46.63,
+          report_status: reviewed ? 'human_confirmed' : 'model_not_available',
+          user_description: 'Relato de teste',
+        },
+      ],
+    }),
+  );
+  await page.route(`**/api/v1/captures/${captureId}/image`, (route) =>
+    route.fulfill({ json: { image_url: '/synthetic-private.jpg' } }),
+  );
+  await page.route(`**/api/v1/captures/${captureId}/review`, (route) =>
+    route.fulfill({
+      json: {
+        id: captureId,
+        protocol_code: 'URM-7K3Q9XYZ',
+        user_description: 'Relato de teste',
+        location: { latitude: -23.55, longitude: -46.63, accuracy_m: null },
+        location_source: 'manual',
+        location_conflict: false,
+        photo_gate: null,
+        human_review: null,
+        events: reviewed
+          ? [{ id: EVENT_ID, public_id: publicId, status: 'confirmed', origin: 'human_review' }]
+          : [],
+        reviews: reviewed
+          ? [
+              {
+                id: reviewId,
+                decision: 'correct',
+                corrected_class: 'URMIND_ROAD_D40',
+                notes: null,
+                created_at: '2026-09-24T12:00:00Z',
+              },
+            ]
+          : [],
+      },
+    }),
+  );
+  await page.route(`**/api/v1/captures/${captureId}/reviews`, (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      decision: 'correct',
+      corrected_class: 'URMIND_ROAD_D40',
+      adjudicate: true,
+    });
+    reviewed = true;
+    return route.fulfill({
+      json: {
+        review_id: reviewId,
+        event_id: EVENT_ID,
+        status: 'confirmed',
+        ground_truth_status: 'adjudicated',
+      },
+    });
+  });
+  await page.route(`**/api/v1/events/${EVENT_ID}/publication`, (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      publish: true,
+      review_id: reviewId,
+      visible_content_reviewed: true,
+    });
+    published = true;
+    return route.fulfill({ json: { event_id: EVENT_ID, publication_status: 'published' } });
+  });
+  await page.goto('/#/app/mapa');
+  await page.getByText(/Lista acessível de pontos/).click();
+  await page.getByRole('button', { name: /Selecionar ponto: Análise indisponível/ }).click();
+  const panel = page.getByRole('region', { name: 'Revisão do relato' });
+  await panel.getByLabel('Classe humana').selectOption('URMIND_ROAD_D40');
+  await panel.getByLabel('Adjudicar como admin').check();
+  await panel.getByRole('button', { name: 'Confirmar rótulo humano' }).click();
+  await expect(panel.getByText(/correct URMIND_ROAD_D40/)).toBeVisible();
+  await panel.getByLabel(/Atesto que o conteúdo visual/).check();
+  await panel.getByRole('button', { name: 'Publicar relato', exact: true }).click();
+  await expect.poll(() => published).toBe(true);
+  await page.route('**/api/v1/public/events?*', (route) =>
+    route.fulfill({ json: [{ ...eventDetail, id: publicId, status: 'confirmed' }] }),
+  );
+  await page.route(`**/api/v1/public/events/${publicId}`, (route) =>
+    route.fulfill({
+      json: {
+        ...eventDetail,
+        id: publicId,
+        status: 'confirmed',
+        model_stage: null,
+        image: {
+          available: true,
+          privacy_redacted: true,
+          reason: null,
+          url: '/synthetic-sanitized.jpg',
+        },
+      },
+    }),
+  );
+  await page.goto(`/#/mapa?ponto=${publicId}`);
+  await expect(page.getByAltText('Foto publicada e sanitizada da ocorrência')).toBeVisible();
+});
+
 for (const anonymous of [false, true]) {
   test(`protege todas as rotas internas para ${anonymous ? 'visitante anônimo' : 'visitante sem sessão'}`, async ({
     page,

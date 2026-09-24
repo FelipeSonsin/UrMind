@@ -18,6 +18,7 @@ from app.repositories.core import CaptureRepository, DecisionRepository, EventRe
 from app.schemas.core import (
     CaptureCreate,
     CaptureProcessingStatus,
+    CaptureReviewCreate,
     CaptureSource,
     Coordinate,
     EventCreate,
@@ -187,6 +188,18 @@ class CoreService:
                     )
                 }
             )
+            human = row.get("human_review") or {}
+            if marker["report_status"] == "human_confirmed":
+                if human.get("class"):
+                    marker["urmind_class"] = human["class"]
+                correction = human.get("corrected_location")
+                if isinstance(correction, dict):
+                    marker["original_latitude"] = marker["latitude"]
+                    marker["original_longitude"] = marker["longitude"]
+                    marker["latitude"] = correction["latitude"]
+                    marker["longitude"] = correction["longitude"]
+            elif human.get("status") == "rejected":
+                marker["report_status"] = "duplicate" if human.get("duplicate_of") else "rejected"
             markers.append(marker)
         return markers
 
@@ -633,6 +646,110 @@ class CoreService:
             ],
         }
 
+    async def review_capture(
+        self,
+        capture_id: uuid.UUID,
+        payload: CaptureReviewCreate,
+        *,
+        reviewer: str,
+        reviewer_role: str | None,
+    ) -> dict[str, Any]:
+        if reviewer_role not in {"reviewer", "admin"}:
+            raise PermissionError("Revisão exige papel de revisor")
+        if payload.adjudicate and reviewer_role != "admin":
+            raise PermissionError("Adjudicação exige admin")
+        if self.decisions is None:
+            raise RuntimeError("Revisão indisponível")
+        capture = await self.captures.get_for_review(capture_id)
+        if capture is None:
+            raise EventNotFoundError("Relato não encontrado")
+        duplicate = None
+        if payload.duplicate_of_protocol:
+            duplicate = await self.captures.protocol_target(payload.duplicate_of_protocol)
+            if duplicate is None or duplicate.id == capture.id:
+                raise ValueError("Protocolo alvo inválido")
+        events = await self.events.for_capture(capture_id)
+        event = events[0] if events else None
+        if event is None and payload.decision is not ReviewDecision.REJECT:
+            if payload.corrected_class is None:
+                raise ValueError("Relato sem análise exige classe humana explícita")
+            event = await self.events.human_event(capture, payload.corrected_class)
+            await self.decisions.attach_report_event(capture_id, event.id)
+        if event:
+            result = await self.review_event(
+                event.id,
+                ReviewCreate.model_validate(payload.model_dump(exclude={"duplicate_of_protocol"})),
+                reviewer=reviewer,
+                reviewer_role=reviewer_role,
+            )
+            await self.decisions.attach_capture_review(result["review_id"], capture_id)
+        else:
+            prior = await self.decisions.review_votes(None, capture_id=capture_id)
+            review = await self.decisions.add_review(
+                event_id=None,
+                capture_id=capture_id,
+                reviewer=reviewer,
+                decision="reject",
+                corrected_class=None,
+                notes=payload.notes,
+            )
+            resolution = review_resolution(
+                [
+                    *prior,
+                    {
+                        "decision": "reject",
+                        "reviewer": reviewer,
+                        "reviewer_role": reviewer_role,
+                        "order_source": review.order_source,
+                        "adjudicated": payload.adjudicate,
+                    },
+                ]
+            )
+            result = {
+                "review_id": review.id,
+                "event_id": None,
+                "status": "rejected",
+                "ground_truth_status": resolution["status"],
+            }
+            await self.decisions.add_audit(
+                operation="review",
+                entity_type="capture",
+                entity_id=capture_id,
+                actor=reviewer,
+                before={},
+                after={
+                    "review_id": str(review.id),
+                    "decision": "reject",
+                    "reviewer_role": reviewer_role,
+                    "review_schema_version": REVIEW_SCHEMA_VERSION,
+                    "adjudicated": payload.adjudicate,
+                    "ground_truth_status": result["ground_truth_status"],
+                },
+                event_hash=f"capture-review-{review.id}",
+            )
+        before = deepcopy((capture.quality or {}).get("human_review") or {})
+        human_review = {
+            "review_id": str(result["review_id"]),
+            "status": result["status"],
+            "ground_truth_status": result["ground_truth_status"],
+            "class": payload.corrected_class or before.get("class"),
+            "duplicate_of": str(duplicate.id) if duplicate else None,
+            "corrected_location": payload.corrected_location.model_dump()
+            if payload.corrected_location
+            else before.get("corrected_location"),
+        }
+        capture.quality = {**(capture.quality or {}), "human_review": human_review}
+        await self.decisions.add_audit(
+            operation="capture_review_state",
+            entity_type="capture",
+            entity_id=capture_id,
+            actor=reviewer,
+            before=before,
+            after=human_review,
+            event_hash=f"capture-state-{uuid.uuid4()}",
+        )
+        return {**result, "capture_id": capture.id, "protocol_code": capture.protocol_code}
+
     async def review_event(
         self,
         event_id: uuid.UUID,
@@ -661,7 +778,7 @@ class CoreService:
             event_id=event_id,
             reviewer=reviewer,
             decision=payload.decision.value,
-            corrected_class=payload.corrected_class.value if payload.corrected_class else None,
+            corrected_class=payload.corrected_class,
             corrected_location=payload.corrected_location,
             notes=payload.notes,
         )

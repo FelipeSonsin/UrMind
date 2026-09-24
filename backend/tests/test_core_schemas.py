@@ -18,6 +18,15 @@ from app.schemas.core import (
 NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
 
 
+def test_human_review_accepts_candidate_class_but_never_unknown_code():
+    from app.schemas.core import ReviewCreate
+
+    result = ReviewCreate(decision="correct", corrected_class="URMIND_FALLEN_TREE")
+    assert result.corrected_class == "URMIND_FALLEN_TREE"
+    with pytest.raises(ValidationError):
+        ReviewCreate(decision="correct", corrected_class="INVENTED_CLASS")
+
+
 def test_bounding_box_rejects_box_outside_frame():
     with pytest.raises(ValidationError):
         BoundingBox(x=0.8, y=0.1, width=0.5, height=0.1)

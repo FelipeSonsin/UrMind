@@ -120,6 +120,8 @@ export const captureMarkerSchema = z.object({
     'model_not_available',
     'experimental',
     'human_confirmed',
+    'rejected',
+    'duplicate',
     'no_supported_detection',
     'location_required',
   ]),
@@ -140,6 +142,8 @@ export const reportLabels: Record<CaptureMarker['report_status'], string> = {
   model_not_available: 'Análise indisponível — sem modelo autorizado',
   experimental: 'Análise experimental',
   human_confirmed: 'Confirmado por revisão humana',
+  rejected: 'Rejeitado por revisão humana',
+  duplicate: 'Relato duplicado',
   no_supported_detection: 'Relato recebido — nenhum problema das classes suportadas identificado',
 };
 

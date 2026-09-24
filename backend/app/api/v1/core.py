@@ -36,6 +36,7 @@ from app.repositories.core import (
 )
 from app.schemas.core import (
     CaptureCreate,
+    CaptureReviewCreate,
     CaptureSource,
     Coordinate,
     EventCreate,
@@ -534,6 +535,63 @@ async def event_detail(
         except StorageError:
             image_url = None  # evidência indisponível não derruba o detalhe
     return {**dossier, "image_url": image_url}
+
+
+@router.get("/captures/{capture_id}/review")
+async def capture_review_detail(
+    capture_id: uuid.UUID, user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
+    capture = await service.captures.get(capture_id)
+    if capture is None or service.decisions is None:
+        raise HTTPException(status_code=404, detail="Relato não encontrado")
+    response.headers["Cache-Control"] = "private, no-store"
+    events = await service.events.for_capture(capture_id)
+    return {
+        "id": capture.id,
+        "protocol_code": capture.protocol_code,
+        "user_description": capture.user_description,
+        "location": await service.captures.location(capture_id),
+        "location_source": capture.source_location,
+        "photo_gate": (capture.quality or {}).get("photo_gate"),
+        "human_review": (capture.quality or {}).get("human_review"),
+        "location_conflict": (capture.quality or {}).get("location_conflict", False),
+        "events": [
+            {
+                "id": e.id,
+                "public_id": e.public_id,
+                "status": e.status,
+                "origin": (e.factors or {}).get("origin", "inference"),
+            }
+            for e in events
+        ],
+        "reviews": await service.decisions.capture_review_history(capture_id),
+    }
+
+
+@router.post("/captures/{capture_id}/reviews", status_code=201)
+async def review_capture(
+    capture_id: uuid.UUID, payload: CaptureReviewCreate, user: CurrentUser, service: Core
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
+    try:
+        result = await service.review_capture(
+            capture_id, payload, reviewer=user.id, reviewer_role=user.urmind_role
+        )
+        await service.captures.session.commit()
+        return result
+    except (EventNotFoundError, PermissionError, ValueError) as exc:
+        await service.captures.session.rollback()
+        code = (
+            404
+            if isinstance(exc, EventNotFoundError)
+            else 403
+            if isinstance(exc, PermissionError)
+            else 422
+        )
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
 
 
 @router.post("/events/{event_id}/reviews", status_code=201)

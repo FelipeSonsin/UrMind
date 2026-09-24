@@ -557,3 +557,14 @@ async def test_generic_public_marker_uses_independent_identity_and_rounded_locat
         }
     ]
     assert str(internal_id) not in str(result)
+
+
+@pytest.mark.asyncio
+async def test_citizen_cannot_use_capture_human_review_service():
+    from app.schemas.core import CaptureReviewCreate
+
+    service = CoreService(SimpleNamespace(), SimpleNamespace())
+    with pytest.raises(PermissionError):
+        await service.review_capture(
+            uuid4(), CaptureReviewCreate(decision="reject"), reviewer="citizen", reviewer_role=None
+        )

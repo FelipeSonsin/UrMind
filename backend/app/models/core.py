@@ -397,8 +397,11 @@ class Review(Base):
     order_source: Mapped[str] = mapped_column(
         Text, nullable=False, server_default="serialized_commit_order"
     )
-    event_id: Mapped[uuid.UUID] = mapped_column(
-        _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=False
+    event_id: Mapped[uuid.UUID | None] = mapped_column(
+        _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=True
+    )
+    capture_id: Mapped[uuid.UUID | None] = mapped_column(
+        _UUID, ForeignKey("public.captures.id", ondelete="RESTRICT")
     )
     reviewer: Mapped[str] = mapped_column(String, nullable=False)
     decision: Mapped[str] = mapped_column(Text, nullable=False)

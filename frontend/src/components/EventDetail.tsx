@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { publicApi } from '../services/publicApi';
+import { type IssueDefinition, modelSupportLabel } from '../domain/public';
 import { ExperimentalBadge } from './public/Diagnosis';
 import {
   classes,
@@ -11,6 +13,193 @@ import {
 } from '../domain/contracts';
 
 const na = 'Não disponível';
+
+export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: () => void }) {
+  const [detail, setDetail] = useState<Awaited<ReturnType<typeof api.captureReview>> | null>(null);
+  const [issues, setIssues] = useState<IssueDefinition[]>([]);
+  const [issue, setIssue] = useState('');
+  const [notes, setNotes] = useState('');
+  const [duplicate, setDuplicate] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [privacy, setPrivacy] = useState(false);
+  const [adjudicate, setAdjudicate] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setDetail(null);
+    setError('');
+    setPrivacy(false);
+    Promise.all([
+      api.captureReview(id, controller.signal),
+      publicApi.taxonomy(controller.signal),
+      api.me(controller.signal),
+    ])
+      .then(([report, taxonomy, me]) => {
+        if (!controller.signal.aborted) {
+          setDetail(report);
+          setIssues(taxonomy.issues);
+          setAdmin(me.can_admin);
+        }
+      })
+      .catch((reason: Error) => {
+        if (!controller.signal.aborted) setError(reason.message);
+      });
+    return () => controller.abort();
+  }, [id, revision]);
+  const run = async (operation: () => Promise<unknown>) => {
+    setBusy(true);
+    setError('');
+    try {
+      await operation();
+      setRevision((value) => value + 1);
+      onChanged();
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const review = (decision: 'correct' | 'reject') => {
+    const coordinate = latitude || longitude ? parseCoordinate(latitude, longitude) : null;
+    if ((latitude || longitude) && !coordinate) {
+      setError('Informe latitude e longitude válidas.');
+      return;
+    }
+    void run(() =>
+      api.reviewCapture(id, {
+        decision,
+        notes,
+        adjudicate,
+        ...(decision === 'correct' && issue ? { corrected_class: issue } : {}),
+        ...(decision === 'correct' && coordinate ? { corrected_location: coordinate } : {}),
+        ...(decision === 'reject' && duplicate ? { duplicate_of_protocol: duplicate } : {}),
+      }),
+    );
+  };
+  const event = detail?.events[0];
+  const lastReview = detail?.reviews.at(-1);
+  return (
+    <section aria-label="Revisão do relato" className="review-panel">
+      <h3>Revisão humana</h3>
+      {error && <p role="alert">{error}</p>}
+      {!detail ? (
+        <p>Carregando relato…</p>
+      ) : (
+        <>
+          <p>
+            {detail.protocol_code} — {detail.location_source}
+          </p>
+          {detail.location && (
+            <p>
+              Original: {detail.location.latitude}, {detail.location.longitude}. Precisão declarada:{' '}
+              {detail.location.accuracy_m ?? na} m.
+            </p>
+          )}
+          {detail.location_conflict && <p>Conflito GPS × EXIF: conferir localização.</p>}
+          <label>
+            Classe humana
+            <select value={issue} onChange={(e) => setIssue(e.target.value)}>
+              <option value="">Selecione após revisar a foto</option>
+              {issues.map((item) => (
+                <option key={item.issue_code} value={item.issue_code}>
+                  {item.display_name_pt} — {modelSupportLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Notas
+            <textarea value={notes} maxLength={2000} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+          <label>
+            Latitude corrigida
+            <input value={latitude} onChange={(e) => setLatitude(e.target.value)} />
+          </label>
+          <label>
+            Longitude corrigida
+            <input value={longitude} onChange={(e) => setLongitude(e.target.value)} />
+          </label>
+          {admin && (
+            <label>
+              <input
+                type="checkbox"
+                checked={adjudicate}
+                onChange={(e) => setAdjudicate(e.target.checked)}
+              />
+              Adjudicar como admin
+            </label>
+          )}
+          <button disabled={busy || (!issue && !latitude)} onClick={() => review('correct')}>
+            Confirmar rótulo humano
+          </button>
+          <button disabled={busy} onClick={() => review('reject')}>
+            Não é problema
+          </button>
+          <label>
+            Protocolo duplicado
+            <input value={duplicate} onChange={(e) => setDuplicate(e.target.value.toUpperCase())} />
+          </label>
+          <button disabled={busy || !duplicate} onClick={() => review('reject')}>
+            Marcar duplicado
+          </button>
+          <p>
+            Consenso entre revisores distintos ou adjudicação continuam obrigatórios. Isto não é
+            inferência da IA.
+          </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={privacy}
+              onChange={(e) => setPrivacy(e.target.checked)}
+            />
+            Atesto que o conteúdo visual pode ser publicado, sem rostos identificáveis, placas ou
+            dados pessoais.
+          </label>
+          <button
+            disabled={busy || !privacy || event?.status !== 'confirmed' || !lastReview}
+            onClick={() =>
+              void run(() =>
+                api.publishEvent(event!.id, {
+                  publish: true,
+                  review_id: lastReview!.id,
+                  visible_content_reviewed: privacy,
+                  reason: notes || 'Publicação após revisão humana',
+                }),
+              )
+            }
+          >
+            Publicar relato
+          </button>
+          <button
+            disabled={busy || !event}
+            onClick={() =>
+              void run(() =>
+                api.publishEvent(event!.id, {
+                  publish: false,
+                  reason: notes || 'Retirada pela equipe revisora',
+                }),
+              )
+            }
+          >
+            Despublicar relato
+          </button>
+          <h4>Histórico</h4>
+          <ul>
+            {detail.reviews.map((item) => (
+              <li key={item.id}>
+                {item.created_at}: {item.decision} {item.corrected_class} {item.notes}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
 
 export function EventDetail({
   id,

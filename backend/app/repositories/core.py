@@ -175,6 +175,7 @@ class CaptureRepository:
                    c.source_location as location_source, c.accuracy_m, c.user_description,
                    c.quality->'location_conflict' as location_conflict,
                    c.quality->'photo_gate' as photo_gate,
+                   c.quality->'human_review' as human_review,
                    c.quality->'inference'->>'status' as processing_status,
                    c.quality->'inference'->>'model_status' as model_status,
                    e.id as event_id, e.public_id as event_public_id,
@@ -283,6 +284,20 @@ class CaptureRepository:
     async def get(self, capture_id: uuid.UUID) -> Capture | None:
         return await self.session.get(Capture, capture_id)
 
+    async def get_for_review(self, capture_id: uuid.UUID) -> Capture | None:
+        result = await self.session.execute(
+            select(Capture)
+            .where(Capture.id == capture_id, Capture.source.in_(["pwa_photo", "exif_upload"]))
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def protocol_target(self, protocol: str) -> Capture | None:
+        result = await self.session.execute(
+            select(Capture).where(Capture.protocol_code == protocol)
+        )
+        return result.scalar_one_or_none()
+
     async def recent_owner_uploads(self, owner_id: str, now: datetime) -> int:
         """Count only server-received photo uploads within the sliding window."""
         result = await self.session.execute(
@@ -362,6 +377,26 @@ class EventRepository:
 
     async def get(self, event_id: uuid.UUID) -> Event | None:
         return await self.session.get(Event, event_id)
+
+    async def human_event(self, capture: Capture, issue_code: str) -> Event:
+        """Reviewer evidence only; never synthesize Detection, confidence or ModelVersion."""
+        original_point = await self.session.scalar(
+            select(func.ST_AsEWKT(Capture.point)).where(Capture.id == capture.id)
+        )
+        event = Event(
+            event_key=f"human-review-{capture.id}",
+            capture_id=capture.id,
+            urmind_class=issue_code,
+            evidence_mode="photo" if capture.point is not None else "image_only",
+            occurred_at=capture.captured_at,
+            point=original_point,
+            location_accuracy_m=capture.accuracy_m,
+            status="review",
+            factors={"origin": "human_review", "label_source": "human_review"},
+        )
+        self.session.add(event)
+        await self.session.flush()
+        return event
 
     async def for_capture(self, capture_id: uuid.UUID) -> list[Event]:
         result = await self.session.execute(
@@ -799,15 +834,17 @@ class DecisionRepository:
     async def add_review(
         self,
         *,
-        event_id: uuid.UUID,
+        event_id: uuid.UUID | None,
         reviewer: str,
         decision: str,
         corrected_class: str | None,
         corrected_location: Coordinate | None = None,
         notes: str | None,
+        capture_id: uuid.UUID | None = None,
     ) -> Review:
         review = Review(
             event_id=event_id,
+            capture_id=capture_id,
             reviewer=reviewer,
             decision=decision,
             corrected_class=corrected_class,
@@ -817,6 +854,33 @@ class DecisionRepository:
         self.session.add(review)
         await self.session.flush()
         return review
+
+    async def attach_capture_review(self, review_id: uuid.UUID, capture_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(Review).where(Review.id == review_id).values(capture_id=capture_id)
+        )
+
+    async def attach_report_event(self, capture_id: uuid.UUID, event_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(Review)
+            .where(Review.capture_id == capture_id, Review.event_id.is_(None))
+            .values(event_id=event_id)
+        )
+
+    async def capture_review_history(self, capture_id: uuid.UUID) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            select(Review).where(Review.capture_id == capture_id).order_by(Review.review_sequence)
+        )
+        return [
+            {
+                "id": row.id,
+                "decision": row.decision,
+                "corrected_class": row.corrected_class,
+                "notes": row.notes,
+                "created_at": row.created_at,
+            }
+            for row in result.scalars()
+        ]
 
     async def add_audit(
         self,
@@ -909,7 +973,10 @@ class DecisionRepository:
         )
         return list(result.scalars())
 
-    async def review_votes(self, event_id: uuid.UUID) -> list[dict[str, Any]]:
+    async def review_votes(
+        self, event_id: uuid.UUID | None, *, capture_id: uuid.UUID | None = None
+    ) -> list[dict[str, Any]]:
+        predicate = "r.capture_id = :capture_id" if capture_id else "r.event_id = :event_id"
         result = await self.session.execute(
             text(
                 "select r.id as review_id, r.decision, r.corrected_class, r.reviewer, "
@@ -920,10 +987,10 @@ class DecisionRepository:
                 "coalesce(a.after_data->>'adjudicated', 'false') = 'true' as adjudicated "
                 "from public.reviews r left join public.audit_log a "
                 "on a.after_data->>'review_id' = r.id::text and a.operation = 'review' "
-                "where r.event_id = :event_id "
+                f"where {predicate} "
                 "order by r.commit_order nulls first, r.review_sequence"
             ),
-            {"event_id": event_id},
+            {"event_id": event_id, "capture_id": capture_id},
         )
         return [dict(row) for row in result.mappings()]
 
@@ -1233,9 +1300,12 @@ class PublicRepository:
     )
 
     _SUMMARY = (
-        "select e.id, e.public_id, e.occurred_at, e.urmind_class, e.status, e.evidence_mode, "
+        "select e.id, e.public_id, e.occurred_at, "
+        "coalesce(hr.corrected_class, e.urmind_class) as urmind_class, "
+        "e.status, e.evidence_mode, "
         "e.visual_confidence, e.location_accuracy_m, e.distance_to_road_m, "
-        "ST_Y(e.point::geometry) as latitude, ST_X(e.point::geometry) as longitude, "
+        "ST_Y(coalesce(hr.corrected_point,e.point)::geometry) as latitude, "
+        "ST_X(coalesce(hr.corrected_point,e.point)::geometry) as longitude, "
         "ST_Y(e.snapped_point::geometry) as snapped_latitude, "
         "ST_X(e.snapped_point::geometry) as snapped_longitude, "
         "r.name as road_name, r.highway as road_highway, r.jurisdiction as road_jurisdiction, "
@@ -1244,6 +1314,9 @@ class PublicRepository:
         "e.factors->'publication'->'public_image' as publication_image, "
         "risk.severity, risk.priority_score, risk.factors "
         "from public.events e "
+        "left join lateral (select corrected_class, corrected_point from public.reviews "
+        "where event_id=e.id order by commit_order desc nulls last, review_sequence desc limit 1) "
+        "hr on e.status='confirmed' "
         "left join public.road_segments r on r.id = e.road_segment_id "
         "left join lateral ("
         "  select severity, priority_score, factors from public.risk_assessments a "
@@ -1265,11 +1338,12 @@ class PublicRepository:
         params: dict[str, Any] = {"limit": limit}
         if bbox is not None:
             clauses.append(
-                "ST_Intersects(e.point::geometry, ST_MakeEnvelope(:west, :south, :east, :north, 4326))"
+                "ST_Intersects(coalesce(hr.corrected_point,e.point)::geometry, "
+                "ST_MakeEnvelope(:west, :south, :east, :north, 4326))"
             )
             params |= {"south": bbox[0], "west": bbox[1], "north": bbox[2], "east": bbox[3]}
         if urmind_class:
-            clauses.append("e.urmind_class = :urmind_class")
+            clauses.append("coalesce(hr.corrected_class,e.urmind_class) = :urmind_class")
             params["urmind_class"] = urmind_class
         if status:
             clauses.append("e.status = :status")

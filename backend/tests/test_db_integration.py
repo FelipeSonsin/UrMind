@@ -115,6 +115,57 @@ async def test_report_identity_unique_server_generated_and_owner_lookup(database
 
 
 @pytest.mark.asyncio
+async def test_human_capture_review_creates_no_detection_and_preserves_original(database):
+    from app.repositories.core import DecisionRepository
+    from app.schemas.core import CaptureReviewCreate
+
+    async with database.session() as session:
+        captures, events = CaptureRepository(session), EventRepository(session)
+        decisions = DecisionRepository(session)
+        service = CoreService(captures, events, decisions)
+        capture = await captures.create(
+            CaptureCreate(
+                capture_key=f"human-review-test-{uuid.uuid4()}",
+                source=CaptureSource.PWA_PHOTO,
+                source_location=LocationSource.MANUAL,
+                captured_at=NOW,
+                coordinate=Coordinate(latitude=LAT, longitude=LON),
+                quality={"uploaded_by": "test-owner"},
+            )
+        )
+        rejected = await service.review_capture(
+            capture.id,
+            CaptureReviewCreate(decision="reject"),
+            reviewer="test-reviewer",
+            reviewer_role="reviewer",
+        )
+        assert rejected["event_id"] is None
+        assert await events.for_capture(capture.id) == []
+        accepted = await service.review_capture(
+            capture.id,
+            CaptureReviewCreate(
+                decision="correct",
+                corrected_class="URMIND_FALLEN_TREE",
+                adjudicate=True,
+                corrected_location=Coordinate(latitude=LAT + 0.001, longitude=LON),
+            ),
+            reviewer="test-admin",
+            reviewer_role="admin",
+        )
+        event = await events.get(accepted["event_id"])
+        assert event.factors["origin"] == "human_review"
+        assert event.model_version_id is None and event.visual_confidence is None
+        assert event.status == "confirmed"
+        assert accepted["ground_truth_status"] == "adjudicated"
+        original = await captures.location(capture.id)
+        assert original["latitude"] == LAT
+        assert capture.quality["human_review"]["corrected_location"]["latitude"] == LAT + 0.001
+        assert await events.evidence_detections(event) == []
+        assert len(await decisions.capture_review_history(capture.id)) == 2
+        await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_photo_report_marker_exif_storage_owner_and_missing_location(database):
     """Real Storage + PostGIS + queue + RLS. No Auth change, model or fake Event."""
     from fastapi import UploadFile
