@@ -11,12 +11,13 @@ import io
 import time
 import warnings
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from threading import Lock
 from typing import Any
 
 import httpx
+import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 from app.config import Settings
@@ -35,6 +36,12 @@ ALLOWED_FORMATS = {
 
 class InvalidImageError(ValueError):
     """Conteúdo recusado: vazio, grande demais, formato não aceito ou corrompido."""
+
+
+class PhotoRejectedError(InvalidImageError):
+    def __init__(self, result: dict[str, Any], message: str) -> None:
+        super().__init__(message)
+        self.result = result
 
 
 class StorageNotConfiguredError(RuntimeError):
@@ -84,6 +91,7 @@ class ValidatedImage:
     extension: str
     width: int
     height: int
+    photo_quality: dict[str, Any] | None = None
 
 
 def validate_image(data: bytes) -> ValidatedImage:
@@ -122,6 +130,70 @@ def validate_image(data: bytes) -> ValidatedImage:
         width=width,
         height=height,
     )
+
+
+def validate_report_photo(data: bytes) -> ValidatedImage:
+    """Conservative technical admission, not scene classification or detection.
+
+    Fixed v1 operational thresholds, not scientifically calibrated. Review stays
+    mandatory while scene/face checks lack validated reference artifacts.
+    Work is bounded by validate_image and the upload executor's two slots.
+    """
+    image = validate_image(data)
+    with Image.open(io.BytesIO(data)) as source:
+        gray = source.convert("L")
+        gray.thumbnail((512, 512))
+        pixels = np.asarray(gray, dtype=np.float32)
+    brightness = float(pixels.mean())
+    if min(pixels.shape) >= 3:
+        laplacian = (
+            pixels[1:-1, :-2]
+            + pixels[1:-1, 2:]
+            + pixels[:-2, 1:-1]
+            + pixels[2:, 1:-1]
+            - 4 * pixels[1:-1, 1:-1]
+        )
+        sharpness = float(laplacian.var())
+    else:
+        sharpness = 0.0
+    reasons = []
+    if min(image.width, image.height) < 640:
+        reasons.append("resolution")
+    if brightness < 20:
+        reasons.append("underexposed")
+    if brightness > 240:
+        reasons.append("overexposed")
+    if sharpness < 25:
+        reasons.append("blur")
+    result: dict[str, Any] = {
+        "version": "urmind-photo-quality-v1",
+        "status": "REJECTED" if reasons else "NEEDS_REVIEW",
+        "technical_status": "REJECTED" if reasons else "ACCEPTED",
+        "scene_status": "NOT_VERIFIED",
+        "face_status": "NOT_VERIFIED",
+        "reasons": reasons,
+        "metrics": {
+            "width": image.width,
+            "height": image.height,
+            "brightness_mean": round(brightness, 3),
+            "laplacian_variance": round(sharpness, 3),
+        },
+        "thresholds": {
+            "min_side": 640,
+            "brightness_min": 20,
+            "brightness_max": 240,
+            "laplacian_min": 25,
+        },
+    }
+    if reasons:
+        hints = {
+            "resolution": "Foto pequena: use uma imagem com pelo menos 640 pixels em cada lado.",
+            "underexposed": "Foto muito escura: tente com mais luz.",
+            "overexposed": "Foto muito clara: evite luz direta na câmera.",
+            "blur": "Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.",
+        }
+        raise PhotoRejectedError(result, hints[reasons[0]])
+    return replace(image, photo_quality=result)
 
 
 def sanitize_public_image(data: bytes) -> ValidatedImage:

@@ -79,6 +79,7 @@ async def test_postgis_disponivel(database):
 async def test_photo_report_marker_exif_storage_owner_and_missing_location(database):
     """Real Storage + PostGIS + queue + RLS. No Auth change, model or fake Event."""
     from fastapi import UploadFile
+    from PIL import Image
 
     from app.api.v1.core import upload_photo
     from app.auth import AuthenticatedUser
@@ -93,6 +94,12 @@ async def test_photo_report_marker_exif_storage_owner_and_missing_location(datab
         for located in (True, False):
             # Synthetic image generated exclusively for this disposable integration test.
             data = build_jpeg(gps=gps_block() if located else None)
+            with Image.open(io.BytesIO(data)) as metadata_source:
+                report_buffer = io.BytesIO()
+                Image.effect_noise((640, 640), 30).convert("RGB").save(
+                    report_buffer, format="JPEG", exif=metadata_source.getexif()
+                )
+                data = report_buffer.getvalue()
             async with database.sessionmaker() as session:
                 service = CoreService(CaptureRepository(session), EventRepository(session))
                 result = await upload_photo(

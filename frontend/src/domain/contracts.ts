@@ -98,14 +98,25 @@ export type CaptureProcessing = z.infer<typeof captureProcessingSchema>;
 
 export const captureMarkerSchema = z.object({
   id: z.string().uuid(),
-  latitude: z.number().finite().min(-90).max(90),
-  longitude: z.number().finite().min(-180).max(180),
+  latitude: z.number().finite().min(-90).max(90).nullable(),
+  longitude: z.number().finite().min(-180).max(180).nullable(),
+  created_at: z.string().nullable().optional(),
+  photo_gate: z
+    .object({
+      status: z.string(),
+      technical_status: z.string(),
+      scene_status: z.string(),
+      face_status: z.string(),
+    })
+    .nullable()
+    .optional(),
   report_status: z.enum([
     'received',
     'model_not_available',
     'experimental',
     'human_confirmed',
     'no_supported_detection',
+    'location_required',
   ]),
   event_id: z.string().uuid().nullable().optional(),
   user_description: z.string().nullable().optional(),
@@ -118,6 +129,7 @@ export const captureMarkerSchema = z.object({
 });
 export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
 export const reportLabels: Record<CaptureMarker['report_status'], string> = {
+  location_required: 'Localização necessária — sem ponto no mapa',
   received: 'Relato recebido — aguardando análise',
   model_not_available: 'Análise indisponível — sem modelo autorizado',
   experimental: 'Análise experimental',

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -19,6 +19,7 @@ export interface MapMarker {
   longitude?: number | null;
   severity?: string | null;
   road_name?: string | null;
+  status?: string;
 }
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -41,12 +42,16 @@ export default function UrbanMap({
   onSelect,
   onPickLocation,
   initialCenter,
+  detail,
+  onCloseDetail,
 }: {
   events: MapMarker[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onPickLocation?: (latitude: number, longitude: number) => void;
   initialCenter?: { latitude: number; longitude: number } | null;
+  detail?: ReactNode;
+  onCloseDetail?: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map>(null);
@@ -79,6 +84,13 @@ export default function UrbanMap({
       setActiveProviderName(primaryProvider.name);
       setActiveAttribution(primaryProvider.attribution);
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      map.addControl(
+        new maplibregl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: false,
+        }),
+        'top-right',
+      );
       if (pickCallback.current) {
         let pickedMarker: maplibregl.Marker | undefined;
         map.on('click', (event) => {
@@ -111,6 +123,9 @@ export default function UrbanMap({
         if (map.getSource('events')) return;
         map.addSource('events', {
           type: 'geojson',
+          cluster: !pickCallback.current,
+          clusterMaxZoom: 14,
+          clusterRadius: 45,
           data: {
             type: 'FeatureCollection',
             features: located.map((event) => ({
@@ -131,9 +146,25 @@ export default function UrbanMap({
           },
         });
         map.addLayer({
+          id: 'report-clusters',
+          type: 'circle',
+          source: 'events',
+          filter: ['has', 'point_count'],
+          paint: { 'circle-color': '#123f36', 'circle-radius': 22 },
+        });
+        map.addLayer({
+          id: 'report-cluster-count',
+          type: 'symbol',
+          source: 'events',
+          filter: ['has', 'point_count'],
+          layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 14 },
+          paint: { 'text-color': '#ffffff' },
+        });
+        map.addLayer({
           id: 'events',
           type: 'circle',
           source: 'events',
+          filter: ['!', ['has', 'point_count']],
           paint: {
             'circle-radius': ['case', ['==', ['get', 'id'], selectedId ?? ''], 11, 7],
             'circle-color': ['get', 'color'],
@@ -154,6 +185,20 @@ export default function UrbanMap({
         });
         if (!interactionsBound) {
           interactionsBound = true;
+          map.on('click', 'report-clusters', async (event) => {
+            const feature = event.features?.[0];
+            if (feature?.geometry.type !== 'Point' || !map) return;
+            try {
+              const source = map.getSource('events') as maplibregl.GeoJSONSource;
+              const zoom = await source.getClusterExpansionZoom(
+                Number(feature.properties?.cluster_id),
+              );
+              if (mapRef.current === map)
+                map.easeTo({ center: feature.geometry.coordinates as [number, number], zoom });
+            } catch {
+              setError('Não foi possível expandir o grupo. Use a lista de pontos.');
+            }
+          });
           map.on('click', 'events', (event) => {
             const feature = event.features?.[0];
             if (feature?.geometry.type !== 'Point' || !map) return;
@@ -227,16 +272,33 @@ export default function UrbanMap({
           <p className="map-empty">Nenhum registro com localização disponível neste recorte.</p>
         )}
       </div>
+      {detail && selectedId && (
+        <aside className="map-detail" aria-label="Detalhe do ponto">
+          <button type="button" className="secondary" onClick={onCloseDetail}>
+            Fechar detalhe
+          </button>
+          {detail}
+        </aside>
+      )}
       {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
-      <ul className="sr-only">
-        {located.map((event) => (
-          <li key={event.id} data-event-id={event.id}>
-            {markerLabel(event)}{' '}
-            {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`} ·{' '}
-            {event.road_name ?? 'via não associada'} · {event.latitude}, {event.longitude}
-          </li>
-        ))}
-      </ul>
+      <details className="map-point-list">
+        <summary>Lista acessível de pontos ({located.length})</summary>
+        <ul>
+          {located.map((event) => (
+            <li key={event.id} data-event-id={event.id}>
+              <button
+                type="button"
+                onClick={() => onSelect?.(event.id)}
+                aria-label={`Selecionar ponto: ${markerLabel(event)}`}
+              >
+                {markerLabel(event)}
+              </button>{' '}
+              {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`} ·{' '}
+              {event.road_name ?? 'via não associada'} · {event.latitude}, {event.longitude}
+            </li>
+          ))}
+        </ul>
+      </details>
       {events.some((event) => event.report_status) && (
         <ul className="map-legend" aria-label="Legenda de relatos">
           {Object.entries(reportLabels).map(([status, label]) => (

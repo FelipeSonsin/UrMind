@@ -1,5 +1,19 @@
 # Estado operacional do UrMind
 
+## Áreas, mapa e porteiro — rodada parcial de24/09/2026
+
+Branch `feature/areas-mapa-porteiro`, checkpoint `63d730d`. Reutilizados mapa/upload/Storage/relatos.
+Adicionados Meus relatos (inclui sem localização), Sobre/privacidade, clustering, lista acessível,
+painel de foto público/privado e bottom sheet; porteiro técnico no navegador e servidor antes do
+Storage, métricas de rejeição em AuditLog e quality.photo_gate privado. Cena e rostos NÃO verificados;
+foto tecnicamente aceita permanece NEEDS_REVIEW. Nenhum modelo instalado/restaurado.
+Verificação fresca:1246 backend/21skips;45 Vitest;106 Playwright/2skips;6 DEV selecionados/14deselected.
+Ruff/mypy/Prettier/TypeScript/build/diff aprovados. Head permanece0022, nenhuma migration nova.
+Escopo completo PARTIAL; gate BLOCKED: faltam protocolo, ações sobre Capture sem Event, novos IDs
+públicos/DTO com arredondamento, filtros completos, pHash, consentimento versionado, config/auditoria
+completa, cena/rostos licenciados/calibrados e validação física/realtime. Não é readiness de treinamento.
+Detalhes e comandos: `docs/audits/AREAS_MAPA_PORTEIRO_DIAGNOSIS_2026-09-24.md`.
+
 ## Foto → relato no mapa — 24/09/2026
 
 Implementado no fluxo canônico: descrição opcional (500 caracteres), GPS do dispositivo

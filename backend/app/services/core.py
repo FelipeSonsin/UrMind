@@ -113,9 +113,16 @@ class CoreService:
         return {"id": capture.id, "capture_key": capture.capture_key, "created": True}
 
     async def capture_markers(
-        self, actor: str, can_review: bool = False, *, public: bool = False
+        self,
+        actor: str,
+        can_review: bool = False,
+        *,
+        public: bool = False,
+        include_unlocated: bool = False,
     ) -> list[dict[str, Any]]:
-        rows = await self.captures.report_markers(actor, can_review, public=public)
+        rows = await self.captures.report_markers(
+            actor, can_review, public=public, include_unlocated=include_unlocated
+        )
         markers = []
         for row in rows:
             marker = {
@@ -129,7 +136,9 @@ class CoreService:
                 markers.append(marker)
                 continue
             status = row.get("processing_status")
-            if row.get("has_review") and row.get("event_status") == "confirmed":
+            if row["latitude"] is None or row["longitude"] is None:
+                marker["report_status"] = "location_required"
+            elif row.get("has_review") and row.get("event_status") == "confirmed":
                 marker["report_status"] = "human_confirmed"
             elif row.get("event_id") and row.get("model_status") == "EXPERIMENTAL_SHADOW":
                 marker["report_status"] = "experimental"
@@ -146,6 +155,8 @@ class CoreService:
                         "user_description",
                         "location_conflict",
                         "event_id",
+                        "created_at",
+                        "photo_gate",
                     )
                 }
             )

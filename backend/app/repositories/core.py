@@ -158,15 +158,22 @@ class CaptureRepository:
         self.session = session
 
     async def report_markers(
-        self, actor: str, can_review: bool = False, *, public: bool = False, limit: int = 500
+        self,
+        actor: str,
+        can_review: bool = False,
+        *,
+        public: bool = False,
+        limit: int = 500,
+        include_unlocated: bool = False,
     ) -> list[dict[str, Any]]:
         """One original-location marker per mobile Capture, never a fabricated Event."""
         rows = await self.session.execute(
             text(
                 """
-            select c.id, ST_Y(c.point::geometry) latitude, ST_X(c.point::geometry) longitude,
+            select c.id, c.created_at, ST_Y(c.point::geometry) latitude, ST_X(c.point::geometry) longitude,
                    c.source_location as location_source, c.accuracy_m, c.user_description,
                    c.quality->'location_conflict' as location_conflict,
+                   c.quality->'photo_gate' as photo_gate,
                    c.quality->'inference'->>'status' as processing_status,
                    c.quality->'inference'->>'model_status' as model_status,
                    e.id as event_id, e.urmind_class, e.status as event_status,
@@ -188,7 +195,8 @@ class CaptureRepository:
                 where event_id = e.id
                 order by commit_order desc nulls last, assessment_sequence desc limit 1
             ) risk on true
-            where c.source in ('pwa_photo', 'exif_upload') and c.point is not null
+            where c.source in ('pwa_photo', 'exif_upload')
+              and (c.point is not null or (:include_unlocated and not :public))
               and (:public or :reviewer or c.quality->>'uploaded_by' = :actor)
             and not (:public and exists(select 1 from public.events e where e.capture_id=c.id and
         """
@@ -197,7 +205,13 @@ class CaptureRepository:
             order by c.created_at desc, c.id limit :limit
         """
             ),
-            {"actor": actor, "reviewer": can_review, "public": public, "limit": limit},
+            {
+                "actor": actor,
+                "reviewer": can_review,
+                "public": public,
+                "limit": limit,
+                "include_unlocated": include_unlocated,
+            },
         )
         return [dict(row) for row in rows.mappings()]
 

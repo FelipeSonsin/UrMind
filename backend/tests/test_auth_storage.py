@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import jwt
+import numpy as np
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from PIL import Image
@@ -907,14 +908,17 @@ def test_detection_exige_lineage_de_model_version() -> None:
         )
 
 
-def _jpeg(size=(32, 24)) -> bytes:
+def _jpeg(size=(640, 640)) -> bytes:
     buffer = io.BytesIO()
-    Image.new("RGB", size, (120, 110, 100)).save(buffer, format="JPEG")
+    y, x = np.indices((size[1], size[0]))
+    Image.fromarray(((x * 73 + y * 151) % 256).astype("uint8")).convert("RGB").save(
+        buffer, format="JPEG"
+    )
     return buffer.getvalue()
 
 
 def test_imagem_valida_recebe_hash_mime_e_dimensoes() -> None:
-    image = validate_image(_jpeg())
+    image = validate_image(_jpeg((32, 24)))
     assert (image.mime, image.extension, image.width, image.height) == ("image/jpeg", "jpg", 32, 24)
     assert len(image.sha256) == 64
 
@@ -1177,3 +1181,66 @@ async def test_storage_delete_uses_idempotent_exact_object_list():
     storage = StorageClient(SETTINGS, transport=httpx.MockTransport(handler))
     await storage.delete("fixture/exact.jpg")
     await storage.delete("fixture/exact.jpg")
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [
+        ("small", "resolution"),
+        ("dark", "underexposed"),
+        ("bright", "overexposed"),
+        ("blur", "blur"),
+    ],
+)
+def test_report_photo_gate_rejects_technically_unusable_image(kind, expected):
+    from app.services.storage import PhotoRejectedError, validate_report_photo
+
+    size = (32, 24) if kind == "small" else (640, 640)
+    color = {"dark": 0, "bright": 255}.get(kind, 120)
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (color, color, color)).save(buffer, format="JPEG")
+    with pytest.raises(PhotoRejectedError) as error:
+        validate_report_photo(buffer.getvalue())
+    assert error.value.result["status"] == "REJECTED"
+    assert expected in error.value.result["reasons"]
+    assert "data" not in error.value.result
+
+
+def test_report_photo_gate_accepts_texture_but_never_claims_urban_scene_or_problem():
+    from app.services.storage import validate_report_photo
+
+    buffer = io.BytesIO()
+    Image.effect_noise((640, 640), 30).convert("RGB").save(buffer, format="JPEG")
+    image = validate_report_photo(buffer.getvalue())
+    assert image.photo_quality["status"] == "NEEDS_REVIEW"
+    assert image.photo_quality["technical_status"] == "ACCEPTED"
+    assert image.photo_quality["scene_status"] == "NOT_VERIFIED"
+    assert image.photo_quality["face_status"] == "NOT_VERIFIED"
+
+
+@pytest.mark.asyncio
+async def test_photo_rejection_is_audited_without_upload_or_capture():
+    from fastapi import HTTPException, UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from app.services.core import CoreService
+
+    storage = SimpleNamespace(upload=AsyncMock())
+    captures = SimpleNamespace(session=SimpleNamespace(commit=AsyncMock()), create=AsyncMock())
+    decisions = SimpleNamespace(add_audit=AsyncMock())
+    with pytest.raises(HTTPException) as error:
+        await upload_photo(
+            user=AuthenticatedUser("owner", None, "authenticated"),
+            service=CoreService(captures, SimpleNamespace(), decisions),
+            storage=storage,
+            file=UploadFile(filename="small.jpg", file=io.BytesIO(_jpeg((32, 24)))),
+        )
+    assert error.value.status_code == 422
+    storage.upload.assert_not_awaited()
+    captures.create.assert_not_awaited()
+    audit = decisions.add_audit.await_args.kwargs
+    assert audit["operation"] == "photo_gate_rejected"
+    assert audit["after"]["reasons"] == ["resolution"]
+    assert "sha256" not in audit["after"]
+    captures.session.commit.assert_awaited_once()

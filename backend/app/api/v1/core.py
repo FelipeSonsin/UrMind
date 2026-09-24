@@ -51,6 +51,7 @@ from app.services.photo_ingest import ingest_photo
 from app.services.storage import (
     MAX_BYTES,
     InvalidImageError,
+    PhotoRejectedError,
     StorageClient,
     StorageError,
     StorageNotConfiguredError,
@@ -60,6 +61,7 @@ from app.services.storage import (
     object_path,
     sanitize_public_image,
     validate_image,
+    validate_report_photo,
 )
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_user)])
@@ -167,10 +169,16 @@ async def capture_processing(
 
 @router.get("/captures/markers")
 async def capture_markers(
-    user: CurrentUser, service: Core, response: Response
+    user: CurrentUser,
+    service: Core,
+    response: Response,
+    only_mine: bool = False,
+    include_unlocated: bool = False,
 ) -> list[dict[str, Any]]:
     response.headers["Cache-Control"] = "private, no-store"
-    return await service.capture_markers(user.id, user.can_review)
+    return await service.capture_markers(
+        user.id, user.can_review and not only_mine, include_unlocated=include_unlocated
+    )
 
 
 @router.patch("/captures/{capture_id}/location")
@@ -256,7 +264,26 @@ async def upload_photo(
 
     data = await file.read(MAX_BYTES + 1)
     try:
-        image = await _decode_upload(data)
+        image = await _decode_upload(data, validate_report_photo)
+    except PhotoRejectedError as exc:
+        # Store metrics/reasons only. No image, hash, EXIF or storage object.
+        attempt_id = uuid.uuid4()
+        if service.decisions is None:
+            raise HTTPException(
+                status_code=503, detail="Registro do porteiro indisponível"
+            ) from exc
+        await service.decisions.add_audit(
+            operation="photo_gate_rejected",
+            entity_type="photo_attempt",
+            entity_id=attempt_id,
+            actor=user.id,
+            before={},
+            after=exc.result,
+            event_hash=hashlib.sha256(f"photo-gate:{attempt_id}".encode()).hexdigest(),
+        )
+        await service.captures.session.commit()
+        log.info("capture_rejected", reason="photo_quality", reasons=exc.result["reasons"])
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except InvalidImageError as exc:
         code = 413 if len(data) > MAX_BYTES else 415
         log.info("capture_rejected", reason="invalid_image", status_code=code)
@@ -306,6 +333,7 @@ async def upload_photo(
             "uploaded_by": user.id,
             "public_upload": not user.can_review,
             "location_attestation": "unverified_client_claim",
+            "photo_gate": image.photo_quality,
         }
     )
     if tz_offset_minutes is not None:

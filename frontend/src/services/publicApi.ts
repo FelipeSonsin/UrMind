@@ -41,6 +41,8 @@ export interface EventQuery {
 }
 
 export const publicApi = {
+  publishedEvent: (id: string, signal?: AbortSignal) =>
+    get(`/events/${id}`, publicEventDetailSchema, signal),
   captureMarkers: (signal?: AbortSignal) =>
     get('/capture-markers', z.array(captureMarkerSchema), signal),
   status: (signal?: AbortSignal) => get('/status', publicStatusSchema, signal),

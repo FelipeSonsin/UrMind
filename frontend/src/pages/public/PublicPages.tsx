@@ -284,14 +284,34 @@ export function PublicMapPage({
   reports?: CaptureMarker[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [pointDetail, setPointDetail] = useState<PublicEventDetail | null>(null);
+  const [pointError, setPointError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    setPointDetail(null);
+    setPointError('');
+    if (selected && events.some((event) => event.id === selected)) {
+      publicApi
+        .publishedEvent(selected, controller.signal)
+        .then((value) => {
+          if (!controller.signal.aborted) setPointDetail(value);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setPointError('Detalhe publicado indisponível.');
+        });
+    }
+    return () => controller.abort();
+  }, [selected, events]);
   const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
-  const reportIds = new Set(reports.map((report) => report.id));
-  const eventIds = new Set(reports.map((report) => report.event_id));
-  const markers = [
-    ...events.filter((event) => !eventIds.has(event.id)),
-    ...(generic ?? []).filter((report) => !reportIds.has(report.id)),
-    ...reports,
-  ];
+  const markers = useMemo(() => {
+    const reportIds = new Set(reports.map((report) => report.id));
+    const eventIds = new Set(reports.map((report) => report.event_id));
+    return [
+      ...events.filter((event) => !eventIds.has(event.id)),
+      ...(generic ?? []).filter((report) => !reportIds.has(report.id)),
+      ...reports,
+    ];
+  }, [events, reports, generic]);
   return (
     <>
       <div className="page-heading public">
@@ -302,7 +322,49 @@ export function PublicMapPage({
         </div>
       </div>
       <Suspense fallback={<p role="status">Carregando mapa…</p>}>
-        <UrbanMap events={markers} selectedId={selected} onSelect={setSelected} />
+        <UrbanMap
+          events={markers}
+          selectedId={selected}
+          onSelect={setSelected}
+          onCloseDetail={() => setSelected(null)}
+          detail={
+            selected && (
+              <>
+                {pointError && <p role="alert">{pointError}</p>}
+                {pointDetail && pointDetail.id === selected ? (
+                  <>
+                    <h2>{labelFor(pointDetail.urmind_class)}</h2>
+                    <ExperimentalBadge stage={pointDetail.model_stage} />
+                    {pointDetail.image.available && pointDetail.image.url && (
+                      <img
+                        src={pointDetail.image.url}
+                        alt="Foto publicada e sanitizada da ocorrência"
+                      />
+                    )}
+                    <p>{pointDetail.road_name ?? 'Endereço aproximado indisponível'}</p>
+                    {pointDetail.latitude != null && pointDetail.longitude != null && (
+                      <>
+                        <p>
+                          {pointDetail.latitude.toFixed(4)}, {pointDetail.longitude.toFixed(4)}
+                        </p>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${pointDetail.latitude.toFixed(4)},${pointDetail.longitude.toFixed(4)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Como chegar
+                        </a>
+                      </>
+                    )}
+                    <a href={`#/resultado/${pointDetail.id}`}>Abrir resultado</a>
+                  </>
+                ) : (
+                  <p>Relato do cidadão. Foto e descrição não publicadas.</p>
+                )}
+              </>
+            )
+          }
+        />
       </Suspense>
       <EventFeed events={events} selectedId={selected} onSelect={(event) => openEvent(event.id)} />
     </>

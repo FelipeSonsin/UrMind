@@ -95,8 +95,12 @@ async function request<T>(
 }
 
 export const api = {
-  captureMarkers: (signal?: AbortSignal) =>
-    request('/captures/markers', z.array(captureMarkerSchema), { signal }),
+  captureMarkers: (signal?: AbortSignal, onlyMine = false) =>
+    request(
+      `/captures/markers${onlyMine ? '?only_mine=true&include_unlocated=true' : ''}`,
+      z.array(captureMarkerSchema),
+      { signal },
+    ),
   captureImage: (id: string, signal?: AbortSignal) =>
     request(`/captures/${id}/image`, z.object({ image_url: z.string() }), { signal }),
   captureLocation: (id: string, latitude: number, longitude: number, signal?: AbortSignal) =>

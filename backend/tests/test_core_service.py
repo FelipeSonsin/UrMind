@@ -287,7 +287,9 @@ async def test_capture_marker_without_model_has_no_invented_analysis():
     repository = SimpleNamespace(report_markers=AsyncMock(return_value=[row]))
     service = CoreService(repository, None)
     result = (await service.capture_markers("owner"))[0]
-    repository.report_markers.assert_awaited_with("owner", False, public=False)
+    repository.report_markers.assert_awaited_with(
+        "owner", False, public=False, include_unlocated=False
+    )
     assert result["report_status"] == "model_not_available"
     assert result["urmind_class"] is None and result["severity"] is None
     assert result["priority_score"] is None
@@ -498,3 +500,28 @@ async def test_detection_completed_is_never_reported_as_completed():
     )
     result = await service.capture_processing(capture_id, "owner", False)
     assert result["status"] != "completed"
+
+
+@pytest.mark.asyncio
+async def test_owner_report_list_retains_unlocated_capture_without_inventing_a_point():
+    captures = SimpleNamespace(
+        report_markers=AsyncMock(
+            return_value=[
+                {
+                    "id": uuid4(),
+                    "latitude": None,
+                    "longitude": None,
+                    "user_description": "Calçada",
+                    "created_at": "2026-09-24T12:00:00Z",
+                }
+            ]
+        )
+    )
+    service = CoreService(captures, SimpleNamespace())
+    result = await service.capture_markers("owner", include_unlocated=True)
+    assert result[0]["latitude"] is None
+    assert result[0]["report_status"] == "location_required"
+    assert result[0]["created_at"] == "2026-09-24T12:00:00Z"
+    captures.report_markers.assert_awaited_once_with(
+        "owner", False, public=False, include_unlocated=True
+    )

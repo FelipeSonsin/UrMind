@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { stubPublicApi } from './fixtures';
+import { stubPublicApi, syntheticReportPhoto } from './fixtures';
 
 // Sessão Supabase simulada SÓ no navegador de teste: a chave de armazenamento é a
 // do projeto configurado no build (frontend/.env.local), e a API é interceptada.
@@ -98,12 +98,7 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
   await page.goto('/#/registrar');
   await page.getByLabel('Descreva o problema (opcional)').fill(description);
   await expect(page.getByText(`${description.length}/500 caracteres`)).toBeVisible();
-  const png = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 20;
-    canvas.height = 20;
-    return canvas.toDataURL('image/png').split(',')[1];
-  });
+  const png = await syntheticReportPhoto(page);
   await page.getByLabel('Escolher foto').setInputFiles({
     name: 'report.png',
     mimeType: 'image/png',
@@ -218,13 +213,7 @@ test('bloqueia signup público se frontend e backend apontam para projetos difer
     return route.abort();
   });
   await page.goto('/#/registrar');
-  const png = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 20;
-    canvas.height = 20;
-    canvas.getContext('2d')!.fillRect(0, 0, 20, 20);
-    return canvas.toDataURL('image/png').split(',')[1];
-  });
+  const png = await syntheticReportPhoto(page);
   await page.getByLabel('Escolher foto').setInputFiles({
     name: 'evidencia.png',
     mimeType: 'image/png',
@@ -271,12 +260,7 @@ test('logout durante upload cancela resposta tardia sem navegar para captura ant
       .catch(() => undefined); // Aborting the actual request is expected after logout.
   });
   await page.goto('/#/registrar');
-  const png = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 20;
-    canvas.height = 20;
-    return canvas.toDataURL('image/png').split(',')[1];
-  });
+  const png = await syntheticReportPhoto(page);
   await page.getByLabel('Escolher foto').setInputFiles({
     name: 'logout-test.png',
     mimeType: 'image/png',
@@ -402,12 +386,7 @@ for (const boundary of ['origin', 'signup'] as const) {
         return route.fulfill({ status: 401, json: { detail: 'test-only' } });
       });
       await page.goto('/#/registrar');
-      const png = await page.evaluate(() => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 20;
-        canvas.height = 20;
-        return canvas.toDataURL('image/png').split(',')[1];
-      });
+      const png = await syntheticReportPhoto(page);
       await page.getByLabel('Escolher foto').setInputFiles({
         name: 'auth-boundary.png',
         mimeType: 'image/png',
@@ -513,13 +492,7 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
 }) => {
   await page.goto('/#/capture');
   // Imagem decodificável criada no próprio navegador, exclusivamente para o teste.
-  const png = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 20;
-    canvas.height = 20;
-    canvas.getContext('2d')!.fillRect(0, 0, 20, 20);
-    return canvas.toDataURL('image/png').split(',')[1];
-  });
+  const png = await syntheticReportPhoto(page);
   await page.getByLabel('Escolher foto').setInputFiles({
     name: 'evidencia.png',
     mimeType: 'image/png',
@@ -656,4 +629,46 @@ test('reabre o aplicativo sem rede após instalar o service worker', async ({ pa
   ).toBeVisible();
   await page.getByRole('link', { name: 'Registrar evidência' }).click();
   await expect(page.getByRole('button', { name: 'Salvar e enviar' })).toBeVisible();
+});
+test('meus relatos inclui captura sem localização e preserva descrição como texto', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.route('**/api/v1/captures/markers?*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: '2b120c24-7ff1-4f58-bda8-c2f82a94fc05',
+          latitude: null,
+          longitude: null,
+          report_status: 'location_required',
+          user_description: '<b>Calçada</b>',
+          created_at: '2026-09-24T12:00:00Z',
+        },
+      ],
+    }),
+  );
+  await page.goto('/#/meus-relatos');
+  await expect(page.getByRole('heading', { name: 'Meus relatos', exact: true })).toBeVisible();
+  await expect(page.getByText('<b>Calçada</b>', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Informar localização' })).toHaveAttribute(
+    'href',
+    /processando/,
+  );
+});
+test('porteiro local recusa foto escura sem perder a descrição', async ({ page }) => {
+  await page.goto('/#/registrar');
+  await page.getByLabel('Descreva o problema (opcional)').fill('Minha observação');
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 640;
+    canvas.getContext('2d')!.fillRect(0, 0, 640, 640);
+    return canvas.toDataURL().split(',')[1];
+  });
+  await page
+    .getByLabel('Escolher foto')
+    .setInputFiles({ name: 'dark.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(page.getByRole('alert')).toContainText('escura');
+  await expect(page.getByLabel('Descreva o problema (opcional)')).toHaveValue('Minha observação');
 });

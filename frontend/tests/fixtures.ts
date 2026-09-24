@@ -1,6 +1,25 @@
 import type { Page, Route } from '@playwright/test';
 import taxonomyFixture from './taxonomy.fixture.json' with { type: 'json' };
 
+/** Synthetic texture for upload mechanics only; never a scientific or real E2E photo. */
+export async function syntheticReportPhoto(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 640;
+    const context = canvas.getContext('2d')!;
+    const image = context.createImageData(640, 640);
+    for (let y = 0; y < 640; y++)
+      for (let x = 0; x < 640; x++) {
+        const i = (y * 640 + x) * 4;
+        image.data[i] = image.data[i + 1] = image.data[i + 2] = (x * 73 + y * 151) % 256;
+        image.data[i + 3] = 255;
+      }
+    context.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+}
+
 // Fixtures existem SOMENTE aqui, nos testes. Nenhum dado fictício entra no produto:
 // o app real só mostra o que a API pública devolve. Os formatos abaixo espelham
 // backend/app/schemas/public.py.

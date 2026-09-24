@@ -318,3 +318,42 @@ test('resultado de modelo não-shadow não recebe o selo experimental', async ({
   await expect(page.getByRole('heading', { name: 'Buraco' }).first()).toBeVisible();
   await expect(page.getByText('ANÁLISE EXPERIMENTAL')).toHaveCount(0);
 });
+test('mapa oferece seleção acessível e detalhe da foto publicada sem sair do mapa', async ({
+  page,
+}, testInfo) => {
+  await stubPublicApi(page, {
+    detail: {
+      ...eventDetail,
+      image: {
+        available: true,
+        privacy_redacted: true,
+        reason: null,
+        url: `/api/v1/public/events/${EVENT_ID}/image`,
+      },
+    },
+  });
+  await page.route('**/api/v1/public/events/*/image', (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#66766f"/></svg>',
+    }),
+  );
+  await page.goto('/#/mapa');
+  await page.getByText(/Lista acessível de pontos/).click();
+  await page.getByRole('button', { name: /Selecionar ponto.*Buraco/ }).click();
+  const detail = page.getByRole('complementary', { name: 'Detalhe do ponto' });
+  await expect(detail).toBeVisible();
+  await expect(detail.getByRole('link', { name: 'Como chegar' })).toHaveAttribute('href', /maps/);
+  await expect(detail.getByRole('link', { name: 'Abrir resultado' })).toBeVisible();
+  await expect(
+    detail.getByRole('img', { name: 'Foto publicada e sanitizada da ocorrência' }),
+  ).toHaveAttribute('src', `/api/v1/public/events/${EVENT_ID}/image`);
+  if (page.viewportSize()!.width < 900) {
+    const box = await detail.boundingBox();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  }
+  await page.screenshot({ path: testInfo.outputPath('map-detail.png'), fullPage: true });
+  await detail.getByRole('button', { name: 'Fechar detalhe' }).click();
+  await expect(detail).not.toBeVisible();
+});

@@ -55,6 +55,20 @@ const SignIn = lazy(() => import('./components/SignIn').then((m) => ({ default: 
 const PUBLIC_REFRESH_MS = 30_000;
 
 const navigation = [
+  {
+    id: 'my-reports',
+    label: 'Meus relatos',
+    icon: ClipboardList,
+    href: '#/meus-relatos',
+    section: 'operação',
+  },
+  {
+    id: 'about',
+    label: 'Sobre e privacidade',
+    icon: BadgeCheck,
+    href: '#/sobre',
+    section: 'público',
+  },
   { id: 'overview', label: 'Visão geral', icon: LayoutDashboard, href: '#/', section: 'público' },
   { id: 'live', label: 'Ao vivo', icon: Radio, href: '#/live', section: 'público' },
   { id: 'map', label: 'Mapa operacional', icon: Map, href: '#/map', section: 'público' },
@@ -194,7 +208,11 @@ export default function App() {
       ? storedProcessingError
       : '';
   const [processingRetry, setProcessingRetry] = useState(0);
-  const [reports, setReports] = useState<{ owner: string; data: CaptureMarker[] } | null>(null);
+  const [reports, setReports] = useState<{
+    owner: string;
+    onlyMine: boolean;
+    data: CaptureMarker[];
+  } | null>(null);
   const [reportError, setReportError] = useState('');
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [reportPhoto, setReportPhoto] = useState<{ owner: string; id: string; url: string } | null>(
@@ -204,8 +222,12 @@ export default function App() {
     null,
   );
   const locationOperation = useRef<AbortController | null>(null);
-  const ownReports = session && reports?.owner === session.user.id ? reports.data : [];
-  const showReports = page === 'processing' || page === 'private-map' || page === 'map';
+  const ownReports =
+    session && reports?.owner === session.user.id && reports.onlyMine === (page === 'my-reports')
+      ? reports.data
+      : [];
+  const showReports =
+    page === 'processing' || page === 'private-map' || page === 'map' || page === 'my-reports';
   useEffect(() => {
     locationOperation.current?.abort();
     setManualPoint(null);
@@ -218,10 +240,10 @@ export default function App() {
     if (!session || !showReports) return () => controller.abort();
     const owner = session.user.id;
     api
-      .captureMarkers(controller.signal)
+      .captureMarkers(controller.signal, page === 'my-reports')
       .then((data) => {
         if (!controller.signal.aborted) {
-          setReports({ owner, data });
+          setReports({ owner, onlyMine: page === 'my-reports', data });
           setReportError('');
         }
       })
@@ -229,7 +251,7 @@ export default function App() {
         if (!controller.signal.aborted) setReportError('Não foi possível consultar os relatos.');
       });
     return () => controller.abort();
-  }, [session?.user.id, showReports, revision, processingRetry]);
+  }, [session?.user.id, showReports, page, revision, processingRetry]);
   useEffect(() => {
     const controller = new AbortController();
     setReportPhoto(null);
@@ -756,7 +778,9 @@ export default function App() {
                 {page === 'private-map' ? (
                   <h1>Gêmeo digital 2D</h1>
                 ) : (
-                  <h2>{canReview ? 'Relatos recebidos' : 'Meus relatos'}</h2>
+                  <h2>
+                    {canReview && page !== 'my-reports' ? 'Relatos recebidos' : 'Meus relatos'}
+                  </h2>
                 )}
                 <p>
                   Relatos sem análise não são problemas confirmados pela IA. Localização declarada,
@@ -767,6 +791,51 @@ export default function App() {
                     events={ownReports}
                     selectedId={selectedReport}
                     onSelect={setSelectedReport}
+                    onCloseDetail={() => setSelectedReport(null)}
+                    detail={
+                      selectedReport &&
+                      ownReports.some((report) => report.id === selectedReport) && (
+                        <>
+                          <h2>Relato do cidadão</h2>
+                          {ownReports.find((report) => report.id === selectedReport)?.photo_gate
+                            ?.status === 'NEEDS_REVIEW' && (
+                            <p>
+                              Verificação pendente: qualidade técnica aceita; cena urbana e rostos
+                              ainda não verificados automaticamente.
+                            </p>
+                          )}
+                          <p>
+                            {
+                              ownReports.find((report) => report.id === selectedReport)
+                                ?.user_description
+                            }
+                          </p>
+                          <p>
+                            {
+                              reportLabels[
+                                ownReports.find((report) => report.id === selectedReport)
+                                  ?.report_status ?? 'received'
+                              ]
+                            }
+                          </p>
+                          {reportPhoto?.owner === session.user.id &&
+                            reportPhoto.id === selectedReport && (
+                              <>
+                                <img
+                                  src={reportPhoto.url}
+                                  alt="Foto privada do relato selecionado"
+                                />
+                                <a href={reportPhoto.url} target="_blank" rel="noopener noreferrer">
+                                  Ver original
+                                </a>
+                              </>
+                            )}
+                          {!canReview && (
+                            <a href={`#/processando/${selectedReport}`}>Abrir relato</a>
+                          )}
+                        </>
+                      )
+                    }
                     onPickLocation={
                       captureStatus?.status === 'location_required'
                         ? (latitude, longitude) => setManualPoint({ latitude, longitude })
@@ -787,6 +856,14 @@ export default function App() {
                         {reportLabels[report.report_status]}
                       </button>
                       {report.user_description && <p>{report.user_description}</p>}
+                      {report.created_at && (
+                        <time dateTime={report.created_at}>
+                          {new Date(report.created_at).toLocaleString('pt-BR')}
+                        </time>
+                      )}
+                      {report.report_status === 'location_required' && (
+                        <a href={`#/processando/${report.id}`}>Informar localização</a>
+                      )}
                       {report.location_conflict && (
                         <p>GPS do dispositivo e EXIF divergentes — necessita revisão.</p>
                       )}
@@ -796,16 +873,46 @@ export default function App() {
                     </li>
                   ))}
                 </ul>
-                {reportPhoto?.owner === session.user.id && reportPhoto.id === selectedReport && (
-                  <img
-                    src={reportPhoto.url}
-                    alt="Foto privada do relato selecionado"
-                    style={{ maxWidth: '100%' }}
-                  />
-                )}
+                {page === 'map' &&
+                  reportPhoto?.owner === session.user.id &&
+                  reportPhoto.id === selectedReport && (
+                    <img
+                      src={reportPhoto.url}
+                      alt="Foto privada do relato selecionado"
+                      style={{ maxWidth: '100%' }}
+                    />
+                  )}
               </section>
             )}
             {page === 'analysis' && <PublicTransparencyPage revision={publicRevision} />}
+            {page === 'my-reports' && !session && (
+              <section className="panel">
+                <h1>Meus relatos</h1>
+                <p>
+                  Abra a sessão usada para enviar os relatos. Relatos de outro visitante não são
+                  exibidos.
+                </p>
+                <a href="#/registrar">Registrar problema</a>
+              </section>
+            )}
+            {page === 'about' && (
+              <>
+                <section className="panel">
+                  <h1>Sobre o UrMind</h1>
+                  <p>
+                    Fotos e localização são armazenadas como evidência privada. Você e a equipe
+                    autorizada podem consultá-las. A publicação depende de revisão humana e usa uma
+                    cópia sem metadados sensíveis. Não fotografe documentos, rostos em primeiro
+                    plano ou placas de veículos.
+                  </p>
+                  <p>
+                    Um relato recebido não é um problema confirmado pela IA. Classes em
+                    desenvolvimento não são reconhecidas automaticamente.
+                  </p>
+                </section>
+                <PublicTransparencyPage revision={publicRevision} />
+              </>
+            )}
             {page === 'demo' && <PublicDemoPage revision={publicRevision} />}
             {page === 'settings' && (
               <PublicSystemPage

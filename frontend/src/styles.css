@@ -1804,3 +1804,61 @@ strong.risk-unknown {
   border-color: #e9c77b;
   margin-bottom: 6px;
 }
+.map-panel {
+  position: relative;
+}
+.map-detail {
+  background: #ffffff;
+  color: #182c25;
+  border: 1px solid #66766f;
+  border-radius: 12px;
+  padding: 16px;
+  margin-block: 12px;
+  max-height: 65vh;
+  overflow: auto;
+}
+.map-detail img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+}
+.map-detail a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-right: 16px;
+}
+.map-point-list summary,
+.map-point-list button {
+  min-height: 44px;
+  cursor: pointer;
+}
+.map-point-list li {
+  overflow-wrap: anywhere;
+  margin-block: 8px;
+}
+@media (max-width: 899px) {
+  .map-detail {
+    position: fixed;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
+    margin: 0;
+    max-height: 70dvh;
+    z-index: 100;
+    box-shadow: 0 -5px 24px #182c2530;
+  }
+  .map-detail img {
+    max-height: 28dvh;
+  }
+}
+@media (min-width: 900px) {
+  .map-detail {
+    position: absolute;
+    right: 24px;
+    top: 24px;
+    width: min(340px, 40%);
+    z-index: 2;
+    box-shadow: 0 5px 16px #182c2530;
+  }
+}
