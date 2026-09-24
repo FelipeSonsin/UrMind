@@ -12,16 +12,18 @@ import time
 import warnings
 from collections import deque
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Any
 
 import httpx
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 
 from app.config import Settings
 from app.schemas.core import PhotoGatePolicy
+from app.services.exif import read_exif_location
+from app.services.photo_reference import ReferenceUnavailable, detect_faces, scene_similarity
 
 BUCKET = "captures"
 MAX_BYTES = 10 * 1024 * 1024
@@ -93,6 +95,20 @@ class ValidatedImage:
     width: int
     height: int
     photo_quality: dict[str, Any] | None = None
+    phash: str | None = None
+
+
+def perceptual_hash(source: Image.Image) -> str:
+    """64-bit low-frequency DCT hash; presentation orientation, no model/embedding."""
+    pixels = np.asarray(
+        ImageOps.exif_transpose(source).convert("L").resize((32, 32), Image.Resampling.LANCZOS),
+        dtype=np.float64,
+    )
+    basis = np.cos(np.pi * np.arange(8)[:, None] * (2 * np.arange(32) + 1) / 64)
+    low = (basis @ pixels @ basis.T).ravel()
+    bits = low > np.median(low[1:])
+    bits[0] = False
+    return f"{int.from_bytes(np.packbits(bits).tobytes(), 'big'):016x}"
 
 
 def validate_image(data: bytes) -> ValidatedImage:
@@ -143,6 +159,7 @@ def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None)
     policy = policy if policy is not None else PhotoGatePolicy()
     image = validate_image(data)
     with Image.open(io.BytesIO(data)) as source:
+        phash = perceptual_hash(source)
         gray = source.convert("L")
         gray.thumbnail((512, 512))
         pixels = np.asarray(gray, dtype=np.float32)
@@ -195,24 +212,99 @@ def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None)
             "blur": "Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.",
         }
         raise PhotoRejectedError(result, hints[reasons[0]])
-    return replace(image, photo_quality=result)
+    exif = read_exif_location(data)
+    result["warnings"] = []
+    result["exif_timezone_known"] = exif.timezone_known
+    if exif.captured_at is not None:
+        now = datetime.now(UTC)
+        # Unknown timezone stays unknown. A date-only comparison is deliberately
+        # conservative (one extra day); this is a warning about a client claim.
+        if exif.captured_at.tzinfo is None:
+            old = (now.date() - exif.captured_at.date()).days > policy.old_photo_days + 1
+        else:
+            old = now - exif.captured_at > timedelta(days=policy.old_photo_days)
+        if old:
+            result["warnings"].append("old_exif_date_unverified")
+    with Image.open(io.BytesIO(data)) as source:
+        try:
+            faces = detect_faces(source)
+        except ReferenceUnavailable as exc:
+            result["face_status"] = "NOT_VERIFIED"
+            result["face_unavailable_reason"] = str(exc)
+        else:
+            result["face_status"] = faces["status"]
+            result["privacy"] = faces
+            if faces["max_area_ratio"] > policy.dominant_face_ratio:
+                result["status"] = "REJECTED"
+                result["reasons"].append("dominant_face")
+                raise PhotoRejectedError(
+                    result,
+                    "A foto deve mostrar o problema, não pessoas. Evite rostos em primeiro plano.",
+                )
+            if faces["boxes"]:
+                result["warnings"].append("privacy_review_required")
+        try:
+            scene = scene_similarity(source)
+        except ReferenceUnavailable as exc:
+            result["scene_unavailable_reason"] = str(exc)
+        else:
+            result["scene"] = scene
+            result["scene_status"] = "CHECKED" if scene["calibrated"] else "UNCALIBRATED"
+            if scene["calibrated"]:
+                if scene["margin"] < policy.scene_reject_margin:
+                    result["status"] = "REJECTED"
+                    result["reasons"].append("non_urban_scene")
+                    raise PhotoRejectedError(
+                        result, "A foto deve mostrar uma via pública. Enquadre a rua ou calçada."
+                    )
+                if (
+                    scene["margin"] >= policy.scene_accept_margin
+                    and result["face_status"] == "CHECKED"
+                    and "privacy_review_required" not in result["warnings"]
+                ):
+                    result["status"] = "ACCEPTED"
+    return replace(image, photo_quality=result, phash=phash)
 
 
 def sanitize_public_image(data: bytes) -> ValidatedImage:
     """Create a metadata-free derivative; never mutate original evidence.
 
     Preserve raster coordinates so existing normalized boxes remain valid.
-    This removes metadata, not visible faces/plates: publication still requires
-    an explicit reviewer attestation about the visible content.
+    Registered YuNet boxes are blurred with a margin. Plates and missed faces
+    still require an explicit reviewer attestation about visible content.
     """
     validate_image(data)
     with Image.open(io.BytesIO(data)) as source:
         clean = Image.new("RGB", source.size, "white")
         converted = source.convert("RGBA")
         clean.paste(converted, mask=converted.getchannel("A"))
+        try:
+            faces = detect_faces(clean)
+        except ReferenceUnavailable as exc:
+            # Original publication gate always requires human privacy review.
+            # Never claim automatic redaction when its artifact is unavailable.
+            faces = {"status": "NOT_VERIFIED", "reason": str(exc), "boxes": []}
+        for left, top, right, bottom in faces["boxes"]:
+            margin_x, margin_y = (right - left) * 0.2, (bottom - top) * 0.2
+            box = (
+                int(max(0, left - margin_x) * clean.width),
+                int(max(0, top - margin_y) * clean.height),
+                int(min(1, right + margin_x) * clean.width),
+                int(min(1, bottom + margin_y) * clean.height),
+            )
+            region = clean.crop(box)
+            clean.paste(region.filter(ImageFilter.GaussianBlur(max(12, min(region.size) / 5))), box)
         output = io.BytesIO()
         clean.save(output, format="JPEG", quality=90)
-    return validate_image(output.getvalue())
+    return replace(
+        validate_image(output.getvalue()),
+        photo_quality={
+            "face_redaction_status": faces["status"],
+            "face_count": len(faces["boxes"]),
+            "reference_sha256": faces.get("sha256"),
+            "human_attestation_required": True,
+        },
+    )
 
 
 def object_path(

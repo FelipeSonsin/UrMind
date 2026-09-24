@@ -55,6 +55,46 @@ LAT, LON = -23.5613, -46.6560
 
 
 @pytest.mark.asyncio
+async def test_photo_admission_lease_is_shared_and_expiring(database):
+    owner, token, competing = str(uuid.uuid4()), uuid.uuid4(), uuid.uuid4()
+    try:
+        async with database.session() as first:
+            assert await CaptureRepository(first).acquire_photo_lease(owner, token)
+        async with database.session() as second:
+            repo = CaptureRepository(second)
+            assert not await repo.acquire_photo_lease(owner, competing)
+            await repo.release_photo_lease(owner, competing)
+            assert not await repo.acquire_photo_lease(owner, competing)
+            await second.execute(
+                text(
+                    "update public.photo_admission_leases set expires_at=now()-interval '1 second' where owner_id=cast(:owner as uuid)"
+                ),
+                {"owner": owner},
+            )
+        async with database.session() as third:
+            repo = CaptureRepository(third)
+            assert await repo.acquire_photo_lease(owner, competing)
+            assert not await third.scalar(
+                text(
+                    "select has_table_privilege('authenticated','public.photo_admission_leases','SELECT')"
+                )
+            )
+            assert await third.scalar(
+                text(
+                    "select relrowsecurity from pg_class where oid='public.photo_admission_leases'::regclass"
+                )
+            )
+    finally:
+        async with database.session() as cleanup:
+            await cleanup.execute(
+                text(
+                    "delete from public.photo_admission_leases where owner_id=cast(:owner as uuid)"
+                ),
+                {"owner": owner},
+            )
+
+
+@pytest.mark.asyncio
 async def test_operational_policy_persistence_and_rls(database):
     from app.repositories.core import DecisionRepository
     from app.schemas.core import PhotoGatePolicy
@@ -238,6 +278,12 @@ async def test_photo_report_marker_exif_storage_owner_and_missing_location(datab
                 ids.append(capture_id)
                 capture = await service.captures.get(capture_id)
                 paths.append(capture.storage_path)
+                assert await service.captures.recent_similar_photo(
+                    owner, capture.quality["phash"], datetime.now(UTC), 0
+                )
+                assert not await service.captures.recent_similar_photo(
+                    other, capture.quality["phash"], datetime.now(UTC), 16
+                )
                 assert await storage.download(capture.storage_path) == data
                 assert result["requires_manual_location"] is not located
                 markers = await service.capture_markers(owner)

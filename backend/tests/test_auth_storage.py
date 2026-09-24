@@ -41,17 +41,50 @@ OTHER_KEY = ec.generate_private_key(ec.SECP256R1())
 
 @pytest.fixture(autouse=True)
 def isolated_upload_attempt_budget():
-    from app.api.v1.core import get_address_provider, get_photo_gate_policy, upload_admission
+    from app.api.v1.core import (
+        get_address_provider,
+        get_photo_gate_policy,
+        photo_admission_lease,
+        upload_admission,
+    )
     from app.main import app
     from app.schemas.core import PhotoGatePolicy
 
     upload_admission.cache_clear()
     app.dependency_overrides[get_photo_gate_policy] = lambda: PhotoGatePolicy()
     app.dependency_overrides[get_address_provider] = lambda: None
+    app.dependency_overrides[photo_admission_lease] = lambda: None
     yield
     app.dependency_overrides.pop(get_photo_gate_policy, None)
     app.dependency_overrides.pop(get_address_provider, None)
+    app.dependency_overrides.pop(photo_admission_lease, None)
     upload_admission.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_photo_admission_lease_releases_after_failure_and_rejects_busy():
+    from fastapi import HTTPException
+
+    from app.api.v1.core import photo_admission_lease
+
+    repo = SimpleNamespace(
+        acquire_photo_lease=AsyncMock(return_value=True),
+        release_photo_lease=AsyncMock(),
+        session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
+    )
+    user = SimpleNamespace(id=str(uuid.uuid4()))
+    lease = photo_admission_lease(user, SimpleNamespace(captures=repo))
+    await anext(lease)
+    with pytest.raises(ValueError, match="upload failed"):
+        await lease.athrow(ValueError("upload failed"))
+    repo.release_photo_lease.assert_awaited_once()
+    assert repo.session.commit.await_count == 2
+    repo.acquire_photo_lease.return_value = False
+    busy = photo_admission_lease(user, SimpleNamespace(captures=repo))
+    with pytest.raises(HTTPException) as denied:
+        await anext(busy)
+    assert denied.value.status_code == 429
+    assert repo.release_photo_lease.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -507,7 +540,8 @@ def test_upload_multipart_normal_atravessa_limite_asgi(client, location) -> None
     capture_id = uuid.uuid4()
     captures = SimpleNamespace(
         get_by_key=AsyncMock(return_value=None),
-        session=SimpleNamespace(commit=AsyncMock()),
+        recent_similar_photo=AsyncMock(return_value=False),
+        session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
     )
     service = SimpleNamespace(
         captures=captures,
@@ -722,6 +756,7 @@ async def test_usuario_publico_dev_pode_criar_captura_com_quota_atomica(
         get_by_key=AsyncMock(return_value=None),
         recent_public_uploads=AsyncMock(return_value=0),
         recent_owner_uploads=AsyncMock(return_value=0),
+        recent_similar_photo=AsyncMock(return_value=False),
         lock_public_uploads=AsyncMock(),
         lock_owner_uploads=AsyncMock(),
         session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
@@ -779,6 +814,7 @@ async def test_limite_concorrente_compensa_objeto_storage(monkeypatch) -> None:
         get_by_key=AsyncMock(return_value=None),
         recent_public_uploads=AsyncMock(return_value=0),
         recent_owner_uploads=AsyncMock(side_effect=[0, 4]),
+        recent_similar_photo=AsyncMock(return_value=False),
         lock_public_uploads=AsyncMock(),
         lock_owner_uploads=AsyncMock(),
         session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
@@ -845,7 +881,8 @@ async def test_upload_pwa_preserva_claims_gps_sem_atestar_precisao() -> None:
     capture_id = uuid.uuid4()
     captures = SimpleNamespace(
         get_by_key=AsyncMock(return_value=None),
-        session=SimpleNamespace(commit=AsyncMock()),
+        recent_similar_photo=AsyncMock(return_value=False),
+        session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
     )
     service = SimpleNamespace(
         captures=captures,
@@ -896,7 +933,9 @@ async def test_upload_sem_gps_nem_exif_armazena_e_pede_local_manual():
 
     service = SimpleNamespace(
         captures=SimpleNamespace(
-            get_by_key=AsyncMock(return_value=None), session=SimpleNamespace(commit=AsyncMock())
+            get_by_key=AsyncMock(return_value=None),
+            recent_similar_photo=AsyncMock(return_value=False),
+            session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
         ),
         register_capture=AsyncMock(return_value={"id": uuid.uuid4(), "created": True}),
     )
@@ -931,7 +970,8 @@ async def test_same_photo_from_two_users_does_not_share_capture_or_storage_path(
     stored = {}
 
     class Captures:
-        session = SimpleNamespace(commit=AsyncMock())
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+        recent_similar_photo = AsyncMock(return_value=False)
 
         async def get_by_key(self, key):
             return stored.get(key)
@@ -1089,6 +1129,7 @@ async def test_storage_object_removed_when_capture_db_fails() -> None:
 
     class Captures:
         session = Session()
+        recent_similar_photo = AsyncMock(return_value=False)
 
         async def get_by_key(self, _key):
             return None
@@ -1308,7 +1349,15 @@ def test_report_photo_gate_rejects_technically_unusable_image(kind, expected):
     assert "data" not in error.value.result
 
 
-def test_report_photo_gate_accepts_texture_but_never_claims_urban_scene_or_problem():
+def test_report_photo_gate_accepts_texture_but_never_claims_urban_scene_or_problem(monkeypatch):
+    from app.services import storage
+    from app.services.photo_reference import ReferenceUnavailable
+
+    def unavailable(_source):
+        raise ReferenceUnavailable("reference_not_installed")
+
+    monkeypatch.setattr(storage, "detect_faces", unavailable)
+    monkeypatch.setattr(storage, "scene_similarity", unavailable)
     from app.services.storage import validate_report_photo
 
     buffer = io.BytesIO()
@@ -1318,6 +1367,146 @@ def test_report_photo_gate_accepts_texture_but_never_claims_urban_scene_or_probl
     assert image.photo_quality["technical_status"] == "ACCEPTED"
     assert image.photo_quality["scene_status"] == "NOT_VERIFIED"
     assert image.photo_quality["face_status"] == "NOT_VERIFIED"
+
+
+def test_report_phash_identifies_reencoding_but_not_unrelated_image():
+    # Macrostructure plus texture: pure periodic high-frequency stripes alias
+    # to nearly flat at 32px and are not a reliable perceptual-hash fixture.
+    from PIL import ImageDraw
+
+    from app.services.storage import perceptual_hash, validate_report_photo
+
+    with Image.open(io.BytesIO(_jpeg())) as source:
+        draw = ImageDraw.Draw(source)
+        draw.rectangle((20, 50, 250, 310), fill=(40, 60, 80))
+        draw.ellipse((300, 240, 610, 600), fill=(190, 160, 140))
+        encoded = io.BytesIO()
+        source.save(encoded, format="JPEG", quality=95)
+    raw = encoded.getvalue()
+    with Image.open(io.BytesIO(raw)) as image:
+        reencoded = io.BytesIO()
+        image.save(reencoded, format="JPEG", quality=85)
+    first = validate_report_photo(raw)
+    second = validate_report_photo(reencoded.getvalue())
+    assert first.sha256 != second.sha256
+    assert (int(first.phash, 16) ^ int(second.phash, 16)).bit_count() <= 6
+    other = Image.fromarray(np.random.default_rng(938).integers(0, 255, (640, 640), dtype=np.uint8))
+    assert (int(first.phash, 16) ^ int(perceptual_hash(other), 16)).bit_count() > 6
+
+
+def test_old_exif_is_warning_not_rejection_and_unknown_timezone_is_not_invented():
+    from app.services.storage import validate_report_photo
+
+    with Image.open(io.BytesIO(_jpeg())) as source:
+        exif = Image.Exif()
+        exif[36867] = "2020:01:01 12:00:00"
+        output = io.BytesIO()
+        source.save(output, format="JPEG", exif=exif)
+    result = validate_report_photo(output.getvalue()).photo_quality
+    assert result["technical_status"] == "ACCEPTED"
+    assert "old_exif_date_unverified" in result["warnings"]
+    assert result["exif_timezone_known"] is False
+
+
+@pytest.mark.asyncio
+async def test_perceptual_duplicate_rejected_before_storage_with_private_audit():
+    from fastapi import HTTPException, UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+
+    captures = SimpleNamespace(
+        get_by_key=AsyncMock(return_value=None),
+        recent_similar_photo=AsyncMock(return_value=True),
+        session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
+    )
+    decisions = SimpleNamespace(add_audit=AsyncMock())
+    storage = SimpleNamespace(upload=AsyncMock())
+    with pytest.raises(HTTPException) as failure:
+        await upload_photo(
+            user=AuthenticatedUser("owner", None, "authenticated", urmind_role="reviewer"),
+            service=SimpleNamespace(captures=captures, decisions=decisions),
+            storage=storage,
+            file=UploadFile(filename="photo.jpg", file=io.BytesIO(_jpeg())),
+        )
+    assert failure.value.status_code == 409
+    assert "já enviou" in failure.value.detail
+    storage.upload.assert_not_awaited()
+    assert captures.recent_similar_photo.await_args.args[0] == "owner"
+    recorded = decisions.add_audit.await_args.kwargs["after"]
+    assert recorded["reasons"] == ["duplicate"]
+    assert "phash" not in recorded and "sha256" not in recorded
+
+
+@pytest.mark.parametrize("area,rejected", [(0.16, True), (0.02, False)])
+def test_face_privacy_gate_and_public_blur(monkeypatch, area, rejected):
+    from app.services import storage
+
+    # Controlled detector boundary verifies decision/redaction, not face recall.
+    monkeypatch.setattr(
+        storage,
+        "detect_faces",
+        lambda _image: {
+            "status": "CHECKED",
+            "boxes": [[0.2, 0.2, 0.7, 0.7]],
+            "max_area_ratio": area,
+            "sha256": "a" * 64,
+        },
+    )
+    raw = _jpeg()
+    if rejected:
+        with pytest.raises(storage.PhotoRejectedError) as error:
+            storage.validate_report_photo(raw)
+        assert error.value.result["reasons"] == ["dominant_face"]
+    else:
+        accepted = storage.validate_report_photo(raw)
+        assert "privacy_review_required" in accepted.photo_quality["warnings"]
+    sanitized = storage.sanitize_public_image(raw)
+    with Image.open(io.BytesIO(raw)) as original, Image.open(io.BytesIO(sanitized.data)) as public:
+        assert public.getexif() == {}
+        assert (
+            np.asarray(public.crop((200, 200, 400, 400))).var()
+            < np.asarray(original.crop((200, 200, 400, 400))).var() / 10
+        )
+    assert sanitized.photo_quality["face_count"] == 1
+    assert sanitized.photo_quality["human_attestation_required"] is True
+
+
+@pytest.mark.parametrize(
+    "margin,calibrated,status",
+    [
+        (-0.5, True, "REJECTED"),
+        (0.5, True, "ACCEPTED"),
+        (0.0, True, "NEEDS_REVIEW"),
+        (-0.5, False, "NEEDS_REVIEW"),
+    ],
+)
+def test_scene_margin_contract_never_claims_calibration(monkeypatch, margin, calibrated, status):
+    from app.services import storage
+
+    monkeypatch.setattr(
+        storage,
+        "detect_faces",
+        lambda _image: {
+            "status": "CHECKED",
+            "boxes": [],
+            "max_area_ratio": 0,
+        },
+    )
+    monkeypatch.setattr(
+        storage,
+        "scene_similarity",
+        lambda _image: {
+            "margin": margin,
+            "calibrated": calibrated,
+        },
+    )
+    if status == "REJECTED":
+        with pytest.raises(storage.PhotoRejectedError) as error:
+            storage.validate_report_photo(_jpeg())
+        assert error.value.result["reasons"] == ["non_urban_scene"]
+    else:
+        assert storage.validate_report_photo(_jpeg()).photo_quality["status"] == status
 
 
 @pytest.mark.asyncio

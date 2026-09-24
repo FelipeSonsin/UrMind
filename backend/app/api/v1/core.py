@@ -326,7 +326,23 @@ async def capture_image(
     return {"image_url": await storage.signed_url(capture.storage_path)}
 
 
-@router.post("/captures/photo", status_code=201)
+async def photo_admission_lease(user: CurrentUser, service: Core) -> AsyncIterator[None]:
+    token = uuid.uuid4()
+    acquired = await service.captures.acquire_photo_lease(user.id, token)
+    await service.captures.session.commit()
+    if not acquired:
+        raise HTTPException(status_code=429, detail="Outro envio seu está em andamento. Aguarde.")
+    try:
+        # Bound admission below the lease expiry; no long transaction during I/O.
+        async with asyncio.timeout(180):
+            yield
+    finally:
+        await service.captures.session.rollback()
+        await service.captures.release_photo_lease(user.id, token)
+        await service.captures.session.commit()
+
+
+@router.post("/captures/photo", status_code=201, dependencies=[Depends(photo_admission_lease)])
 async def upload_photo(
     user: CurrentUser,
     service: Core,
@@ -443,6 +459,7 @@ async def upload_photo(
     ingest.capture.quality.update(
         {
             "sha256": image.sha256,
+            "phash": image.phash,
             "mime": image.mime,
             "width": image.width,
             "height": image.height,
@@ -462,7 +479,10 @@ async def upload_photo(
             ingest.capture.quality["location_timestamp"] = location_timestamp.isoformat()
     existing = await service.captures.get_by_key(ingest.capture.capture_key)
     if existing is not None:
-        return await _deduplicated_capture(existing, ingest.capture.coordinate, service, user.id)
+        await _deduplicated_capture(existing, ingest.capture.coordinate, service, user.id)
+        raise HTTPException(
+            status_code=409, detail="Você já enviou esta foto. Consulte Meus relatos."
+        )
     if not user.can_review:
         if (await service.captures.recent_public_uploads(received_at)) >= (
             settings.public_capture_global_limit_per_hour
@@ -474,6 +494,30 @@ async def upload_photo(
             raise HTTPException(status_code=429, detail="Limite de capturas por hora atingido")
         # Do not hold an idle transaction during the external Storage upload.
         await service.captures.session.rollback()
+    if image.phash is not None and await service.captures.recent_similar_photo(
+        user.id, image.phash, received_at, (gate_policy or PhotoGatePolicy()).phash_distance
+    ):
+        attempt_id = uuid.uuid4()
+        if service.decisions is None:
+            raise HTTPException(status_code=503, detail="Registro do porteiro indisponível")
+        await service.decisions.add_audit(
+            operation="photo_gate_rejected",
+            entity_type="photo_attempt",
+            entity_id=attempt_id,
+            actor=user.id,
+            before={},
+            after={
+                "status": "REJECTED",
+                "reasons": ["duplicate"],
+                "version": "urmind-photo-quality-v1",
+            },
+            event_hash=hashlib.sha256(f"photo-gate:{attempt_id}".encode()).hexdigest(),
+        )
+        await service.captures.session.commit()
+        raise HTTPException(
+            status_code=409, detail="Você já enviou esta foto. Consulte Meus relatos."
+        )
+    await service.captures.session.rollback()
     if ingest.capture.coordinate is not None and address_provider is not None:
         address = await address_provider.fetch(
             ingest.capture.coordinate.latitude, ingest.capture.coordinate.longitude, received_at
@@ -837,6 +881,7 @@ async def publish_event(
                 "content_type": image.mime,
                 "visible_content_reviewed": True,
                 "metadata_stripped": True,
+                "face_redaction": image.photo_quality,
                 "created_at": now.isoformat(),
                 "review_id": str(review.id),
             }

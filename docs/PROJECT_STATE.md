@@ -1,5 +1,17 @@
 # Estado operacional do UrMind
 
+## Porteiro com referências verificadas (24/09/2026)
+
+pHash e aviso EXIF conectados; YuNet verificado para privacidade/blur da derivada.
+CLIP exportado ONNX, somente REFERENCE, nunca detector urbano; calibração BLOCKED_INPUT
+por falta de 20 positivas + 20 negativas próprias/licenciadas revisadas.
+Sem calibração: NEEDS_REVIEW, nunca falsa validação da cena. Nenhum treino executado.
+Artefatos locais ignorados no Git; fonte/hash/export documentados no relatório Áreas.
+Concorrência pHash protegida por lease distribuído `0026_photo_admission_leases`:
+upgrade/downgrade/upgrade DEV passaram; 4 testes DEV focados passaram.
+Backend 1272 passed / 25 skipped; Playwright 116 passed / 2 skipped; Ruff/mypy verdes.
+Evidência real de recall C4 permanece OPEN. Bloco 6 pendente.
+
 ## Mapa filtrável e endereço (24/09/2026)
 
 UrbanMap existente: filtros sincronizados com URL, contador e ícones/legenda.

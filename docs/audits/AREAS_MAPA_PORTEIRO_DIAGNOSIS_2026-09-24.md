@@ -1,5 +1,57 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Bloco 5 — referências e porteiro (24/09/2026)
+
+- C1: pHash DCT 64 bits, comparação Postgres por proprietário/recebimento nos últimos
+  30 dias, limite persistido; duplicata prévia recusada antes do Storage. Aviso EXIF
+  antigo não bloqueia nem inventa fuso. Migration `0026_photo_admission_leases` serializa
+  envios por proprietário entre processos, com token e expiração, sem lock durante I/O.
+  Upgrade/downgrade/upgrade DEV passaram. Sessões independentes, token incorreto,
+  expiração, RLS e grants foram exercitados no DEV.
+- C2: OpenCLIP ViT-B-32/laion2b_s34b_b79k, revisão
+  `1a25a446712ba5ee05982a381eed697ef9b435cf`, MIT declarada no model card imutável.
+  Fonte safetensors: 605143316 bytes, SHA256
+  `ac4f8c4b88af6d963118cbf40ad93176d092abbedfcb752601ae1866352656e6`.
+  ONNX somente encoder: 351613650 bytes, SHA256
+  `7ed89580c61104c11a0d6ac277fde4b106258b1938d643dbaa53e65b2774b5b5`.
+  Textos ingleses/embeddings, pré-processamento, parity e fonte versionados em
+  `datasets/metadata/photo_reference_export.json`. Parity absoluta/relativa 1e-4
+  passou em entrada sintética; NÃO é avaliação científica ou acurácia de cena.
+  Encoder CPU aquecido: 28–31 ms (5 execuções); chamada fria completa: 1,064 s.
+  Calibração **BLOCKED_INPUT**: zero fotos próprias revisadas, não 20+20.
+  Modelo executa, mas não rejeita/aceita automaticamente por cena sem calibração;
+  estado UNCAlIBRATED/NEEDS_REVIEW explícito. Model card adverte contra implantação
+  sem testes específicos; não foi apresentado como validado para produção.
+- C4/D6: YuNet OpenCV Zoo, revisão `26cc381e4d2594bb9f47a26eb8fd96c94a13660d`,
+  licença do arquivo **MIT**, 232589 bytes, SHA256
+  `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`.
+  Rosto dominante rejeita; pequeno marca revisão; derivada recebe blur com margem.
+  Original preservado; atestado humano continua obrigatório inclusive para placas.
+  Sem artefato, NOT_VERIFIED explícito e atestado humano, sem afirmar blur automático.
+  Carregamento OpenCV corrigido pela API de bytes para caminhos Unicode Windows.
+- Ambos registrados no DEV como REFERENCE, sem promoted_at/shadow autorizado:
+  YuNet `76eb8ab3-0145-40cb-bc32-a7ee6ad608d1`, CLIP
+  `dedb1af0-3b5b-4344-a309-0b935de83f9a`, AuditLog register_photo_reference.
+  Detector científico arquivado não foi restaurado.
+- Aquisição reutiliza `acquire_registered.py --reference-model <id> --execute`;
+  export: `--export-reference-scene --execute`. Sem sobrescrita implícita; orçamento
+  verificado (<40 GB), hash/revisão obrigatórios; runtime não baixa nem hidrata.
+- Evidência atual: backend completo 1272 passed / 25 skipped (24 integrações opt-in,
+  1 serviço externo); auth/storage 88 passed; DEV lease/pHash/Storage/publicação/política
+  4 passed / 20 deselected; Ruff/mypy passaram. Frontend Vitest 46 passed, TypeScript,
+  build e Prettier passaram; Playwright 116 passed / 2 E2Es reais skipped (workers=2).
+  Uma execução com 10 workers teve timeout de screenshot; reprodução isolada e execução
+  completa com 2 workers passaram. Testes controlados de blur não provam recall de rostos.
+  Registry intermediário desatualizado foi corrigido pelo gerador oficial.
+- OPEN: calibração com fotos próprias, teste real de rosto licenciado e calibração dos
+  limiares; calibração e rollout não autorizados por mocks.
+- Novo módulo photo_reference: NEW_COMPONENT_JUSTIFIED, responsável por resolução e
+  inferência dos artefatos de pré-processamento, separado do Storage e do detector YOLOX.
+  Acquisition registry/Storage/porteiro/admin: EXTENDED_EXISTING_COMPONENT.
+
+Fontes verificadas: [CLIP model card imutável](https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K/blob/1a25a446712ba5ee05982a381eed697ef9b435cf/README.md),
+[YuNet MIT](https://github.com/opencv/opencv_zoo/blob/26cc381e4d2594bb9f47a26eb8fd96c94a13660d/models/face_detection_yunet/LICENSE).
+
 ## Bloco 4 — mapa e endereço (24/09/2026)
 
 UrbanMap canônico estendido com filtros de status/família/classe/período UTC,

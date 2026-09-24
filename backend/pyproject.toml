@@ -30,6 +30,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+photo-reference-export = [
+  # Export only of explicitly registered reference models; no training.
+  "open_clip_torch==3.3.0",
+  "timm==1.0.30",
+  "ftfy==6.3.1",
+  "regex==2026.9.10",
+  "safetensors==0.8.0",
+]
 dev = [
   "mypy>=1.11,<2",
   "pytest>=8.3,<9",

@@ -157,6 +157,26 @@ class CaptureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def acquire_photo_lease(self, owner: str, token: uuid.UUID) -> bool:
+        await self.session.execute(
+            text("delete from public.photo_admission_leases where expires_at<=clock_timestamp()")
+        )
+        row = await self.session.scalar(
+            text("""insert into public.photo_admission_leases
+            (owner_id,token,expires_at) values (cast(:owner as uuid),:token,clock_timestamp()+interval '5 minutes')
+            on conflict(owner_id) do update set token=excluded.token,expires_at=excluded.expires_at
+            where photo_admission_leases.expires_at<=clock_timestamp() returning token"""),
+            {"owner": owner, "token": token},
+        )
+        return row == token
+
+    async def release_photo_lease(self, owner: str, token: uuid.UUID) -> None:
+        await self.session.execute(
+            text("""delete from public.photo_admission_leases
+            where owner_id=cast(:owner as uuid) and token=:token"""),
+            {"owner": owner, "token": token},
+        )
+
     async def report_markers(
         self,
         actor: str,
@@ -311,6 +331,29 @@ class CaptureRepository:
             )
         )
         return int(result.scalar_one())
+
+    async def recent_similar_photo(
+        self, owner: str, phash: str, now: datetime, maximum_distance: int
+    ) -> bool:
+        """Owner-only, server receipt time; unknown legacy pHash is not a match."""
+        if not re.fullmatch(r"[0-9a-f]{16}", phash) or not 0 <= maximum_distance <= 16:
+            raise ValueError("invalid perceptual hash contract")
+        result = await self.session.scalar(
+            text("""select exists(select 1 from public.captures
+                where quality->>'uploaded_by'=:owner
+                and created_at >= :cutoff
+                and case when quality->>'phash' ~ '^[0-9a-f]{16}$'
+                    then bit_count((('x' || (quality->>'phash'))::bit(64)) #
+                                   (('x' || :phash)::bit(64))) <= :distance
+                    else false end)"""),
+            {
+                "owner": owner,
+                "cutoff": now - timedelta(days=30),
+                "phash": phash,
+                "distance": maximum_distance,
+            },
+        )
+        return bool(result)
 
     async def lock_owner_uploads(self, owner_id: str) -> None:
         """Serialize the quota check and Capture commit across API processes."""

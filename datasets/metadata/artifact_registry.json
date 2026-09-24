@@ -119,13 +119,13 @@
     },
     {
       "path": "datasets/metadata/acquisition_plan.json",
-      "sha256": "6c775cfb7365397ca64d1c3954d26fd53d0004700bc660ab5ae65bed9f937ab2",
-      "size_bytes": 5963
+      "sha256": "6860a1600457962654f969dd0719d55a5fa9c5cf5cf818557014ab15640c0d75",
+      "size_bytes": 7884
     },
     {
       "path": "datasets/metadata/artifact_contract.yaml",
-      "sha256": "bcb839dcf97bd7e69899127bec3c0e923f38c9a443eda8d822479c7a291f208b",
-      "size_bytes": 18811
+      "sha256": "264d0e2f0d04d7aa8cc5d09fe7839ff3fa71e188d545f86fd87f5c0e5a5ed252",
+      "size_bytes": 18860
     },
     {
       "path": "datasets/metadata/bdd100k_acquisition_plan.json",
@@ -146,6 +146,11 @@
       "path": "datasets/metadata/licenses.md",
       "sha256": "3aef4172af1f170417f3ff5b7b75754078ad0a595742189142ecf730276d95fc",
       "size_bytes": 5654
+    },
+    {
+      "path": "datasets/metadata/photo_reference_export.json",
+      "sha256": "601648e113262406d8dd85bec1edfeace66b98c794cefefe59b82506a9fcde16",
+      "size_bytes": 226016
     },
     {
       "path": "datasets/metadata/removed_sources.json",
@@ -401,8 +406,8 @@
     },
     {
       "path": "scripts/datasets/acquire_registered.py",
-      "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4",
-      "size_bytes": 15194
+      "sha256": "d5c0f2ac7b7eac2086b4ac305fbcb1500083ce57f3870c6e3fe67a02d82fbf57",
+      "size_bytes": 23239
     },
     {
       "path": "scripts/datasets/analyze_rdd2022_geometry.py",

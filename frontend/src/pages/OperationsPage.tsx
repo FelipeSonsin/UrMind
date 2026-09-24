@@ -132,6 +132,11 @@ const fields = [
   ['brightness_min', 'Brilho mínimo'],
   ['brightness_max', 'Brilho máximo'],
   ['laplacian_min', 'Nitidez mínima'],
+  ['phash_distance', 'Distância máxima pHash (duplicatas)'],
+  ['old_photo_days', 'Aviso de idade EXIF (dias)'],
+  ['scene_accept_margin', 'Margem para aceitar cena (após calibração)'],
+  ['scene_reject_margin', 'Margem para rejeitar cena (após calibração)'],
+  ['dominant_face_ratio', 'Fração máxima de rosto dominante'],
 ] as const;
 
 /** The existing administration route owns this persisted policy editor. */
@@ -213,8 +218,9 @@ export function OperationsPage() {
             </label>
           ))}
           <p>
-            Os verificadores de cena e rostos ainda não estão ativos. Aprovação técnica não confirma
-            um problema.
+            Cena exige artefato e calibração próprios; sem calibração, fica pendente de revisão.
+            Rostos dependem do YuNet verificado no servidor. Aprovação técnica não confirma um
+            problema.
           </p>
           <button disabled={busy} type="submit">
             {busy ? 'Salvando…' : 'Salvar configuração'}

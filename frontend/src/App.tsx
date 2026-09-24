@@ -878,8 +878,8 @@ export default function App() {
                           {ownReports.find((report) => report.id === selectedReport)?.photo_gate
                             ?.status === 'NEEDS_REVIEW' && (
                             <p>
-                              Verificação pendente: qualidade técnica aceita; cena urbana e rostos
-                              ainda não verificados automaticamente.
+                              Verificação pendente: o porteiro não confirmou todas as condições de
+                              cena e privacidade. Isso não é uma detecção de problema.
                             </p>
                           )}
                           <p>
