@@ -197,9 +197,9 @@ export const api = {
       ),
       { signal },
     ),
-  operationalModels: (signal?: AbortSignal) =>
+  operationalModels: (cursor: string | null, signal?: AbortSignal) =>
     request(
-      '/ops/models',
+      `/ops/models?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       z.array(
         z.object({
           id: z.string(),

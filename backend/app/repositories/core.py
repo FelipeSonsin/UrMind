@@ -374,22 +374,35 @@ class CaptureRepository:
         )
         return result.scalar_one_or_none() is not None
 
-    async def reserve_pending_address(self) -> dict[str, Any] | None:
+    async def reserve_pending_address(
+        self, capture_id: uuid.UUID | None = None
+    ) -> dict[str, Any] | None:
         row = (
             (
                 await self.session.execute(
                     text("""with candidate as (
             select id from public.captures where source in ('pwa_photo','exif_upload')
+            and (cast(:capture_id as uuid) is null or id=cast(:capture_id as uuid))
             and (point is not null or jsonb_typeof(quality->'human_review'->'corrected_location')='object')
-            and quality->'address'->>'status'='address_pending'
-            and coalesce((quality->'address'->>'retry_at')::timestamptz,'-infinity')<=clock_timestamp()
+            and ((quality->'address'->>'status'='address_pending'
+              and coalesce((quality->'address'->>'retry_at')::timestamptz,'-infinity')<=clock_timestamp())
+              or (quality->'report_context'->>'status'='pending'
+              and coalesce((quality->'report_context'->>'retry_at')::timestamptz,'-infinity')<=clock_timestamp()))
             order by created_at,id for update skip locked limit 1
-        ) update public.captures c set quality=jsonb_set(c.quality,'{address,retry_at}',
-            to_jsonb(clock_timestamp()+interval '30 seconds'),true)
-          from candidate where c.id=candidate.id returning c.id,c.quality->'address'->>'request_id' request_id,
+        ) update public.captures c set quality=jsonb_set(
+            jsonb_set(c.quality,'{address,retry_at}',
+                to_jsonb(clock_timestamp()+interval '30 seconds'),true),
+            '{report_context,retry_at}',
+                to_jsonb(clock_timestamp()+interval '30 seconds'),true)
+          from candidate where c.id=candidate.id returning c.id,
+            c.quality->'address'->>'request_id' request_id,
+            c.quality->'address'->>'status' address_status,
+            c.quality->'report_context'->>'request_id' context_request_id,
+            c.quality->'report_context'->>'status' context_status,
             coalesce((c.quality->'human_review'->'corrected_location'->>'latitude')::float,ST_Y(c.point::geometry)) latitude,
             coalesce((c.quality->'human_review'->'corrected_location'->>'longitude')::float,ST_X(c.point::geometry)) longitude,
-            c.captured_at""")
+            c.captured_at"""),
+                    {"capture_id": capture_id},
                 )
             )
             .mappings()
@@ -405,6 +418,16 @@ class CaptureRepository:
             text("""update public.captures set quality=jsonb_set(quality,'{address}',cast(:address as jsonb))
             where id=:id and quality->'address'->>'request_id'=:request_id returning id"""),
             {"id": identifier, "request_id": request_id, "address": json.dumps(address)},
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def save_report_context(
+        self, identifier: uuid.UUID, request_id: str, context: dict[str, Any]
+    ) -> bool:
+        result = await self.session.execute(
+            text("""update public.captures set quality=jsonb_set(quality,'{report_context}',cast(:context as jsonb))
+            where id=:id and quality->'report_context'->>'request_id'=:request_id returning id"""),
+            {"id": identifier, "request_id": request_id, "context": json.dumps(context)},
         )
         return result.scalar_one_or_none() is not None
 
@@ -1012,9 +1035,14 @@ class DecisionRepository:
             {"payload": policy.model_dump_json()},
         )
 
-    async def operational_models(self) -> list[dict[str, Any]]:
+    async def operational_models(
+        self, *, after: tuple[datetime, uuid.UUID] | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query = select(ModelVersion)
+        if after is not None:
+            query = query.where(tuple_(ModelVersion.created_at, ModelVersion.id) < after)
         result = await self.session.execute(
-            select(ModelVersion).order_by(ModelVersion.created_at.desc())
+            query.order_by(ModelVersion.created_at.desc(), ModelVersion.id.desc()).limit(limit)
         )
         return [
             {

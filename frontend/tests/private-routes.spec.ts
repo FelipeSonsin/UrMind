@@ -426,7 +426,7 @@ test('modelos e auditoria interna carregam dados e filtros sem identidades', asy
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.route('**/api/v1/ops/models', (route) =>
+  await page.route('**/api/v1/ops/models?*', (route) =>
     route.fulfill({
       json: [
         {

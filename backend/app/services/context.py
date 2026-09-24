@@ -104,6 +104,16 @@ def pending_address(quality: dict[str, Any]) -> dict[str, Any]:
             "requested_at": _now(),
             "request_id": str(uuid.uuid4()),
         },
+        "report_context": pending_report_context(),
+    }
+
+
+def pending_report_context() -> dict[str, Any]:
+    """Version a location-dependent enrichment so stale Worker results are discarded."""
+    return {
+        "status": "pending",
+        "requested_at": _now(),
+        "request_id": str(uuid.uuid4()),
     }
 
 

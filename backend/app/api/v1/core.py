@@ -55,7 +55,7 @@ from app.schemas.core import (
     decode_page_cursor,
 )
 from app.schemas.issue_taxonomy import get_issue
-from app.services.context import NominatimReverse, pending_address
+from app.services.context import NominatimReverse, pending_address, pending_report_context
 from app.services.core import CoreService, DuplicateKeyError, EventNotFoundError
 from app.services.external_sources.http import ExternalHttpClient
 from app.services.photo_ingest import ingest_photo
@@ -225,14 +225,18 @@ async def integration_health(
 
 @router.get("/ops/models")
 async def operational_models(
-    user: CurrentUser, service: Core, response: Response
+    user: CurrentUser,
+    service: Core,
+    response: Response,
+    after: PageBoundary = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[dict[str, Any]]:
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Registro de modelos exige papel interno")
     if service.decisions is None:
         raise HTTPException(status_code=503, detail="Registro indisponível")
     response.headers["Cache-Control"] = "private, no-store"
-    return await service.decisions.operational_models()
+    return await service.decisions.operational_models(after=after, limit=limit)
 
 
 @router.get("/ops/reports")
@@ -740,6 +744,8 @@ async def upload_photo(
             "reason": "additional_evidence",
         }
         await service.captures.session.rollback()
+    if ingest.capture.coordinate is not None:
+        ingest.capture.quality["report_context"] = pending_report_context()
     if ingest.capture.coordinate is not None and address_provider is not None:
         address = await address_provider.fetch(
             ingest.capture.coordinate.latitude, ingest.capture.coordinate.longitude, received_at

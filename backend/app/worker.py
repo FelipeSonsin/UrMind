@@ -31,9 +31,9 @@ from app.repositories.core import (
     EventRepository,
     InferenceRepository,
 )
-from app.schemas.core import BoundingBox, CaptureProcessingStatus, UrmindClass
+from app.schemas.core import BoundingBox, CaptureProcessingStatus, Coordinate, UrmindClass
 from app.schemas.issue_taxonomy import model_may_emit
-from app.services.context import NominatimReverse, gather_context
+from app.services.context import NominatimReverse, OpenMeteoRain, gather_context
 from app.services.core import CoreService
 from app.services.external_sources.http import ExternalHttpClient
 from app.services.external_sources.sidra import municipal_population_query
@@ -66,32 +66,107 @@ class Worker:
         self._detector_version: uuid.UUID | None = None
         self._score_threshold: float | None = None
 
-    async def process_pending_address(self) -> bool:
+    async def process_pending_address(self, capture_id: uuid.UUID | None = None) -> bool:
         """Retry explicit mobile address requests, independently of detector availability."""
         async with self.database.sessionmaker() as session:
-            job = await CaptureRepository(session).reserve_pending_address()
+            job = await CaptureRepository(session).reserve_pending_address(capture_id)
             await session.commit()
         if job is None:
             return False
-        async with ExternalHttpClient(
-            user_agent=get_settings().external_http_user_agent, timeout_seconds=3, max_attempts=1
-        ) as client:
-            result = await NominatimReverse(client, sessions=self.database.sessionmaker).fetch(
-                job["latitude"], job["longitude"], job["captured_at"]
+        if job["address_status"] == "address_pending" and job["request_id"]:
+            async with ExternalHttpClient(
+                user_agent=get_settings().external_http_user_agent,
+                timeout_seconds=3,
+                max_attempts=1,
+            ) as client:
+                result = await NominatimReverse(client, sessions=self.database.sessionmaker).fetch(
+                    job["latitude"], job["longitude"], job["captured_at"]
+                )
+            if result.status == "ok":
+                address = {
+                    "status": result.status,
+                    "source": result.source,
+                    "fetched_at": result.fetched_at,
+                    "provenance": result.provenance,
+                    **{
+                        name: result.data.get(name)
+                        for name in ("road", "suburb", "city", "attribution")
+                    },
+                }
+                async with self.database.sessionmaker() as session:
+                    await CaptureRepository(session).save_address(
+                        job["id"], job["request_id"], address
+                    )
+                    await session.commit()
+        if job["context_status"] == "pending" and job["context_request_id"]:
+            settings = get_settings()
+            sidra_query = (
+                municipal_population_query(settings.ibge_sidra_municipality_code)
+                if settings.ibge_sidra_municipality_code
+                else None
             )
-        if result.status == "ok":
-            address = {
-                "status": result.status,
-                "source": result.source,
-                "fetched_at": result.fetched_at,
-                "provenance": result.provenance,
-                **{
-                    name: result.data.get(name)
-                    for name in ("road", "suburb", "city", "attribution")
-                },
-            }
+            providers: dict[str, dict] = {}
+            try:
+                results = await gather_context(
+                    job["latitude"],
+                    job["longitude"],
+                    job["captured_at"],
+                    providers=(OpenMeteoRain,),
+                    include_sidra=sidra_query is not None,
+                    sidra_query=sidra_query,
+                )
+                providers = {result.source: result.as_payload() for result in results}
+            except Exception as exc:  # noqa: BLE001 - external context must not fail a report
+                providers["open_meteo_rain"] = {
+                    "status": "context_unavailable",
+                    "error": type(exc).__name__,
+                }
+                if sidra_query is not None:
+                    providers["ibge_sidra"] = {
+                        "status": "context_unavailable",
+                        "error": type(exc).__name__,
+                    }
+            if sidra_query is None:
+                providers["ibge_sidra"] = {"status": "not_applicable"}
+            try:
+                async with self.database.sessionmaker() as session:
+                    snapped = await EventRepository(session).snap_to_road(
+                        Coordinate(latitude=job["latitude"], longitude=job["longitude"])
+                    )
+                road = (
+                    {
+                        "status": "ok",
+                        "source": "postgis_road_segments",
+                        "road_segment_id": str(snapped["road_segment_id"]),
+                        "distance_m": snapped["distance_m"],
+                        "latitude": snapped["latitude"],
+                        "longitude": snapped["longitude"],
+                    }
+                    if snapped is not None
+                    else {
+                        "status": "context_unavailable",
+                        "source": "postgis_road_segments",
+                        "reason": "no_segment_within_radius",
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001 - missing road data is degradable
+                road = {
+                    "status": "context_unavailable",
+                    "source": "postgis_road_segments",
+                    "reason": type(exc).__name__,
+                }
             async with self.database.sessionmaker() as session:
-                await CaptureRepository(session).save_address(job["id"], job["request_id"], address)
+                await CaptureRepository(session).save_report_context(
+                    job["id"],
+                    job["context_request_id"],
+                    {
+                        "status": "processed",
+                        "request_id": job["context_request_id"],
+                        "at": datetime.now(UTC).isoformat(),
+                        "providers": providers,
+                        "road": road,
+                    },
+                )
                 await session.commit()
         return True
 

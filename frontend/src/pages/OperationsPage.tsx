@@ -348,7 +348,7 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
     setError('');
     const request =
       mode === 'models'
-        ? api.operationalModels(controller.signal).then((rows) => {
+        ? api.operationalModels(cursors.at(-1) ?? null, controller.signal).then((rows) => {
             if (!controller.signal.aborted) setModels(rows);
           })
         : api
@@ -394,6 +394,23 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
               </li>
             ))}
           </ul>
+          <div className="actions">
+            <button
+              disabled={cursors.length === 1}
+              onClick={() => setCursors(cursors.slice(0, -1))}
+            >
+              Anterior
+            </button>
+            <button
+              disabled={models.length < 50}
+              onClick={() => {
+                const last = models.at(-1)!;
+                setCursors([...cursors, `${last.created_at}|${last.id}`]);
+              }}
+            >
+              Próxima
+            </button>
+          </div>
         </>
       )}
       {audit && (

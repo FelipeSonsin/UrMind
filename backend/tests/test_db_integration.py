@@ -85,8 +85,14 @@ async def test_manual_location_schedules_address_and_stale_result_is_ignored(dat
             )
             await session.refresh(capture)
             request_id = capture.quality["address"]["request_id"]
+            context_request_id = capture.quality["report_context"]["request_id"]
             assert capture.quality["address"]["status"] == "address_pending"
             repository = CaptureRepository(session)
+            assert await repository.save_report_context(
+                identifier,
+                context_request_id,
+                {"status": "processed", "road": {"status": "context_unavailable"}},
+            )
             assert await repository.save_address(
                 identifier, request_id, {"status": "ok", "road": "Fixture first address"}
             )
@@ -97,10 +103,18 @@ async def test_manual_location_schedules_address_and_stale_result_is_ignored(dat
             assert not await repository.save_address(
                 identifier, request_id, {"status": "ok", "road": "Stale"}
             )
+            assert not await repository.save_report_context(
+                identifier, context_request_id, {"status": "processed", "road": {"status": "ok"}}
+            )
             assert await repository.save_address(
                 identifier,
                 capture.quality["address"]["request_id"],
                 {"status": "ok", "road": "New"},
+            )
+            assert await repository.save_report_context(
+                identifier,
+                capture.quality["report_context"]["request_id"],
+                {"status": "processed", "road": {"status": "context_unavailable"}},
             )
             await session.rollback()
         finally:
@@ -123,6 +137,69 @@ async def test_manual_location_schedules_address_and_stale_result_is_ignored(dat
                 )
                 == 0
             )
+
+
+@pytest.mark.asyncio
+async def test_worker_enriches_report_without_event_or_model(database, monkeypatch):
+    from app.services.context import ContextResult, pending_report_context
+    from app.worker import Worker
+
+    async def weather_unavailable(*args, **kwargs):
+        return [
+            ContextResult(
+                "open_meteo_rain",
+                "context_unavailable",
+                datetime.now(UTC).isoformat(),
+                {"provider": "Open-Meteo"},
+                error="timeout",
+            )
+        ]
+
+    async def no_road(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.worker.gather_context", weather_unavailable)
+    monkeypatch.setattr(EventRepository, "snap_to_road", no_road)
+    async with database.sessionmaker() as session:
+        capture = await CaptureRepository(session).create(
+            CaptureCreate(
+                capture_key=f"context-fixture-{uuid.uuid4()}",
+                source=CaptureSource.PWA_PHOTO,
+                source_location=LocationSource.MANUAL,
+                captured_at=NOW,
+                coordinate=Coordinate(latitude=LAT, longitude=LON),
+                quality={
+                    "uploaded_by": str(uuid.uuid4()),
+                    "address": {"status": "ok", "road": "Existing address"},
+                    "report_context": pending_report_context(),
+                },
+            )
+        )
+        identifier = capture.id
+        await session.commit()
+    try:
+        assert await Worker(database, StorageClient(get_settings())).process_pending_address(
+            identifier
+        )
+        async with database.sessionmaker() as session:
+            capture = await CaptureRepository(session).get(identifier)
+            assert capture is not None
+            assert capture.quality["address"]["road"] == "Existing address"
+            context = capture.quality["report_context"]
+            assert context["status"] == "processed"
+            assert context["providers"]["open_meteo_rain"]["status"] == "context_unavailable"
+            assert context["road"]["status"] == "context_unavailable"
+            assert await EventRepository(session).for_capture(identifier) == []
+    finally:
+        async with database.sessionmaker() as session:
+            await session.execute(
+                text("delete from pgmq.q_inference_jobs where message->>'capture_id'=:id"),
+                {"id": str(identifier)},
+            )
+            await session.execute(
+                text("delete from public.captures where id=:id"), {"id": identifier}
+            )
+            await session.commit()
 
 
 @pytest.mark.asyncio
@@ -829,6 +906,12 @@ async def test_operational_policy_persistence_and_rls(database):
             await repo.report_totals(0)
         models = await repo.operational_models()
         assert all("metrics" not in row and "checksum" not in row for row in models)
+        if models:
+            last = models[-1]
+            next_models = await repo.operational_models(
+                after=(last["created_at"], last["id"]), limit=50
+            )
+            assert not ({row["id"] for row in models} & {row["id"] for row in next_models})
         rows = await repo.audit_page(operation=None, after=None, limit=3)
         assert len(rows) <= 3 and all("actor" not in row for row in rows)
         service = CoreService(CaptureRepository(session), EventRepository(session), repo)
