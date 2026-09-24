@@ -23,6 +23,26 @@ const record = {
   factors: {},
 };
 
+test('navegação interna dedicada cabe em 320px e usa menu inferior', async ({ page }) => {
+  await session(page);
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  await page.goto('/#/app/dashboard');
+  const nav = page.getByRole('navigation', { name: 'Navegação interna' });
+  await expect(nav.getByText('Área interna')).toBeVisible();
+  await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa', 'Relatos/GT']);
+  const box = await nav.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(740);
+  expect(box!.y).toBeGreaterThan(600);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await nav.getByText('Mais', { exact: true }).click();
+  await expect(nav.getByRole('link', { name: 'Auditoria' })).toBeVisible();
+  await expect(nav.getByRole('link', { name: 'Administração' })).toHaveCount(0);
+});
+
 async function session(page: Page, anonymous = false) {
   const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
   const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1]?.trim();

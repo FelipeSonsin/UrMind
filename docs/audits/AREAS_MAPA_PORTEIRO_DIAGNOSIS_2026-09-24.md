@@ -1,5 +1,32 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Continuação de fechamento — linha do tempo e cursores (24/09/2026)
+
+Estado desta etapa: **PARTIAL**, sem declaração de fechamento dos sete blocos.
+Componentes canônicos estendidos, sem segunda API/mapa/fila.
+
+- Timeline autenticada do titular em `/captures/{id}/timeline`, carregada no detalhe
+  e em Meus relatos. DTO allowlisted, sem identidade de revisor, notas ou AuditLog bruto;
+  histórico de inferência novo auditado; timestamps legados ausentes permanecem desconhecidos.
+- Cursos keyset por timestamp + UUID em Captures, Events e auditoria; GT paginada
+  por Event, preservando todos os votos do Event. Controles anteriores/próximos na UI.
+  Exportação atual é explicitamente da página: exportação integral em lotes e filtros
+  globais ainda OPEN (não afirmar que todos os requisitos de A2 estão concluídos).
+- Navegação interna mobile dedicada, com Área interna, cinco destinos e menu Mais;
+  páginas existentes reutilizadas. Sem alteração nas permissões backend/RLS.
+- Teste DEV isolado: 1.200 Captures com timestamp empatado percorridas em lotes de 137,
+  sem duplicação/perda; isolamento por titular; rollback de Capture/fila ao final.
+- Regressão fresca: backend **1278 passed / 30 skipped** (29 integrações opt-in e um
+  live-check; o teste de 1.200 foi executado separadamente: **1 passed**). Diferença do
+  baseline: dois testes unitários de timeline e um novo teste DEV. Vitest **48 passed**;
+  Playwright de rotas privadas **22 passed**, incluindo 320 px. Build/TypeScript e mypy
+  passaram. Ruff encontrou apenas ordem de import, corrigida; rechecagem final pendente.
+- Ainda OPEN nesta tarefa: endereço distribuído/retry, métricas estimadas, calibração,
+  Auth/Realtime ao vivo, integrações, deploy e verificação final completa. Não foi
+  recebida pasta de calibração; importação OSM depende da confirmação do centro.
+- Nenhuma migration criada nesta etapa; `.env`, Auth, pesos, datasets e Scout intactos.
+  Cinco arquivos preexistentes untracked em `datasets/reports` foram preservados fora do commit.
+
 ## Fechamento do bloco 6 e verificação — 24/09/2026
 
 Esta seção substitui os estados anteriores para a continuação atual. As seções

@@ -48,6 +48,7 @@ from app.schemas.core import (
     PublicationRequest,
     ReviewCreate,
     UrmindClass,
+    decode_page_cursor,
 )
 from app.services.context import NominatimReverse
 from app.services.core import CoreService, DuplicateKeyError, EventNotFoundError
@@ -126,6 +127,18 @@ def get_storage() -> StorageClient:
 Core = Annotated[CoreService, Depends(get_core_service)]
 Inference = Annotated[InferenceRepository, Depends(get_inference_repository)]
 Storage = Annotated[StorageClient, Depends(get_storage)]
+
+
+def page_boundary(
+    cursor: Annotated[str | None, Query(max_length=120)] = None,
+) -> tuple[datetime, uuid.UUID] | None:
+    try:
+        return decode_page_cursor(cursor)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="Cursor inválido") from exc
+
+
+PageBoundary = Annotated[tuple[datetime, uuid.UUID] | None, Depends(page_boundary)]
 
 
 async def get_photo_gate_policy(service: Core) -> PhotoGatePolicy:
@@ -216,12 +229,21 @@ async def operational_reports(
 
 @router.get("/ops/ground-truth")
 async def operational_ground_truth(
-    user: CurrentUser, service: Core, response: Response
+    user: CurrentUser,
+    service: Core,
+    response: Response,
+    cursor: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> dict[str, Any]:
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Ground Truth exige papel interno")
     response.headers["Cache-Control"] = "private, no-store"
-    return await service.tabular_ground_truth()
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Ground Truth indisponível")
+    ids = await service.decisions.reviewed_event_ids(cursor, limit + 1)
+    result = await service.tabular_ground_truth(ids[:limit])
+    result["next_cursor"] = str(ids[limit - 1]) if len(ids) > limit else None
+    return result
 
 
 @router.get("/ops/audit")
@@ -229,8 +251,8 @@ async def operational_audit(
     user: CurrentUser,
     service: Core,
     response: Response,
+    after: PageBoundary = None,
     operation: Annotated[str | None, Query(max_length=100)] = None,
-    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[dict[str, Any]]:
     if not user.can_review:
@@ -238,7 +260,7 @@ async def operational_audit(
     if service.decisions is None:
         raise HTTPException(status_code=503, detail="Auditoria indisponível")
     response.headers["Cache-Control"] = "private, no-store"
-    return await service.decisions.audit_page(operation=operation, offset=offset, limit=limit)
+    return await service.decisions.audit_page(operation=operation, after=after, limit=limit)
 
 
 @router.get("/me")
@@ -283,17 +305,34 @@ async def capture_by_protocol(
     return {"capture_id": capture.id, "protocol_code": capture.protocol_code}
 
 
+@router.get("/captures/{capture_id}/timeline")
+async def capture_timeline(
+    capture_id: uuid.UUID, user: CurrentUser, service: Core, response: Response
+) -> list[dict[str, Any]]:
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        return await service.capture_timeline(capture_id, user.id)
+    except EventNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/captures/markers")
 async def capture_markers(
     user: CurrentUser,
     service: Core,
     response: Response,
+    after: PageBoundary = None,
     only_mine: bool = False,
     include_unlocated: bool = False,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[dict[str, Any]]:
     response.headers["Cache-Control"] = "private, no-store"
     return await service.capture_markers(
-        user.id, user.can_review and not only_mine, include_unlocated=include_unlocated
+        user.id,
+        user.can_review and not only_mine,
+        include_unlocated=include_unlocated,
+        after=after,
+        limit=limit,
     )
 
 
@@ -308,6 +347,17 @@ async def capture_location(
         raise HTTPException(status_code=404, detail="Captura não encontrada")
     if not await service.captures.fill_missing_location(capture_id, user.id, payload):
         raise HTTPException(status_code=409, detail="A localização original já está registrada")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Auditoria indisponível")
+    await service.decisions.add_audit(
+        operation="capture_location",
+        entity_type="capture",
+        entity_id=capture_id,
+        actor=user.id,
+        before={},
+        after={"source": "manual"},
+        event_hash=f"location-{uuid.uuid4()}",
+    )
     await service.captures.session.commit()
     return {"capture_id": capture_id, "location_source": "manual"}
 
@@ -724,6 +774,7 @@ async def create_event(payload: EventCreate, service: Core) -> dict[str, Any]:
 async def list_events(
     service: Core,
     user: CurrentUser,
+    after: PageBoundary = None,
     urmind_class: UrmindClass | None = None,
     status: EventStatus | None = None,
     limit: int = Query(default=100, gt=0, le=500),
@@ -734,6 +785,7 @@ async def list_events(
         urmind_class=urmind_class.value if urmind_class else None,
         status=status.value if status else None,
         limit=limit,
+        after=after,
     )
 
 

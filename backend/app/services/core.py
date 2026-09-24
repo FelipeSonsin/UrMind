@@ -133,9 +133,16 @@ class CoreService:
         *,
         public: bool = False,
         include_unlocated: bool = False,
+        limit: int = 500,
+        after: tuple[datetime, uuid.UUID] | None = None,
     ) -> list[dict[str, Any]]:
         rows = await self.captures.report_markers(
-            actor, can_review, public=public, include_unlocated=include_unlocated
+            actor,
+            can_review,
+            public=public,
+            include_unlocated=include_unlocated,
+            limit=limit,
+            after=after,
         )
         markers = []
         for row in rows:
@@ -282,6 +289,123 @@ class CoreService:
             "updated_at": inference.get("completed_at") or inference.get("at"),
             "additional_evidence": bool(quality.get("additional_evidence")),
         }
+
+    async def capture_timeline(self, capture_id: uuid.UUID, actor: str) -> list[dict[str, Any]]:
+        capture = await self.captures.get(capture_id)
+        if capture is None or (capture.quality or {}).get("uploaded_by") != actor:
+            raise EventNotFoundError("Relato não encontrado")
+        quality = capture.quality or {}
+        gate = quality.get("photo_gate") or {}
+        at = capture.created_at.isoformat()
+        history = await self.captures.timeline_history(capture_id)
+        # The owner endpoint can only fill a missing point, never replace one.
+        source = (
+            "unknown"
+            if any(item["operation"] == "capture_location" for item in history)
+            else capture.source_location
+        )
+        rows: list[dict[str, Any]] = [
+            {"stage": "received", "status": "received", "at": at},
+            {
+                "stage": "photo_gate",
+                "status": gate.get("status")
+                if gate.get("status") in {"ACCEPTED", "REJECTED", "NEEDS_REVIEW"}
+                else "unknown",
+                "at": at,
+                "reasons": [
+                    reason
+                    for reason in gate.get("reasons", [])
+                    if reason
+                    in {
+                        "resolution",
+                        "blur",
+                        "underexposed",
+                        "overexposed",
+                        "duplicate",
+                        "scene",
+                        "face",
+                        "face_large",
+                    }
+                ],
+            },
+            {
+                "stage": "location",
+                "status": "declared" if source != "unknown" else "location_required",
+                "source": source if source in {"gps_device", "exif", "manual"} else "unknown",
+                "at": at,
+            },
+        ]
+        inference = quality.get("inference") or {}
+        if inference and not any(item["operation"] == "capture_inference" for item in history):
+            # Legacy snapshots have no complete transition log. Never invent a timestamp.
+            history = [
+                {
+                    "operation": "capture_inference",
+                    "created_at": inference.get("completed_at") or inference.get("at"),
+                    "after_data": inference,
+                },
+                *history,
+            ]
+        for item in history:
+            data = item["after_data"] or {}
+            operation = item["operation"]
+            timestamp = item["created_at"]
+            entry: dict[str, Any] = {
+                "at": timestamp.isoformat() if isinstance(timestamp, datetime) else timestamp
+            }
+            if operation in {"capture_review_state", "review"}:
+                status = "duplicate" if data.get("duplicate_of") else data.get("status")
+                entry.update(
+                    stage="review",
+                    status=status
+                    if status in {"confirmed", "rejected", "duplicate", "review", "triage_required"}
+                    else "review",
+                )
+                if data.get("corrected_location"):
+                    rows.append(
+                        {
+                            "stage": "location",
+                            "status": "adjusted",
+                            "source": "human_review",
+                            "at": entry["at"],
+                        }
+                    )
+            elif operation in {"publish_event", "withdraw_event"}:
+                entry.update(
+                    stage="publication",
+                    status="published" if data.get("status") == "published" else "withdrawn",
+                )
+            elif operation in {"attach_report_evidence", "detach_report_evidence"}:
+                entry.update(
+                    stage="review",
+                    status="attached" if operation.startswith("attach") else "detached",
+                )
+            elif operation == "capture_location":
+                entry.update(stage="location", status="adjusted", source="manual")
+            elif operation == "capture_inference":
+                status = data.get("status")
+                allowed = {s.value for s in CaptureProcessingStatus} | {
+                    "inference_completed",
+                    "analysis_completed",
+                    "inference_failed",
+                    "no_detection",
+                }
+                entry.update(stage="analysis", status=status if status in allowed else "unknown")
+                if data.get("model_status") == "EXPERIMENTAL_SHADOW":
+                    entry["status"] = "experimental"
+            else:
+                continue
+            rows.append(entry)
+
+        # Null legacy timestamps remain explicitly unknown after the dated history.
+        def instant(entry: dict[str, Any]) -> datetime:
+            try:
+                value = datetime.fromisoformat(entry["at"])
+                return value.astimezone(UTC) if value.tzinfo else datetime.max.replace(tzinfo=UTC)
+            except (ValueError, TypeError):
+                return datetime.max.replace(tzinfo=UTC)
+
+        return sorted(rows, key=instant)
 
     async def _analysis_status(self, events: list[Any]) -> CaptureProcessingStatus:
         """`completed` only with Event + feature snapshot + RiskAssessment + DecisionTrace."""
@@ -668,11 +792,18 @@ class CoreService:
             ],
         }
 
-    async def tabular_ground_truth(self) -> dict[str, Any]:
+    async def tabular_ground_truth(
+        self, event_ids: list[uuid.UUID] | None = None
+    ) -> dict[str, Any]:
         if self.decisions is None:
             raise RuntimeError("Ground Truth indisponível")
         grouped: dict[str, list[dict[str, Any]]] = {}
-        for row in await self.decisions.dataset_candidates():
+        candidates = (
+            await self.decisions.dataset_candidates(event_ids=event_ids)
+            if event_ids is not None
+            else await self.decisions.dataset_candidates()
+        )
+        for row in candidates:
             grouped.setdefault(str(row["event_id"]), []).append(row)
         examples = []
         entries = []
@@ -1027,9 +1158,16 @@ class CoreService:
         }
 
     async def list_events(
-        self, *, urmind_class: str | None = None, status: str | None = None, limit: int = 100
+        self,
+        *,
+        urmind_class: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+        after: tuple[datetime, uuid.UUID] | None = None,
     ) -> list[dict[str, Any]]:
-        return await self.events.rows(urmind_class=urmind_class, status=status, limit=limit)
+        return await self.events.rows(
+            urmind_class=urmind_class, status=status, limit=limit, after=after
+        )
 
     async def events_nearby(self, query: NearbyQuery) -> list[dict[str, Any]]:
         return await self.events.nearby(query)

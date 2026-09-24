@@ -58,6 +58,9 @@ const EventDetail = lazy(() =>
 const CaptureReviewPanel = lazy(() =>
   import('./components/EventDetail').then((m) => ({ default: m.CaptureReviewPanel })),
 );
+const OwnerReportTimeline = lazy(() =>
+  import('./components/EventDetail').then((m) => ({ default: m.OwnerReportTimeline })),
+);
 const SignIn = lazy(() => import('./components/SignIn').then((m) => ({ default: m.SignIn })));
 const OperationsPage = lazy(() =>
   import('./pages/OperationsPage').then((m) => ({ default: m.OperationsPage })),
@@ -130,6 +133,12 @@ const privateNavigation = [
   { id: 'models', label: 'Modelos', href: '#/app/modelos' },
   { id: 'audit', label: 'Auditoria', href: '#/app/auditoria' },
 ] as const;
+const internalTabs = [
+  { id: 'dashboard', label: 'Painel' },
+  { id: 'review', label: 'Fila' },
+  { id: 'private-map', label: 'Mapa' },
+  { id: 'ground-truth', label: 'Relatos/GT' },
+] as const;
 type Page =
   | (typeof navigation)[number]['id']
   | (typeof privateNavigation)[number]['id']
@@ -196,6 +205,8 @@ export default function App() {
   const [editing, setEditing] = useState<CaptureDraft>();
   const [notice, setNotice] = useState('');
   const [events, setEvents] = useState<UrbanEvent[] | null>(null);
+  const [eventCursors, setEventCursors] = useState<Array<string | null>>([null]);
+  const [reportCursors, setReportCursors] = useState<Array<string | null>>([null]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -295,13 +306,19 @@ export default function App() {
     setSelectedReport(null);
     setReportPhoto(null);
     setReports(null);
+    setReportCursors([null]);
+    setEventCursors([null]);
   }, [session?.user.id]);
+  useEffect(() => {
+    setReportCursors([null]);
+    setEventCursors([null]);
+  }, [page]);
   useEffect(() => {
     const controller = new AbortController();
     if (!session || !showReports) return () => controller.abort();
     const owner = session.user.id;
     api
-      .captureMarkers(controller.signal, page === 'my-reports')
+      .captureMarkers(controller.signal, page === 'my-reports', reportCursors.at(-1) ?? null)
       .then((data) => {
         if (!controller.signal.aborted) {
           setReports({ owner, onlyMine: page === 'my-reports', data });
@@ -312,7 +329,7 @@ export default function App() {
         if (!controller.signal.aborted) setReportError('Não foi possível consultar os relatos.');
       });
     return () => controller.abort();
-  }, [session?.user.id, showReports, page, revision, processingRetry]);
+  }, [session?.user.id, showReports, page, revision, processingRetry, reportCursors]);
   useEffect(() => {
     const controller = new AbortController();
     setReportPhoto(null);
@@ -475,7 +492,7 @@ export default function App() {
           setApiError('O Supabase/PostGIS ainda não está configurado.');
           return;
         }
-        const data = await api.events(controller.signal);
+        const data = await api.events(controller.signal, eventCursors.at(-1) ?? null);
         if (!controller.signal.aborted) setEvents(data);
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -487,7 +504,7 @@ export default function App() {
     }
     void load();
     return () => controller.abort();
-  }, [revision, canReview, privatePage]);
+  }, [revision, canReview, privatePage, eventCursors]);
   useEffect(() => {
     const controller = new AbortController();
     setMetrics(null);
@@ -721,7 +738,7 @@ export default function App() {
     }
   }
   return (
-    <div className="app-shell">
+    <div className={`app-shell${privatePage && canReview ? ' internal-shell' : ''}`}>
       <a
         className="skip-link"
         href="#main"
@@ -886,6 +903,13 @@ export default function App() {
                     </p>
                   ))}
                 {processingError && <p role="alert">{processingError}</p>}
+                {captureStatus && (
+                  <OwnerReportTimeline
+                    key={`${session?.user.id}:${captureStatus.capture_id}`}
+                    id={captureStatus.capture_id}
+                    revision={revision}
+                  />
+                )}
                 <button
                   type="button"
                   className="secondary"
@@ -1135,9 +1159,37 @@ export default function App() {
                       {report.event_public_id && (
                         <a href={`#/resultado/${report.event_public_id}`}>Ver análise</a>
                       )}
+                      {page === 'my-reports' && (
+                        <OwnerReportTimeline
+                          key={`${session.user.id}:${report.id}`}
+                          id={report.id}
+                          revision={revision}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
+                <div className="actions" aria-label="Páginas de relatos">
+                  <button
+                    disabled={reportCursors.length === 1}
+                    onClick={() => setReportCursors(reportCursors.slice(0, -1))}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    disabled={ownReports.length < 100 || !ownReports.at(-1)?.created_at}
+                    onClick={() => {
+                      const last = ownReports.at(-1)!;
+                      setReportCursors([...reportCursors, `${last.created_at}|${last.id}`]);
+                    }}
+                  >
+                    Próxima
+                  </button>
+                  <span>
+                    Página {reportCursors.length}; filtros e exportação aplicados aos pontos desta
+                    página.
+                  </span>
+                </div>
                 {page === 'map' &&
                   reportPhoto?.owner === session.user.id &&
                   reportPhoto.id === selectedReport && (
@@ -1296,28 +1348,46 @@ export default function App() {
             )}
             {privatePage && canReview && (
               <>
-                <nav className="actions" aria-label="Navegação interna">
-                  {privateNavigation
-                    .filter((item) => item.id !== 'admin' || canAdmin)
-                    .map((item) => (
-                      <a
-                        key={item.id}
-                        href={item.href}
-                        aria-current={page === item.id ? 'page' : undefined}
-                      >
-                        {item.label}
-                      </a>
-                    ))}
-                  <button className="text-button" onClick={() => void auth.signOut()}>
-                    Sair
-                  </button>
+                <nav className="internal-navigation" aria-label="Navegação interna">
+                  <span className="internal-badge">Área interna</span>
+                  {internalTabs.map((item) => (
+                    <a
+                      key={item.id}
+                      href={privateNavigation.find((entry) => entry.id === item.id)!.href}
+                      aria-current={page === item.id ? 'page' : undefined}
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                  <details>
+                    <summary>Mais</summary>
+                    <div className="internal-more">
+                      {privateNavigation
+                        .filter(
+                          (item) =>
+                            !['dashboard', 'review', 'private-map', 'ground-truth'].includes(
+                              item.id,
+                            ) &&
+                            (item.id !== 'admin' || canAdmin),
+                        )
+                        .map((item) => (
+                          <a key={item.id} href={item.href}>
+                            {item.label}
+                          </a>
+                        ))}
+                      <a href="#/">Área do cliente</a>
+                      <button className="text-button" onClick={() => void auth.signOut()}>
+                        Sair
+                      </button>
+                    </div>
+                  </details>
                 </nav>
                 {(page === 'dashboard' || page === 'login') && (
                   <section className="panel">
                     <h1>Painel interno</h1>
                     <p>
-                      Recorte dos até 500 registros mais recentes. As contagens não representam todo
-                      o histórico.
+                      Página de até 100 ocorrências. Use os cursores para percorrer o histórico; os
+                      indicadores agregados abaixo consultam o banco.
                     </p>
                     {loading && <p role="status">Carregando ocorrências…</p>}
                     {apiError && <p role="alert">{apiError}</p>}
@@ -1426,16 +1496,36 @@ export default function App() {
               </>
             )}
             {['review', 'private-events', 'private-map'].includes(page) && canReview && (
-              <EventsPage
-                key={page}
-                map={false}
-                linkDetails={page !== 'review'}
-                events={events}
-                loading={loading}
-                error={apiError}
-                onReload={() => setRevision((value) => value + 1)}
-                changed={changed}
-              />
+              <>
+                <EventsPage
+                  key={page}
+                  map={false}
+                  linkDetails={page !== 'review'}
+                  events={events}
+                  loading={loading}
+                  error={apiError}
+                  onReload={() => setRevision((value) => value + 1)}
+                  changed={changed}
+                />
+                <div className="actions" aria-label="Páginas de ocorrências">
+                  <button
+                    disabled={loading || eventCursors.length === 1}
+                    onClick={() => setEventCursors(eventCursors.slice(0, -1))}
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    disabled={loading || !events || events.length < 100}
+                    onClick={() => {
+                      const last = events!.at(-1)!;
+                      setEventCursors([...eventCursors, `${last.occurred_at}|${last.id}`]);
+                    }}
+                  >
+                    Próxima
+                  </button>
+                  <span>Página {eventCursors.length}</span>
+                </div>
+              </>
             )}
           </Suspense>
           <footer>

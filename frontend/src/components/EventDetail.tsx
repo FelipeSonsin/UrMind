@@ -14,6 +14,85 @@ import {
 
 const na = 'Não disponível';
 
+export function OwnerReportTimeline({ id, revision }: { id: string; revision: number }) {
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof api.captureTimeline>> | null>(null);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!expanded) return;
+    const controller = new AbortController();
+    setRows(null);
+    setError('');
+    void api
+      .captureTimeline(id, controller.signal)
+      .then((value) => {
+        if (!controller.signal.aborted) setRows(value);
+      })
+      .catch((reason: Error) => {
+        if (!controller.signal.aborted) setError(reason.message);
+      });
+    return () => controller.abort();
+  }, [id, revision, expanded]);
+  const labels: Record<string, string> = {
+    received: 'Recebido',
+    photo_gate: 'Porteiro',
+    location: 'Localização',
+    analysis: 'Análise',
+    review: 'Revisão humana',
+    publication: 'Publicação',
+    ACCEPTED: 'Foto aceita para análise',
+    NEEDS_REVIEW: 'Verificação pendente',
+    REJECTED: 'Foto recusada',
+    confirmed: 'Confirmado',
+    rejected: 'Não é problema',
+    duplicate: 'Duplicado',
+    attached: 'Evidência anexada',
+    detached: 'Evidência desanexada',
+    published: 'Publicado',
+    withdrawn: 'Despublicado',
+    adjusted: 'Localização ajustada',
+    declared: 'Localização declarada',
+    model_not_available: 'Análise indisponível — sem modelo autorizado',
+    experimental: 'Análise experimental',
+    queued: 'Na fila',
+    processing_detection: 'Em análise',
+    location_required: 'Localização necessária',
+    unknown: 'Não registrado',
+    blur: 'Nitidez insuficiente',
+    resolution: 'Resolução insuficiente',
+    underexposed: 'Muito escura',
+    overexposed: 'Muito clara',
+    scene: 'Cena não compatível',
+    face: 'Atenção à privacidade',
+    face_large: 'Rosto em primeiro plano',
+  };
+  return (
+    <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary>Histórico do relato</summary>
+      {error && <p role="alert">{error}</p>}
+      {!rows && !error && expanded && <p role="status">Consultando histórico…</p>}
+      <ol>
+        {rows?.map((row, index) => (
+          <li key={index}>
+            <strong>
+              {labels[row.stage] ?? row.stage}: {labels[row.status] ?? row.status}
+            </strong>
+            {row.at ? (
+              <time dateTime={row.at}> — {new Date(row.at).toLocaleString('pt-BR')}</time>
+            ) : (
+              <span> — Data não registrada</span>
+            )}
+            {row.source && <span> · Origem: {row.source}</span>}
+            {row.reasons?.length ? (
+              <p>{row.reasons.map((reason) => labels[reason] ?? reason).join(', ')}</p>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: () => void }) {
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof api.captureReview>> | null>(null);
   const [issues, setIssues] = useState<IssueDefinition[]>([]);

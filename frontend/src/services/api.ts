@@ -109,9 +109,9 @@ export const photoGatePolicySchema = z.object({
 });
 
 export const api = {
-  groundTruth: (signal?: AbortSignal) =>
+  groundTruth: (signal?: AbortSignal, cursor: string | null = null) =>
     request(
-      '/ops/ground-truth',
+      `/ops/ground-truth${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
       z.object({
         entries: z.array(
           z.object({
@@ -126,6 +126,7 @@ export const api = {
         dataset: z.record(z.string(), z.unknown()),
         rows: z.array(z.record(z.string(), z.unknown())),
         training_authorized: z.literal(false),
+        next_cursor: z.string().nullable().optional(),
       }),
       { signal },
     ),
@@ -159,9 +160,9 @@ export const api = {
       ),
       { signal },
     ),
-  operationalAudit: (operation: string, offset: number, signal?: AbortSignal) =>
+  operationalAudit: (operation: string, cursor: string | null, signal?: AbortSignal) =>
     request(
-      `/ops/audit?operation=${encodeURIComponent(operation)}&offset=${offset}&limit=50`,
+      `/ops/audit?operation=${encodeURIComponent(operation)}&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       z.array(
         z.object({
           id: z.string(),
@@ -268,14 +269,28 @@ export const api = {
       z.object({ capture_id: z.string().uuid(), protocol_code: z.string() }),
       { signal },
     ),
-  captureMarkers: (signal?: AbortSignal, onlyMine = false) =>
+  captureMarkers: (signal?: AbortSignal, onlyMine = false, cursor: string | null = null) =>
     request(
-      `/captures/markers?include_unlocated=true${onlyMine ? '&only_mine=true' : ''}`,
+      `/captures/markers?include_unlocated=true&limit=100${onlyMine ? '&only_mine=true' : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       z.array(captureMarkerSchema),
       { signal },
     ),
   captureImage: (id: string, signal?: AbortSignal) =>
     request(`/captures/${id}/image`, z.object({ image_url: z.string() }), { signal }),
+  captureTimeline: (id: string, signal?: AbortSignal) =>
+    request(
+      `/captures/${id}/timeline`,
+      z.array(
+        z.object({
+          stage: z.string(),
+          status: z.string(),
+          at: z.string().nullable(),
+          reasons: z.array(z.string()).optional(),
+          source: z.string().optional(),
+        }),
+      ),
+      { signal },
+    ),
   captureLocation: (id: string, latitude: number, longitude: number, signal?: AbortSignal) =>
     request(
       `/captures/${id}/location`,
@@ -310,7 +325,12 @@ export const api = {
     request('/health', z.object({ status: z.string(), database: z.string().optional() }), {
       signal,
     }),
-  events: (signal?: AbortSignal) => request('/events?limit=500', z.array(eventSchema), { signal }),
+  events: (signal?: AbortSignal, cursor: string | null = null) =>
+    request(
+      `/events?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      z.array(eventSchema),
+      { signal },
+    ),
   me: (signal?: AbortSignal) =>
     request(
       '/me',

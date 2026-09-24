@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
 from geoalchemy2 import Geometry
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, select, text, tuple_, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -240,6 +240,7 @@ class CaptureRepository:
         public: bool = False,
         limit: int = 500,
         include_unlocated: bool = False,
+        after: tuple[datetime, uuid.UUID] | None = None,
     ) -> list[dict[str, Any]]:
         """One original-location marker per mobile Capture, never a fabricated Event."""
         rows = await self.session.execute(
@@ -287,7 +288,9 @@ class CaptureRepository:
         """
                 + PublicRepository._PUBLISHED
                 + """))
-            order by c.created_at desc, c.id limit :limit
+            and (cast(:after_at as timestamptz) is null or
+                 (c.created_at,c.id)<(cast(:after_at as timestamptz),cast(:after_id as uuid)))
+            order by c.created_at desc, c.id desc limit :limit
         """
             ),
             {
@@ -296,6 +299,8 @@ class CaptureRepository:
                 "public": public,
                 "limit": limit,
                 "include_unlocated": include_unlocated,
+                "after_at": after[0] if after else None,
+                "after_id": after[1] if after else None,
             },
         )
         return [dict(row) for row in rows.mappings()]
@@ -365,6 +370,26 @@ class CaptureRepository:
 
     async def get(self, capture_id: uuid.UUID) -> Capture | None:
         return await self.session.get(Capture, capture_id)
+
+    async def timeline_history(self, capture_id: uuid.UUID) -> list[dict[str, Any]]:
+        rows = await self.session.execute(
+            text("""
+            select a.operation,a.created_at,a.after_data
+            from public.audit_log a
+            where (a.entity_type='capture' and a.entity_id=:capture_id
+                and a.operation in ('capture_review_state','capture_location',
+                    'attach_report_evidence','detach_report_evidence','capture_inference'))
+               or (a.entity_type='event' and a.entity_id in
+                    (select id from public.events where capture_id=:capture_id)
+                   and a.operation in ('publish_event','withdraw_event','review')
+                   and (a.operation<>'review' or not exists(select 1 from public.audit_log b
+                       where b.entity_id=:capture_id and b.operation='capture_review_state'
+                       and b.after_data->>'review_id'=a.after_data->>'review_id')))
+            order by a.created_at,a.id
+        """),
+            {"capture_id": capture_id},
+        )
+        return [dict(row) for row in rows.mappings()]
 
     async def get_for_review(self, capture_id: uuid.UUID) -> Capture | None:
         result = await self.session.execute(
@@ -686,8 +711,11 @@ class EventRepository:
         urmind_class: str | None = None,
         status: str | None = None,
         limit: int = 100,
+        after: tuple[datetime, uuid.UUID] | None = None,
     ) -> list[dict[str, Any]]:
-        stmt = self._row_select().order_by(Event.occurred_at.desc()).limit(limit)
+        stmt = self._row_select().order_by(Event.occurred_at.desc(), Event.id.desc()).limit(limit)
+        if after:
+            stmt = stmt.where(tuple_(Event.occurred_at, Event.id) < after)
         if urmind_class:
             stmt = stmt.where(Event.urmind_class == urmind_class)
         if status:
@@ -939,12 +967,14 @@ class DecisionRepository:
         return totals
 
     async def audit_page(
-        self, *, operation: str | None, offset: int, limit: int
+        self, *, operation: str | None, limit: int, after: tuple[datetime, uuid.UUID] | None = None
     ) -> list[dict[str, Any]]:
         query = select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
         if operation:
             query = query.where(AuditLog.operation == operation)
-        result = await self.session.execute(query.offset(offset).limit(limit))
+        if after:
+            query = query.where(tuple_(AuditLog.created_at, AuditLog.id) < after)
+        result = await self.session.execute(query.limit(limit))
         # Raw payloads/actor can contain private identifiers. This operational
         # listing deliberately exposes only the audit envelope.
         return [
@@ -1099,7 +1129,19 @@ class DecisionRepository:
         )
         return result.scalar_one_or_none()
 
-    async def dataset_candidates(self) -> list[dict[str, Any]]:
+    async def reviewed_event_ids(self, after: uuid.UUID | None, limit: int) -> list[uuid.UUID]:
+        rows = await self.session.execute(
+            text("""select distinct event_id from public.reviews
+            where event_id is not null and decision in ('confirm','correct','reject')
+            and (cast(:after as uuid) is null or event_id < cast(:after as uuid))
+            order by event_id desc limit :limit"""),
+            {"after": after, "limit": limit},
+        )
+        return list(rows.scalars())
+
+    async def dataset_candidates(
+        self, event_ids: list[uuid.UUID] | None = None
+    ) -> list[dict[str, Any]]:
         """Revisões confirmadas/corrigidas com toda a linhagem da inferência original."""
         result = await self.session.execute(
             text(
@@ -1125,8 +1167,10 @@ class DecisionRepository:
                 "left join public.captures c on c.id = e.capture_id "
                 "left join public.model_versions m on m.id = e.model_version_id "
                 "left join public.dataset_versions d on d.id = m.dataset_version_id "
+                "where (cast(:event_ids as uuid[]) is null or e.id=any(cast(:event_ids as uuid[]))) "
                 "order by r.commit_order nulls first, r.review_sequence"
-            )
+            ),
+            {"event_ids": event_ids},
         )
         rows = [dict(row) for row in result.mappings()]
         all_ids = {
@@ -1416,7 +1460,18 @@ class InferenceRepository:
         return int(result.scalar_one()) > 0
 
     async def set_capture_inference(self, capture: Capture, state: dict[str, Any]) -> None:
+        previous = (capture.quality or {}).get("inference") or {}
         capture.quality = {**(capture.quality or {}), "inference": state}
+        if previous.get("status") != state.get("status"):
+            await DecisionRepository(self.session).add_audit(
+                operation="capture_inference",
+                entity_type="capture",
+                entity_id=capture.id,
+                actor="worker",
+                before={"status": previous.get("status")},
+                after={"status": state.get("status"), "model_status": state.get("model_status")},
+                event_hash=f"inference-{uuid.uuid4()}",
+            )
         await self.session.flush()
 
     async def upsert_dataset_version(self, **fields: Any) -> DatasetVersion:

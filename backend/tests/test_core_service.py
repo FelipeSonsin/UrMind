@@ -29,6 +29,105 @@ SNAP = {"road_segment_id": uuid4(), "distance_m": 3.2, "latitude": -23.5505, "lo
 
 
 @pytest.mark.asyncio
+async def test_owner_timeline_is_allowlisted_ordered_and_isolated():
+    capture = SimpleNamespace(
+        id=uuid4(),
+        created_at=NOW,
+        source_location="gps_device",
+        quality={
+            "uploaded_by": "owner",
+            "photo_gate": {"status": "NEEDS_REVIEW", "reasons": ["blur", "private-token"]},
+            "inference": {"status": "model_not_available", "at": NOW.isoformat()},
+        },
+    )
+    history = AsyncMock(
+        return_value=[
+            {
+                "operation": "capture_review_state",
+                "created_at": NOW,
+                "after_data": {
+                    "status": "confirmed",
+                    "class": "URMIND_FALLEN_TREE",
+                    "reviewer": "secret",
+                    "notes": "internal",
+                },
+            },
+            {
+                "operation": "publish_event",
+                "created_at": NOW,
+                "after_data": {
+                    "status": "published",
+                    "reviewer": "secret",
+                    "public_image": {"path": "private"},
+                },
+            },
+            {
+                "operation": "publish_event",
+                "created_at": NOW,
+                "after_data": {"status": "withdrawn"},
+            },
+        ]
+    )
+    service = CoreService(
+        SimpleNamespace(get=AsyncMock(return_value=capture), timeline_history=history),
+        SimpleNamespace(),
+    )
+    result = await service.capture_timeline(capture.id, "owner")
+    assert [entry["stage"] for entry in result] == [
+        "received",
+        "photo_gate",
+        "location",
+        "analysis",
+        "review",
+        "publication",
+        "publication",
+    ]
+    assert result[-1]["status"] == "withdrawn"
+    assert result[1]["reasons"] == ["blur"]
+    assert all(
+        set(entry) <= {"stage", "status", "at", "reasons", "issue_code", "source"}
+        for entry in result
+    )
+    assert (
+        "secret" not in str(result)
+        and "private" not in str(result)
+        and "internal" not in str(result)
+    )
+    with pytest.raises(RuntimeError):
+        await service.capture_timeline(capture.id, "other")
+    assert history.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_owner_timeline_orders_instants_and_preserves_initial_missing_location():
+    capture = SimpleNamespace(
+        id=uuid4(), created_at=NOW, source_location="manual", quality={"uploaded_by": "owner"}
+    )
+    history = AsyncMock(
+        return_value=[
+            {
+                "operation": "capture_location",
+                "created_at": "2026-09-04T09:10:00-03:00",
+                "after_data": {},
+            },
+            {
+                "operation": "capture_inference",
+                "created_at": "2026-09-04T12:05:00+00:00",
+                "after_data": {"status": "model_not_available"},
+            },
+        ]
+    )
+    service = CoreService(
+        SimpleNamespace(get=AsyncMock(return_value=capture), timeline_history=history),
+        SimpleNamespace(),
+    )
+    result = await service.capture_timeline(capture.id, "owner")
+    assert result[2]["status"] == "location_required"
+    assert result[-2]["status"] == "model_not_available"
+    assert result[-1]["status"] == "adjusted"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("same_model", [True, False])
 async def test_private_dossier_model_status_bound_to_capture_inference(same_model):
     model_id = uuid4()
@@ -290,7 +389,7 @@ async def test_capture_marker_without_model_has_no_invented_analysis():
     service = CoreService(repository, None)
     result = (await service.capture_markers("owner"))[0]
     repository.report_markers.assert_awaited_with(
-        "owner", False, public=False, include_unlocated=False
+        "owner", False, public=False, include_unlocated=False, limit=500, after=None
     )
     assert result["report_status"] == "model_not_available"
     assert result["urmind_class"] is None and result["severity"] is None
@@ -549,7 +648,7 @@ async def test_owner_report_list_retains_unlocated_capture_without_inventing_a_p
     assert result[0]["report_status"] == "location_required"
     assert result[0]["created_at"] == "2026-09-24T12:00:00Z"
     captures.report_markers.assert_awaited_once_with(
-        "owner", False, public=False, include_unlocated=True
+        "owner", False, public=False, include_unlocated=True, limit=500, after=None
     )
 
 

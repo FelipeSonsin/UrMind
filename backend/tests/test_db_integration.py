@@ -55,6 +55,37 @@ LAT, LON = -23.5613, -46.6560
 
 
 @pytest.mark.asyncio
+async def test_capture_cursor_walks_1200_tied_records_without_loss(database):
+    owner = str(uuid.uuid4())
+    async with database.sessionmaker() as session:
+        try:
+            await session.execute(
+                text("""insert into public.captures
+                (capture_key,source,source_location,captured_at,quality,created_at)
+                select :prefix||g::text,'pwa_photo','unknown',now(),
+                    jsonb_build_object('uploaded_by',cast(:owner as text)),now()
+                from generate_series(1,1200) g"""),
+                {"prefix": f"keyset-{owner}-", "owner": owner},
+            )
+            repository = CaptureRepository(session)
+            after = None
+            identifiers = []
+            while True:
+                rows = await repository.report_markers(
+                    owner, include_unlocated=True, limit=137, after=after
+                )
+                if not rows:
+                    break
+                identifiers.extend(row["id"] for row in rows)
+                after = rows[-1]["created_at"], rows[-1]["id"]
+            assert len(identifiers) == len(set(identifiers)) == 1200
+            assert not await repository.report_markers(str(uuid.uuid4()), include_unlocated=True)
+        finally:
+            # Capture triggers and queue writes are in the same uncommitted transaction.
+            await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_human_report_real_storage_publication_and_cleanup(database):
     """Synthetic isolated integration, not a citizen E2E or detector evaluation."""
     from fastapi import UploadFile
@@ -384,7 +415,7 @@ async def test_operational_policy_persistence_and_rls(database):
         assert totals["published"] >= 0
         models = await repo.operational_models()
         assert all("metrics" not in row and "checksum" not in row for row in models)
-        rows = await repo.audit_page(operation=None, offset=0, limit=3)
+        rows = await repo.audit_page(operation=None, after=None, limit=3)
         assert len(rows) <= 3 and all("actor" not in row for row in rows)
         service = CoreService(CaptureRepository(session), EventRepository(session), repo)
         assert (await service.tabular_ground_truth())["training_authorized"] is False

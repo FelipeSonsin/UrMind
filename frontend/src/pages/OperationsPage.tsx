@@ -4,12 +4,15 @@ import { api } from '../services/api';
 type Policy = Awaited<ReturnType<typeof api.photoGatePolicy>>;
 
 export function GroundTruthPage() {
+  const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.groundTruth>> | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
+    setData(null);
+    setError('');
     void api
-      .groundTruth(controller.signal)
+      .groundTruth(controller.signal, cursors.at(-1) ?? null)
       .then((rows) => {
         if (!controller.signal.aborted) setData(rows);
       })
@@ -17,7 +20,7 @@ export function GroundTruthPage() {
         if (!controller.signal.aborted) setError(failure.message);
       });
     return () => controller.abort();
-  }, []);
+  }, [cursors]);
   return (
     <section className="panel">
       <h1>Ground truth</h1>
@@ -30,6 +33,7 @@ export function GroundTruthPage() {
       {data && (
         <>
           <h2>Rótulos por classe</h2>
+          <p>Contagens e exportação referentes a esta página; cada Event mantém todos os votos.</p>
           <ul>
             {Object.entries(data.counts_by_class).map(([issue, count]) => (
               <li key={issue}>
@@ -67,6 +71,20 @@ export function GroundTruthPage() {
             Exportar snapshot tabular elegível ({data.rows.length})
           </button>
           <a href="#/app/reviews">Consultar revisões de ocorrências</a>
+          <div className="actions">
+            <button
+              disabled={cursors.length === 1}
+              onClick={() => setCursors(cursors.slice(0, -1))}
+            >
+              Anterior
+            </button>
+            <button
+              disabled={!data.next_cursor}
+              onClick={() => setCursors([...cursors, data.next_cursor!])}
+            >
+              Próxima
+            </button>
+          </div>
         </>
       )}
     </section>
@@ -238,7 +256,7 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
   );
   const [audit, setAudit] = useState<Awaited<ReturnType<typeof api.operationalAudit>> | null>(null);
   const [operation, setOperation] = useState('');
-  const [offset, setOffset] = useState(0);
+  const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
@@ -250,14 +268,16 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
         ? api.operationalModels(controller.signal).then((rows) => {
             if (!controller.signal.aborted) setModels(rows);
           })
-        : api.operationalAudit(operation, offset, controller.signal).then((rows) => {
-            if (!controller.signal.aborted) setAudit(rows);
-          });
+        : api
+            .operationalAudit(operation, cursors.at(-1) ?? null, controller.signal)
+            .then((rows) => {
+              if (!controller.signal.aborted) setAudit(rows);
+            });
     void request.catch((failure: Error) => {
       if (!controller.signal.aborted) setError(failure.message);
     });
     return () => controller.abort();
-  }, [mode, operation, offset]);
+  }, [mode, operation, cursors]);
   return (
     <section className="panel">
       <h1>{mode === 'models' ? 'Modelos registrados' : 'Auditoria operacional'}</h1>
@@ -268,7 +288,7 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
             value={operation}
             onChange={(event) => {
               setOperation(event.target.value);
-              setOffset(0);
+              setCursors([null]);
             }}
           />
         </label>
@@ -309,10 +329,19 @@ export function OperationalRegistryPage({ mode }: { mode: 'models' | 'audit' }) 
             ))}
           </ul>
           <div className="actions">
-            <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>
+            <button
+              disabled={cursors.length === 1}
+              onClick={() => setCursors(cursors.slice(0, -1))}
+            >
               Anterior
             </button>
-            <button disabled={audit.length < 50} onClick={() => setOffset(offset + 50)}>
+            <button
+              disabled={audit.length < 50}
+              onClick={() => {
+                const last = audit.at(-1)!;
+                setCursors([...cursors, `${last.created_at}|${last.id}`]);
+              }}
+            >
               Próxima
             </button>
           </div>

@@ -11,6 +11,17 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+def decode_page_cursor(value: str | None) -> tuple[datetime, uuid.UUID] | None:
+    """Internal keyset boundary, not an authorization token."""
+    if value is None:
+        return None
+    timestamp, identifier = value.split("|", 1)
+    at = datetime.fromisoformat(timestamp)
+    if at.utcoffset() is None:
+        raise ValueError("Cursor requires an aware timestamp")
+    return at, uuid.UUID(identifier)
+
+
 class PublicationRequest(BaseModel):
     """Reviewer publication is separate from a model result or ground truth."""
 
