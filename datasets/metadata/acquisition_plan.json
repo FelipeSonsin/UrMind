@@ -1,6 +1,37 @@
 {
   "version": 1,
   "authorization": "user_explicit_download_20260908",
+  "reference_models_authorization": "user_explicit_photo_gate_20260924",
+  "reference_models": [
+    {
+      "id": "yunet_face_privacy",
+      "status": "REFERENCE",
+      "purpose": "photo_privacy_preprocessing_not_issue_detection",
+      "revision": "26cc381e4d2594bb9f47a26eb8fd96c94a13660d",
+      "license": "MIT",
+      "license_url": "https://raw.githubusercontent.com/opencv/opencv_zoo/26cc381e4d2594bb9f47a26eb8fd96c94a13660d/models/face_detection_yunet/LICENSE",
+      "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/26cc381e4d2594bb9f47a26eb8fd96c94a13660d/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+      "path": "models/reference/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+      "size_bytes": 232589
+    },
+    {
+      "id": "openclip_scene_reference",
+      "derived_manifest": "datasets/metadata/photo_reference_export.json",
+      "derived_manifest_sha256": "601648e113262406d8dd85bec1edfeace66b98c794cefefe59b82506a9fcde16",
+      "status": "REFERENCE",
+      "purpose": "photo_scene_preprocessing_not_issue_detection",
+      "revision": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+      "license": "MIT",
+      "license_url": "https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K/raw/1a25a446712ba5ee05982a381eed697ef9b435cf/README.md",
+      "url": "https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K/resolve/1a25a446712ba5ee05982a381eed697ef9b435cf/open_clip_model.safetensors",
+      "path": "models/reference/open_clip_model.safetensors",
+      "sha256": "ac4f8c4b88af6d963118cbf40ad93176d092abbedfcb752601ae1866352656e6",
+      "size_bytes": 605143316,
+      "calibration_status": "REQUIRES_OWN_PHOTOS",
+      "limitations": "Model card requires fixed-taxonomy in-domain testing; not validated for deployed photo admission. No person identification."
+    }
+  ],
   "sources": [
     {
       "dataset": "project_sidewalk",

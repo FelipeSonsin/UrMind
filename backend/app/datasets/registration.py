@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -30,8 +31,11 @@ __all__ = [
     "DatasetSummary",
     "RegistrationRefused",
     "build_dataset_version",
+    "preserve_manifest_metadata",
     "summarize",
 ]
+
+PRESERVED_MANIFEST_FIELDS = ("audit_stage_status", "path_base")
 
 
 class RegistrationRefused(RuntimeError):
@@ -100,6 +104,23 @@ def summarize(
         rejected_counts=dict(rejeitados),
         groups=tuple(sorted(grupos)),
     )
+
+
+def preserve_manifest_metadata(payload: dict[str, Any], existing: dict[str, Any]) -> dict[str, Any]:
+    """Preserva metadata valida e o timestamp quando a regeneracao e idempotente."""
+    merged = deepcopy(payload)
+    for field_name in PRESERVED_MANIFEST_FIELDS:
+        if isinstance(existing.get(field_name), str) and existing[field_name].strip():
+            merged[field_name] = existing[field_name]
+
+    previous_split = existing.get("split")
+    current_split = merged.get("split")
+    if isinstance(previous_split, dict) and isinstance(current_split, dict):
+        previous_semantic = {k: v for k, v in previous_split.items() if k != "generated_at"}
+        current_semantic = {k: v for k, v in current_split.items() if k != "generated_at"}
+        if previous_semantic == current_semantic and previous_split.get("generated_at"):
+            current_split["generated_at"] = previous_split["generated_at"]
+    return merged
 
 
 def build_dataset_version(

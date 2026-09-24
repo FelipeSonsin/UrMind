@@ -104,6 +104,25 @@ def test_build_report_nao_escreve_registry():
     assert 'write_json_report("artifact_registry.json"' not in source
 
 
+def test_removed_v2_consumers_fail_closed_before_writing(tmp_path, monkeypatch):
+    import importlib
+
+    import pytest
+
+    monkeypatch.syspath_prepend(str(SCRIPT.parent))
+    builder = importlib.import_module("build_detection_manifests")
+    approval = importlib.import_module("prepare_rdd_split_authorization")
+    audit = importlib.import_module("audit_ird_dashcam")
+    monkeypatch.setattr(builder, "DATASETS_DIR", tmp_path)
+    monkeypatch.setattr(approval, "V2_SPLIT", tmp_path / "missing-split.json")
+    monkeypatch.setattr(approval, "V2_SHEET", tmp_path / "approval.json")
+    monkeypatch.setattr(audit, "DATASETS_DIR", tmp_path)
+    for operation in (builder.materialize_rdd2022_v2, approval.run_v2, audit._roles):
+        with pytest.raises(RuntimeError, match="DATASET_SPLIT_NOT_AVAILABLE"):
+            operation()
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_audit_storage_e_o_unico_writer_do_relatorio_de_armazenamento():
     root = SCRIPT.parents[2]
     writers = []

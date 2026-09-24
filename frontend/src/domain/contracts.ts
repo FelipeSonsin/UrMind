@@ -21,12 +21,13 @@ const optionalNumber = z.number().finite().nullable().optional();
 export const eventSchema = z.object({
   id: z.string().uuid(),
   event_key: z.string(),
-  urmind_class: z.enum(
-    Object.keys(classes) as [keyof typeof classes, ...Array<keyof typeof classes>],
-  ),
+  // Human reviews may use any canonical candidate class. The backend registry
+  // validates membership; the visual Worker's four-class allowlist is separate.
+  urmind_class: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/),
   status: z.enum(Object.keys(statuses) as [keyof typeof statuses, ...Array<keyof typeof statuses>]),
   occurred_at: z.string().datetime({ offset: true }),
   evidence_mode: z.string(),
+  model_status: z.string().nullable().optional(),
   visual_confidence: z.number().min(0).max(1).nullable().optional(),
   fused_confidence: z.number().min(0).max(1).nullable().optional(),
   latitude: z.number().min(-90).max(90).nullable().optional(),
@@ -57,3 +58,180 @@ export function parseCoordinate(latitude: string, longitude: string): Coordinate
     throw new Error('Coordenadas inválidas: latitude de −90 a 90 e longitude de −180 a 180.');
   return result.data;
 }
+
+export const uploadResultSchema = z.object({
+  additional_evidence: z.boolean().optional(),
+  protocol_code: z.string().optional(),
+  id: z.string().uuid(),
+  capture_key: z.string(),
+  created: z.boolean(),
+  requires_manual_location: z.boolean(),
+  location_source: z.string().optional(),
+  exif_status: z.string().optional(),
+});
+export type UploadResult = z.infer<typeof uploadResultSchema>;
+
+export const captureProcessingSchema = z.object({
+  additional_evidence: z.boolean().optional(),
+  protocol_code: z.string().nullable().optional(),
+  event_public_ids: z.array(z.string()).default([]),
+  capture_id: z.string().uuid(),
+  status: z.enum([
+    'received',
+    'queued',
+    'processing_detection',
+    'detection_completed',
+    'building_event',
+    'enriching_context',
+    'building_features',
+    'assessing',
+    'completed',
+    'no_supported_detection',
+    'no_event',
+    'needs_review',
+    'failed',
+    'model_not_available',
+    'location_required',
+  ]),
+  requires_manual_location: z.boolean(),
+  event_ids: z.array(z.string().uuid()),
+  model_version_id: z.string().uuid().nullable(),
+  model_status: z.string().nullable().optional(),
+  updated_at: z.string().nullable(),
+});
+export type CaptureProcessing = z.infer<typeof captureProcessingSchema>;
+
+export const captureMarkerSchema = z.object({
+  id: z.string().min(12),
+  protocol_code: z.string().nullable().optional(),
+  public_id: z.string().nullable().optional(),
+  reporters_count: z.number().int().nonnegative().nullable().optional(),
+  latitude: z.number().finite().min(-90).max(90).nullable(),
+  longitude: z.number().finite().min(-180).max(180).nullable(),
+  created_at: z.string().nullable().optional(),
+  address: z
+    .object({
+      status: z.string(),
+      road: z.string().nullable(),
+      suburb: z.string().nullable(),
+      city: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+  photo_gate: z
+    .object({
+      status: z.string(),
+      technical_status: z.string(),
+      scene_status: z.string(),
+      face_status: z.string(),
+    })
+    .nullable()
+    .optional(),
+  report_status: z.enum([
+    'received',
+    'model_not_available',
+    'experimental',
+    'human_confirmed',
+    'rejected',
+    'duplicate',
+    'no_supported_detection',
+    'location_required',
+  ]),
+  event_id: z.string().uuid().nullable().optional(),
+  event_public_id: z.string().nullable().optional(),
+  user_description: z.string().nullable().optional(),
+  location_source: z.string().optional(),
+  location_conflict: z.boolean().nullable().optional(),
+  accuracy_m: optionalNumber,
+  urmind_class: z.string().nullable().optional(),
+  severity: z.string().nullable().optional(),
+  priority_score: optionalNumber,
+});
+export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
+export const reportLabels: Record<CaptureMarker['report_status'], string> = {
+  location_required: 'Localização necessária — sem ponto no mapa',
+  received: 'Relato recebido — aguardando análise',
+  model_not_available: 'Análise indisponível — sem modelo autorizado',
+  experimental: 'Análise experimental',
+  human_confirmed: 'Confirmado por revisão humana',
+  rejected: 'Rejeitado por revisão humana',
+  duplicate: 'Relato duplicado',
+  no_supported_detection: 'Relato recebido — nenhum problema das classes suportadas identificado',
+};
+
+const detectionSchema = z.object({
+  id: z.string().uuid(),
+  urmind_class: z.string(),
+  confidence: z.number().min(0).max(1),
+  bbox: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+  model_version_id: z.string().uuid().nullable(),
+});
+export const eventDetailSchema = eventSchema.extend({
+  image_url: z.string().url().nullable(),
+  capture: z
+    .object({
+      id: z.string().uuid(),
+      capture_key: z.string(),
+      source: z.string(),
+      source_location: z.string(),
+      captured_at: z.string(),
+      storage_path: z.string().nullable(),
+    })
+    .nullable(),
+  detections: z.array(detectionSchema),
+  risk: z
+    .object({
+      severity: z.string(),
+      priority_score: z.number().nullable(),
+      uncertainty: z.number().nullable(),
+      factors: z.record(z.string(), z.unknown()),
+      created_at: z.string(),
+    })
+    .nullable(),
+  responsibility: z
+    .union([
+      z.object({ responsible: z.string(), source: z.string(), version: z.string() }),
+      z.literal('requires_triage'),
+    ])
+    .nullable(),
+  action: z.object({ code: z.string(), label: z.string(), version: z.string() }).nullable(),
+  report: z.string().nullable(),
+  context: z
+    .array(
+      z.object({
+        source: z.string(),
+        status: z.string(),
+        fetched_at: z.string(),
+        data: z.record(z.string(), z.unknown()),
+        error: z.string().nullable().optional(),
+      }),
+    )
+    .default([]),
+  reviews: z.array(
+    z.object({
+      decision: z.enum(['confirm', 'correct', 'reject']),
+      corrected_class: z.string().nullable(),
+      notes: z.string().nullable(),
+      reviewer: z.string(),
+      created_at: z.string(),
+    }),
+  ),
+});
+export type EventDetail = z.infer<typeof eventDetailSchema>;
+
+export type ReviewPayload =
+  | { decision: 'confirm' | 'reject'; notes?: string }
+  | {
+      decision: 'correct';
+      corrected_class?: keyof typeof classes;
+      corrected_location?: Coordinate;
+      notes?: string;
+    };
+
+export const severities: Record<string, string> = {
+  unknown: 'Não determinada',
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  critical: 'Crítica',
+};

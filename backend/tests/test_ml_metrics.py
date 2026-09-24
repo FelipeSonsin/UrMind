@@ -277,9 +277,9 @@ def test_ap_confere_com_calculo_manual():
         gt("img3", D40, (0, 0, 10, 10)),
     ]
     predictions = [
-        pred("img1", D40, (0, 0, 10, 10), 0.9),   # acerto
+        pred("img1", D40, (0, 0, 10, 10), 0.9),  # acerto
         pred("img1", D40, (90, 90, 99, 99), 0.8),  # alarme falso
-        pred("img2", D40, (0, 0, 10, 10), 0.7),   # acerto
+        pred("img2", D40, (0, 0, 10, 10), 0.7),  # acerto
     ]
 
     metrics = evaluate(predictions, truths, labels=[D40], score_threshold=0.0).per_class[D40]
@@ -332,3 +332,22 @@ def test_metricas_globais_sem_prediction_com_gt_tem_precision_e_recall_zero() ->
 
     assert result.precision == 0.0
     assert result.recall == 0.0
+
+
+def test_falso_positivo_em_imagem_negativa_por_classe_e_confianca():
+    from app.ml.metrics import negative_image_false_positives
+
+    predictions = [
+        pred("neg1", "D40", (0, 0, 10, 10), 0.9),
+        pred("neg1", "D00", (0, 0, 10, 10), 0.3),
+        pred("neg2", "D40", (0, 0, 10, 10), 0.1),  # abaixo do limiar
+        pred("pos1", "D40", (0, 0, 10, 10), 0.99),  # imagem positiva: fora da conta
+    ]
+    report = negative_image_false_positives(
+        predictions, {"neg1", "neg2", "neg3"}, score_threshold=0.25
+    )
+    assert report["false_positives"] == 2
+    assert report["negative_images_with_false_positive"] == 1
+    assert report["false_positives_by_class"] == {"D00": 1, "D40": 1}
+    assert report["high_confidence_false_positives_by_class"] == {"D40": 1}
+    assert report["false_positives_per_negative_image"] == pytest.approx(2 / 3, abs=1e-6)

@@ -1,4 +1,4 @@
-"""núcleo canônico do UrMind — captura, detecção, evento e geoespacial
+"""Alinha o schema legado 0001_core ao núcleo canônico geoespacial do UrMind.
 
 O DDL vive aqui por inteiro e é imutável: uma revisão aplicada é registro
 histórico, nunca é editada. Correções entram como a próxima revisão
@@ -8,19 +8,87 @@ Este esquema não é fruto de autogenerate. Ele cria extensões, funções PL/pg
 geografias, índices GiST, RLS e grants — coisas que o autogenerate do Alembic
 não descreve corretamente, e por isso foi escrito e revisado à mão [R43].
 
-Revision ID: 0001_core_geospatial
-Revises:
-Create Date: 2026-09-05
+Revision ID: 0002_align_urmind_core
+Revises: 0001_core
+Create Date: 2026-09-16
 """
 
 from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0001_core_geospatial"
-down_revision: str | None = None
+revision: str = "0002_align_urmind_core"
+down_revision: str | None = "0001_core"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+
+ROAD_SEGMENTS_TRANSITION = r"""
+-- Preserva a tabela legado e a evolui in-place. Em banco vazio, cria diretamente
+-- a representação canônica antes do restante do núcleo.
+-- Supabase installs PostGIS in `extensions`. Explicit placement is required:
+-- pg_catalog leads the function search_path and cannot hold extension objects.
+set local search_path = pg_catalog, public, extensions;
+create extension if not exists postgis with schema extensions;
+create extension if not exists pgcrypto with schema extensions;
+
+create table if not exists public.road_segments (
+    id uuid primary key default gen_random_uuid(),
+    osm_id bigint unique,
+    name text,
+    highway text,
+    jurisdiction text,
+    geom geometry(LineString, 4326) not null,
+    geog geography(LineString, 4326) generated always as (geom::geography) stored,
+    attributes jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default now()
+);
+
+do $transition$
+begin
+    if exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='geometry')
+       and not exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='geom') then
+        alter table public.road_segments rename column geometry to geom;
+    end if;
+    if exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='osm_way_id')
+       and not exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='osm_id') then
+        alter table public.road_segments rename column osm_way_id to osm_id;
+    end if;
+    if exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='road_class')
+       and not exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='highway') then
+        alter table public.road_segments rename column road_class to highway;
+    end if;
+end
+$transition$;
+
+alter table public.road_segments add column if not exists jurisdiction text;
+alter table public.road_segments
+    add column if not exists attributes jsonb not null default '{}'::jsonb;
+alter table public.road_segments
+    add column if not exists geog geography(LineString, 4326)
+    generated always as (geom::geography) stored;
+
+do $transition$
+begin
+    -- Mesma constraint que `osm_id bigint unique` gera em banco vazio.
+    if not exists (select 1 from pg_constraint
+        where conrelid = 'public.road_segments'::regclass and conname = 'road_segments_osm_id_key') then
+        alter table public.road_segments
+            add constraint road_segments_osm_id_key unique (osm_id);
+    end if;
+    if exists (select 1 from information_schema.columns where table_schema='public'
+        and table_name='road_segments' and column_name='context_version') then
+        alter table public.road_segments alter column context_version drop not null;
+    end if;
+end
+$transition$;
+"""
 
 
 CORE_SCHEMA = r"""
@@ -29,13 +97,10 @@ CORE_SCHEMA = r"""
 -- evento georreferenciado → contexto / risco / ação / previsão / revisão.
 -- Toda saída guarda model_version e dataset_version para rastreabilidade.
 
-create extension if not exists postgis;
-create extension if not exists pgcrypto;
-
 -- ---------------------------------------------------------------- utilitários
 
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = pg_catalog, public as $$
 begin
     new.updated_at = now();
     return new;
@@ -134,19 +199,6 @@ create table if not exists public.missions (
     started_at timestamptz,
     finished_at timestamptz,
     route geography(LineString, 4326),
-    created_at timestamptz not null default now()
-);
-
--- Rede viária importada do OSM (apenas a área piloto).
-create table if not exists public.road_segments (
-    id uuid primary key default gen_random_uuid(),
-    osm_id bigint unique,
-    name text,
-    highway text,
-    jurisdiction text,
-    geom geometry(LineString, 4326) not null,
-    geog geography(LineString, 4326) generated always as (geom::geography) stored,
-    attributes jsonb not null default '{}'::jsonb,
     created_at timestamptz not null default now()
 );
 
@@ -268,8 +320,24 @@ create table if not exists public.reviews (
 
 -- ---------------------------------------------------------------- índices
 
-create index if not exists road_segments_geom_gix on public.road_segments using gist (geom);
-create index if not exists road_segments_geog_gix on public.road_segments using gist (geog);
+do $index_transition$
+begin
+    if not exists (
+        select 1 from pg_indexes where schemaname='public' and tablename='road_segments'
+        and lower(indexdef) like '%using gist (geom)%'
+    ) then
+        create index road_segments_geom_gix on public.road_segments using gist (geom);
+    end if;
+    -- O índice legado de expressão `(geometry)::geography` não atende consultas
+    -- sobre a coluna `geog`, que é o que snap_to_road usa.
+    if not exists (
+        select 1 from pg_indexes where schemaname='public' and tablename='road_segments'
+        and lower(indexdef) like '%using gist (geog)%'
+    ) then
+        create index road_segments_geog_gix on public.road_segments using gist (geog);
+    end if;
+end
+$index_transition$;
 create index if not exists captures_point_gix on public.captures using gist (point);
 create index if not exists captures_captured_at_idx on public.captures (captured_at desc);
 create index if not exists captures_mission_idx on public.captures (mission_id, captured_at desc);
@@ -285,8 +353,7 @@ create index if not exists predictions_event_idx on public.predictions (event_id
 create index if not exists reviews_event_idx on public.reviews (event_id, created_at desc);
 create index if not exists missions_route_gix on public.missions using gist (route);
 
-drop trigger if exists events_set_updated_at on public.events;
-create trigger events_set_updated_at
+create or replace trigger events_set_updated_at
 before update on public.events
 for each row execute function public.set_updated_at();
 
@@ -302,12 +369,12 @@ create or replace function public.snap_to_road(
     distance_m double precision,
     snapped_point geography
 )
-language sql stable set search_path = public as $fn$
+language sql stable set search_path = pg_catalog, public, extensions as $fn$
     select rs.id,
-           st_distance(p_point, rs.geog),
-           st_closestpoint(rs.geom, p_point::geometry)::geography
+           extensions.st_distance(p_point, rs.geog),
+           extensions.st_closestpoint(rs.geom, p_point::geometry)::geography
     from public.road_segments rs
-    where st_dwithin(p_point, rs.geog, p_max_distance_m)
+    where extensions.st_dwithin(p_point, rs.geog, p_max_distance_m)
     order by p_point::geometry <-> rs.geom
     limit 1;
 $fn$;
@@ -319,12 +386,16 @@ create or replace function public.events_near(
     p_radius_m double precision default 500,
     p_limit integer default 100
 ) returns setof public.events
-language sql stable set search_path = public as $fn$
+language sql stable set search_path = pg_catalog, public, extensions as $fn$
     select e.*
     from public.events e
     where e.point is not null
-      and st_dwithin(e.point, st_point(p_lon, p_lat, 4326)::geography, p_radius_m)
-    order by st_distance(e.point, st_point(p_lon, p_lat, 4326)::geography)
+      and extensions.st_dwithin(
+          e.point, extensions.st_point(p_lon, p_lat, 4326)::geography, p_radius_m
+      )
+    order by extensions.st_distance(
+        e.point, extensions.st_point(p_lon, p_lat, 4326)::geography
+    )
     limit p_limit;
 $fn$;
 
@@ -359,6 +430,7 @@ grant select, insert, update, delete on public.audit_log, public.dataset_version
     public.events, public.event_context, public.risk_assessments, public.predictions,
     public.reviews to service_role;
 
+revoke all on function public.set_updated_at() from public, anon, authenticated;
 revoke all on function public.snap_to_road(geography, double precision)
     from public, anon, authenticated;
 revoke all on function public.events_near(double precision, double precision, double precision, integer)
@@ -368,52 +440,55 @@ grant execute on function public.events_near(double precision, double precision,
     to service_role;
 """
 
-# Ordem inversa da criação: dependentes primeiro, catálogos por último.
-DROP_ORDER = (
-    "reviews",
-    "predictions",
-    "risk_assessments",
-    "event_context",
-    "events",
-    "detections",
-    "sensor_assets",
-    "captures",
-    "road_segments",
-    "missions",
-    "devices",
-    "responsibility_rules",
-    "actions_catalog",
-    "model_versions",
-    "dataset_versions",
-    "audit_log",
-)
 
+LEGACY_HARDENING = r"""
+-- Tabelas legadas de 0001_core ficaram expostas ao Data API sem RLS e com
+-- DELETE/TRUNCATE para anon e authenticated (MASTER_PLAN §17: RLS em toda tabela
+-- exposta). Nenhuma linha é alterada: só RLS e privilégios. Sem policies, o acesso
+-- fica restrito ao owner e a service_role até a integração Auth/PWA.
+do $legacy$
+declare
+    t text;
+begin
+    foreach t in array array['alembic_version', 'app_users', 'data_sources', 'organizations',
+                             'points_of_interest', 'problem_types'] loop
+        if to_regclass('public.' || t) is not null then
+            execute format('alter table public.%I enable row level security', t);
+            execute format('revoke all on public.%I from anon, authenticated', t);
+        end if;
+    end loop;
+end
+$legacy$;
+"""
 
 def _run(sql: str) -> None:
     """Emite SQL bruto, online ou em modo --sql.
 
     Não passa por `op.execute()`/`text()` de propósito: o DDL tem casts `::` e
     corpos de função entre `$$`, que o SQLAlchemy leria como bind parameters.
+    Também não usa `exec_driver_sql()`: ele envia parâmetros ao psycopg, que então
+    trata `%` de `like '%...%'` e `format('%I')` como placeholder. Sem parâmetros,
+    o cursor DBAPI executa o texto literal.
     """
     context = op.get_context()
     if context.as_sql:
         context.impl.static_output(sql)
     else:
-        op.get_bind().exec_driver_sql(sql)
+        cursor = op.get_bind().connection.dbapi_connection.cursor()
+        try:
+            cursor.execute(sql)
+        finally:
+            cursor.close()
 
 
 def upgrade() -> None:
+    _run(ROAD_SEGMENTS_TRANSITION)
     _run(CORE_SCHEMA)
+    _run(LEGACY_HARDENING)
 
 
 def downgrade() -> None:
-    _run(
-        "drop function if exists public.events_near("
-        "double precision, double precision, double precision, integer);"
+    raise RuntimeError(
+        "0002 preserva tabelas legadas e pode receber dados; restaure o backup "
+        "lógico ou aplique uma revisão forward-only em vez de apagar objetos"
     )
-    _run("drop function if exists public.snap_to_road(geography, double precision);")
-    for table in DROP_ORDER:
-        _run(f"drop table if exists public.{table} cascade;")
-    _run("drop function if exists public.set_updated_at();")
-    # postgis e pgcrypto não são removidos: outros objetos do projeto dependem
-    # deles e derrubar uma extensão inteira num downgrade é destrutivo demais.

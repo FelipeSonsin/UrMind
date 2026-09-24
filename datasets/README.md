@@ -191,6 +191,38 @@ com a versão anterior do `dataset_readiness.json`, que declarou por semanas
 disco, com adaptador e checksum oficial conferido. Ao mudar qualquer coisa sobre uma fonte,
 mude o catálogo e regenere; não edite o JSON.
 
+## Publicação no Hugging Face
+
+O MASTER_PLAN não exige Hugging Face: ele é cópia de distribuição, nunca fonte de verdade
+nem armazenamento obrigatório. Só se publica o que tem licença de redistribuição confirmada
+e uso previsto; o resto fica referenciado pela fonte oficial.
+
+A publicação não entra nos manifestos de propósito: `manifests/rdd2022.json` é a source
+definition cujo SHA-256 está fixado em `metadata/artifact_contract.yaml` e na revisão humana
+de `reports/rdd2022_split_authorization_review.json` — editá-lo invalidaria a autorização.
+Cada repo é citado pela revisão, que é imutável; a contagem abaixo é daquela revisão,
+verificada em 2026-09-16 arquivo a arquivo contra `datasets/raw/` (tamanho + SHA-256 do LFS
+ou SHA-1 do blob git), com 0 divergências.
+
+| Fonte | Hugging Face @ revisão | Arquivos `data/` | Bytes | Escopo |
+|---|---|---|---|---|
+| `rdd2022` | [FelipeS09/urmind-rdd2022](https://huggingface.co/datasets/FelipeS09/urmind-rdd2022) @ `d9f37c430d051ea0f217e79a6588e969ef014f95` | 70.644 | 10.707.609.060 | só o subset autorizado (35.322 imagens + XML de `manifests/rdd2022_subset_selection.jsonl`); `splits/` idênticos a `datasets/splits/rdd2022_subset_*.txt` |
+| `rtk_br` | [FelipeS09/urmind-rtk-br](https://huggingface.co/datasets/FelipeS09/urmind-rtk-br) @ `fc33db0fc281dcffb1976e18714fde97517a2a60` | 1.405 | 104.842.893 | espelho integral, CC BY 4.0 |
+| `univali_br` | [FelipeS09/urmind-univali-br](https://huggingface.co/datasets/FelipeS09/urmind-univali-br) @ `8792a0478d8b8cf81a900c53e8a02140a4314112` | 8.940 | 251.473.314 | espelho integral de `raw/univali_br/v1`, CC BY 4.0 |
+
+| Fonte | Hugging Face | Motivo |
+|---|---|---|
+| `project_sidewalk` | não publicar | já está no Hugging Face oficial (`projectsidewalk/...`, revisão fixada em `sources.csv`); espelhar seria duplicata. Imagem de origem GSV sem direito de redistribuição demonstrado |
+| `rampnet` | não publicar | mesmo caso do `project_sidewalk` |
+| `global_streetscapes` | não publicar | já está no Hugging Face oficial (`NUS-UAL`); bloqueio `ATTRIBUTION_INCOMPLETE` em `metadata/licenses.md` |
+| `urban_community` | **proibido** | `BLOCKED_LICENSE / BLOCKED_PROVENANCE`: imagens do Open Images sob CC BY 2.0 individual, 718 sem origem |
+| `camber` | não publicar | `EXTERNAL_HEAVY_MEDIA_LICENSE_NOT_ESTABLISHED`; o CSV CC BY 4.0 já tem DOI no Zenodo e é saída de modelo, só referência |
+| `bdd100k` | não publicar | fonte de referência, sem uso de treino previsto; licença acadêmica exige aviso em cada cópia e não há checksum oficial válido |
+
+Antes de publicar ou atualizar um repo, compare arquivo a arquivo com o local (tamanho,
+SHA-256 do LFS, SHA-1 do blob) e envie só o que diverge. Nunca crie um segundo repo para a
+mesma fonte.
+
 ## Dado existente não é dado treinável
 
 São perguntas diferentes e o relatório separa as colunas:

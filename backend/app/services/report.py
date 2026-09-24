@@ -20,9 +20,113 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from app.config import BACKEND_DIR
 from app.schemas.core import UrmindClass
+from app.schemas.issue_taxonomy import TAXONOMY_VERSION, get_issue, model_may_emit
+from app.schemas.public import (
+    EventDetailPublic,
+    PotentialConsequencePublic,
+    UrbanAnalysisProvenancePublic,
+    UrbanAnalysisPublic,
+    UrbanIdentificationPublic,
+)
 from app.services.risk import RiskResult, Severity
 
-__all__ = ["ActionSuggestion", "ReportInput", "ResponsibilitySuggestion", "render_event_report"]
+__all__ = [
+    "ActionSuggestion",
+    "ReportInput",
+    "ResponsibilitySuggestion",
+    "build_urban_analysis",
+    "render_event_report",
+]
+
+
+def build_urban_analysis(detail: EventDetailPublic) -> UrbanAnalysisPublic:
+    """Render safe public facts; never reassess risk, infer causes or select an agency.
+
+    `assessment_source` is set by the public adapter only for persisted Phase 5
+    output. Legacy assessments remain visible elsewhere, but cannot become this
+    contract's ordinal assessment. No provider calls or current-time inputs occur.
+    """
+    issue = get_issue(detail.urmind_class)
+    risk = detail.risk if detail.risk and detail.risk.assessment_source == "phase5" else None
+    label = issue.display_name_pt if issue else "Classe não identificada na taxonomia"
+    limitations = [
+        "Análise descritiva de dados registrados; não substitui inspeção técnica.",
+        "A imagem não mede profundidade, dimensões físicas ou extensão real do dano.",
+        "Causas não determinadas: não há evidência causal neste contrato.",
+        "Consequências potenciais são condicionais, não previsões nem probabilidades.",
+    ]
+    if issue is None:
+        description = "O registro não possui uma classe reconhecida pela taxonomia atual."
+        diagnosis = "Diagnóstico indisponível; requer classificação e revisão."
+    elif not model_may_emit(issue.issue_code):
+        description = f"Categoria registrada: {label}. Não há detector habilitado para esta classe."
+        diagnosis = "Categoria candidata; reconhecimento visual automático não disponível."
+        limitations.append("Classe sem suporte de modelo; o registro não comprova detecção visual.")
+    else:
+        description = f"O registro contém a classificação visual: {label}."
+        diagnosis = (
+            f"Descrição da categoria na taxonomia: {issue.visual_definition} "
+            "A classificação não confirma causa, dimensão física ou gravidade."
+        )
+    if issue and issue.model_support_status.value == "EXPERIMENTAL_MODEL":
+        limitations.append(
+            "Classe com suporte experimental; o modelo não está validado para uso operacional."
+        )
+    if detail.model_version is None:
+        limitations.append("Versão do modelo não disponível; origem visual não verificável.")
+    if risk is None:
+        limitations.append(
+            "Avaliação persistida da Fase 5 não disponível; risco e prioridade ausentes."
+        )
+    else:
+        limitations.extend(risk.limitations)
+        if not risk.thresholds_are_calibrated:
+            limitations.append("Regras ordinais provisórias, sem calibração de probabilidade.")
+
+    # The domains come only from the stored assessment. Taxonomy applicability
+    # is never substituted for observed context or an event impact assessment.
+    consequences = [
+        PotentialConsequencePublic(
+            domain=domain,
+            statement=(
+                f"Se a ocorrência for confirmada e houver exposição, pode haver impacto "
+                f"no domínio {domain}; a ocorrência desse impacto não foi demonstrada."
+            ),
+        )
+        for domain in dict.fromkeys(risk.impact if risk else [])
+    ]
+    return UrbanAnalysisPublic(
+        identification=UrbanIdentificationPublic(
+            issue_code=detail.urmind_class,
+            display_name=label,
+            family=issue.family.value if issue else None,
+            model_support_status=issue.model_support_status.value if issue else None,
+            visual_confidence=detail.visual_confidence,
+            reviewed=detail.reviewed,
+        ),
+        description=description,
+        diagnosis=diagnosis,
+        potential_consequences=consequences,
+        possible_causes=[],
+        severity=risk.severity if risk else None,
+        risk_level=risk.risk_level if risk else None,
+        priority_lane=risk.priority_lane if risk else None,
+        action=detail.action,
+        responsibility=detail.responsibility,
+        responsibility_domain=issue.responsibility_domain if issue else None,
+        context=detail.context,
+        limitations=list(dict.fromkeys(limitations)),
+        provenance=UrbanAnalysisProvenancePublic(
+            taxonomy_version=TAXONOMY_VERSION,
+            model_version=detail.model_version,
+            model_stage=detail.model_stage,
+            dataset_version=detail.dataset_version,
+            ruleset_version=risk.ruleset_version if risk else None,
+            assessed_at=risk.assessed_at if risk else None,
+            assessment_source="persisted_phase5" if risk else "unavailable",
+        ),
+    )
+
 
 TEMPLATES_DIR = BACKEND_DIR / "app" / "templates"
 TEMPLATE_NAME = "event_report_pt_br.j2"
@@ -119,9 +223,7 @@ def render_event_report(payload: ReportInput) -> str:
             "a um detector promovido"
         )
     if payload.latitude is None or payload.longitude is None:
-        limitations.append(
-            "sem coordenada, o evento não é georreferenciável e não entra no mapa"
-        )
+        limitations.append("sem coordenada, o evento não é georreferenciável e não entra no mapa")
     if payload.address is not None:
         limitations.append(
             "o endereço é aproximado: vem do objeto mais próximo na base cartográfica, "

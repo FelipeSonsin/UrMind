@@ -1,0 +1,4586 @@
+{
+  "status": "CANDIDATE_HOLDOUT",
+  "authorized_for_test": false,
+  "source": "https://doi.org/10.5281/zenodo.21370736",
+  "source_version": "1.0.0",
+  "source_archive_url": "https://zenodo.org/records/21370736/files/IRD-Dataset_v1.0.0_images_Dashcam.zip?download=1",
+  "source_archive_md5": "eade1f27a43cff48276fb489b0572f7d",
+  "source_archive_bytes": 2505474989,
+  "selection_rule": "Dash index divisible by 4 OR label contains D20/D40 OR empty label with even index",
+  "selected_images": 439,
+  "selected_image_bytes": 1052254668,
+  "source_class_instances": {
+    "0": 342,
+    "1": 133,
+    "2": 64,
+    "3": 174,
+    "4": 0
+  },
+  "empty_labels": 104,
+  "checksums_sha256": "619249d7747b391650046c47011b7a538f599bdb593790e64f04d8ae6466236b",
+  "labels_zip_sha256": "c120ac89fb3d0d5fb9d6dcd8d6ed504761eb85abb1609f3af7615a319e10d2ff",
+  "gps_zip_sha256": "b1e5731eb8b6b0fb67f32462f1b93ba977576615190aa16f1476e0c622e01564",
+  "images": [
+    {
+      "image": "images/Dash_0001.jpg",
+      "sha256": "7d2d26c36a7511c01b0db02fc154427dc91eb06fc7a1386732643fd7a5dadec1",
+      "bytes": 1978095,
+      "label": "labels_bbox/Dash_0001.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0001.jpg"
+    },
+    {
+      "image": "images/Dash_0002.jpg",
+      "sha256": "3f7960fa034bc67868022435373fcfa472762a705700061fa76c4df217180ae8",
+      "bytes": 2240192,
+      "label": "labels_bbox/Dash_0002.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0002.jpg"
+    },
+    {
+      "image": "images/Dash_0003.jpg",
+      "sha256": "3c0e6384c34cdf7a2d8c1e1a847e9673379d4d456e3724ccade0acc3d7f3870e",
+      "bytes": 1970892,
+      "label": "labels_bbox/Dash_0003.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0003.jpg"
+    },
+    {
+      "image": "images/Dash_0004.jpg",
+      "sha256": "d6e0b71bed22986bc7c53670c42f5a5d6de704be551025fba4334edd7490373c",
+      "bytes": 2917988,
+      "label": "labels_bbox/Dash_0004.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0004.jpg"
+    },
+    {
+      "image": "images/Dash_0008.jpg",
+      "sha256": "fbb0a0bd57805fc5ea12d366d24034ee75a0f35b7bd05700af8a03cca99390c7",
+      "bytes": 2769321,
+      "label": "labels_bbox/Dash_0008.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0008.jpg"
+    },
+    {
+      "image": "images/Dash_0012.jpg",
+      "sha256": "8830fb0e28bf6225eb3131e6e8b89ac283605975ceb4d995f67d3186b0e7bee4",
+      "bytes": 2412871,
+      "label": "labels_bbox/Dash_0012.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0012.jpg"
+    },
+    {
+      "image": "images/Dash_0014.jpg",
+      "sha256": "85ac5fed087145e986a3871e594db436a5887b92205641353f43448aef61640f",
+      "bytes": 3000734,
+      "label": "labels_bbox/Dash_0014.txt",
+      "source_class_ids": [
+        2,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0014.jpg"
+    },
+    {
+      "image": "images/Dash_0016.jpg",
+      "sha256": "4440e722a3d86f9058e991ee8eb07830d8302bec107856f2fce4775e203740d8",
+      "bytes": 2459642,
+      "label": "labels_bbox/Dash_0016.txt",
+      "source_class_ids": [
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0016.jpg"
+    },
+    {
+      "image": "images/Dash_0020.jpg",
+      "sha256": "6a500e8b9a5dfbca6a558af40c4e50b808f8b39ec1300ebb73fefc10b2d64d6f",
+      "bytes": 3042467,
+      "label": "labels_bbox/Dash_0020.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0020.jpg"
+    },
+    {
+      "image": "images/Dash_0024.jpg",
+      "sha256": "c88ba83d26a54a61a2f991c14feb9d60d2543c8e0585f7a3341cc7f08f891edd",
+      "bytes": 3078605,
+      "label": "labels_bbox/Dash_0024.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0024.jpg"
+    },
+    {
+      "image": "images/Dash_0028.jpg",
+      "sha256": "7b14c78bcc2bcedfdee2b1989e9ddeb5ca42736a33933ae58ebdcb2a8fc23cec",
+      "bytes": 3148621,
+      "label": "labels_bbox/Dash_0028.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0028.jpg"
+    },
+    {
+      "image": "images/Dash_0032.jpg",
+      "sha256": "fdd6525b36aed5787f5f41d2dbcca55b531a773bf659f86ffc7c107b88bc8caf",
+      "bytes": 3065568,
+      "label": "labels_bbox/Dash_0032.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0032.jpg"
+    },
+    {
+      "image": "images/Dash_0036.jpg",
+      "sha256": "20bdc0727b13b6a0d855aa9cefbde6c89bb8f4ca5352e4654b6809f6e4b4e643",
+      "bytes": 3050502,
+      "label": "labels_bbox/Dash_0036.txt",
+      "source_class_ids": [
+        1,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0036.jpg"
+    },
+    {
+      "image": "images/Dash_0038.jpg",
+      "sha256": "5b0c97baccc84df944cc3d1512d0a442c464941620b52959f84414ce1865bde5",
+      "bytes": 3045145,
+      "label": "labels_bbox/Dash_0038.txt",
+      "source_class_ids": [
+        2,
+        1,
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0038.jpg"
+    },
+    {
+      "image": "images/Dash_0039.jpg",
+      "sha256": "9d0a84894b37e6f262126ebaf3a764494d48692bbda970c21e99fa7056476487",
+      "bytes": 3365761,
+      "label": "labels_bbox/Dash_0039.txt",
+      "source_class_ids": [
+        3,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0039.jpg"
+    },
+    {
+      "image": "images/Dash_0040.jpg",
+      "sha256": "806aaa5ceffec5e598bc0fdb8e73729d8780716907a82968af379a7c24a7c0db",
+      "bytes": 3064344,
+      "label": "labels_bbox/Dash_0040.txt",
+      "source_class_ids": [
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0040.jpg"
+    },
+    {
+      "image": "images/Dash_0044.jpg",
+      "sha256": "600bb22083fb9c0c67bb119d3f6b2a308982a0cc094db612c97b7fa83ccef09e",
+      "bytes": 2894046,
+      "label": "labels_bbox/Dash_0044.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0044.jpg"
+    },
+    {
+      "image": "images/Dash_0048.jpg",
+      "sha256": "5ea67d1fee4c2cbff48c0b88c95eeb4f61816b55898c760e1d1149df3d375848",
+      "bytes": 2646758,
+      "label": "labels_bbox/Dash_0048.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0048.jpg"
+    },
+    {
+      "image": "images/Dash_0052.jpg",
+      "sha256": "624708378a75231be46d9368dbb3b54095595331e5a78f83ae8409b75e7f696e",
+      "bytes": 2016177,
+      "label": "labels_bbox/Dash_0052.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0052.jpg"
+    },
+    {
+      "image": "images/Dash_0056.jpg",
+      "sha256": "ca6e39fde8c6e87444752691d00af2460c3bc4bba4ae478539eef14e6150367f",
+      "bytes": 2317690,
+      "label": "labels_bbox/Dash_0056.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0056.jpg"
+    },
+    {
+      "image": "images/Dash_0060.jpg",
+      "sha256": "e12377190162f87ab6eb073e462e138a111cba36db19720deea9de4c9447cdd5",
+      "bytes": 2545859,
+      "label": "labels_bbox/Dash_0060.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0060.jpg"
+    },
+    {
+      "image": "images/Dash_0061.jpg",
+      "sha256": "0f5178f4350532beb0694b1554f321bba09dd5abe665156d3a38b651b6a4a8ef",
+      "bytes": 2131082,
+      "label": "labels_bbox/Dash_0061.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0061.jpg"
+    },
+    {
+      "image": "images/Dash_0064.jpg",
+      "sha256": "a689f52f382b288ba2add154b8d02a09771ed40dfd001d3be96920cc5dd1433a",
+      "bytes": 2459604,
+      "label": "labels_bbox/Dash_0064.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0064.jpg"
+    },
+    {
+      "image": "images/Dash_0066.jpg",
+      "sha256": "65ba058f2a3d4bd81a08327b85bb423dbb7bbdb4cf180c1192ec58b7ff502a1b",
+      "bytes": 2560098,
+      "label": "labels_bbox/Dash_0066.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0066.jpg"
+    },
+    {
+      "image": "images/Dash_0068.jpg",
+      "sha256": "9aab660e0835c9e12609b102be0ae26e92bced83019d2f1055eae284b51800bb",
+      "bytes": 1871335,
+      "label": "labels_bbox/Dash_0068.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0068.jpg"
+    },
+    {
+      "image": "images/Dash_0072.jpg",
+      "sha256": "a47bc9d339fade8c2dd0629c91b37219b42cb9781f16dabcd769cc906c52d193",
+      "bytes": 1974746,
+      "label": "labels_bbox/Dash_0072.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0072.jpg"
+    },
+    {
+      "image": "images/Dash_0073.jpg",
+      "sha256": "4afcd9a6739ea999fbf3add42d77452f5bc81cea15b8465afd25e73f423084d3",
+      "bytes": 2646304,
+      "label": "labels_bbox/Dash_0073.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0073.jpg"
+    },
+    {
+      "image": "images/Dash_0074.jpg",
+      "sha256": "653837f5d4974936ae1a804cda621bf99affc95f0924a64359b4298072b0941f",
+      "bytes": 2581530,
+      "label": "labels_bbox/Dash_0074.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0074.jpg"
+    },
+    {
+      "image": "images/Dash_0075.jpg",
+      "sha256": "e323c57b34a07c180f1f67eda5832ff324ea01e5b048be740f1cd3e929c9090d",
+      "bytes": 2661644,
+      "label": "labels_bbox/Dash_0075.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0075.jpg"
+    },
+    {
+      "image": "images/Dash_0076.jpg",
+      "sha256": "151cb0829c6c57c93b674c5548bdeea89b507b3694246a2b229b07f692554628",
+      "bytes": 2364545,
+      "label": "labels_bbox/Dash_0076.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0076.jpg"
+    },
+    {
+      "image": "images/Dash_0077.jpg",
+      "sha256": "f6e889b906129cf7abfca27f35ee5ed636dff74645579f2abb5381013af9818f",
+      "bytes": 2546955,
+      "label": "labels_bbox/Dash_0077.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0077.jpg"
+    },
+    {
+      "image": "images/Dash_0078.jpg",
+      "sha256": "aa7e8d7bea8564f9075a7b4e61a651993894cf4bd383dd537932e55bc0bc35c8",
+      "bytes": 2103555,
+      "label": "labels_bbox/Dash_0078.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0078.jpg"
+    },
+    {
+      "image": "images/Dash_0079.jpg",
+      "sha256": "c2a27b454e5646a29390f59901a006cd5999422adf66e8bf8c058aa37f3c8fec",
+      "bytes": 2560103,
+      "label": "labels_bbox/Dash_0079.txt",
+      "source_class_ids": [
+        0,
+        0,
+        3,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0079.jpg"
+    },
+    {
+      "image": "images/Dash_0080.jpg",
+      "sha256": "c6e6fc93c585481969226125b59512dca502787810b15586ee0c82edb118ccab",
+      "bytes": 2006692,
+      "label": "labels_bbox/Dash_0080.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0080.jpg"
+    },
+    {
+      "image": "images/Dash_0081.jpg",
+      "sha256": "99688d8272ab88c85da6bfd9942cdba2798b7c53c397eabcbbfcd2d738a37ff0",
+      "bytes": 1818045,
+      "label": "labels_bbox/Dash_0081.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0081.jpg"
+    },
+    {
+      "image": "images/Dash_0082.jpg",
+      "sha256": "d9636c31052d08ebb3c3aebc07977076762217dc70417d18246ddd3ea726472e",
+      "bytes": 2610278,
+      "label": "labels_bbox/Dash_0082.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0082.jpg"
+    },
+    {
+      "image": "images/Dash_0083.jpg",
+      "sha256": "7572ff090ca9739669cb8c65de5dd449a7a374f2b1ac69287734344639490df4",
+      "bytes": 2021977,
+      "label": "labels_bbox/Dash_0083.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0083.jpg"
+    },
+    {
+      "image": "images/Dash_0084.jpg",
+      "sha256": "b136a593ae4d1e990e8379d93af9798c9ce45118082f0ca183f88c7b5ce90121",
+      "bytes": 1767742,
+      "label": "labels_bbox/Dash_0084.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0084.jpg"
+    },
+    {
+      "image": "images/Dash_0085.jpg",
+      "sha256": "524c42959d1ba45c31540e31e0d5206326078c39c801addbf22aa66777367646",
+      "bytes": 1831933,
+      "label": "labels_bbox/Dash_0085.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0085.jpg"
+    },
+    {
+      "image": "images/Dash_0086.jpg",
+      "sha256": "dc0b51af0b829bf74842c73bb029e194ffece32b80c83b04bc5983f223557416",
+      "bytes": 1975852,
+      "label": "labels_bbox/Dash_0086.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0086.jpg"
+    },
+    {
+      "image": "images/Dash_0087.jpg",
+      "sha256": "256f35cb83ffcd36d1a0c4d295352a3552dd7f446c65f6a758807ddabee52079",
+      "bytes": 2312905,
+      "label": "labels_bbox/Dash_0087.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0087.jpg"
+    },
+    {
+      "image": "images/Dash_0088.jpg",
+      "sha256": "9a930f50ebc7177cf971cce0029e81f5d51ea65426dc636931dab87596115276",
+      "bytes": 2152683,
+      "label": "labels_bbox/Dash_0088.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0088.jpg"
+    },
+    {
+      "image": "images/Dash_0090.jpg",
+      "sha256": "bd7fec2f19075b9a4b52089e93e71826ff37d0a3893004c451ee180d5c057798",
+      "bytes": 2220357,
+      "label": "labels_bbox/Dash_0090.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0090.jpg"
+    },
+    {
+      "image": "images/Dash_0092.jpg",
+      "sha256": "0a10e69c8716a84043dfbd22bc3de8042b3d0f98c2eec71a05ef75260a48503a",
+      "bytes": 1847691,
+      "label": "labels_bbox/Dash_0092.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0092.jpg"
+    },
+    {
+      "image": "images/Dash_0096.jpg",
+      "sha256": "bd67e6741f85dbfc87ef06b90674e6551598db45f2d2fd9ace547e89311f1ab3",
+      "bytes": 2484573,
+      "label": "labels_bbox/Dash_0096.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0096.jpg"
+    },
+    {
+      "image": "images/Dash_0097.jpg",
+      "sha256": "592c74ad1c84a78140c3f90e796d784bffe636ca06bc874ad022939376b7cdd8",
+      "bytes": 2686966,
+      "label": "labels_bbox/Dash_0097.txt",
+      "source_class_ids": [
+        0,
+        3,
+        1
+      ],
+      "gps_image_name": "Dash_0097.jpg"
+    },
+    {
+      "image": "images/Dash_0100.jpg",
+      "sha256": "d99970ce0c71d6d215c6e5a8ba5a930a7211d30aa2b26f992aa35062414f9589",
+      "bytes": 2817191,
+      "label": "labels_bbox/Dash_0100.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0100.jpg"
+    },
+    {
+      "image": "images/Dash_0104.jpg",
+      "sha256": "6161f9b7e5c014424bd0934c0f014bda555bddfa24de2fd47cb4df3fe2dda62d",
+      "bytes": 2575335,
+      "label": "labels_bbox/Dash_0104.txt",
+      "source_class_ids": [
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0104.jpg"
+    },
+    {
+      "image": "images/Dash_0108.jpg",
+      "sha256": "cc4168522331cdb7ebd3cd137981b97be6d9c35db5a3361d363bb642f27dd5d5",
+      "bytes": 2586190,
+      "label": "labels_bbox/Dash_0108.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0108.jpg"
+    },
+    {
+      "image": "images/Dash_0112.jpg",
+      "sha256": "53e63a898fe660fecac0f98e11efb4b097ff8e2f5dec73d3ad4fe6e555b7ed3a",
+      "bytes": 2890470,
+      "label": "labels_bbox/Dash_0112.txt",
+      "source_class_ids": [
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0112.jpg"
+    },
+    {
+      "image": "images/Dash_0114.jpg",
+      "sha256": "f517952394d9b8269b147839ba8a728336c95d9ab936bf5d1235e9a5d46d061d",
+      "bytes": 2539094,
+      "label": "labels_bbox/Dash_0114.txt",
+      "source_class_ids": [
+        0,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0114.jpg"
+    },
+    {
+      "image": "images/Dash_0115.jpg",
+      "sha256": "d60d400daae665f357f56d6934b457a0f14db80d0c63c8c40fa16437ed1887c7",
+      "bytes": 2877338,
+      "label": "labels_bbox/Dash_0115.txt",
+      "source_class_ids": [
+        2,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0115.jpg"
+    },
+    {
+      "image": "images/Dash_0116.jpg",
+      "sha256": "3bc197e3139b8a203cc6f9b64067541eb707e1026006bd082392a03d8f6ffad3",
+      "bytes": 2679048,
+      "label": "labels_bbox/Dash_0116.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0116.jpg"
+    },
+    {
+      "image": "images/Dash_0119.jpg",
+      "sha256": "eae5b4891f53c584824fff9c86b93469e1ba3e91fc445295b1e73cef8623e58a",
+      "bytes": 2517715,
+      "label": "labels_bbox/Dash_0119.txt",
+      "source_class_ids": [
+        3,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0119.jpg"
+    },
+    {
+      "image": "images/Dash_0120.jpg",
+      "sha256": "00aba173e64a1c98133917f4cba898ce7b4179dbac5a6362e9230051afd3fa43",
+      "bytes": 2303717,
+      "label": "labels_bbox/Dash_0120.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0120.jpg"
+    },
+    {
+      "image": "images/Dash_0121.jpg",
+      "sha256": "485f5c5868ebbc924ab16a438de860a39abbcf108a3981d049b83fe8af2e5067",
+      "bytes": 2834930,
+      "label": "labels_bbox/Dash_0121.txt",
+      "source_class_ids": [
+        0,
+        0,
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0121.jpg"
+    },
+    {
+      "image": "images/Dash_0123.jpg",
+      "sha256": "124cdee3897aba6ea910a99ccb3134400840559949cb64caf2e22dbce639f7aa",
+      "bytes": 2653453,
+      "label": "labels_bbox/Dash_0123.txt",
+      "source_class_ids": [
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0123.jpg"
+    },
+    {
+      "image": "images/Dash_0124.jpg",
+      "sha256": "f89fca2b069040a754169c552631ccbfa064fc144e80a348cb2a2cd03b363ef9",
+      "bytes": 2437655,
+      "label": "labels_bbox/Dash_0124.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0124.jpg"
+    },
+    {
+      "image": "images/Dash_0128.jpg",
+      "sha256": "2daa5ebf920cf2125660ba3db5df792c8aaaab8fed672535d1cd043224849f28",
+      "bytes": 2154417,
+      "label": "labels_bbox/Dash_0128.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0128.jpg"
+    },
+    {
+      "image": "images/Dash_0132.jpg",
+      "sha256": "6b0cda821f08c09f61f20775bb2cf6b23132e01e4db822411a5cfe35377bcb10",
+      "bytes": 2013951,
+      "label": "labels_bbox/Dash_0132.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0132.jpg"
+    },
+    {
+      "image": "images/Dash_0136.jpg",
+      "sha256": "b291480b23f1fe7f66d933d140a5efe4d7e17d379c7b0de483ecb499c55333cf",
+      "bytes": 2007198,
+      "label": "labels_bbox/Dash_0136.txt",
+      "source_class_ids": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0136.jpg"
+    },
+    {
+      "image": "images/Dash_0140.jpg",
+      "sha256": "5439bc9d41f03eae111bde905458e4dd8a21bd085980d43955ab9c6971b80e55",
+      "bytes": 2103566,
+      "label": "labels_bbox/Dash_0140.txt",
+      "source_class_ids": [
+        3,
+        0,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0140.jpg"
+    },
+    {
+      "image": "images/Dash_0142.jpg",
+      "sha256": "eb0f588a74b1f892c6444d31720528d1f3bf6bc7a23ecdf0610b6f991916f769",
+      "bytes": 2225355,
+      "label": "labels_bbox/Dash_0142.txt",
+      "source_class_ids": [
+        0,
+        3,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0142.jpg"
+    },
+    {
+      "image": "images/Dash_0143.jpg",
+      "sha256": "2a189964cc2d1fb35792ffd996d4d074191c72a2e4469ac8f9ca6a7c70b6879b",
+      "bytes": 2170516,
+      "label": "labels_bbox/Dash_0143.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0143.jpg"
+    },
+    {
+      "image": "images/Dash_0144.jpg",
+      "sha256": "ace0c56ab8f4825f8ffb0ae31e369ecc345e207a58c71fddad1d965c40c674a0",
+      "bytes": 2150930,
+      "label": "labels_bbox/Dash_0144.txt",
+      "source_class_ids": [
+        0,
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0144.jpg"
+    },
+    {
+      "image": "images/Dash_0145.jpg",
+      "sha256": "e807ccd6efb854d8a3029260b290b87deebafec0c0183cce77aca34f7ef3cd43",
+      "bytes": 2478358,
+      "label": "labels_bbox/Dash_0145.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0145.jpg"
+    },
+    {
+      "image": "images/Dash_0147.jpg",
+      "sha256": "d4863d56f2440fbf9c97cbba71cd483354e2ab890e6860de1d07b4ee6ec26a4c",
+      "bytes": 2058848,
+      "label": "labels_bbox/Dash_0147.txt",
+      "source_class_ids": [
+        0,
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0147.jpg"
+    },
+    {
+      "image": "images/Dash_0148.jpg",
+      "sha256": "b2eeb845dd0565b259e69e538c1723414aad7fc9335b80be3607944282b908cd",
+      "bytes": 2147582,
+      "label": "labels_bbox/Dash_0148.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0148.jpg"
+    },
+    {
+      "image": "images/Dash_0149.jpg",
+      "sha256": "fc7f1727d0546ebbb5cb0c49ad0c7e329ae88b2a45b9af5b9d9ccf5487d80120",
+      "bytes": 2013429,
+      "label": "labels_bbox/Dash_0149.txt",
+      "source_class_ids": [
+        3,
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0149.jpg"
+    },
+    {
+      "image": "images/Dash_0150.jpg",
+      "sha256": "bb1debf470cb74253e8ae3dcd5bdfe8cc569264d5b5530f4d17c41f009bae422",
+      "bytes": 1847906,
+      "label": "labels_bbox/Dash_0150.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0150.jpg"
+    },
+    {
+      "image": "images/Dash_0152.jpg",
+      "sha256": "971fc45ea451f3936791f69d0920a8fa9bff3961c51da79cf97678c7d1784b49",
+      "bytes": 1553821,
+      "label": "labels_bbox/Dash_0152.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0152.jpg"
+    },
+    {
+      "image": "images/Dash_0154.jpg",
+      "sha256": "3264a43b9f976df5a8eea681deb6afb33a6dffdf8b5d86d6baf1dc99edcad196",
+      "bytes": 2127201,
+      "label": "labels_bbox/Dash_0154.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0154.jpg"
+    },
+    {
+      "image": "images/Dash_0156.jpg",
+      "sha256": "6b1ebaf510bb4818a7eb3182ff86f8a89a44eab32b6974decdaaae8da06ab211",
+      "bytes": 1712924,
+      "label": "labels_bbox/Dash_0156.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0156.jpg"
+    },
+    {
+      "image": "images/Dash_0158.jpg",
+      "sha256": "f5cc21ee59504dd59ba3f94b1c56accb3c022b9a0da35b74382bf638c62b3d52",
+      "bytes": 2444864,
+      "label": "labels_bbox/Dash_0158.txt",
+      "source_class_ids": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0158.jpg"
+    },
+    {
+      "image": "images/Dash_0160.jpg",
+      "sha256": "a36fe9a4d008286132193bf21a2953f1c485557c73359e193af97f888fd5daff",
+      "bytes": 2321818,
+      "label": "labels_bbox/Dash_0160.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0160.jpg"
+    },
+    {
+      "image": "images/Dash_0162.jpg",
+      "sha256": "99adf5c366deed6e488e6d374ac094ce374133cdcaaeb2bd0be59dc780e8faea",
+      "bytes": 2500977,
+      "label": "labels_bbox/Dash_0162.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0162.jpg"
+    },
+    {
+      "image": "images/Dash_0163.jpg",
+      "sha256": "a6c7b92057086effe6d382b5dc05cdb6e6ff43bda2ef1003ca7b548eb1b8e6c3",
+      "bytes": 3722261,
+      "label": "labels_bbox/Dash_0163.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0163.jpg"
+    },
+    {
+      "image": "images/Dash_0164.jpg",
+      "sha256": "e07c06cbcc5c7dee19ff8d51673d3198b59acd902e9bcfbf48d1049f21d798c1",
+      "bytes": 4005500,
+      "label": "labels_bbox/Dash_0164.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0164.jpg"
+    },
+    {
+      "image": "images/Dash_0165.jpg",
+      "sha256": "7698e74d49ec3359c28f9be66d5a72705ba9b55f72c43888f1ba186293afa901",
+      "bytes": 3942085,
+      "label": "labels_bbox/Dash_0165.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0165.jpg"
+    },
+    {
+      "image": "images/Dash_0166.jpg",
+      "sha256": "28084931b3a95aedd4823322f7341fe8d23ca2305fd0acee3a9c979f92b8ffa4",
+      "bytes": 3540795,
+      "label": "labels_bbox/Dash_0166.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0166.jpg"
+    },
+    {
+      "image": "images/Dash_0167.jpg",
+      "sha256": "7a2141a2271502f5a2c54fa3b41474428696dcdff8ef48c539947d12d4ee8e8d",
+      "bytes": 2503458,
+      "label": "labels_bbox/Dash_0167.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0167.jpg"
+    },
+    {
+      "image": "images/Dash_0168.jpg",
+      "sha256": "d28da9ac8e38a49fb18f6251c5bc38018d5289dd27de82f2370aa67d08c2cb55",
+      "bytes": 2509869,
+      "label": "labels_bbox/Dash_0168.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0168.jpg"
+    },
+    {
+      "image": "images/Dash_0170.jpg",
+      "sha256": "3f222e186bc322309ed56b89acab25b6354275b33d13cff3180bb794865ce930",
+      "bytes": 2995369,
+      "label": "labels_bbox/Dash_0170.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0170.jpg"
+    },
+    {
+      "image": "images/Dash_0172.jpg",
+      "sha256": "cfe1b72c24e43befd99e2041b20d771d3aa539bcdd84fa4e977b6e67595c1756",
+      "bytes": 1854382,
+      "label": "labels_bbox/Dash_0172.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0172.jpg"
+    },
+    {
+      "image": "images/Dash_0176.jpg",
+      "sha256": "6f94cc2662380b4ad2243dd43409ff841310d0f22376077c7d8953ff104e4d36",
+      "bytes": 2538157,
+      "label": "labels_bbox/Dash_0176.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0176.jpg"
+    },
+    {
+      "image": "images/Dash_0178.jpg",
+      "sha256": "e3fd3796fe3fd804415f691af95ba3f43241ff82eb9efea9d409b4b08ebb531b",
+      "bytes": 2439953,
+      "label": "labels_bbox/Dash_0178.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0178.jpg"
+    },
+    {
+      "image": "images/Dash_0180.jpg",
+      "sha256": "4044eee5c2f49552d835e6280337624b48f4e4ef2b5b4278131f8a9f838e7021",
+      "bytes": 3509223,
+      "label": "labels_bbox/Dash_0180.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0180.jpg"
+    },
+    {
+      "image": "images/Dash_0181.jpg",
+      "sha256": "22083177ae99a3f9bd8733146cbadd9a820b4e289a95f9d59b7079c8c836715d",
+      "bytes": 3253598,
+      "label": "labels_bbox/Dash_0181.txt",
+      "source_class_ids": [
+        1,
+        1,
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0181.jpg"
+    },
+    {
+      "image": "images/Dash_0182.jpg",
+      "sha256": "caec343028c3041bb781ed7a3a383b5de4b680e8a2c5342ab7a97b427ebff9d6",
+      "bytes": 2750222,
+      "label": "labels_bbox/Dash_0182.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0182.jpg"
+    },
+    {
+      "image": "images/Dash_0184.jpg",
+      "sha256": "6452ed266deca70271c68f2790e23e40485b86bf1542979d3265b65bcb3245d2",
+      "bytes": 3874494,
+      "label": "labels_bbox/Dash_0184.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0184.jpg"
+    },
+    {
+      "image": "images/Dash_0186.jpg",
+      "sha256": "4c64732c1828a0f7cfeac1d1685da3ac079f784f3413efd36ca3470880bec8d6",
+      "bytes": 2219517,
+      "label": "labels_bbox/Dash_0186.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0186.jpg"
+    },
+    {
+      "image": "images/Dash_0188.jpg",
+      "sha256": "6616a88ca2a010803ff37cf49a04cc7b2aa1a442d814c24cb6fa3a184c4b0569",
+      "bytes": 2778147,
+      "label": "labels_bbox/Dash_0188.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0188.jpg"
+    },
+    {
+      "image": "images/Dash_0192.jpg",
+      "sha256": "d9979dc7e9b82c7ced137748c153daa1e89457dbd5302e3e081e8294ceda6397",
+      "bytes": 2164830,
+      "label": "labels_bbox/Dash_0192.txt",
+      "source_class_ids": [
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0192.jpg"
+    },
+    {
+      "image": "images/Dash_0196.jpg",
+      "sha256": "9b2882405cf49e5c7b7adc83f22147b36c2ff369ae3b75438d2966df18f3e437",
+      "bytes": 2632089,
+      "label": "labels_bbox/Dash_0196.txt",
+      "source_class_ids": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0196.jpg"
+    },
+    {
+      "image": "images/Dash_0200.jpg",
+      "sha256": "3b13a53f64d219d6c69caf569b14c84ff2e4f2ddf00b5b51622899112bd7f012",
+      "bytes": 2086538,
+      "label": "labels_bbox/Dash_0200.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0200.jpg"
+    },
+    {
+      "image": "images/Dash_0204.jpg",
+      "sha256": "4ee5abfcba9d8a5940affe21e913cf7c1c3ba4e53809d8dc0e9ceee9e8f30f1b",
+      "bytes": 2514893,
+      "label": "labels_bbox/Dash_0204.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0204.jpg"
+    },
+    {
+      "image": "images/Dash_0208.jpg",
+      "sha256": "05f3db1ea8daa2bd9dc8f398bac2a8bbba1bbe6b5318d94b1d344f6886de62a7",
+      "bytes": 3158864,
+      "label": "labels_bbox/Dash_0208.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0208.jpg"
+    },
+    {
+      "image": "images/Dash_0212.jpg",
+      "sha256": "8a422059b429af642c62b6d5cd4a746da80b086f752061fef521647ce71eeae2",
+      "bytes": 2529491,
+      "label": "labels_bbox/Dash_0212.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0212.jpg"
+    },
+    {
+      "image": "images/Dash_0216.jpg",
+      "sha256": "59d46c6645fbf2a24140d94a5d012b04cf8141e56620a6b342ccd68f7f7c94b2",
+      "bytes": 1893588,
+      "label": "labels_bbox/Dash_0216.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0216.jpg"
+    },
+    {
+      "image": "images/Dash_0220.jpg",
+      "sha256": "32cab8c060282c7492ad0018cceb1c8ee631b4cf2a6ae549cd4c258bac74ac07",
+      "bytes": 2474530,
+      "label": "labels_bbox/Dash_0220.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0220.jpg"
+    },
+    {
+      "image": "images/Dash_0224.jpg",
+      "sha256": "4bb036566622561337039b039ef6eecec14ec5e17b07c30a6eb4a7260166a179",
+      "bytes": 2381656,
+      "label": "labels_bbox/Dash_0224.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0224.jpg"
+    },
+    {
+      "image": "images/Dash_0226.jpg",
+      "sha256": "bd33866ec7440d3eab48d3c12a621dadc5d028a6411bbbb5d0b74f5951dd22de",
+      "bytes": 2066852,
+      "label": "labels_bbox/Dash_0226.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0226.jpg"
+    },
+    {
+      "image": "images/Dash_0228.jpg",
+      "sha256": "f44583e1d4dca31134664e834bbc49db7804289ddd2330971227952fa81952d0",
+      "bytes": 1849532,
+      "label": "labels_bbox/Dash_0228.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0228.jpg"
+    },
+    {
+      "image": "images/Dash_0232.jpg",
+      "sha256": "efb571437a587d1009ed96ae7597adb2de2a2e432e3e7462b2e4a2e955b37ff9",
+      "bytes": 2350843,
+      "label": "labels_bbox/Dash_0232.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0232.jpg"
+    },
+    {
+      "image": "images/Dash_0236.jpg",
+      "sha256": "b3ab3766f6fe8d848ead73982d515b598b1e73e15bf7ab02cccc5ad144ad406b",
+      "bytes": 2223083,
+      "label": "labels_bbox/Dash_0236.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0236.jpg"
+    },
+    {
+      "image": "images/Dash_0237.jpg",
+      "sha256": "6ff47b9e479b812b40ee205d5ee08a666f7dbc3479dcb27e5c570e9d1388035a",
+      "bytes": 2483314,
+      "label": "labels_bbox/Dash_0237.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0237.jpg"
+    },
+    {
+      "image": "images/Dash_0240.jpg",
+      "sha256": "f73fb615fd66e9eaaebe87c02435253aca6e48e3d47248648df3146978863b5b",
+      "bytes": 2813582,
+      "label": "labels_bbox/Dash_0240.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0240.jpg"
+    },
+    {
+      "image": "images/Dash_0242.jpg",
+      "sha256": "633554d29abf2c47d79e0d22d7d8056b10c1d85f450a8ed411982f5b0c44998b",
+      "bytes": 3027774,
+      "label": "labels_bbox/Dash_0242.txt",
+      "source_class_ids": [
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0242.jpg"
+    },
+    {
+      "image": "images/Dash_0243.jpg",
+      "sha256": "34a6f94d21af8a76478cc410e9a5d43fd7a5b941e315a2ea1805866e92d592e9",
+      "bytes": 3373681,
+      "label": "labels_bbox/Dash_0243.txt",
+      "source_class_ids": [
+        2,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0243.jpg"
+    },
+    {
+      "image": "images/Dash_0244.jpg",
+      "sha256": "67133818fa9fa84ab4b087dc2ff19db5a726a576c9bf78790ae965ada074aa40",
+      "bytes": 1962355,
+      "label": "labels_bbox/Dash_0244.txt",
+      "source_class_ids": [
+        3,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0244.jpg"
+    },
+    {
+      "image": "images/Dash_0245.jpg",
+      "sha256": "101f4fcdda8c199414fe9fa3f631e2a9dcfacd5631b13c5c45c378724c2ac8a0",
+      "bytes": 2960295,
+      "label": "labels_bbox/Dash_0245.txt",
+      "source_class_ids": [
+        0,
+        1,
+        2
+      ],
+      "gps_image_name": "Dash_0245.jpg"
+    },
+    {
+      "image": "images/Dash_0247.jpg",
+      "sha256": "d4300b6187e3ffbbe8efe8acbbfd36b201c671d5291f9bd250ed796bce9ec703",
+      "bytes": 2328644,
+      "label": "labels_bbox/Dash_0247.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0247.jpg"
+    },
+    {
+      "image": "images/Dash_0248.jpg",
+      "sha256": "1359fac00e8d5b738778479970085aaab95b0efbfc5fd0bfe1af5ea5fbe562f7",
+      "bytes": 2244517,
+      "label": "labels_bbox/Dash_0248.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0248.jpg"
+    },
+    {
+      "image": "images/Dash_0249.jpg",
+      "sha256": "bd6fc46276ff1447534aae49eb35c285d9b03244e46d22e90e924d78a5933fd5",
+      "bytes": 2211117,
+      "label": "labels_bbox/Dash_0249.txt",
+      "source_class_ids": [
+        1,
+        2,
+        3
+      ],
+      "gps_image_name": "Dash_0249.jpg"
+    },
+    {
+      "image": "images/Dash_0250.jpg",
+      "sha256": "1e77bd0bf1b85243ed4ad7bf4a73a93e8c1d45cc21f4e625fb6056ee997c4378",
+      "bytes": 2543247,
+      "label": "labels_bbox/Dash_0250.txt",
+      "source_class_ids": [
+        1,
+        1,
+        2
+      ],
+      "gps_image_name": "Dash_0250.jpg"
+    },
+    {
+      "image": "images/Dash_0251.jpg",
+      "sha256": "1c8d866ab4b998afd3f3c5109aba42274f5ef66a77d6c874e07ce5d9a9f26752",
+      "bytes": 2483347,
+      "label": "labels_bbox/Dash_0251.txt",
+      "source_class_ids": [
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0251.jpg"
+    },
+    {
+      "image": "images/Dash_0252.jpg",
+      "sha256": "ccc58f6ea6aa452eefae0a3b8c3068349b67591111f679ea4111c62ce2fe9172",
+      "bytes": 3398847,
+      "label": "labels_bbox/Dash_0252.txt",
+      "source_class_ids": [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0252.jpg"
+    },
+    {
+      "image": "images/Dash_0253.jpg",
+      "sha256": "b44588bfc1e7238f70856e132f4f83114de773ff40360316730cdb33a60b5b66",
+      "bytes": 3470472,
+      "label": "labels_bbox/Dash_0253.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0,
+        1,
+        3
+      ],
+      "gps_image_name": "Dash_0253.jpg"
+    },
+    {
+      "image": "images/Dash_0256.jpg",
+      "sha256": "022664bfb77014aa94d0908f59d03bf7f8242aba5e97287ec4d6bd4cd3178986",
+      "bytes": 2784685,
+      "label": "labels_bbox/Dash_0256.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0256.jpg"
+    },
+    {
+      "image": "images/Dash_0260.jpg",
+      "sha256": "017102803290cec89b267818ee8c7725d9695039b9d76c8f4db0ec1518112457",
+      "bytes": 1864060,
+      "label": "labels_bbox/Dash_0260.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0260.jpg"
+    },
+    {
+      "image": "images/Dash_0264.jpg",
+      "sha256": "286e9ad2427357fe47138ab2e071337c2963fdfeddf258bf067fc18a4e286475",
+      "bytes": 2295628,
+      "label": "labels_bbox/Dash_0264.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0264.jpg"
+    },
+    {
+      "image": "images/Dash_0268.jpg",
+      "sha256": "b794843b41bac1b0974ab8e39e30756788fa538b3cd63168f7b40a4a4f3f12c9",
+      "bytes": 2306335,
+      "label": "labels_bbox/Dash_0268.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0268.jpg"
+    },
+    {
+      "image": "images/Dash_0272.jpg",
+      "sha256": "8bf7ec3767a4e3ccf47b3c58a7d87aa380e14c77484628e01447f7fb86310c9b",
+      "bytes": 1932604,
+      "label": "labels_bbox/Dash_0272.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0272.jpg"
+    },
+    {
+      "image": "images/Dash_0276.jpg",
+      "sha256": "b2fa13d165348082b5b781a64dc5b2835ea85a4d1126014c7886d3c3f781ee57",
+      "bytes": 2377016,
+      "label": "labels_bbox/Dash_0276.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0276.jpg"
+    },
+    {
+      "image": "images/Dash_0279.jpg",
+      "sha256": "ac94f446e23f4d8e3b9921fc0a782a80ec41e729d4c1b7e1c0e37acd49e494a8",
+      "bytes": 1859062,
+      "label": "labels_bbox/Dash_0279.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0279.jpg"
+    },
+    {
+      "image": "images/Dash_0280.jpg",
+      "sha256": "09701de4929f581e7534a518d0f5a9032b37765768cd709d68494fff1fad9565",
+      "bytes": 1879414,
+      "label": "labels_bbox/Dash_0280.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0280.jpg"
+    },
+    {
+      "image": "images/Dash_0284.jpg",
+      "sha256": "14235ec9f40368af4ba80ad14946d4cb038620cee57a706b6667e7ad7395e545",
+      "bytes": 2128201,
+      "label": "labels_bbox/Dash_0284.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0284.jpg"
+    },
+    {
+      "image": "images/Dash_0286.jpg",
+      "sha256": "ee732968cf9178d4ad1a084262a0060039e7ab2a896bd978a6b37dbe9867f3cf",
+      "bytes": 2185643,
+      "label": "labels_bbox/Dash_0286.txt",
+      "source_class_ids": [
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0286.jpg"
+    },
+    {
+      "image": "images/Dash_0288.jpg",
+      "sha256": "d60dbe3baa7b757dae67100bf3a4b48d0764a5daca7602e8c62cd02f283975d0",
+      "bytes": 1981753,
+      "label": "labels_bbox/Dash_0288.txt",
+      "source_class_ids": [
+        0,
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0288.jpg"
+    },
+    {
+      "image": "images/Dash_0292.jpg",
+      "sha256": "9d7c70221712c58d23e7caa51fe7191610be4eb3916c3ba390e6aad33336ffc8",
+      "bytes": 2232897,
+      "label": "labels_bbox/Dash_0292.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0292.jpg"
+    },
+    {
+      "image": "images/Dash_0294.jpg",
+      "sha256": "a883521643877d15b5b9013fc2807f2a5c1ce1b1ec6136f5632a73c1847b9aeb",
+      "bytes": 1816082,
+      "label": "labels_bbox/Dash_0294.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0294.jpg"
+    },
+    {
+      "image": "images/Dash_0296.jpg",
+      "sha256": "036d4c55c5da21e6d025084be60ae4cc3ed1cb4e494b986e2a308bc36e68b996",
+      "bytes": 2421178,
+      "label": "labels_bbox/Dash_0296.txt",
+      "source_class_ids": [
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0296.jpg"
+    },
+    {
+      "image": "images/Dash_0300.jpg",
+      "sha256": "7272fdfebd65d4b97ba4796175dcabb5b01d17ec6d934a80ba61c3e3fe61c886",
+      "bytes": 1602033,
+      "label": "labels_bbox/Dash_0300.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0300.jpg"
+    },
+    {
+      "image": "images/Dash_0302.jpg",
+      "sha256": "384e8da71f8cfd07edfd0b5b83649e47e4a8f6250d37c0f99c3ae424f0f748d2",
+      "bytes": 1495745,
+      "label": "labels_bbox/Dash_0302.txt",
+      "source_class_ids": [
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0302.jpg"
+    },
+    {
+      "image": "images/Dash_0304.jpg",
+      "sha256": "0d86714ae6adc93742943d5225b4648ea090af0933be14ca7a484e26d14795ec",
+      "bytes": 1737224,
+      "label": "labels_bbox/Dash_0304.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0304.jpg"
+    },
+    {
+      "image": "images/Dash_0308.jpg",
+      "sha256": "1c9fc3ffb4b730522df41ef7f9386c50778d4a803f91d301adf9f2480592a615",
+      "bytes": 1517344,
+      "label": "labels_bbox/Dash_0308.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0308.jpg"
+    },
+    {
+      "image": "images/Dash_0312.jpg",
+      "sha256": "67296c3d020ce8705e96c0a8fe2de2df526ea852f01844284675243bc46f247a",
+      "bytes": 1829735,
+      "label": "labels_bbox/Dash_0312.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0312.jpg"
+    },
+    {
+      "image": "images/Dash_0316.jpg",
+      "sha256": "b1b4089bade2ef0bc888bd37ea75140fce5bdec9b11a1453fa117f12f9caf82c",
+      "bytes": 2357730,
+      "label": "labels_bbox/Dash_0316.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0316.jpg"
+    },
+    {
+      "image": "images/Dash_0318.jpg",
+      "sha256": "a7b6d831369fcb484bb9dd7fb670439d5f9c0d8ec5d40048ad3a8ef5e6b3615e",
+      "bytes": 2155780,
+      "label": "labels_bbox/Dash_0318.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0318.jpg"
+    },
+    {
+      "image": "images/Dash_0320.jpg",
+      "sha256": "44af3c0c6d600f530b374f1fa9afef9ec40b37ad85dcee3ac4cfc4bea9c68c18",
+      "bytes": 2236428,
+      "label": "labels_bbox/Dash_0320.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0320.jpg"
+    },
+    {
+      "image": "images/Dash_0322.jpg",
+      "sha256": "0e703a8df13fff0cb0f52fc8a87e19d5c1efdbe71128c4e9fd074ce43161940b",
+      "bytes": 2237969,
+      "label": "labels_bbox/Dash_0322.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0322.jpg"
+    },
+    {
+      "image": "images/Dash_0324.jpg",
+      "sha256": "aadf6d9e88166b58023d3edc00906fd318877d21ad519c5a8441a49f18cd85fc",
+      "bytes": 2147410,
+      "label": "labels_bbox/Dash_0324.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0324.jpg"
+    },
+    {
+      "image": "images/Dash_0326.jpg",
+      "sha256": "eda0b0105ac3b6ed37e745995ab16aa7e21d35e0579265a21805ab58c968622f",
+      "bytes": 2199858,
+      "label": "labels_bbox/Dash_0326.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0326.jpg"
+    },
+    {
+      "image": "images/Dash_0328.jpg",
+      "sha256": "910bdb501bb1efa8114064ebaa6539b6aef1743d488c30b8ccb53064ae38eaa0",
+      "bytes": 2177000,
+      "label": "labels_bbox/Dash_0328.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0328.jpg"
+    },
+    {
+      "image": "images/Dash_0330.jpg",
+      "sha256": "3f0a352770a3214e0aa63657ee73d268c6cbcba8aa8931d3f6be6e903c4807d2",
+      "bytes": 2568273,
+      "label": "labels_bbox/Dash_0330.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0330.jpg"
+    },
+    {
+      "image": "images/Dash_0331.jpg",
+      "sha256": "121d422f1f67a8cfd02db5a70dc770cdf1b8f54807472a6c9ddf8cea9d57a484",
+      "bytes": 2865894,
+      "label": "labels_bbox/Dash_0331.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0331.jpg"
+    },
+    {
+      "image": "images/Dash_0332.jpg",
+      "sha256": "1e5b9cb193427596ccbd9c9dc2ed8c0586e6d09f98684befd12bef61c48bf38d",
+      "bytes": 2468571,
+      "label": "labels_bbox/Dash_0332.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0332.jpg"
+    },
+    {
+      "image": "images/Dash_0335.jpg",
+      "sha256": "5d2723aa3306be2f30497d4e532698fcdd7f5d1ba8e5b383bdd1b9066a85d5c4",
+      "bytes": 2104088,
+      "label": "labels_bbox/Dash_0335.txt",
+      "source_class_ids": [
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0335.jpg"
+    },
+    {
+      "image": "images/Dash_0336.jpg",
+      "sha256": "8dbf1a9e2cf59510fea120103fe8144275c83e99b3092f59a6c467832a00f457",
+      "bytes": 2059872,
+      "label": "labels_bbox/Dash_0336.txt",
+      "source_class_ids": [
+        0,
+        2,
+        2,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0336.jpg"
+    },
+    {
+      "image": "images/Dash_0340.jpg",
+      "sha256": "2b350429978625be8ffbfdc36c76ff9413b51eee9797beffc4f68d7cf0d68fd1",
+      "bytes": 2579970,
+      "label": "labels_bbox/Dash_0340.txt",
+      "source_class_ids": [
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0340.jpg"
+    },
+    {
+      "image": "images/Dash_0342.jpg",
+      "sha256": "ed5b8bf44669075a6015b002dec011eb8bca6ee72924e6201b600bccd20499b8",
+      "bytes": 2050971,
+      "label": "labels_bbox/Dash_0342.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0342.jpg"
+    },
+    {
+      "image": "images/Dash_0344.jpg",
+      "sha256": "7fd90562bf45cbcdc7eeae5a23ff7414cdf36512e2b418b036ac3b460f625ce0",
+      "bytes": 1769563,
+      "label": "labels_bbox/Dash_0344.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0344.jpg"
+    },
+    {
+      "image": "images/Dash_0348.jpg",
+      "sha256": "f9a5b52bc5973e1bd70300a7fe7c42ec190971d86fac13cdf0d93349760b7b90",
+      "bytes": 1720042,
+      "label": "labels_bbox/Dash_0348.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0348.jpg"
+    },
+    {
+      "image": "images/Dash_0350.jpg",
+      "sha256": "1e8657ea2f9d97e0ae1101457313e660fc0e2fadf34af1f4ecb85050b7c8ccbd",
+      "bytes": 1912475,
+      "label": "labels_bbox/Dash_0350.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0350.jpg"
+    },
+    {
+      "image": "images/Dash_0352.jpg",
+      "sha256": "64bfe6508cafaeec21964dd23b43b15485b587ba50c07460956c2899cce90285",
+      "bytes": 2303326,
+      "label": "labels_bbox/Dash_0352.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0352.jpg"
+    },
+    {
+      "image": "images/Dash_0353.jpg",
+      "sha256": "18e3725d21ee7f910386d7a2465ed6616c97e688370e432b5cb0c8adf67e1aae",
+      "bytes": 2239042,
+      "label": "labels_bbox/Dash_0353.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0353.jpg"
+    },
+    {
+      "image": "images/Dash_0354.jpg",
+      "sha256": "39d724d15418b3a6e2d886dd965faab8c05c7ab3019e24af46b56f0ef28823c2",
+      "bytes": 2053684,
+      "label": "labels_bbox/Dash_0354.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0354.jpg"
+    },
+    {
+      "image": "images/Dash_0355.jpg",
+      "sha256": "505b96c5915dae8915bb7f1b5802dc48a23db249e1b84fa4e2dfc1985d6b326f",
+      "bytes": 2002004,
+      "label": "labels_bbox/Dash_0355.txt",
+      "source_class_ids": [
+        3,
+        3,
+        2
+      ],
+      "gps_image_name": "Dash_0355.jpg"
+    },
+    {
+      "image": "images/Dash_0356.jpg",
+      "sha256": "51e57a11734c1b8d39c8cc35524730e7523ee8e66d20a2b221b5bcac0ad180d3",
+      "bytes": 2325122,
+      "label": "labels_bbox/Dash_0356.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0356.jpg"
+    },
+    {
+      "image": "images/Dash_0360.jpg",
+      "sha256": "6b040f7dcd74e8832493cc78f9f6e3233f3b22d8661a70507915593840824506",
+      "bytes": 2173741,
+      "label": "labels_bbox/Dash_0360.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0360.jpg"
+    },
+    {
+      "image": "images/Dash_0362.jpg",
+      "sha256": "d22d72dcba2ea208b0991331d398997bf3d4072dd3866e9cb659c2477c34baf2",
+      "bytes": 1615487,
+      "label": "labels_bbox/Dash_0362.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0362.jpg"
+    },
+    {
+      "image": "images/Dash_0364.jpg",
+      "sha256": "c107f24d0dae7970f8333c4494cf301b1b39f3c6c4b341a7a67605a065e197ba",
+      "bytes": 1998483,
+      "label": "labels_bbox/Dash_0364.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0364.jpg"
+    },
+    {
+      "image": "images/Dash_0366.jpg",
+      "sha256": "dcec140225d9bbfc2ba0c179e93a6188f79583e3991ddbc986378e1c771c05d0",
+      "bytes": 1936674,
+      "label": "labels_bbox/Dash_0366.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0366.jpg"
+    },
+    {
+      "image": "images/Dash_0368.jpg",
+      "sha256": "bdbd00da259601590ed9c5fbdeaeedf51c732dbf89fc7d9c3e874f8efdb6256a",
+      "bytes": 2031335,
+      "label": "labels_bbox/Dash_0368.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0368.jpg"
+    },
+    {
+      "image": "images/Dash_0370.jpg",
+      "sha256": "822c21c2aa558d3b11ffa6ffba21ea0ba66c86f86e7ac290cd65406686dd9c14",
+      "bytes": 1952554,
+      "label": "labels_bbox/Dash_0370.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0370.jpg"
+    },
+    {
+      "image": "images/Dash_0372.jpg",
+      "sha256": "5ab1b7fbeafd7ab7f8eb9578cb15889de67a1e41de0cb1772511479ef723e544",
+      "bytes": 1593347,
+      "label": "labels_bbox/Dash_0372.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0372.jpg"
+    },
+    {
+      "image": "images/Dash_0374.jpg",
+      "sha256": "b5eced79ff7dbe12e499658be37be4471e7f00b79aef6070b4e5a02e0fcfe05e",
+      "bytes": 1516968,
+      "label": "labels_bbox/Dash_0374.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0374.jpg"
+    },
+    {
+      "image": "images/Dash_0376.jpg",
+      "sha256": "d80227b9de5eeae229597a5f93d8376b8a069c166dba337f7eb51dc9c68d3e4b",
+      "bytes": 1499334,
+      "label": "labels_bbox/Dash_0376.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0376.jpg"
+    },
+    {
+      "image": "images/Dash_0378.jpg",
+      "sha256": "dcbcb214e6c4bf0208e48908af747a91f3c51d46cfb8481df488e0701340951a",
+      "bytes": 1591151,
+      "label": "labels_bbox/Dash_0378.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0378.jpg"
+    },
+    {
+      "image": "images/Dash_0380.jpg",
+      "sha256": "c88403dbc8ea0aa4da411455d1ff4eed5c3f0459a2d8d82655a9394f3bb27e12",
+      "bytes": 1526081,
+      "label": "labels_bbox/Dash_0380.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0380.jpg"
+    },
+    {
+      "image": "images/Dash_0382.jpg",
+      "sha256": "2ae47c72a534fa736b20bca11585f491afbec771444ad61f7d6146cc72f58c62",
+      "bytes": 1883371,
+      "label": "labels_bbox/Dash_0382.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0382.jpg"
+    },
+    {
+      "image": "images/Dash_0384.jpg",
+      "sha256": "93dae8d04a25871f1f957563b86b1f70bbadd38a4fc063ccdf6cd753ca9fcb1a",
+      "bytes": 1534163,
+      "label": "labels_bbox/Dash_0384.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0384.jpg"
+    },
+    {
+      "image": "images/Dash_0386.jpg",
+      "sha256": "1323621147ec488d2b48e4a642bf4a27b827132f159d0cee83d56d3109788d4b",
+      "bytes": 1562786,
+      "label": "labels_bbox/Dash_0386.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0386.jpg"
+    },
+    {
+      "image": "images/Dash_0388.jpg",
+      "sha256": "4283be1fc91b1148b8d12b975ae54b153932d082d5a4decbea62bd455f159afd",
+      "bytes": 1534190,
+      "label": "labels_bbox/Dash_0388.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0388.jpg"
+    },
+    {
+      "image": "images/Dash_0390.jpg",
+      "sha256": "62e64181107a02ad8a0b4cb56b1da5c049485f975479c757d51b165a8885b91b",
+      "bytes": 1575361,
+      "label": "labels_bbox/Dash_0390.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0390.jpg"
+    },
+    {
+      "image": "images/Dash_0392.jpg",
+      "sha256": "5ec378fe3ca678ecb2fc161d1ce04b139594fdb8c5c5a3e391628a64b78dbfcb",
+      "bytes": 1565651,
+      "label": "labels_bbox/Dash_0392.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0392.jpg"
+    },
+    {
+      "image": "images/Dash_0394.jpg",
+      "sha256": "8b93ee71e0fead49f456fbd3cfadd88cedd0a30a2c4a234d286657e8309ddd59",
+      "bytes": 1749292,
+      "label": "labels_bbox/Dash_0394.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0394.jpg"
+    },
+    {
+      "image": "images/Dash_0396.jpg",
+      "sha256": "7318fa5c289439d150c33f54203df4645f51e53ef5ea0a2bc8864d4c38107d03",
+      "bytes": 2454029,
+      "label": "labels_bbox/Dash_0396.txt",
+      "source_class_ids": [
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0396.jpg"
+    },
+    {
+      "image": "images/Dash_0400.jpg",
+      "sha256": "161e7d35a0313e2599f0d826ac4e30eb28be511870bc420dea1dab81fc4a45c0",
+      "bytes": 2501127,
+      "label": "labels_bbox/Dash_0400.txt",
+      "source_class_ids": [
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0400.jpg"
+    },
+    {
+      "image": "images/Dash_0404.jpg",
+      "sha256": "f4aa9df89679b18503e945c712c606297e81a2723d1c5fc31923fc5fa6b4ce52",
+      "bytes": 1753080,
+      "label": "labels_bbox/Dash_0404.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0404.jpg"
+    },
+    {
+      "image": "images/Dash_0408.jpg",
+      "sha256": "cb41665bc3c1d4a1bf2b8760780535c30520a42d270f6f9771fef10e712f0473",
+      "bytes": 1388814,
+      "label": "labels_bbox/Dash_0408.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0408.jpg"
+    },
+    {
+      "image": "images/Dash_0412.jpg",
+      "sha256": "16623934e2ae481b84650f2527d96ab4e6b7c17c197980ce3b583cd769f7c813",
+      "bytes": 1795387,
+      "label": "labels_bbox/Dash_0412.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0412.jpg"
+    },
+    {
+      "image": "images/Dash_0416.jpg",
+      "sha256": "e281f918c997f567b4d2aa4a6bc1e4c5f8cad6d70df28ac0109f94080431d00f",
+      "bytes": 1939705,
+      "label": "labels_bbox/Dash_0416.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0416.jpg"
+    },
+    {
+      "image": "images/Dash_0418.jpg",
+      "sha256": "ed6020614c6109ff52d0faea9b018b5ab6f2086b6802f24d8acfaf029fe92cfd",
+      "bytes": 2181238,
+      "label": "labels_bbox/Dash_0418.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0418.jpg"
+    },
+    {
+      "image": "images/Dash_0420.jpg",
+      "sha256": "4ef48f473e6f3e04d721d40c366063e86068f28b7f243a139c5fb0a07120e612",
+      "bytes": 1709769,
+      "label": "labels_bbox/Dash_0420.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0420.jpg"
+    },
+    {
+      "image": "images/Dash_0422.jpg",
+      "sha256": "dd092573e6f451a7f2804158224337a4c1eacf3c9afa970da3d93ed949b6330b",
+      "bytes": 1753060,
+      "label": "labels_bbox/Dash_0422.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0422.jpg"
+    },
+    {
+      "image": "images/Dash_0424.jpg",
+      "sha256": "e7fb05d2540ca5a001fbfe34a710c336038d77969fca33a40a6af81912331c89",
+      "bytes": 2842058,
+      "label": "labels_bbox/Dash_0424.txt",
+      "source_class_ids": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0424.jpg"
+    },
+    {
+      "image": "images/Dash_0428.jpg",
+      "sha256": "552fee3a3d6b90b9686bc8caa216b144d5e16d3587842fa89fa30b9a486e267f",
+      "bytes": 2028897,
+      "label": "labels_bbox/Dash_0428.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0428.jpg"
+    },
+    {
+      "image": "images/Dash_0429.jpg",
+      "sha256": "e32c5ad19283dbde56c9f26647dbd3ece89233bcfd534fb3a45810dc9ad04439",
+      "bytes": 2402404,
+      "label": "labels_bbox/Dash_0429.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        3
+      ],
+      "gps_image_name": "Dash_0429.jpg"
+    },
+    {
+      "image": "images/Dash_0430.jpg",
+      "sha256": "b5c3ec3137b952f3ce8f37074afc7b660f2c2f7a4738aaeaf10e99d46857a6ff",
+      "bytes": 2611349,
+      "label": "labels_bbox/Dash_0430.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0430.jpg"
+    },
+    {
+      "image": "images/Dash_0432.jpg",
+      "sha256": "b730ad78ddfa57061f7a53e05316f9293848fd41e14875c2310fa9ec498887b6",
+      "bytes": 2160664,
+      "label": "labels_bbox/Dash_0432.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0432.jpg"
+    },
+    {
+      "image": "images/Dash_0434.jpg",
+      "sha256": "7d687838ad23a8f44a0959caa774b67606ad914ae400927dbf93bedc3cbbb217",
+      "bytes": 1878420,
+      "label": "labels_bbox/Dash_0434.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0434.jpg"
+    },
+    {
+      "image": "images/Dash_0436.jpg",
+      "sha256": "88f2dd70c436756755b642fdb02c8cacc48d6956bda0149e00ea1fd467c8d222",
+      "bytes": 2356957,
+      "label": "labels_bbox/Dash_0436.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0436.jpg"
+    },
+    {
+      "image": "images/Dash_0438.jpg",
+      "sha256": "a8afb672d0f5655bf40df60b8b9fd696658d68a20105142cfa6ddf2e27fdcd1d",
+      "bytes": 1737178,
+      "label": "labels_bbox/Dash_0438.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0438.jpg"
+    },
+    {
+      "image": "images/Dash_0440.jpg",
+      "sha256": "e33903f597065b80f4a4158bc78d42d9ec6c6f5878eb9158c2a37e1e61a16cec",
+      "bytes": 2231054,
+      "label": "labels_bbox/Dash_0440.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0440.jpg"
+    },
+    {
+      "image": "images/Dash_0442.jpg",
+      "sha256": "6af7f1a4662340960591d41ec50ff12a3a9d7835377e6e6a84e63e2cc8fd5990",
+      "bytes": 2228892,
+      "label": "labels_bbox/Dash_0442.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0442.jpg"
+    },
+    {
+      "image": "images/Dash_0444.jpg",
+      "sha256": "08e9d12ece290cc4115ff191b369bbdefb24385f86b9fe8f88bb58a9bd2efe5c",
+      "bytes": 1513416,
+      "label": "labels_bbox/Dash_0444.txt",
+      "source_class_ids": [
+        2,
+        1,
+        0,
+        2,
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0444.jpg"
+    },
+    {
+      "image": "images/Dash_0445.jpg",
+      "sha256": "e19f35b40e117c89a549322c9c9ad540681366faa3231610173428567d120623",
+      "bytes": 1423563,
+      "label": "labels_bbox/Dash_0445.txt",
+      "source_class_ids": [
+        1,
+        0,
+        2,
+        0,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0445.jpg"
+    },
+    {
+      "image": "images/Dash_0446.jpg",
+      "sha256": "c552b56926fb71c07c6e3bbc383983351b06bd56eba33101092264651646d286",
+      "bytes": 1663590,
+      "label": "labels_bbox/Dash_0446.txt",
+      "source_class_ids": [
+        0,
+        2,
+        2,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0446.jpg"
+    },
+    {
+      "image": "images/Dash_0447.jpg",
+      "sha256": "2ff6ff30e9d2d51def674aefabde126fbff7ee68e10f7bf08be57cb5a83e264d",
+      "bytes": 1757717,
+      "label": "labels_bbox/Dash_0447.txt",
+      "source_class_ids": [
+        0,
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0447.jpg"
+    },
+    {
+      "image": "images/Dash_0448.jpg",
+      "sha256": "5f35bee8005071ebf4566ddc78d1003c8e099e189eb1b476c9bca25c23d2321a",
+      "bytes": 1397550,
+      "label": "labels_bbox/Dash_0448.txt",
+      "source_class_ids": [
+        1,
+        2,
+        0,
+        1,
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0448.jpg"
+    },
+    {
+      "image": "images/Dash_0449.jpg",
+      "sha256": "7d07943c1c22773d9fd0321fc1f7a62ac3d71af5de0bfa2cc694e9c8ff7147e0",
+      "bytes": 1734442,
+      "label": "labels_bbox/Dash_0449.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0449.jpg"
+    },
+    {
+      "image": "images/Dash_0450.jpg",
+      "sha256": "6db8ff24bebdcb0e6456581541eb9d3c1e1b0e1b6f438e22a7af9e3f20ab628d",
+      "bytes": 1477130,
+      "label": "labels_bbox/Dash_0450.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0450.jpg"
+    },
+    {
+      "image": "images/Dash_0451.jpg",
+      "sha256": "31a2aa8e3acd33303bf8bb4041a520086b9350689b4566003defc30a28fa7ccc",
+      "bytes": 1381369,
+      "label": "labels_bbox/Dash_0451.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0451.jpg"
+    },
+    {
+      "image": "images/Dash_0452.jpg",
+      "sha256": "4101f5caa24ea203dd451120149f160f409c70c43a35e98f074df3a66069f384",
+      "bytes": 1780521,
+      "label": "labels_bbox/Dash_0452.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0452.jpg"
+    },
+    {
+      "image": "images/Dash_0453.jpg",
+      "sha256": "3c5cbdc15de970825ff0b7857ec1b2193b167fa2a87903fa77b46c065ba82f73",
+      "bytes": 2045494,
+      "label": "labels_bbox/Dash_0453.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0453.jpg"
+    },
+    {
+      "image": "images/Dash_0454.jpg",
+      "sha256": "a47cac84db6f27f667a91459aa925644207fc3bc040b59f42f0e325150a6363f",
+      "bytes": 1862231,
+      "label": "labels_bbox/Dash_0454.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0454.jpg"
+    },
+    {
+      "image": "images/Dash_0455.jpg",
+      "sha256": "0f4b0f6dbd23021aaa2238f5174b8c5333ddc4b4415700879a286f0e88170fa4",
+      "bytes": 1966996,
+      "label": "labels_bbox/Dash_0455.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0455.jpg"
+    },
+    {
+      "image": "images/Dash_0456.jpg",
+      "sha256": "e54e8c10fc06e73e3819aaf9899b7d90ba4426d6b50f0f37f91fa31ea9c55504",
+      "bytes": 1692966,
+      "label": "labels_bbox/Dash_0456.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        0,
+        3,
+        2
+      ],
+      "gps_image_name": "Dash_0456.jpg"
+    },
+    {
+      "image": "images/Dash_0457.jpg",
+      "sha256": "925e0a0a07fa1149cfd2a4f0426d51e6ee42bb7af2a8520a34ce6c20163d6e8f",
+      "bytes": 1397776,
+      "label": "labels_bbox/Dash_0457.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0457.jpg"
+    },
+    {
+      "image": "images/Dash_0458.jpg",
+      "sha256": "cf6e0214c35205de1bd7f90321543c573da7d52f4115c1d1103ce2e621a17e5f",
+      "bytes": 1841178,
+      "label": "labels_bbox/Dash_0458.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0458.jpg"
+    },
+    {
+      "image": "images/Dash_0460.jpg",
+      "sha256": "d27b2984c1f10e5975b221ca976716df88d07738a59f33a7f838e93ef298c8a3",
+      "bytes": 2575161,
+      "label": "labels_bbox/Dash_0460.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0460.jpg"
+    },
+    {
+      "image": "images/Dash_0461.jpg",
+      "sha256": "916e433f7f3b56c9671894c99393e4ccaac0b234ff2f163ca1009020dc14f104",
+      "bytes": 2302352,
+      "label": "labels_bbox/Dash_0461.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0461.jpg"
+    },
+    {
+      "image": "images/Dash_0462.jpg",
+      "sha256": "d35cf985a7f8d3c150c908123df6c6494bb6dda7194b23d7a371c20fbc778ff2",
+      "bytes": 2243575,
+      "label": "labels_bbox/Dash_0462.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0462.jpg"
+    },
+    {
+      "image": "images/Dash_0463.jpg",
+      "sha256": "432c5ac4e999d3f75b04840a17dfef8be0a21f12e7853d5d152aa50f58071b78",
+      "bytes": 1949621,
+      "label": "labels_bbox/Dash_0463.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0463.jpg"
+    },
+    {
+      "image": "images/Dash_0464.jpg",
+      "sha256": "68f836c23a15c5a024dabf45d990fd26cdf08d2e9177a11e0702c80f463cf06f",
+      "bytes": 1911113,
+      "label": "labels_bbox/Dash_0464.txt",
+      "source_class_ids": [
+        3,
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0464.jpg"
+    },
+    {
+      "image": "images/Dash_0465.jpg",
+      "sha256": "0bd8dfac5750ad42500889e59773829f0b314b56974eb28b61fb61e583c53a22",
+      "bytes": 2303743,
+      "label": "labels_bbox/Dash_0465.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0465.jpg"
+    },
+    {
+      "image": "images/Dash_0466.jpg",
+      "sha256": "b073773235166afe833c7b51c125942cd67376c07a1b6bac539a14d87148f594",
+      "bytes": 2198759,
+      "label": "labels_bbox/Dash_0466.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0466.jpg"
+    },
+    {
+      "image": "images/Dash_0468.jpg",
+      "sha256": "5801dc7583398709f426bb969489a1f577eb9b5b330dad8573d080d0214f29d3",
+      "bytes": 1614050,
+      "label": "labels_bbox/Dash_0468.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0468.jpg"
+    },
+    {
+      "image": "images/Dash_0470.jpg",
+      "sha256": "66d9c5624bc4a0ca25992f5a42c2a15382c0d8c56e1749f740b9086cbe4c3fd8",
+      "bytes": 1978601,
+      "label": "labels_bbox/Dash_0470.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0470.jpg"
+    },
+    {
+      "image": "images/Dash_0472.jpg",
+      "sha256": "ebb198e27f6060fffbdc52922771ed8efa9f7835ba7266eb34bc747610fb3702",
+      "bytes": 2335153,
+      "label": "labels_bbox/Dash_0472.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0472.jpg"
+    },
+    {
+      "image": "images/Dash_0474.jpg",
+      "sha256": "dc8e32d4b1283afcf9ae60d6a7ef18f2906d32c36922563f5971bd5727d6ee1f",
+      "bytes": 1889818,
+      "label": "labels_bbox/Dash_0474.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0474.jpg"
+    },
+    {
+      "image": "images/Dash_0476.jpg",
+      "sha256": "45d14562e10137a5890e060bda6a604496a5ae2d2bb60ed66aeb18ab8fa505ce",
+      "bytes": 1763485,
+      "label": "labels_bbox/Dash_0476.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0476.jpg"
+    },
+    {
+      "image": "images/Dash_0478.jpg",
+      "sha256": "2f758336475ffcadecbfcadd02129c2f01ec4c99d3d1ef7646e54b261993c850",
+      "bytes": 2178975,
+      "label": "labels_bbox/Dash_0478.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0478.jpg"
+    },
+    {
+      "image": "images/Dash_0480.jpg",
+      "sha256": "36c1406f7d4193b670c3416e563edecf2217fcc243ee876eb0a9a472618a18ba",
+      "bytes": 2007074,
+      "label": "labels_bbox/Dash_0480.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0480.jpg"
+    },
+    {
+      "image": "images/Dash_0482.jpg",
+      "sha256": "40a02dba857c4c1780c10d617109ce2925bac62740962747827da0e80c4c0a2e",
+      "bytes": 1841894,
+      "label": "labels_bbox/Dash_0482.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0482.jpg"
+    },
+    {
+      "image": "images/Dash_0484.jpg",
+      "sha256": "6d24d8a640d850be3ee5f8d3529a24bf1b8448c73ac1802005efac476a281efd",
+      "bytes": 2219407,
+      "label": "labels_bbox/Dash_0484.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0484.jpg"
+    },
+    {
+      "image": "images/Dash_0486.jpg",
+      "sha256": "afbc560f7d6b4bc2ecad54f8dbc061552d1c91ae5d0791196e7e9f3a017ce3de",
+      "bytes": 1984906,
+      "label": "labels_bbox/Dash_0486.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0486.jpg"
+    },
+    {
+      "image": "images/Dash_0488.jpg",
+      "sha256": "6d4caf4af2e50f030afd906d1318f61ca55ccb0d006d5c0185e389b0e58efb71",
+      "bytes": 1921336,
+      "label": "labels_bbox/Dash_0488.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0488.jpg"
+    },
+    {
+      "image": "images/Dash_0490.jpg",
+      "sha256": "de2ebfc9620e11e53a38e1d0f9cb14f2d6efc2accd6f90a7515d93765c2dd27a",
+      "bytes": 2130727,
+      "label": "labels_bbox/Dash_0490.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0490.jpg"
+    },
+    {
+      "image": "images/Dash_0492.jpg",
+      "sha256": "c3cf2e632f9ab52327a2ededb16842dc1dec423b3cd3054acd007ae1fd9ba405",
+      "bytes": 1732932,
+      "label": "labels_bbox/Dash_0492.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0492.jpg"
+    },
+    {
+      "image": "images/Dash_0494.jpg",
+      "sha256": "d986189720143abd23e5894c35606570b2d7476bba22115569dce2570cf7e0fa",
+      "bytes": 1632091,
+      "label": "labels_bbox/Dash_0494.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0494.jpg"
+    },
+    {
+      "image": "images/Dash_0496.jpg",
+      "sha256": "8be4291e10f347d0cae871bf99249dba332f8a45ef3e574e7ce14e006b576e33",
+      "bytes": 2968441,
+      "label": "labels_bbox/Dash_0496.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0496.jpg"
+    },
+    {
+      "image": "images/Dash_0497.jpg",
+      "sha256": "055f7d13edd7252b87108ef2e931f100c7cf75257c8e704cd9b22282cf582371",
+      "bytes": 2747167,
+      "label": "labels_bbox/Dash_0497.txt",
+      "source_class_ids": [
+        3,
+        0,
+        3,
+        1
+      ],
+      "gps_image_name": "Dash_0497.jpg"
+    },
+    {
+      "image": "images/Dash_0498.jpg",
+      "sha256": "a7048a81ad1f661e18b74b9984911e7107c8d4c71521012fa80b4fe17105f053",
+      "bytes": 2301733,
+      "label": "labels_bbox/Dash_0498.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0498.jpg"
+    },
+    {
+      "image": "images/Dash_0499.jpg",
+      "sha256": "2998f7c98b03f7129ac1696c1347515301edd5aef610dd6363e3ab4971b7b4a9",
+      "bytes": 2155516,
+      "label": "labels_bbox/Dash_0499.txt",
+      "source_class_ids": [
+        3,
+        3,
+        0,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0499.jpg"
+    },
+    {
+      "image": "images/Dash_0500.jpg",
+      "sha256": "002db4cbe68f49740dd751672e576e55eb5516eb9f945ad84842e3fffe847377",
+      "bytes": 1957548,
+      "label": "labels_bbox/Dash_0500.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0500.jpg"
+    },
+    {
+      "image": "images/Dash_0501.jpg",
+      "sha256": "71ea1881a15352bc9f25fdf33f7d636bb34b02cdc74df0d81e82c32e3058f09a",
+      "bytes": 2418595,
+      "label": "labels_bbox/Dash_0501.txt",
+      "source_class_ids": [
+        3,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0501.jpg"
+    },
+    {
+      "image": "images/Dash_0502.jpg",
+      "sha256": "8ec297cd2720de514577af5c3f673b0d20cb1991351e2ad9f014cd40b963868a",
+      "bytes": 2263631,
+      "label": "labels_bbox/Dash_0502.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0502.jpg"
+    },
+    {
+      "image": "images/Dash_0504.jpg",
+      "sha256": "2b70bbc455f1d81a7977dc2b654532c22788c7bda7ff5659a20bbda80487d691",
+      "bytes": 1877887,
+      "label": "labels_bbox/Dash_0504.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0504.jpg"
+    },
+    {
+      "image": "images/Dash_0506.jpg",
+      "sha256": "dbe8be4a0bcb235234e1e0fb4fe81c54eacf361f62bb2ba46f876be67555dc67",
+      "bytes": 1745828,
+      "label": "labels_bbox/Dash_0506.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0506.jpg"
+    },
+    {
+      "image": "images/Dash_0508.jpg",
+      "sha256": "c8f3fe70f9b74bc18350f07d911d14716e73c2950a974d902d383c0c7966b570",
+      "bytes": 1908621,
+      "label": "labels_bbox/Dash_0508.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0508.jpg"
+    },
+    {
+      "image": "images/Dash_0510.jpg",
+      "sha256": "227f803b2bab6489201a69121709a2150c430e6c6d903353c8107067b497276a",
+      "bytes": 2308669,
+      "label": "labels_bbox/Dash_0510.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0510.jpg"
+    },
+    {
+      "image": "images/Dash_0512.jpg",
+      "sha256": "218e228ca606b161c0a6d2f5cabeba46cc96632561567cec1bb258ecc6269c27",
+      "bytes": 1878571,
+      "label": "labels_bbox/Dash_0512.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0512.jpg"
+    },
+    {
+      "image": "images/Dash_0514.jpg",
+      "sha256": "32b718c7e1dc57449b8084cd33183388a7375356b64df8288f817a94e57a5c26",
+      "bytes": 1903475,
+      "label": "labels_bbox/Dash_0514.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0514.jpg"
+    },
+    {
+      "image": "images/Dash_0516.jpg",
+      "sha256": "4e1641ab388df332ebf655991d67dc81a35a486d7f16455234186dc760d8cd7a",
+      "bytes": 1804355,
+      "label": "labels_bbox/Dash_0516.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0516.jpg"
+    },
+    {
+      "image": "images/Dash_0518.jpg",
+      "sha256": "e90fe08cb095a039b181f9c383b3f6ffc630977a6a81e5afe5268a64b73f27ce",
+      "bytes": 2124025,
+      "label": "labels_bbox/Dash_0518.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0518.jpg"
+    },
+    {
+      "image": "images/Dash_0520.jpg",
+      "sha256": "85986e91079007c4a249df3cb2a46a85f5c9ea067ec91c170624d61f4fcaad88",
+      "bytes": 1813769,
+      "label": "labels_bbox/Dash_0520.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0520.jpg"
+    },
+    {
+      "image": "images/Dash_0522.jpg",
+      "sha256": "ab4e30e11a9b160cfea9f2e3ebc12671f35abb28116ac987b3ca08c583a9905c",
+      "bytes": 2208121,
+      "label": "labels_bbox/Dash_0522.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0522.jpg"
+    },
+    {
+      "image": "images/Dash_0524.jpg",
+      "sha256": "48120077753661bc4701e6ffe8a48bb6e3626e9862e378951989f7ab26490de1",
+      "bytes": 1679052,
+      "label": "labels_bbox/Dash_0524.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0524.jpg"
+    },
+    {
+      "image": "images/Dash_0526.jpg",
+      "sha256": "da46bef28c81b337b67716eb8efc5d400f4bf454541dba563b26ceece34425d9",
+      "bytes": 2329536,
+      "label": "labels_bbox/Dash_0526.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0526.jpg"
+    },
+    {
+      "image": "images/Dash_0528.jpg",
+      "sha256": "63b750b3c6b4f41ef3a747628bdc4bd78cb49d1779261ce37d5f88ef4982517e",
+      "bytes": 3428199,
+      "label": "labels_bbox/Dash_0528.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0528.jpg"
+    },
+    {
+      "image": "images/Dash_0530.jpg",
+      "sha256": "15c27fb1bf77480d4bd2af3f96cb9388149a447b396a997804ff041ba6d222cf",
+      "bytes": 2005834,
+      "label": "labels_bbox/Dash_0530.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0530.jpg"
+    },
+    {
+      "image": "images/Dash_0531.jpg",
+      "sha256": "dc297aad6fb4a04a6893b48fba6acabac03f4a8b83463df5cbf7b7fa71363447",
+      "bytes": 1892581,
+      "label": "labels_bbox/Dash_0531.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0531.jpg"
+    },
+    {
+      "image": "images/Dash_0532.jpg",
+      "sha256": "54cebec4083200b65643a4f0dc945f9365ed9e0158158286c2e3216c5e1725e6",
+      "bytes": 1636901,
+      "label": "labels_bbox/Dash_0532.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0532.jpg"
+    },
+    {
+      "image": "images/Dash_0533.jpg",
+      "sha256": "8692f5a6e92360b1dbe93ebf7962c8264b10e20ef38bf8a4d3a7ddaaef777963",
+      "bytes": 2054332,
+      "label": "labels_bbox/Dash_0533.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0533.jpg"
+    },
+    {
+      "image": "images/Dash_0536.jpg",
+      "sha256": "a3fb86ae6cfa9fe923570e559462ebcad57eef9c02105707f719e7858037a894",
+      "bytes": 2072397,
+      "label": "labels_bbox/Dash_0536.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0536.jpg"
+    },
+    {
+      "image": "images/Dash_0537.jpg",
+      "sha256": "37869611edbb075de120857ce1f4369988fe9e9498dc301806bd6ecd76afa6d4",
+      "bytes": 2191810,
+      "label": "labels_bbox/Dash_0537.txt",
+      "source_class_ids": [
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0537.jpg"
+    },
+    {
+      "image": "images/Dash_0538.jpg",
+      "sha256": "560beaac2795a02199b3c093aae419f07df7671a707da6c29f80b11918964114",
+      "bytes": 2197720,
+      "label": "labels_bbox/Dash_0538.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0538.jpg"
+    },
+    {
+      "image": "images/Dash_0540.jpg",
+      "sha256": "fef07bccb26a79fad02561751b94ce02f5f4d4a677e64de5eab923dba97fe973",
+      "bytes": 2150531,
+      "label": "labels_bbox/Dash_0540.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0540.jpg"
+    },
+    {
+      "image": "images/Dash_0541.jpg",
+      "sha256": "87f25c10305d0c082bed7f2575eeec9b031043789f42fcb03bde9c395b89fa6c",
+      "bytes": 2208796,
+      "label": "labels_bbox/Dash_0541.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0541.jpg"
+    },
+    {
+      "image": "images/Dash_0542.jpg",
+      "sha256": "eefacaef0a7509eb3de43cb115fc476dbb24b6cc11997d9ed021ded358e66d78",
+      "bytes": 1890344,
+      "label": "labels_bbox/Dash_0542.txt",
+      "source_class_ids": [
+        2,
+        3
+      ],
+      "gps_image_name": "Dash_0542.jpg"
+    },
+    {
+      "image": "images/Dash_0543.jpg",
+      "sha256": "b7b88f5484cc4e0af4edd108eead91f2d205ed23c21809d1b69b55a12c0cca15",
+      "bytes": 1782787,
+      "label": "labels_bbox/Dash_0543.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0543.jpg"
+    },
+    {
+      "image": "images/Dash_0544.jpg",
+      "sha256": "d530c8c6f94b65e28b19b6f556b27866e3056748f328342eb463315390416fa3",
+      "bytes": 1623831,
+      "label": "labels_bbox/Dash_0544.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0544.jpg"
+    },
+    {
+      "image": "images/Dash_0545.jpg",
+      "sha256": "fd7117c36f90040a8c59368af1c2e0523707da8d92a6b7dddcc561a075c58aad",
+      "bytes": 2006376,
+      "label": "labels_bbox/Dash_0545.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0545.jpg"
+    },
+    {
+      "image": "images/Dash_0546.jpg",
+      "sha256": "52993a0e5122404527e3759e3dc4df9d56eeec983271cf64929b89664991749e",
+      "bytes": 2366814,
+      "label": "labels_bbox/Dash_0546.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0546.jpg"
+    },
+    {
+      "image": "images/Dash_0547.jpg",
+      "sha256": "b72b663b83fcf5ce8d0bd7a9abadf61620336955df0037f5e82852f6305e54eb",
+      "bytes": 2027508,
+      "label": "labels_bbox/Dash_0547.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0547.jpg"
+    },
+    {
+      "image": "images/Dash_0548.jpg",
+      "sha256": "53c3006b7ad59d5664b02ade2e00cc0d0e905fcf315d92450903c79b73904b1b",
+      "bytes": 2298058,
+      "label": "labels_bbox/Dash_0548.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0548.jpg"
+    },
+    {
+      "image": "images/Dash_0550.jpg",
+      "sha256": "e5e8ca7ac49d079ddd8f86a6daf5af650791a8bb1f60e0d741b54c3040d30302",
+      "bytes": 2273785,
+      "label": "labels_bbox/Dash_0550.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0550.jpg"
+    },
+    {
+      "image": "images/Dash_0551.jpg",
+      "sha256": "b2f4a4f0a3d263724966f557924b0fef01d27a742f20eb6dbe9fa5e2e790f4e8",
+      "bytes": 2111312,
+      "label": "labels_bbox/Dash_0551.txt",
+      "source_class_ids": [
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0551.jpg"
+    },
+    {
+      "image": "images/Dash_0552.jpg",
+      "sha256": "9b6bcd757652bb81edef6588f01b06cbf0a53c900a4aa2ab0ccf53bd6f1c1757",
+      "bytes": 1637015,
+      "label": "labels_bbox/Dash_0552.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0552.jpg"
+    },
+    {
+      "image": "images/Dash_0553.jpg",
+      "sha256": "c13fa8de8d5fa3fc76c4938b4bbd5e9afe6a464613ccdf8007ad58f10d11de7d",
+      "bytes": 1681767,
+      "label": "labels_bbox/Dash_0553.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0553.jpg"
+    },
+    {
+      "image": "images/Dash_0554.jpg",
+      "sha256": "f01d786ebfdd745385f87b7c5fba0b2c5d549a4564c453ca08c7cafb13d57ce7",
+      "bytes": 1847580,
+      "label": "labels_bbox/Dash_0554.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0554.jpg"
+    },
+    {
+      "image": "images/Dash_0555.jpg",
+      "sha256": "39c23dbaa8b05343e59c701c4480e7ffa7839802b7a3eb06693b17257f9608b8",
+      "bytes": 1762076,
+      "label": "labels_bbox/Dash_0555.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0555.jpg"
+    },
+    {
+      "image": "images/Dash_0556.jpg",
+      "sha256": "e659e26fcb6991fc77b008d9973c24190590560fa2496b506c2b1a5f43e7c0a1",
+      "bytes": 2120025,
+      "label": "labels_bbox/Dash_0556.txt",
+      "source_class_ids": [
+        3,
+        2
+      ],
+      "gps_image_name": "Dash_0556.jpg"
+    },
+    {
+      "image": "images/Dash_0557.jpg",
+      "sha256": "a6660c4e06eb58cde0a33ec667ac2c1dae131ea91233f6653a79c1a85056b153",
+      "bytes": 2251805,
+      "label": "labels_bbox/Dash_0557.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0557.jpg"
+    },
+    {
+      "image": "images/Dash_0558.jpg",
+      "sha256": "3b44cd8a79c754089c3fa49bc4e61130ec28f6411b6904e16a357076c79a4454",
+      "bytes": 1833143,
+      "label": "labels_bbox/Dash_0558.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0558.jpg"
+    },
+    {
+      "image": "images/Dash_0559.jpg",
+      "sha256": "57250810885a9cdd4925a2355e16fabfdfb2787533291a2e0fb73d52e7c204b0",
+      "bytes": 2326660,
+      "label": "labels_bbox/Dash_0559.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0559.jpg"
+    },
+    {
+      "image": "images/Dash_0560.jpg",
+      "sha256": "1921ed76d1fdfff1747be2ef280de554d38e420a4b5271fc0a4d989ee729e9be",
+      "bytes": 1826896,
+      "label": "labels_bbox/Dash_0560.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0560.jpg"
+    },
+    {
+      "image": "images/Dash_0561.jpg",
+      "sha256": "5d9b13b70aa0d7f8fb1ded6d6fe36e4d0298ec2b96c69b8d240b021f1f2fbe57",
+      "bytes": 2236445,
+      "label": "labels_bbox/Dash_0561.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0561.jpg"
+    },
+    {
+      "image": "images/Dash_0562.jpg",
+      "sha256": "b0b2efe23e5dc6c4c54dd234900047fdbd2af9dc41fbfca2b308bb000c4d16b0",
+      "bytes": 1900828,
+      "label": "labels_bbox/Dash_0562.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0562.jpg"
+    },
+    {
+      "image": "images/Dash_0563.jpg",
+      "sha256": "3c44644a249109fb83de837d3afc537c7ae45137f4b0e12134f9077dc5c259d5",
+      "bytes": 2113943,
+      "label": "labels_bbox/Dash_0563.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0563.jpg"
+    },
+    {
+      "image": "images/Dash_0564.jpg",
+      "sha256": "e4b18a49a0529afb5d0675dd3b0fb15e7858b4975aa497f3ed59907ce611da79",
+      "bytes": 1882425,
+      "label": "labels_bbox/Dash_0564.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0564.jpg"
+    },
+    {
+      "image": "images/Dash_0566.jpg",
+      "sha256": "4147db3ab59f60c1c224d66f691330925f4607422d7e0e473845ac228c69976a",
+      "bytes": 1631804,
+      "label": "labels_bbox/Dash_0566.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0566.jpg"
+    },
+    {
+      "image": "images/Dash_0568.jpg",
+      "sha256": "498a5f06791b4d5d8c5484f16d5931c31817d2ef846995a6ef2b7f299df94ffa",
+      "bytes": 1622170,
+      "label": "labels_bbox/Dash_0568.txt",
+      "source_class_ids": [
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0568.jpg"
+    },
+    {
+      "image": "images/Dash_0570.jpg",
+      "sha256": "7ea7ab781ab9e45a0be960083a55638189b7f5fce92706d29dd9f33639b3aedf",
+      "bytes": 1644213,
+      "label": "labels_bbox/Dash_0570.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0570.jpg"
+    },
+    {
+      "image": "images/Dash_0571.jpg",
+      "sha256": "2f76341928f29aa6a02db2d7e2d719bd2d97a384ef794b61f93924352bb4cce3",
+      "bytes": 2958895,
+      "label": "labels_bbox/Dash_0571.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0571.jpg"
+    },
+    {
+      "image": "images/Dash_0572.jpg",
+      "sha256": "771d828a450e82fae68541fe4cacee305004e49841c644cfb4bfc78fd258ee36",
+      "bytes": 2345293,
+      "label": "labels_bbox/Dash_0572.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0572.jpg"
+    },
+    {
+      "image": "images/Dash_0573.jpg",
+      "sha256": "30b983e2fe19900a90cc716d0c28cdfd509fb1ffa07bfc4db57c9488ca758c35",
+      "bytes": 1927424,
+      "label": "labels_bbox/Dash_0573.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0573.jpg"
+    },
+    {
+      "image": "images/Dash_0574.jpg",
+      "sha256": "b8e92a076cb64d5b44c3c0192977b67ebf606ecd81b0d5adae6b873727db688e",
+      "bytes": 1554164,
+      "label": "labels_bbox/Dash_0574.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0574.jpg"
+    },
+    {
+      "image": "images/Dash_0575.jpg",
+      "sha256": "5919885608cd96db3a38b8aa264d64e4b976a58138750c5203dd89d582b40de0",
+      "bytes": 2239636,
+      "label": "labels_bbox/Dash_0575.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0575.jpg"
+    },
+    {
+      "image": "images/Dash_0576.jpg",
+      "sha256": "0b15d8a5b8e69afe4c4ff7c62537a7af659876986b8106216659832288cb8df1",
+      "bytes": 2296345,
+      "label": "labels_bbox/Dash_0576.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0576.jpg"
+    },
+    {
+      "image": "images/Dash_0578.jpg",
+      "sha256": "73a051e1f78246f6f63082afadb2ddc6f1502d06cf7f0b8a2375c045a16f6614",
+      "bytes": 2397070,
+      "label": "labels_bbox/Dash_0578.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0578.jpg"
+    },
+    {
+      "image": "images/Dash_0580.jpg",
+      "sha256": "81cd1c8100d0f581f7020c616343808b7d3853b41c5269d5a4e0663393e2d284",
+      "bytes": 2127764,
+      "label": "labels_bbox/Dash_0580.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0580.jpg"
+    },
+    {
+      "image": "images/Dash_0584.jpg",
+      "sha256": "52516d982d932ba09104850e4b5d6dec1bff4516e9c007cb75ab86ce9a4fd641",
+      "bytes": 2649541,
+      "label": "labels_bbox/Dash_0584.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0584.jpg"
+    },
+    {
+      "image": "images/Dash_0588.jpg",
+      "sha256": "3a22b080c5d756e3783ecd671217f972b4b9399934356c2d254bdad8d5298bd9",
+      "bytes": 3855279,
+      "label": "labels_bbox/Dash_0588.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0588.jpg"
+    },
+    {
+      "image": "images/Dash_0592.jpg",
+      "sha256": "42ff6e22f6d7dfaaa4563a315c2153eaa1c6d6a8c3325308bc93ee5a178e3b41",
+      "bytes": 3300905,
+      "label": "labels_bbox/Dash_0592.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0592.jpg"
+    },
+    {
+      "image": "images/Dash_0596.jpg",
+      "sha256": "2b0be4df80e55e4f23ea1c76211cbb2ab339c1817d92abed4503e7b2a1eb0935",
+      "bytes": 2844227,
+      "label": "labels_bbox/Dash_0596.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0596.jpg"
+    },
+    {
+      "image": "images/Dash_0600.jpg",
+      "sha256": "b43270906d5c552c0b64fe8670218addef99e21501a87c4891e87f5b66717742",
+      "bytes": 2616674,
+      "label": "labels_bbox/Dash_0600.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0600.jpg"
+    },
+    {
+      "image": "images/Dash_0604.jpg",
+      "sha256": "c95605a9fdc731549036caff47e9b3af8ea8d7337fe752a0b21418635534b1da",
+      "bytes": 2951544,
+      "label": "labels_bbox/Dash_0604.txt",
+      "source_class_ids": [
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0604.jpg"
+    },
+    {
+      "image": "images/Dash_0608.jpg",
+      "sha256": "e09562ce9456240f60f63a4bd497aab70d9204621d0c7b060e58661f2b5eebab",
+      "bytes": 2938269,
+      "label": "labels_bbox/Dash_0608.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0608.jpg"
+    },
+    {
+      "image": "images/Dash_0612.jpg",
+      "sha256": "cc7506c3706a4fc4a609831ecf89d928f13559931979a1d8e22d62faf43649f9",
+      "bytes": 2567010,
+      "label": "labels_bbox/Dash_0612.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0612.jpg"
+    },
+    {
+      "image": "images/Dash_0616.jpg",
+      "sha256": "f1017de23ca87d968b6b96c3080150003bf122b4261ec3cdc18e601720d6c3f1",
+      "bytes": 2336098,
+      "label": "labels_bbox/Dash_0616.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0616.jpg"
+    },
+    {
+      "image": "images/Dash_0620.jpg",
+      "sha256": "783ccb5ee0cd8bbfbf77d62a2233308afd168617bd4c768824bac8116addae2b",
+      "bytes": 2640204,
+      "label": "labels_bbox/Dash_0620.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0620.jpg"
+    },
+    {
+      "image": "images/Dash_0624.jpg",
+      "sha256": "b023471540abae8fcbc433f5bdd739e33c6d6c2feee5c7003cfb0662dcfee8cc",
+      "bytes": 2721692,
+      "label": "labels_bbox/Dash_0624.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0624.jpg"
+    },
+    {
+      "image": "images/Dash_0628.jpg",
+      "sha256": "f42749c93f8c6a431a8002c2a36db8047be70b0cca787017e5b87c3cda1a1d4b",
+      "bytes": 2639467,
+      "label": "labels_bbox/Dash_0628.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0628.jpg"
+    },
+    {
+      "image": "images/Dash_0632.jpg",
+      "sha256": "c4778063987fe3d7e250401e0ef932c21d29447a5172e4e8625257e82a864b08",
+      "bytes": 2758408,
+      "label": "labels_bbox/Dash_0632.txt",
+      "source_class_ids": [
+        0,
+        3,
+        1,
+        1,
+        3
+      ],
+      "gps_image_name": "Dash_0632.jpg"
+    },
+    {
+      "image": "images/Dash_0633.jpg",
+      "sha256": "ab6beab1b56a5e4a906e1b41f0fca099c75452fa37f95e5b44d83ce6cbe344ec",
+      "bytes": 2958668,
+      "label": "labels_bbox/Dash_0633.txt",
+      "source_class_ids": [
+        1,
+        3,
+        2,
+        1
+      ],
+      "gps_image_name": "Dash_0633.jpg"
+    },
+    {
+      "image": "images/Dash_0636.jpg",
+      "sha256": "29b3d812902b33d7482a0ba544856626c8766825f63e4b807f0034b3bfa6c978",
+      "bytes": 3614631,
+      "label": "labels_bbox/Dash_0636.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0636.jpg"
+    },
+    {
+      "image": "images/Dash_0638.jpg",
+      "sha256": "df6921b1701f04d8c25098f45eb61be3b052f93342c55e52369369e75b55df92",
+      "bytes": 2228525,
+      "label": "labels_bbox/Dash_0638.txt",
+      "source_class_ids": [
+        3,
+        3,
+        1
+      ],
+      "gps_image_name": "Dash_0638.jpg"
+    },
+    {
+      "image": "images/Dash_0640.jpg",
+      "sha256": "949ba9e55a8edda7974b22bda851964a265a670023d516d89c01d36d1711888c",
+      "bytes": 2242839,
+      "label": "labels_bbox/Dash_0640.txt",
+      "source_class_ids": [
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0640.jpg"
+    },
+    {
+      "image": "images/Dash_0644.jpg",
+      "sha256": "5caaea7e8711aff9f7380a76d8393b9b200295c42001108e1b06817f723130ff",
+      "bytes": 1874198,
+      "label": "labels_bbox/Dash_0644.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0644.jpg"
+    },
+    {
+      "image": "images/Dash_0648.jpg",
+      "sha256": "075360ff81992c3cdf439f9db567c077595f52e525f05f81d7f7c3fae7abe12e",
+      "bytes": 2048701,
+      "label": "labels_bbox/Dash_0648.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0648.jpg"
+    },
+    {
+      "image": "images/Dash_0650.jpg",
+      "sha256": "02fe0aed69fe997db9c7a89c50d85517b882d997d6ad91082986e3192e5eb69b",
+      "bytes": 1908502,
+      "label": "labels_bbox/Dash_0650.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0650.jpg"
+    },
+    {
+      "image": "images/Dash_0651.jpg",
+      "sha256": "d7b3604ad52d4482a31dea702542ae2db29ef880affbe26a2278981235b319c9",
+      "bytes": 2187137,
+      "label": "labels_bbox/Dash_0651.txt",
+      "source_class_ids": [
+        3,
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0651.jpg"
+    },
+    {
+      "image": "images/Dash_0652.jpg",
+      "sha256": "122aabf1baa3067b0ef0a7a4c8122975eb1c5f1e02509eafc8e9d114722c105d",
+      "bytes": 1890029,
+      "label": "labels_bbox/Dash_0652.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0652.jpg"
+    },
+    {
+      "image": "images/Dash_0653.jpg",
+      "sha256": "d3d5742dd338a1f37512e25be2a2f7a9bf8f35292a4c8325de01d27ac8430d24",
+      "bytes": 1892613,
+      "label": "labels_bbox/Dash_0653.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0653.jpg"
+    },
+    {
+      "image": "images/Dash_0654.jpg",
+      "sha256": "9eaf3ddc8104a0e62ba570f2a4cd85b7422a7c8f48408833f3bfb035101297d7",
+      "bytes": 1896193,
+      "label": "labels_bbox/Dash_0654.txt",
+      "source_class_ids": [
+        3,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0654.jpg"
+    },
+    {
+      "image": "images/Dash_0656.jpg",
+      "sha256": "5ece8332e4ccc8e65d44472dfaaf8e729ab5c66509a20684815ffdafefa7fcba",
+      "bytes": 1776799,
+      "label": "labels_bbox/Dash_0656.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0656.jpg"
+    },
+    {
+      "image": "images/Dash_0658.jpg",
+      "sha256": "dbe1fabbbce4d073e9cab3ffd9f7e5764f7fb0089a7ab2382de0f6ff72b63bfd",
+      "bytes": 2228416,
+      "label": "labels_bbox/Dash_0658.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0658.jpg"
+    },
+    {
+      "image": "images/Dash_0660.jpg",
+      "sha256": "99f8befcd068f2707f5ee865bb8cb270096ea4b34e0eda2356861a1703fc3fc6",
+      "bytes": 2143996,
+      "label": "labels_bbox/Dash_0660.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0660.jpg"
+    },
+    {
+      "image": "images/Dash_0664.jpg",
+      "sha256": "59553eee4d7770b0883ebc5e15f3bde1bc0ee99dfce5bcd73a72ae66b02e32cd",
+      "bytes": 2097385,
+      "label": "labels_bbox/Dash_0664.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0664.jpg"
+    },
+    {
+      "image": "images/Dash_0666.jpg",
+      "sha256": "0fe29e95dfcb8bceda2cdea864023c653561fa118ab18fe5f9d2a3eef4ab8c7e",
+      "bytes": 2725452,
+      "label": "labels_bbox/Dash_0666.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0666.jpg"
+    },
+    {
+      "image": "images/Dash_0667.jpg",
+      "sha256": "09e9625937c946741ef3c475f9a24b0beb779de8581db4103020b845543969eb",
+      "bytes": 2247613,
+      "label": "labels_bbox/Dash_0667.txt",
+      "source_class_ids": [
+        0,
+        2
+      ],
+      "gps_image_name": "Dash_0667.jpg"
+    },
+    {
+      "image": "images/Dash_0668.jpg",
+      "sha256": "ec7be5a29ee532208aa59f6bb4db2d1244d124096953a6d6272b05178ddb4a80",
+      "bytes": 2068585,
+      "label": "labels_bbox/Dash_0668.txt",
+      "source_class_ids": [
+        2,
+        1,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0668.jpg"
+    },
+    {
+      "image": "images/Dash_0672.jpg",
+      "sha256": "72d0b52d23c7df9ba00965747b82a2ecfd3c69d33957370c420d1daaafbddc8f",
+      "bytes": 2416951,
+      "label": "labels_bbox/Dash_0672.txt",
+      "source_class_ids": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0672.jpg"
+    },
+    {
+      "image": "images/Dash_0673.jpg",
+      "sha256": "81c366e5322b91cd4c1884f50066ebe81069be51bbdfba23ed92ba19db4687f5",
+      "bytes": 2263733,
+      "label": "labels_bbox/Dash_0673.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0673.jpg"
+    },
+    {
+      "image": "images/Dash_0674.jpg",
+      "sha256": "9ad8c568116ae93506b3fbdecf54fefcfe729396432b96302cf13302b67f0404",
+      "bytes": 2545081,
+      "label": "labels_bbox/Dash_0674.txt",
+      "source_class_ids": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        2,
+        2,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0674.jpg"
+    },
+    {
+      "image": "images/Dash_0675.jpg",
+      "sha256": "f0de3bba84fa9b76df1005f32c40c7aae6dfdca83f941efa70718c7dcfd7e863",
+      "bytes": 2065070,
+      "label": "labels_bbox/Dash_0675.txt",
+      "source_class_ids": [
+        1,
+        2,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0675.jpg"
+    },
+    {
+      "image": "images/Dash_0676.jpg",
+      "sha256": "39c47aec8cb5f2b8eb5b1d30cc22462e12bedf5cbb52ca1a0f53d925325dbda3",
+      "bytes": 2097883,
+      "label": "labels_bbox/Dash_0676.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0676.jpg"
+    },
+    {
+      "image": "images/Dash_0680.jpg",
+      "sha256": "a765e430b304b3baf31b9af0a75018d6ad1a9a19122a4491abbaf4910d0d3ad1",
+      "bytes": 2085633,
+      "label": "labels_bbox/Dash_0680.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0680.jpg"
+    },
+    {
+      "image": "images/Dash_0684.jpg",
+      "sha256": "a36eb4f31633c1234c178c0d5b66328174a7157d157319e4115f71ff7ff6179a",
+      "bytes": 1766832,
+      "label": "labels_bbox/Dash_0684.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0684.jpg"
+    },
+    {
+      "image": "images/Dash_0688.jpg",
+      "sha256": "15ce196537f378ea61f0eebc0bbbc05de93243bbb949e8d8bcc45ce6f46ca835",
+      "bytes": 2095159,
+      "label": "labels_bbox/Dash_0688.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0688.jpg"
+    },
+    {
+      "image": "images/Dash_0692.jpg",
+      "sha256": "0cef3aa77e5ef1de3d81f19ace62615eb8501f8b77f5abe96393cdab7c066557",
+      "bytes": 1718054,
+      "label": "labels_bbox/Dash_0692.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0692.jpg"
+    },
+    {
+      "image": "images/Dash_0693.jpg",
+      "sha256": "f56f37d7c5f25729c5d797a937f6529bfa6939a8a98c2e825dfba06f7359dad9",
+      "bytes": 1624769,
+      "label": "labels_bbox/Dash_0693.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0693.jpg"
+    },
+    {
+      "image": "images/Dash_0696.jpg",
+      "sha256": "7d3e954c5438bd3aa295c494d8a2f3bfc732d5e1551aa21900948e2350ed394b",
+      "bytes": 1940106,
+      "label": "labels_bbox/Dash_0696.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0696.jpg"
+    },
+    {
+      "image": "images/Dash_0700.jpg",
+      "sha256": "6141e2a930c4e2179f98d1abcb6bceac94e542e5cf9b15c2ba20585c99776176",
+      "bytes": 2154437,
+      "label": "labels_bbox/Dash_0700.txt",
+      "source_class_ids": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0700.jpg"
+    },
+    {
+      "image": "images/Dash_0704.jpg",
+      "sha256": "52ae33f41b95792e96f4d99643a9e06fa854cedf4a1e4428ce1653df78e3dcef",
+      "bytes": 2086880,
+      "label": "labels_bbox/Dash_0704.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0704.jpg"
+    },
+    {
+      "image": "images/Dash_0708.jpg",
+      "sha256": "6e59c7df254ee1888b24a8094b1968129c9902e6549e93ce108b9cf9875b6c8f",
+      "bytes": 2201015,
+      "label": "labels_bbox/Dash_0708.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0708.jpg"
+    },
+    {
+      "image": "images/Dash_0712.jpg",
+      "sha256": "8ae8a987e400b42ec5969697bc44c88c75d2bbd5c3ec61b6edaac6cf16392cfe",
+      "bytes": 2518603,
+      "label": "labels_bbox/Dash_0712.txt",
+      "source_class_ids": [
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0712.jpg"
+    },
+    {
+      "image": "images/Dash_0713.jpg",
+      "sha256": "37a537879b2c64f624288cc323c98672b0cb515bcd7bbfa6483b0e914e98d8b3",
+      "bytes": 2236456,
+      "label": "labels_bbox/Dash_0713.txt",
+      "source_class_ids": [
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0713.jpg"
+    },
+    {
+      "image": "images/Dash_0714.jpg",
+      "sha256": "c4a902910b678ff389dc15fd92971ff308be4d82ad1856aef0e33a787e0c4a48",
+      "bytes": 2220017,
+      "label": "labels_bbox/Dash_0714.txt",
+      "source_class_ids": [
+        0,
+        1,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0714.jpg"
+    },
+    {
+      "image": "images/Dash_0716.jpg",
+      "sha256": "26e170f43101456dbb1a3cffd3cdcdfc58c1638695eb08f47229853688e6de68",
+      "bytes": 2123458,
+      "label": "labels_bbox/Dash_0716.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0716.jpg"
+    },
+    {
+      "image": "images/Dash_0720.jpg",
+      "sha256": "6ba310c8c85360d8f1de63e358a4672e071e973733e0eaf8b2383868c1ba054a",
+      "bytes": 1674901,
+      "label": "labels_bbox/Dash_0720.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0720.jpg"
+    },
+    {
+      "image": "images/Dash_0721.jpg",
+      "sha256": "25452352132d86fc2afb91f7cf5c94c728cccd8f617f905b8cab634f796631cf",
+      "bytes": 1636395,
+      "label": "labels_bbox/Dash_0721.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0721.jpg"
+    },
+    {
+      "image": "images/Dash_0722.jpg",
+      "sha256": "d1f16e4997cd404ecd7582fd9370a95e597cc0572d7bf5c9a5c872a1bc22248d",
+      "bytes": 1864933,
+      "label": "labels_bbox/Dash_0722.txt",
+      "source_class_ids": [
+        2,
+        3,
+        2
+      ],
+      "gps_image_name": "Dash_0722.jpg"
+    },
+    {
+      "image": "images/Dash_0723.jpg",
+      "sha256": "4d14d0461663595394b0a097af8385efa225edd10e496469539a8ebf4bb9ab1f",
+      "bytes": 1789866,
+      "label": "labels_bbox/Dash_0723.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0723.jpg"
+    },
+    {
+      "image": "images/Dash_0724.jpg",
+      "sha256": "ed21d7a3002d4c63700359126b47ed18fa43bd5c86adfe78c12e5cf8d40752ac",
+      "bytes": 3757294,
+      "label": "labels_bbox/Dash_0724.txt",
+      "source_class_ids": [
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0724.jpg"
+    },
+    {
+      "image": "images/Dash_0728.jpg",
+      "sha256": "f9612dcf350ffde363c9770dc3f08bdc803b16817f3021e2883c1bad279efa2b",
+      "bytes": 3874845,
+      "label": "labels_bbox/Dash_0728.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0728.jpg"
+    },
+    {
+      "image": "images/Dash_0732.jpg",
+      "sha256": "e739ef30c1b9927393fb48eecc134d3802ffd07a9fcc96d8a0400aa97f0c0337",
+      "bytes": 3758229,
+      "label": "labels_bbox/Dash_0732.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0732.jpg"
+    },
+    {
+      "image": "images/Dash_0736.jpg",
+      "sha256": "b0d48e8fb5bd9bd9b3cc5b7e4b508742b0a3c656ca920ba46297ea061c9cfbd5",
+      "bytes": 3994977,
+      "label": "labels_bbox/Dash_0736.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0736.jpg"
+    },
+    {
+      "image": "images/Dash_0740.jpg",
+      "sha256": "ebc920844400d33aa63aeea815b8ca94a051e5f125fbc13f181fed0c1301193b",
+      "bytes": 3889424,
+      "label": "labels_bbox/Dash_0740.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0740.jpg"
+    },
+    {
+      "image": "images/Dash_0744.jpg",
+      "sha256": "888fb69fee9a2ff97b5bf40299958be7472297972d8118317b38fbe4240a4bfb",
+      "bytes": 3838100,
+      "label": "labels_bbox/Dash_0744.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0744.jpg"
+    },
+    {
+      "image": "images/Dash_0748.jpg",
+      "sha256": "2489907bedab8229947f9d789d4cfced8865dd9b266e2fa31b8738707586550b",
+      "bytes": 3736675,
+      "label": "labels_bbox/Dash_0748.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0748.jpg"
+    },
+    {
+      "image": "images/Dash_0752.jpg",
+      "sha256": "0086025f4375afcb867fb73df415e1c9d85bd20fc4277684d30493c334f70fce",
+      "bytes": 3489714,
+      "label": "labels_bbox/Dash_0752.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0752.jpg"
+    },
+    {
+      "image": "images/Dash_0756.jpg",
+      "sha256": "79549131cc478335f482165bf2ef9396f0c52a570aacf35461a7fd04c4b92c10",
+      "bytes": 3690453,
+      "label": "labels_bbox/Dash_0756.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0756.jpg"
+    },
+    {
+      "image": "images/Dash_0757.jpg",
+      "sha256": "4bf136fbe8f7db8af5d2201e54472feb91c66b017004ac6f122c32c7e0746341",
+      "bytes": 4149774,
+      "label": "labels_bbox/Dash_0757.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0757.jpg"
+    },
+    {
+      "image": "images/Dash_0760.jpg",
+      "sha256": "6b1c8db489a682365ea2d4d9801fbd5221b4137ff5ed8439a4b178268e0a6e8c",
+      "bytes": 3724994,
+      "label": "labels_bbox/Dash_0760.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0760.jpg"
+    },
+    {
+      "image": "images/Dash_0764.jpg",
+      "sha256": "f8bfbd715cfb49bb39d8626a660375c582860fcbcf8bebe2e1f48af56b897c25",
+      "bytes": 3736940,
+      "label": "labels_bbox/Dash_0764.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0764.jpg"
+    },
+    {
+      "image": "images/Dash_0768.jpg",
+      "sha256": "0087a3ffa6a4b8c97f1c74af9c762e78dec5a1380a2080cdd4bafdcc4714d277",
+      "bytes": 3880890,
+      "label": "labels_bbox/Dash_0768.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0768.jpg"
+    },
+    {
+      "image": "images/Dash_0772.jpg",
+      "sha256": "971d6f443fe00b9bda2823520e7104d288149f7e291ef84c1afb03aaf583a0f0",
+      "bytes": 3557279,
+      "label": "labels_bbox/Dash_0772.txt",
+      "source_class_ids": [
+        0,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0772.jpg"
+    },
+    {
+      "image": "images/Dash_0776.jpg",
+      "sha256": "d12bb36e08cdae97e053d09ba129c2f5d62ac16e77642b62d3003693c2a7f7aa",
+      "bytes": 3816321,
+      "label": "labels_bbox/Dash_0776.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0776.jpg"
+    },
+    {
+      "image": "images/Dash_0780.jpg",
+      "sha256": "4c7a550a954a86505c7933b004b380ab799f996673e214e1fc9eb2494dd029c5",
+      "bytes": 3541663,
+      "label": "labels_bbox/Dash_0780.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0780.jpg"
+    },
+    {
+      "image": "images/Dash_0784.jpg",
+      "sha256": "e63960bd677ebcb63512d33a1e194e8160c19bf1911c4adac198f9d9de9d3a29",
+      "bytes": 3577361,
+      "label": "labels_bbox/Dash_0784.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0784.jpg"
+    },
+    {
+      "image": "images/Dash_0785.jpg",
+      "sha256": "58b5351ac3ffa1ac63fda0cdc556e06840db65274a0f4f75f33b438ae7de7a54",
+      "bytes": 3697133,
+      "label": "labels_bbox/Dash_0785.txt",
+      "source_class_ids": [
+        0,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0785.jpg"
+    },
+    {
+      "image": "images/Dash_0788.jpg",
+      "sha256": "c79a09c29b9423570738327d697bbc53d79aeac999c80e0c9b989fd4f3e2b30c",
+      "bytes": 3350152,
+      "label": "labels_bbox/Dash_0788.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0788.jpg"
+    },
+    {
+      "image": "images/Dash_0792.jpg",
+      "sha256": "db99c9944e6f6d5b9ebf4e066fdbe9daa33aec66fc32d4cc833568cee7311a91",
+      "bytes": 2964187,
+      "label": "labels_bbox/Dash_0792.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0792.jpg"
+    },
+    {
+      "image": "images/Dash_0796.jpg",
+      "sha256": "b6fee14aeeba98a837eb6203141fadbdc196d3833c836b2a83546254648956fc",
+      "bytes": 3039944,
+      "label": "labels_bbox/Dash_0796.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0796.jpg"
+    },
+    {
+      "image": "images/Dash_0799.jpg",
+      "sha256": "d86ed5a219226e82ef6bb567ba1f821ea1e0f0534a0120b741ef46bfac385e65",
+      "bytes": 3044523,
+      "label": "labels_bbox/Dash_0799.txt",
+      "source_class_ids": [
+        1,
+        0,
+        3
+      ],
+      "gps_image_name": "Dash_0799.jpg"
+    },
+    {
+      "image": "images/Dash_0800.jpg",
+      "sha256": "2100db00cec15b341302eeeff4d696a55c981886a4c21d03ef8c473cd939179f",
+      "bytes": 3188910,
+      "label": "labels_bbox/Dash_0800.txt",
+      "source_class_ids": [
+        1,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0800.jpg"
+    },
+    {
+      "image": "images/Dash_0801.jpg",
+      "sha256": "5a26940d16095d9ef26dd1f1085d0890362e2326af555c7211d30aa35efbba57",
+      "bytes": 2880954,
+      "label": "labels_bbox/Dash_0801.txt",
+      "source_class_ids": [
+        3,
+        0,
+        1,
+        3,
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0801.jpg"
+    },
+    {
+      "image": "images/Dash_0802.jpg",
+      "sha256": "2b0be4df80e55e4f23ea1c76211cbb2ab339c1817d92abed4503e7b2a1eb0935",
+      "bytes": 2844227,
+      "label": "labels_bbox/Dash_0802.txt",
+      "source_class_ids": [
+        3,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0802.jpg"
+    },
+    {
+      "image": "images/Dash_0804.jpg",
+      "sha256": "b439a52a39d56ff4700cbfde19bf9510303b61ed6fa355a4551484556f7f17d8",
+      "bytes": 3633023,
+      "label": "labels_bbox/Dash_0804.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0804.jpg"
+    },
+    {
+      "image": "images/Dash_0808.jpg",
+      "sha256": "a04152b8f2c9be5af8df1ec0706151abb016b07a0fd0261fb033c9897b16b153",
+      "bytes": 2377259,
+      "label": "labels_bbox/Dash_0808.txt",
+      "source_class_ids": [
+        0,
+        3,
+        0,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0808.jpg"
+    },
+    {
+      "image": "images/Dash_0812.jpg",
+      "sha256": "d5069853c4fe34130e1731590e72e9c29210d72a7963dcb22318b72655a96b37",
+      "bytes": 3106902,
+      "label": "labels_bbox/Dash_0812.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0812.jpg"
+    },
+    {
+      "image": "images/Dash_0816.jpg",
+      "sha256": "69e7101e346f6c5bbefaa83626e10971fc2022c8a84a813cd5c9471d70f0d4b1",
+      "bytes": 2376099,
+      "label": "labels_bbox/Dash_0816.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0816.jpg"
+    },
+    {
+      "image": "images/Dash_0820.jpg",
+      "sha256": "efcd34c28b3bc55eb233a79199f2847a6eb7aacbfe6c9c3f052c5466b7b8421c",
+      "bytes": 2576824,
+      "label": "labels_bbox/Dash_0820.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0820.jpg"
+    },
+    {
+      "image": "images/Dash_0824.jpg",
+      "sha256": "26e2e982cb24f250209affb64bece5241d7cc747d6f5c679dd0a3e7cbd4abba2",
+      "bytes": 2706579,
+      "label": "labels_bbox/Dash_0824.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0824.jpg"
+    },
+    {
+      "image": "images/Dash_0828.jpg",
+      "sha256": "5385e2fc877495cbc3c0c4af60985f49c8f43804eb90e38c18ffdfee77995c75",
+      "bytes": 2550692,
+      "label": "labels_bbox/Dash_0828.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0828.jpg"
+    },
+    {
+      "image": "images/Dash_0832.jpg",
+      "sha256": "bbf3af4b78f0d5c72677de2f3e8ab724f95e47e0efcd0704884d5091ad95b83f",
+      "bytes": 2909379,
+      "label": "labels_bbox/Dash_0832.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0832.jpg"
+    },
+    {
+      "image": "images/Dash_0836.jpg",
+      "sha256": "7230c6eb8e1430bee18254f69dacfdd7bea9ed4fd2aa1c9af2b8dd593acfa881",
+      "bytes": 2818365,
+      "label": "labels_bbox/Dash_0836.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0836.jpg"
+    },
+    {
+      "image": "images/Dash_0840.jpg",
+      "sha256": "4daa9bf922f1dcbc5120eaa4c0343ee0ca1a5c0b624470082ea732fd996be748",
+      "bytes": 2988250,
+      "label": "labels_bbox/Dash_0840.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0840.jpg"
+    },
+    {
+      "image": "images/Dash_0844.jpg",
+      "sha256": "48f584cd2381063c2fcae898da33a30a009a00d6c6d73470e2c3c160bc3b6ae5",
+      "bytes": 2913597,
+      "label": "labels_bbox/Dash_0844.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0844.jpg"
+    },
+    {
+      "image": "images/Dash_0848.jpg",
+      "sha256": "df24e337b9bb41a2842b54c36143d582b0321f1c8fa2aea88caa432f42a1316c",
+      "bytes": 2992494,
+      "label": "labels_bbox/Dash_0848.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0848.jpg"
+    },
+    {
+      "image": "images/Dash_0852.jpg",
+      "sha256": "e20b9d8c766b43a7a29bba8d82feea82b9d96273bdd5cc4eedd39416330c1904",
+      "bytes": 2621928,
+      "label": "labels_bbox/Dash_0852.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0852.jpg"
+    },
+    {
+      "image": "images/Dash_0856.jpg",
+      "sha256": "17c18576deee51c3e71ee64556737ff7b7ab2ee400270cc2367f261a139e1d44",
+      "bytes": 2781815,
+      "label": "labels_bbox/Dash_0856.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0856.jpg"
+    },
+    {
+      "image": "images/Dash_0860.jpg",
+      "sha256": "3026acb3f060b6cf8d6b8f9e158b6a818c15c6e3d24ec540a7ef8b5d06350de4",
+      "bytes": 2888276,
+      "label": "labels_bbox/Dash_0860.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0860.jpg"
+    },
+    {
+      "image": "images/Dash_0864.jpg",
+      "sha256": "857442c07556e16d0d1fc1ccd3fe107d64870c831697fe089ce7806f51066fc8",
+      "bytes": 1985534,
+      "label": "labels_bbox/Dash_0864.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0864.jpg"
+    },
+    {
+      "image": "images/Dash_0868.jpg",
+      "sha256": "274c6d3ad534765e309228547f8b4b5c8e6c6c6af52f7971c037f9bee56df4e7",
+      "bytes": 2314240,
+      "label": "labels_bbox/Dash_0868.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0868.jpg"
+    },
+    {
+      "image": "images/Dash_0872.jpg",
+      "sha256": "09a4d548c9841b90c2640e1316c761fe2f0c66988684229feced6c1a8e546312",
+      "bytes": 2299002,
+      "label": "labels_bbox/Dash_0872.txt",
+      "source_class_ids": [
+        1,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0872.jpg"
+    },
+    {
+      "image": "images/Dash_0876.jpg",
+      "sha256": "124f0fa364483393f3587fe53a9a77e93c562e5980e543725905991b7a1cd06c",
+      "bytes": 2431382,
+      "label": "labels_bbox/Dash_0876.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0876.jpg"
+    },
+    {
+      "image": "images/Dash_0880.jpg",
+      "sha256": "d0b981408a23be235b0e78df0312ac37dd70f76b5e798d1f641aebe68226905d",
+      "bytes": 2598098,
+      "label": "labels_bbox/Dash_0880.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0880.jpg"
+    },
+    {
+      "image": "images/Dash_0884.jpg",
+      "sha256": "427aab40cb877a00979d40904ae04122198b3eafa66223618fa09bd3b06e3667",
+      "bytes": 2911951,
+      "label": "labels_bbox/Dash_0884.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0884.jpg"
+    },
+    {
+      "image": "images/Dash_0888.jpg",
+      "sha256": "53412fd48166f57a178a139c5ac61f7efc733e811bba445540583e3c02fb440a",
+      "bytes": 2335521,
+      "label": "labels_bbox/Dash_0888.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0888.jpg"
+    },
+    {
+      "image": "images/Dash_0892.jpg",
+      "sha256": "0b7669e1de2447500a15aa3cc50e6cab9751196c8c91ea08a97af05b8106cc35",
+      "bytes": 3036559,
+      "label": "labels_bbox/Dash_0892.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0892.jpg"
+    },
+    {
+      "image": "images/Dash_0896.jpg",
+      "sha256": "783ccb5ee0cd8bbfbf77d62a2233308afd168617bd4c768824bac8116addae2b",
+      "bytes": 2640204,
+      "label": "labels_bbox/Dash_0896.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0896.jpg"
+    },
+    {
+      "image": "images/Dash_0900.jpg",
+      "sha256": "0fd46db57c6a21657a862f9904a4bb9c2fcf1acac0982e5202f5a672168ae201",
+      "bytes": 2703563,
+      "label": "labels_bbox/Dash_0900.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0900.jpg"
+    },
+    {
+      "image": "images/Dash_0904.jpg",
+      "sha256": "44f67c5dbe94358c196b33e0b7d52fd1e1ce87a25ee3759422292195a8ee5aa6",
+      "bytes": 2412521,
+      "label": "labels_bbox/Dash_0904.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0904.jpg"
+    },
+    {
+      "image": "images/Dash_0906.jpg",
+      "sha256": "5ba847cfd4773ad3d7e71241e35d91acb7be2d00f93fce7fd2e3d59a8856cc8f",
+      "bytes": 2807848,
+      "label": "labels_bbox/Dash_0906.txt",
+      "source_class_ids": [
+        2,
+        1,
+        3,
+        1
+      ],
+      "gps_image_name": "Dash_0906.jpg"
+    },
+    {
+      "image": "images/Dash_0908.jpg",
+      "sha256": "ec2f810581f1806295d362da330028887dd36abc77e3d01aae6995348f93236b",
+      "bytes": 2782894,
+      "label": "labels_bbox/Dash_0908.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0908.jpg"
+    },
+    {
+      "image": "images/Dash_0912.jpg",
+      "sha256": "4163757b6cb81c36f317b5fa294e624213d93e7e0220f7e9948fcb6ba7c2b995",
+      "bytes": 2919455,
+      "label": "labels_bbox/Dash_0912.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0912.jpg"
+    },
+    {
+      "image": "images/Dash_0914.jpg",
+      "sha256": "ceec9b34116af93aa6be45bd5aaa8f8a26bba9638e83bb09db10e19c6b4e9a7c",
+      "bytes": 2906556,
+      "label": "labels_bbox/Dash_0914.txt",
+      "source_class_ids": [
+        3,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0914.jpg"
+    },
+    {
+      "image": "images/Dash_0916.jpg",
+      "sha256": "424e5d4a0075555313cefb74102874b3e1bfaebe0a24e4afd1088e461e8bd30d",
+      "bytes": 2895845,
+      "label": "labels_bbox/Dash_0916.txt",
+      "source_class_ids": [
+        3,
+        1,
+        3,
+        0,
+        2,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0916.jpg"
+    },
+    {
+      "image": "images/Dash_0918.jpg",
+      "sha256": "c9ebeedb9993c2c796dd0282a818fd04c617b326f0a974bcda91ba28e6302fe0",
+      "bytes": 3037851,
+      "label": "labels_bbox/Dash_0918.txt",
+      "source_class_ids": [
+        0,
+        1,
+        2
+      ],
+      "gps_image_name": "Dash_0918.jpg"
+    },
+    {
+      "image": "images/Dash_0920.jpg",
+      "sha256": "a7c529d964c331b9289f13ea4b7d7759d848ff0fdc55e76805da8674431dec9c",
+      "bytes": 2715511,
+      "label": "labels_bbox/Dash_0920.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0920.jpg"
+    },
+    {
+      "image": "images/Dash_0921.jpg",
+      "sha256": "bfc6dbff7a907574ee1de24bbabe3d0b738a2e6130e8e3489a2e98570fe313ba",
+      "bytes": 3105805,
+      "label": "labels_bbox/Dash_0921.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        3,
+        0
+      ],
+      "gps_image_name": "Dash_0921.jpg"
+    },
+    {
+      "image": "images/Dash_0924.jpg",
+      "sha256": "ae9c7511a5668a88cb820602738ddf766f5cd19ba71a85c810591656a25c89a5",
+      "bytes": 3088539,
+      "label": "labels_bbox/Dash_0924.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0924.jpg"
+    },
+    {
+      "image": "images/Dash_0925.jpg",
+      "sha256": "6db75b5f1b3978ed0f919ccf46ceda07ae0c0cd23b9a7295bf5b453b2160f5cb",
+      "bytes": 2787258,
+      "label": "labels_bbox/Dash_0925.txt",
+      "source_class_ids": [
+        0,
+        0,
+        1,
+        3,
+        0,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0925.jpg"
+    },
+    {
+      "image": "images/Dash_0928.jpg",
+      "sha256": "898e9f1ea6fd206baca2299d4e8f021dd8f3640705e30a7afd78151bf652957d",
+      "bytes": 2758561,
+      "label": "labels_bbox/Dash_0928.txt",
+      "source_class_ids": [
+        1,
+        1,
+        0
+      ],
+      "gps_image_name": "Dash_0928.jpg"
+    },
+    {
+      "image": "images/Dash_0930.jpg",
+      "sha256": "ab6beab1b56a5e4a906e1b41f0fca099c75452fa37f95e5b44d83ce6cbe344ec",
+      "bytes": 2958668,
+      "label": "labels_bbox/Dash_0930.txt",
+      "source_class_ids": [
+        3,
+        2,
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0930.jpg"
+    },
+    {
+      "image": "images/Dash_0932.jpg",
+      "sha256": "74ce4f0d138a51d63f3779c449d79640bfb3060aaca3d06a1228ee3580fc4bce",
+      "bytes": 2807853,
+      "label": "labels_bbox/Dash_0932.txt",
+      "source_class_ids": [
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0932.jpg"
+    },
+    {
+      "image": "images/Dash_0936.jpg",
+      "sha256": "b38047b1c3ee0f89d363768bf5c25fec8cc3cb5ad988227837d9f887bd80827d",
+      "bytes": 3651436,
+      "label": "labels_bbox/Dash_0936.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0936.jpg"
+    },
+    {
+      "image": "images/Dash_0937.jpg",
+      "sha256": "1fba19d653664de0f7b950bec8fdfe232039755cfe688144c7029632d2deb8ac",
+      "bytes": 3983718,
+      "label": "labels_bbox/Dash_0937.txt",
+      "source_class_ids": [
+        3,
+        3
+      ],
+      "gps_image_name": "Dash_0937.jpg"
+    },
+    {
+      "image": "images/Dash_0940.jpg",
+      "sha256": "a7a6ac445ba36d8003cb5b2cddb4e059bc8ce161abac48e7ee6fc1da79c83535",
+      "bytes": 4186625,
+      "label": "labels_bbox/Dash_0940.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0940.jpg"
+    },
+    {
+      "image": "images/Dash_0944.jpg",
+      "sha256": "d7fa0a58f4b84b34e5c8e83b9d416602ec15cb24c6e06495fad6023e90f5ded1",
+      "bytes": 3862699,
+      "label": "labels_bbox/Dash_0944.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0944.jpg"
+    },
+    {
+      "image": "images/Dash_0948.jpg",
+      "sha256": "1845d7964ddd9e0b996002180be6456e1a37a779bd3738e300ecf6abf62e518c",
+      "bytes": 4101862,
+      "label": "labels_bbox/Dash_0948.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0948.jpg"
+    },
+    {
+      "image": "images/Dash_0952.jpg",
+      "sha256": "0eaa613fa41b4c75434cf6762b7471ffa019ade593581b33ad44de2878b4f17b",
+      "bytes": 4078061,
+      "label": "labels_bbox/Dash_0952.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0952.jpg"
+    },
+    {
+      "image": "images/Dash_0956.jpg",
+      "sha256": "3007f456d0812c475aab4e2a04414e387afb6ad98f1dcb3aea85c3bf6bf76acb",
+      "bytes": 3035749,
+      "label": "labels_bbox/Dash_0956.txt",
+      "source_class_ids": [
+        1,
+        1
+      ],
+      "gps_image_name": "Dash_0956.jpg"
+    },
+    {
+      "image": "images/Dash_0960.jpg",
+      "sha256": "2a5484698d55ac33a0cc55dce8e89df6971ef25b945e434b1e317b8e0f0ebb65",
+      "bytes": 3095725,
+      "label": "labels_bbox/Dash_0960.txt",
+      "source_class_ids": [
+        1
+      ],
+      "gps_image_name": "Dash_0960.jpg"
+    },
+    {
+      "image": "images/Dash_0964.jpg",
+      "sha256": "8b1e52724c532b14da62125e66791b5925ca15fc173e44530280cff0c7bca16a",
+      "bytes": 2828761,
+      "label": "labels_bbox/Dash_0964.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0964.jpg"
+    },
+    {
+      "image": "images/Dash_0965.jpg",
+      "sha256": "92de29e8e9dfbc5f5c4eedfd6e5a23e464b0a7624d94b4bd03cd78c72e447036",
+      "bytes": 2757853,
+      "label": "labels_bbox/Dash_0965.txt",
+      "source_class_ids": [
+        3
+      ],
+      "gps_image_name": "Dash_0965.jpg"
+    },
+    {
+      "image": "images/Dash_0966.jpg",
+      "sha256": "d72c1083f06bc8744885fb9d922fc0bee1007918624cb951d1c7ca5015f2f590",
+      "bytes": 2802187,
+      "label": "labels_bbox/Dash_0966.txt",
+      "source_class_ids": [
+        0,
+        1,
+        3,
+        1
+      ],
+      "gps_image_name": "Dash_0966.jpg"
+    },
+    {
+      "image": "images/Dash_0968.jpg",
+      "sha256": "076dfcf8dd05eed2870b968313119f0be7246e805c4360bd15378f0f46cf2b9f",
+      "bytes": 2128202,
+      "label": "labels_bbox/Dash_0968.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0968.jpg"
+    },
+    {
+      "image": "images/Dash_0972.jpg",
+      "sha256": "630e1b685c134185428abc8c698a3f6fffa9ded60b0618096f980fcd6909be6e",
+      "bytes": 3060118,
+      "label": "labels_bbox/Dash_0972.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0972.jpg"
+    },
+    {
+      "image": "images/Dash_0976.jpg",
+      "sha256": "e614d5717004f7c9fe9e737408fc82c4e040e373c0976f7f92627072ac7bae20",
+      "bytes": 3090612,
+      "label": "labels_bbox/Dash_0976.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0976.jpg"
+    },
+    {
+      "image": "images/Dash_0980.jpg",
+      "sha256": "14e377b5e5138bf20f40b699db49efed9e4f80c5bb90fc5c00f59a45b6b7e6c9",
+      "bytes": 2991654,
+      "label": "labels_bbox/Dash_0980.txt",
+      "source_class_ids": [
+        0
+      ],
+      "gps_image_name": "Dash_0980.jpg"
+    },
+    {
+      "image": "images/Dash_0982.jpg",
+      "sha256": "9961e33c346d3cf4beea290b3e2230a60ba871ec86c230977602748ef6ff59b7",
+      "bytes": 2735304,
+      "label": "labels_bbox/Dash_0982.txt",
+      "source_class_ids": [
+        1,
+        0,
+        0,
+        2,
+        0
+      ],
+      "gps_image_name": "Dash_0982.jpg"
+    },
+    {
+      "image": "images/Dash_0984.jpg",
+      "sha256": "f72a832c02b3458f5cf20a8ece35f24e2c807c7cbbfb1b6f1ae96e10d6ebba7b",
+      "bytes": 2297803,
+      "label": "labels_bbox/Dash_0984.txt",
+      "source_class_ids": [
+        0,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0984.jpg"
+    },
+    {
+      "image": "images/Dash_0986.jpg",
+      "sha256": "d24d3258f2fad3b43645929f9c11b04fbed097ab037275b0a37921b711a7848d",
+      "bytes": 2750351,
+      "label": "labels_bbox/Dash_0986.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0986.jpg"
+    },
+    {
+      "image": "images/Dash_0987.jpg",
+      "sha256": "11153977ace297bd66b1cff00290118022677682197826fe883a6e06b2970aba",
+      "bytes": 3011103,
+      "label": "labels_bbox/Dash_0987.txt",
+      "source_class_ids": [
+        2,
+        1,
+        0,
+        0
+      ],
+      "gps_image_name": "Dash_0987.jpg"
+    },
+    {
+      "image": "images/Dash_0988.jpg",
+      "sha256": "c23e53fdaf9812e3dacc14efc8a385eea69e75811ef09b6471d643ac0b7bbf44",
+      "bytes": 2755292,
+      "label": "labels_bbox/Dash_0988.txt",
+      "source_class_ids": [
+        0,
+        2,
+        0,
+        1
+      ],
+      "gps_image_name": "Dash_0988.jpg"
+    },
+    {
+      "image": "images/Dash_0990.jpg",
+      "sha256": "c0cbac61939d1d29ea38978747ec621a2035f6e5dc537ec3ffb0225b3cb6aa68",
+      "bytes": 3046968,
+      "label": "labels_bbox/Dash_0990.txt",
+      "source_class_ids": [
+        2
+      ],
+      "gps_image_name": "Dash_0990.jpg"
+    },
+    {
+      "image": "images/Dash_0992.jpg",
+      "sha256": "30f087dade8c6bc187927bd1af245d9af67b2942590d13683f322f65c368a789",
+      "bytes": 2278348,
+      "label": "labels_bbox/Dash_0992.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0992.jpg"
+    },
+    {
+      "image": "images/Dash_0994.jpg",
+      "sha256": "512097db36ea7f0ddfd700240a32ddf5c7df0b13575010a7b5c4683015e6f6b1",
+      "bytes": 2464403,
+      "label": "labels_bbox/Dash_0994.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0994.jpg"
+    },
+    {
+      "image": "images/Dash_0996.jpg",
+      "sha256": "b972649ade288837a2b2cd11ff93b85e966eb10d83f08eada90c07b2d0ddecae",
+      "bytes": 2494838,
+      "label": "labels_bbox/Dash_0996.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0996.jpg"
+    },
+    {
+      "image": "images/Dash_0998.jpg",
+      "sha256": "dfc738ba7e0f75a5e75fa54249100a2077438d5834b179f2b4dbee7b11ef5510",
+      "bytes": 1841392,
+      "label": "labels_bbox/Dash_0998.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_0998.jpg"
+    },
+    {
+      "image": "images/Dash_1000.jpg",
+      "sha256": "896b4684b59dc450cf27ae75ce16e5a0db17ca20ba6e59f2042a25d15031a34d",
+      "bytes": 2057397,
+      "label": "labels_bbox/Dash_1000.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_1000.jpg"
+    },
+    {
+      "image": "images/Dash_1004.jpg",
+      "sha256": "8ac16179fc52caf0e9d592745d06aad667d698ed80ddcdffe497b1eedfa40a53",
+      "bytes": 2461122,
+      "label": "labels_bbox/Dash_1004.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_1004.jpg"
+    },
+    {
+      "image": "images/Dash_1006.jpg",
+      "sha256": "faffb4d3b0403451f9964a95d3e9107227ebebb85490ea77ad85d961d3288d8c",
+      "bytes": 2873992,
+      "label": "labels_bbox/Dash_1006.txt",
+      "source_class_ids": [],
+      "gps_image_name": "Dash_1006.jpg"
+    }
+  ],
+  "acquired_at": "2026-09-23T19:50:26.366828+00:00"
+}

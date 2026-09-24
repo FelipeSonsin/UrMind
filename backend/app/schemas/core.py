@@ -2,12 +2,58 @@
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def decode_page_cursor(value: str | None) -> tuple[datetime, uuid.UUID] | None:
+    """Internal keyset boundary, not an authorization token."""
+    if value is None:
+        return None
+    timestamp, identifier = value.split("|", 1)
+    at = datetime.fromisoformat(timestamp)
+    if at.utcoffset() is None:
+        raise ValueError("Cursor requires an aware timestamp")
+    return at, uuid.UUID(identifier)
+
+
+class PublicationRequest(BaseModel):
+    """Reviewer publication is separate from a model result or ground truth."""
+
+    model_config = ConfigDict(extra="forbid")
+    publish: bool
+    review_id: uuid.UUID | None = None
+    visible_content_reviewed: bool = False
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class PhotoGatePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    public_capture_markers_enabled: bool = False
+    min_side: int = Field(default=640, ge=256, le=4096)
+    brightness_min: float = Field(default=20, ge=0, le=100)
+    brightness_max: float = Field(default=240, ge=150, le=255)
+    laplacian_min: float = Field(default=25, ge=1, le=1000)
+    phash_distance: int = Field(default=6, ge=0, le=16)
+    old_photo_days: int = Field(default=30, ge=1, le=365)
+    scene_accept_margin: float = Field(default=0.02, ge=-1, le=1)
+    scene_reject_margin: float = Field(default=-0.02, ge=-1, le=1)
+    dominant_face_ratio: float = Field(default=0.15, ge=0.01, le=0.5)
+    nearby_radius_m: float = Field(default=25, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def ordered_thresholds(self) -> PhotoGatePolicy:
+        if (
+            self.brightness_min >= self.brightness_max
+            or self.scene_reject_margin >= self.scene_accept_margin
+        ):
+            raise ValueError("limiares contraditórios")
+        return self
 
 
 class UrmindClass(StrEnum):
@@ -59,6 +105,43 @@ class EventStatus(StrEnum):
     TRIAGE_REQUIRED = "triage_required"
 
 
+class CaptureProcessingStatus(StrEnum):
+    """Estado público do processamento de uma Capture (fonte única de verdade).
+
+    `detection_completed` não é `completed`: `completed` exige Event, snapshot de
+    features, RiskAssessment e DecisionTrace persistidos.
+    """
+
+    RECEIVED = "received"
+    QUEUED = "queued"
+    PROCESSING_DETECTION = "processing_detection"
+    DETECTION_COMPLETED = "detection_completed"
+    BUILDING_EVENT = "building_event"
+    ENRICHING_CONTEXT = "enriching_context"
+    BUILDING_FEATURES = "building_features"
+    ASSESSING = "assessing"
+    COMPLETED = "completed"
+    NO_SUPPORTED_DETECTION = "no_supported_detection"
+    NO_EVENT = "no_event"
+    NEEDS_REVIEW = "needs_review"
+    FAILED = "failed"
+    MODEL_NOT_AVAILABLE = "model_not_available"
+    LOCATION_REQUIRED = "location_required"
+
+
+TERMINAL_PROCESSING_STATUSES: frozenset[CaptureProcessingStatus] = frozenset(
+    {
+        CaptureProcessingStatus.COMPLETED,
+        CaptureProcessingStatus.NO_SUPPORTED_DETECTION,
+        CaptureProcessingStatus.NO_EVENT,
+        CaptureProcessingStatus.NEEDS_REVIEW,
+        CaptureProcessingStatus.FAILED,
+        CaptureProcessingStatus.MODEL_NOT_AVAILABLE,
+        CaptureProcessingStatus.LOCATION_REQUIRED,
+    }
+)
+
+
 class Coordinate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -84,7 +167,7 @@ class DetectionCreate(BaseModel):
     urmind_class: UrmindClass
     confidence: float = Field(ge=0, le=1)
     bbox: BoundingBox
-    model_version_id: uuid.UUID | None = None
+    model_version_id: uuid.UUID
 
 
 class CaptureCreate(BaseModel):
@@ -97,11 +180,19 @@ class CaptureCreate(BaseModel):
     mission_id: uuid.UUID | None = None
     device_id: uuid.UUID | None = None
     storage_path: str | None = Field(default=None, max_length=500)
+    user_description: str | None = Field(default=None, max_length=500)
     coordinate: Coordinate | None = None
     heading_deg: float | None = Field(default=None, ge=0, le=360)
     speed_mps: float | None = Field(default=None, ge=0)
     quality: dict[str, Any] = Field(default_factory=dict)
     detections: list[DetectionCreate] = Field(default_factory=list)
+
+    @field_validator("user_description")
+    @classmethod
+    def plain_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return "".join(c for c in value if unicodedata.category(c) not in {"Cc", "Cf"}).strip()
 
     @model_validator(mode="after")
     def location_is_declared(self) -> CaptureCreate:
@@ -167,3 +258,61 @@ class NearbyQuery(BaseModel):
     longitude: float = Field(ge=-180, le=180)
     radius_m: float = Field(default=500, gt=0, le=20000)
     limit: int = Field(default=100, gt=0, le=500)
+
+
+class ReviewDecision(StrEnum):
+    CONFIRM = "confirm"
+    CORRECT = "correct"
+    REJECT = "reject"
+
+
+class ReviewCreate(BaseModel):
+    """Revisão humana (§16.2). A inferência original nunca é sobrescrita."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: ReviewDecision
+    corrected_class: str | None = None
+    corrected_location: Coordinate | None = None
+    """Ponto corrigido pelo revisor. O ponto original do Event permanece intacto."""
+
+    notes: str | None = Field(default=None, max_length=2000)
+    adjudicate: bool = False
+
+    @field_validator("corrected_class")
+    @classmethod
+    def known_human_class(cls, value: str | None) -> str | None:
+        from app.schemas.issue_taxonomy import get_issue
+
+        if value is not None and get_issue(value) is None and value not in UrmindClass:
+            raise ValueError("classe humana fora da taxonomia")
+        return UrmindClass(value) if value is not None and value in UrmindClass else value
+
+    @model_validator(mode="after")
+    def correction_has_content(self) -> ReviewCreate:
+        correcting = self.corrected_class is not None or self.corrected_location is not None
+        if self.decision is ReviewDecision.CORRECT and not correcting:
+            raise ValueError("correção exige corrected_class e/ou corrected_location")
+        if self.decision is not ReviewDecision.CORRECT and correcting:
+            raise ValueError("corrected_class/corrected_location só valem para decision=correct")
+        return self
+
+
+CAPTURE_PRIVACY_VERSION = "urmind-capture-privacy-v1"
+CAPTURE_PRIVACY_TEXT = (
+    "Sua foto original, descrição e localização serão armazenadas de forma privada. "
+    "Você e a equipe autorizada de revisão podem consultá-las. A publicação no mapa "
+    "público depende de revisão e utiliza uma cópia da foto sem metadados sensíveis. "
+    "Evite fotografar rostos e placas de veículos. A análise pode estar indisponível "
+    "ou ser experimental; enviar não confirma a existência de um problema."
+)
+
+
+class CaptureReviewCreate(ReviewCreate):
+    duplicate_of_protocol: str | None = Field(default=None, pattern=r"^URM-[2-9A-HJ-NP-Z]{8}$")
+
+    @model_validator(mode="after")
+    def duplicate_is_not_confirmation(self) -> CaptureReviewCreate:
+        if self.duplicate_of_protocol and self.decision is not ReviewDecision.REJECT:
+            raise ValueError("duplicado exige rejeição do ponto separado")
+        return self

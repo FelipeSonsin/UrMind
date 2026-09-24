@@ -11,6 +11,11 @@ from app.ml.taxonomy import MODEL_V1_CANONICAL_CLASS_ORDER, MODEL_V1_CLASS_ORDER
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MODEL_METADATA_PATH = PROJECT_ROOT / "datasets/metadata/yolox_model_v1.json"
+MODEL_GENERATIONS = {
+    "yolox-s-model-v1": "v1",
+    "yolox-s-model-v2": "v2",
+    "yolox-s-quality-rebuild": "quality-rebuild",
+}
 YOLOX_SOURCE_PATH = PROJECT_ROOT / "backend/third_party/YOLOX"
 
 
@@ -39,17 +44,38 @@ def _submodule_commit() -> str:
 def validate_model_config(config: dict[str, Any]) -> None:
     """Garante arquitetura, proveniência, taxonomia e readiness do MODEL V1."""
     required = {
-        "schema_version", "model_id", "architecture", "source_repository",
-        "source_commit", "license", "num_classes", "class_names",
-        "canonical_class_names", "input_size", "test_size", "preprocessing",
-        "target_format", "cuda_capability", "pretrained_policy", "resume_policy",
-        "readiness", "training", "evaluation", "checkpointing", "mlflow", "dry_run",
+        "schema_version",
+        "model_id",
+        "architecture",
+        "source_repository",
+        "source_commit",
+        "license",
+        "num_classes",
+        "class_names",
+        "canonical_class_names",
+        "input_size",
+        "test_size",
+        "preprocessing",
+        "target_format",
+        "cuda_capability",
+        "pretrained_policy",
+        "resume_policy",
+        "readiness",
+        "training",
+        "evaluation",
+        "checkpointing",
+        "mlflow",
+        "dry_run",
         "architecture_parameters",
     }
-    if set(config) != required:
-        raise ValueError("metadata MODEL V1 possui campos ausentes ou desconhecidos")
-    if config["schema_version"] != 1 or config["model_id"] != "yolox-s-model-v1":
-        raise ValueError("identidade/schema do MODEL V1 inválido")
+    # A geração V2 reutiliza este mesmo contrato e acrescenta somente `dataset`,
+    # que aponta manifests/split/autorização próprios; V1 continua sem ela.
+    generation = MODEL_GENERATIONS.get(str(config.get("model_id")))
+    if generation is None or config["schema_version"] != 1:
+        raise ValueError("identidade/schema do MODEL inválido")
+    expected_keys = required | ({"dataset"} if generation != "v1" else set())
+    if set(config) != expected_keys:
+        raise ValueError("metadata MODEL possui campos ausentes ou desconhecidos")
     if config["architecture"] != "YOLOX-s":
         raise ValueError("architecture deve ser exatamente YOLOX-s")
     if config["num_classes"] != len(MODEL_V1_CLASS_ORDER):
@@ -74,8 +100,10 @@ def validate_model_config(config: dict[str, Any]) -> None:
         raise ValueError("parâmetros não correspondem ao YOLOX-s oficial")
     for field in ("input_size", "test_size"):
         value = config[field]
-        if not isinstance(value, list) or len(value) != 2 or any(
-            not isinstance(item, int) or item <= 0 or item % 32 for item in value
+        if (
+            not isinstance(value, list)
+            or len(value) != 2
+            or any(not isinstance(item, int) or item <= 0 or item % 32 for item in value)
         ):
             raise ValueError(f"{field} deve conter dois múltiplos positivos de 32")
     if config["pretrained_policy"]["mode"] != "pretrained_official_optional":
@@ -94,7 +122,7 @@ def validate_model_config(config: dict[str, Any]) -> None:
     if config["mlflow"] != {
         "tracking_mode": "local_sqlite",
         "tracking_directory": "mlruns",
-        "experiment": "urmind-yolox-model-v1",
+        "experiment": f"urmind-yolox-model-{generation}",
         "artifact_policy": "lightweight_metadata_and_references_only",
     }:
         raise ValueError("MLflow deve usar exclusivamente SQLite local")
@@ -122,9 +150,7 @@ def validate_model_config(config: dict[str, Any]) -> None:
 
 
 _CONFIG = load_model_config()
-YOLOX_SOURCE: str = _CONFIG["source_repository"]
 YOLOX_COMMIT: str = _CONFIG["source_commit"]
-YOLOX_MODEL_NAME: str = _CONFIG["architecture"]
 MODEL_V1_NUM_CLASSES: int = _CONFIG["num_classes"]
 YOLOX_INPUT_SIZE: tuple[int, int] = tuple(_CONFIG["input_size"])
 YOLOX_MAX_LABELS: int = _CONFIG["target_format"]["max_labels"]
@@ -178,8 +204,10 @@ def validate_yolox_batch(model: Any, images: Any, targets: Any) -> None:
     if torch.any(active & ((targets[..., 3] <= 0) | (targets[..., 4] <= 0))):
         raise ValueError("target ativo deve ter width e height positivos")
     classes = targets[..., 0][active]
-    if torch.any(classes != classes.floor()) or torch.any(classes < 0) or torch.any(
-        classes >= MODEL_V1_NUM_CLASSES
+    if (
+        torch.any(classes != classes.floor())
+        or torch.any(classes < 0)
+        or torch.any(classes >= MODEL_V1_NUM_CLASSES)
     ):
         raise ValueError("class index fora da taxonomia V1")
     if torch.any(targets[~active] != 0):

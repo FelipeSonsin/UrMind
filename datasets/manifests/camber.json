@@ -1,57 +1,52 @@
 {
-    "name":  "camber",
-    "version":  "zenodo-21361827",
-    "source":  "https://zenodo.org/records/21361827",
-    "license":  "conferir por registro no Zenodo",
-    "classes":  [
-
-                ],
-    "split":  {
-                  "role":  "geo_reference",
-                  "generated_at":  "2026-09-08T03:38:36.035854+00:00",
-                  "summary":  {
-                                  "dataset_id":  "camber",
-                                  "total_samples":  60,
-                                  "usable_samples":  0,
-                                  "class_counts":  {
-
-                                                   },
-                                  "rejected_counts":  {
-                                                          "camber_malfunction_0":  9,
-                                                          "camber_track_point":  51
-                                                      },
-                                  "group_count":  2,
-                                  "groups":  [
-                                                 "route:50",
-                                                 "route:ride_1778861898555"
-                                             ]
-                              },
-                  "inventory":  {
-                                    "dataset_id":  "camber",
-                                    "root":  "datasets/raw/camber",
-                                    "state":  "declared_only",
-                                    "total_bytes":  95830501,
-                                    "checksums_verified":  true,
-                                    "extracted_dirs":  [
-                                                           "detections",
-                                                           "routes",
-                                                           "videos"
-                                                       ],
-                                    "files":  [
-
-                                              ],
-                                    "blocking_reasons":  [
-
-                                                         ]
-                                },
-                  "taxonomy_note":  "As detecções do CSV vêm de um YOLO de terceiros e a coluna `user_confirmed` está vazia na amostra. Isso é saída de modelo, não ground truth: não vira rótulo de treino nem ocorrência real (§8.3).",
-                  "group_note":  "Grupo = rota, que corresponde a uma sessão de coleta.",
-                  "caveats":  [
-                                  "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
-                                  "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real."
-                              ]
-              },
-    "dvc_revision":  null,
-    "audit_stage_status":  "legacy_backend_registration_not_current_selection",
-    "path_base":  "project_root"
+  "name": "camber",
+  "version": "zenodo-21361827",
+  "source": "https://zenodo.org/records/21361827",
+  "license": "CC BY 4.0 no depósito Zenodo (detections_50.csv, video_50_metadata.txt); licença explícita do MP4/GPX externos NÃO demonstrada",
+  "classes": [],
+  "split": {
+    "role": "geo_reference",
+    "generated_at": "2026-09-16T15:14:02.553767+00:00",
+    "summary": {
+      "dataset_id": "camber",
+      "total_samples": 60,
+      "usable_samples": 0,
+      "class_counts": {},
+      "rejected_counts": {
+        "camber_malfunction_0": 9,
+        "camber_track_point": 51
+      },
+      "group_count": 2,
+      "groups": [
+        "route:50",
+        "route:ride_1778861898555"
+      ]
+    },
+    "inventory": {
+      "dataset_id": "camber",
+      "root": "datasets/raw/camber",
+      "state": "declared_only",
+      "total_bytes": 95830501,
+      "checksums_verified": true,
+      "extracted_dirs": [
+        "detections",
+        "routes",
+        "videos"
+      ],
+      "files": [],
+      "blocking_reasons": []
+    },
+    "taxonomy_note": "As detecções do CSV vêm de um YOLO de terceiros e a coluna `user_confirmed` está vazia na amostra. Isso é saída de modelo, não ground truth: não vira rótulo de treino nem ocorrência real (§8.3).",
+    "group_note": "Grupo = rota, que corresponde a uma sessão de coleta.",
+    "caveats": [
+      "Um registro Zenodo é um vídeo/rota. A coleção são vários registros.",
+      "Coordenadas em Atenas: exercitam PostGIS, não representam o mapa real.",
+      "Publicação: YELLOW — REVIEW_REQUIRED, bloqueio EXTERNAL_HEAVY_MEDIA_LICENSE_NOT_ESTABLISHED (revisão de 2026-09-16). Zenodo 21361827, DOI 10.5281/zenodo.21361827, versão 1.0: o depósito é CC BY 4.0 e cobre detections_50.csv e video_50_metadata.txt. O MP4 e o GPX estão em S3 externo (isense-s3.iccs.gr) sem licença explícita demonstrada. Integridade verificada: MD5 do GPX local == ETag remoto; ETag multipart do MP4 (8 MiB x 12) == remoto; os bytes locais correspondem aos objetos publicados.",
+      "A metadata depositada declara 'Privacy-Blurred Video File Access': é declaração do publicador, sem verificação visual independente. O Zenodo cita o Grant Agreement 101156387; o CORDIS registra o CAMBER como 101146800 — divergência não resolvida.",
+      "Desbloqueio da publicação: confirmação escrita do publicador (data@camber-project.eu) de que MP4 e GPX são CC BY 4.0, OU depósito oficial desses objetos com licença explícita."
+    ]
+  },
+  "dvc_revision": null,
+  "audit_stage_status": "legacy_backend_registration_not_current_selection",
+  "path_base": "project_root"
 }

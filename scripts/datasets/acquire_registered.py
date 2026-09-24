@@ -5,6 +5,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import time
 import urllib.request
 import zipfile
@@ -26,6 +27,195 @@ from _core import (
 )
 
 PLAN = DATASETS_DIR / "metadata/acquisition_plan.json"
+
+
+def acquire_reference(plan, identifier, execute=False):
+    """Explicit reference-only extension; immutable source, no raw/detector writes."""
+    if (
+        plan.get("reference_models_authorization")
+        != "user_explicit_photo_gate_20260924"
+    ):
+        raise ValueError("reference acquisition not authorized")
+    entries = [e for e in plan.get("reference_models", []) if e["id"] == identifier]
+    if len(entries) != 1:
+        raise ValueError("reference id must resolve exactly once")
+    entry = entries[0]
+    revision = entry["revision"]
+    url = urlsplit(entry["url"])
+    if (
+        entry["status"] != "REFERENCE"
+        or entry["license"] not in {"MIT", "Apache-2.0", "BSD-3-Clause"}
+        or not re.fullmatch("[0-9a-f]{40}", revision)
+        or not re.fullmatch("[0-9a-f]{64}", entry["sha256"])
+        or url.scheme != "https"
+        or revision not in url.path.split("/")
+        or url.hostname not in {"huggingface.co", "media.githubusercontent.com"}
+    ):
+        raise ValueError("invalid reference provenance")
+    relative = Path(entry["path"])
+    if relative.parts[:2] != ("models", "reference") or len(relative.parts) != 3:
+        raise ValueError("reference must have a dedicated leaf under models/reference")
+    destination = assert_inside_project(PROJECT_ROOT / relative)
+    if any(
+        p.is_symlink() or p.is_junction() for p in (destination, destination.parent)
+    ):
+        raise ValueError("reference links forbidden")
+    if destination.exists():
+        if (
+            require_local(destination).stat().st_size != entry["size_bytes"]
+            or file_sha256(destination) != entry["sha256"]
+        ):
+            raise ValueError("existing reference integrity mismatch; not overwritten")
+        print("VERIFIED", entry["path"])
+        return
+    budget = preflight(
+        "reference preprocessing",
+        entry["size_bytes"] + 8192,
+        entry["size_bytes"] + 8192,
+        raise_on_block=True,
+    )
+    print(
+        json.dumps({"id": identifier, "execute": execute, "budget": budget.as_dict()}),
+        flush=True,
+    )
+    if not execute:
+        return
+    temporary = destination.with_suffix(destination.suffix + ".part")
+    if temporary.exists():
+        raise ValueError("reference partial exists; inspect before retry")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(
+        entry["url"], headers={"User-Agent": "UrMind-PhotoGate/1.0"}
+    )
+    digest, size = hashlib.sha256(), 0
+    with (
+        urllib.request.urlopen(request, timeout=60) as response,
+        temporary.open("xb") as output,
+    ):
+        while chunk := response.read(4 * 1024 * 1024):
+            size += len(chunk)
+            if (
+                size > entry["size_bytes"]
+                or free_disk_bytes() - len(chunk) < 10_000_000_000
+            ):
+                raise ValueError("reference download exceeded budget")
+            output.write(chunk)
+            digest.update(chunk)
+    if size != entry["size_bytes"] or digest.hexdigest() != entry["sha256"]:
+        raise ValueError("reference checksum mismatch; partial preserved")
+    temporary.rename(destination)
+    print("VERIFIED", identifier, digest.hexdigest(), size, flush=True)
+
+
+def export_reference_scene(plan, execute=False):
+    """Frozen pretrained image encoder + text vectors. No optimizer/dataset/train."""
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "backend"))
+    from app.services.photo_reference import reference_artifact, SCENE_PROMPTS
+
+    path, entry = reference_artifact("openclip_scene_reference")
+    output = PROJECT_ROOT / "models/reference/openclip_scene.onnx"
+    manifest = PROJECT_ROOT / entry["derived_manifest"]
+    if output.exists() or manifest.exists():
+        raise ValueError("derived reference already exists; no implicit overwrite")
+    budget = preflight(
+        "reference ONNX export", 400_000_000, 800_000_000, raise_on_block=True
+    )
+    print(json.dumps({"execute": execute, "budget": budget.as_dict()}), flush=True)
+    if not execute:
+        return
+    import numpy as np
+    import open_clip
+    import onnxruntime as ort
+    import torch
+
+    torch.set_num_threads(4)
+    # Eager fused attention has no legacy ONNX symbolic; unfused math is
+    # numerically checked against the same frozen weights below.
+    torch.backends.mha.set_fastpath_enabled(False)
+    torch.manual_seed(20260924)
+    model = open_clip.create_model("ViT-B-32", pretrained=None, device="cpu")
+    open_clip.load_checkpoint(model, str(path), strict=True)
+    model.eval().requires_grad_(False)
+    prompts = SCENE_PROMPTS["positive"] + SCENE_PROMPTS["negative"]
+    with torch.inference_mode():
+        vectors = model.encode_text(
+            open_clip.get_tokenizer("ViT-B-32")(prompts), normalize=True
+        )
+
+    class ImageEncoder(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.visual = model.visual
+
+        def forward(self, image):
+            return torch.nn.functional.normalize(self.visual(image), dim=-1)
+
+    encoder = ImageEncoder().eval()
+    sample = torch.zeros(1, 3, 224, 224)
+    with torch.inference_mode():
+        torch.onnx.export(
+            encoder,
+            sample,
+            str(output),
+            input_names=["image"],
+            output_names=["embedding"],
+            opset_version=17,
+            dynamo=False,
+        )
+        expected = encoder(sample).numpy()
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 4
+    session = ort.InferenceSession(
+        str(output), options, providers=["CPUExecutionProvider"]
+    )
+    actual = session.run(None, {"image": sample.numpy()})[0]
+    np.testing.assert_allclose(actual, expected, atol=1e-4, rtol=1e-4)
+    durations = []
+    for _ in range(5):
+        start = time.perf_counter()
+        session.run(None, {"image": sample.numpy()})
+        durations.append(time.perf_counter() - start)
+    report = {
+        "version": "urmind-photo-reference-v1",
+        "status": "REFERENCE",
+        "source_sha256": entry["sha256"],
+        "source_revision": entry["revision"],
+        "onnx_path": output.relative_to(PROJECT_ROOT).as_posix(),
+        "onnx_sha256": file_sha256(output),
+        "onnx_size_bytes": output.stat().st_size,
+        "open_clip_version": "3.3.0",
+        "prompts": SCENE_PROMPTS,
+        "text_embeddings": vectors.tolist(),
+        "parity_atol": 1e-4,
+        "synthetic_cpu_encoder_seconds": durations,
+        "calibration_status": "REQUIRES_OWN_PHOTOS",
+        "calibrated": False,
+        "positive_count": 0,
+        "negative_count": 0,
+        "preprocess": {
+            "size": 224,
+            "resize": "bicubic_shortest_center_crop",
+            "mean": [0.48145466, 0.4578275, 0.40821073],
+            "std": [0.26862954, 0.26130258, 0.27577711],
+        },
+    }
+    with manifest.open("x", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2)
+        handle.write("\n")
+    for item in plan["reference_models"]:
+        if item["id"] == "openclip_scene_reference":
+            item["derived_manifest_sha256"] = file_sha256(manifest)
+    with PLAN.open("w", encoding="utf-8") as handle:
+        json.dump(plan, handle, indent=2)
+        handle.write("\n")
+    print(
+        "EXPORTED_REFERENCE_ONLY",
+        report["onnx_sha256"],
+        report["onnx_size_bytes"],
+        durations,
+    )
 
 
 def download_ranges(entry, resume, workers=4):
@@ -219,6 +409,8 @@ def main():
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--reference-model")
+    parser.add_argument("--export-reference-scene", action="store_true")
     parser.add_argument("--dataset", choices=("project_sidewalk", "rampnet"))
     parser.add_argument("--workers", type=int, choices=range(1, 17), default=4)
     parser.add_argument(
@@ -231,6 +423,16 @@ def main():
     )
     args = parser.parse_args()
     plan = json.loads(require_local(PLAN).read_text(encoding="utf-8"))
+    if args.export_reference_scene:
+        if args.reference_model or args.dataset or args.resume:
+            raise ValueError("export reference cannot combine acquisition options")
+        export_reference_scene(plan, args.execute)
+        return
+    if args.reference_model:
+        if args.dataset or args.resume:
+            raise ValueError("reference mode cannot combine dataset/resume")
+        acquire_reference(plan, args.reference_model, args.execute)
+        return
     if plan["authorization"] != "user_explicit_download_20260908":
         raise ValueError("plano sem autorização registrada")
     entries = plan["files"]

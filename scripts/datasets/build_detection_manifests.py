@@ -21,6 +21,21 @@ NAMES = {"TRAIN": "detection_train_authorized.jsonl", "VALIDATION": "detection_v
 RDD_MAP = {"D00": "URMIND_ROAD_D00", "D10": "URMIND_ROAD_D10", "D20": "URMIND_ROAD_D20", "D40": "URMIND_ROAD_D40"}
 SCHEMA_VERSION = 2
 
+# Geração V2 (quality rebuild). Papéis separados por arquivo próprio: nada aqui
+# sobrescreve os manifests do V1, que continuam sendo a fonte do ModelVersion V1.
+V2_NAMES = {
+    "TRAIN": "detection_v2_train_authorized.jsonl",
+    "VALIDATION": "detection_v2_validation_authorized.jsonl",
+    "TEST": "detection_v2_frozen_test_authorized.jsonl",
+    "DOMAIN_SHIFT_PROBE": "detection_v2_domain_shift_probe.jsonl",
+}
+V2_ROLE_TO_SPLIT_KEY = {
+    "TRAIN": "train",
+    "VALIDATION": "validation",
+    "TEST": "frozen_test",
+    "DOMAIN_SHIFT_PROBE": "domain_shift_probe",
+}
+
 
 class ManifestBuildError(RuntimeError):
     pass
@@ -112,7 +127,9 @@ def validate_image_records(rows: dict[str, list[dict]]) -> None:
                 box_identities.add(identity)
         paths_by_role[role] = paths
         fingerprints_by_role[role] = fingerprints
-    protected = ("TRAIN", "VALIDATION", "TEST")
+    protected = tuple(
+        role for role in ("TRAIN", "VALIDATION", "TEST", "DOMAIN_SHIFT_PROBE") if role in rows
+    )
     for index, left in enumerate(protected):
         for right in protected[index + 1 :]:
             if paths_by_role[left] & paths_by_role[right]:
@@ -170,7 +187,127 @@ def materialize_rdd2022(*, split_path: Path, selection_path: Path, source_path: 
     return result, {"authorized": True, "counts": source_counts}
 
 
+def materialize_rdd2022_v2() -> tuple[dict[str, list[dict]], dict]:
+    """Materializa os manifests V2 a partir do split estratificado autorizado."""
+    split_path = DATASETS_DIR / "splits/rdd2022_v2_splits.json"
+    selection_path = DATASETS_DIR / "manifests/rdd2022_subset_selection.jsonl"
+    status_path = DATASETS_DIR / "reports/rdd2022_v2_split_authorization_status.json"
+    if not split_path.is_file() or not status_path.is_file():
+        raise ManifestBuildError("DATASET_SPLIT_NOT_AVAILABLE: V2 requer novo split/autorização")
+    split, source, status = (
+        _json(split_path),
+        _json(DATASETS_DIR / "manifests/rdd2022.json"),
+        _json(status_path),
+    )
+    expected_binding = {
+        "dataset_id": "rdd2022",
+        "dataset_version": source.get("version"),
+        "population_id": "crddc2022-official-all-images-train-test",
+        "split_manifest_sha256": file_sha256(split_path),
+        "selection_manifest_sha256": file_sha256(selection_path),
+    }
+    if status.get("status") != "AUTHORIZED_FOR_MODEL_V2" or any(
+        status.get(key) != value for key, value in expected_binding.items()
+    ):
+        raise ManifestBuildError(
+            f"split V2 não autorizado ou binding stale: status={status.get('status')}"
+        )
+    if split.get("selection_manifest_sha256") != file_sha256(selection_path):
+        raise ManifestBuildError("split V2 aponta para selection fingerprint divergente")
+
+    selection = _jsonl(selection_path)
+    indexed = {row["rel_path"]: row for row in selection}
+    if len(indexed) != len(selection):
+        raise ManifestBuildError("selection contém image_path duplicado")
+
+    result: dict[str, list[dict]] = {role: [] for role in V2_NAMES}
+    counts = {}
+    for role, key in V2_ROLE_TO_SPLIT_KEY.items():
+        listed = split["manifest_files"][key]
+        list_path = PROJECT_ROOT / listed["path"]
+        if listed["sha256"] != file_sha256(list_path):
+            raise ManifestBuildError(f"{role}: fingerprint do arquivo de split diverge")
+        paths = [
+            line.strip()
+            for line in require_local(list_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        expected = split["splits"][key]
+        if len(paths) != expected["images"]:
+            raise ManifestBuildError(f"{role}: cardinalidade diverge")
+        for image_rel in paths:
+            row = indexed.get(image_rel)
+            if row is None:
+                raise ManifestBuildError(f"{role}: path fora da seleção: {image_rel}")
+            if not row.get("sha256") or not row.get("annotation_sha256"):
+                raise ManifestBuildError(f"{role}: fingerprint ausente: {image_rel}")
+            width, height, boxes = _boxes(
+                PROJECT_ROOT / row["annotation_path"], row["annotation_sha256"]
+            )
+            result[role].append({
+                "schema_version": SCHEMA_VERSION,
+                "dataset_id": "rdd2022", "source_version": source["version"], "image_path": image_rel,
+                "image_width": width, "image_height": height, "split": role, "group": row["group"],
+                "authorization_status": f"{role}_AUTHORIZED",
+                "source_fingerprint": row["sha256"], "annotation_fingerprint": row["annotation_sha256"],
+                "human_pending": False, "quarantine": False, "duplicate_rejected": False,
+                "blocked_source": False, "boxes": boxes,
+            })
+        box_count = sum(len(item["boxes"]) for item in result[role])
+        if box_count != expected["objects"]:
+            raise ManifestBuildError(f"{role}: boxes {box_count} != {expected['objects']}")
+        counts[role] = {
+            "total_images": len(paths),
+            "positive_images": sum(bool(item["boxes"]) for item in result[role]),
+            "negative_images": sum(not item["boxes"] for item in result[role]),
+            "boxes": box_count,
+        }
+    validate_image_records(result)
+    return result, {"authorized": True, "counts": counts, "split_sha256": expected_binding["split_manifest_sha256"]}
+
+
+def build_v2() -> int:
+    rows, meta = materialize_rdd2022_v2()
+    hashes, counts, classes = {}, {}, {}
+    for role, name in V2_NAMES.items():
+        path = DATASETS_DIR / "manifests" / name
+        write_text_safe(path, "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows[role]))
+        hashes[role] = file_sha256(path)
+        positive = sum(bool(row["boxes"]) for row in rows[role])
+        counts[role] = {
+            "records": len(rows[role]), "total_images": len(rows[role]),
+            "positive_images": positive, "negative_images": len(rows[role]) - positive,
+            "boxes": sum(len(row["boxes"]) for row in rows[role]),
+        }
+        classes[role] = dict(Counter(box["canonical_class"] for row in rows[role] for box in row["boxes"]))
+    report = {
+        "version": 1,
+        "dataset_version_name": "rdd2022-model-v2-quality-rebuild",
+        **provenance(__file__, source_dataset="rdd2022", source_version="2022-crddc", transform="materialização fail-closed do split V2 autorizado", params={"roles": list(V2_NAMES), "authorization_required": True}),
+        "integrity": {"manifests_sha256": hashes, "split_sha256": meta["split_sha256"]},
+        "counts": counts,
+        "classes": classes,
+        "role_semantics": {
+            "TRAIN": "TRAIN_V2",
+            "VALIDATION": "VALIDATION_V2: única fonte de seleção de checkpoint, augmentation, hiperparâmetro e operating point",
+            "TEST": "FROZEN_INTERNAL_TEST_V2: abertura única após congelamento do operating point",
+            "DOMAIN_SHIFT_PROBE": "DOMAIN_SHIFT_PROBE_V2 (população inteira do TEST V1: Czech + United_States): report-only; proibido em treino, mining e qualquer seleção",
+        },
+    }
+    write_json_report("detection_manifests_v2.json", report)
+    for role in V2_NAMES:
+        item = counts[role]
+        print(f"{role:<20} images={item['total_images']:<6} neg={item['negative_images']:<6} boxes={item['boxes']}")
+    return 0
+
+
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--generation", choices=("v1", "v2"), default="v1")
+    if parser.parse_args().generation == "v2":
+        return build_v2()
     split_path = DATASETS_DIR / "splits/rdd2022_subset_splits.json"
     selection_path = DATASETS_DIR / "manifests/rdd2022_subset_selection.jsonl"
     rows, rdd = materialize_rdd2022(split_path=split_path, selection_path=selection_path, source_path=DATASETS_DIR / "manifests/rdd2022.json", status_path=DATASETS_DIR / "reports/rdd2022_split_authorization_status.json")
@@ -210,7 +347,16 @@ def main() -> int:
         "evaluator_ready": model_readiness["evaluator_ready"],
         "checkpointing_ready": model_readiness["checkpointing_ready"],
         "system_ready_for_training": model_readiness["system_ready_for_training"],
-        "reason": None if total else "BLOCKED_NO_AUTHORIZED_DATA",
+        # O flag do contrato é marco manual: `validate_readiness` não o exige para `--run`.
+        # Quando há dado e o flag está falso, o relatório diz isso em vez de ficar mudo.
+        "reason": (
+            "BLOCKED_NO_AUTHORIZED_DATA"
+            if not total
+            else None
+            if model_readiness["system_ready_for_training"]
+            else "READINESS_MILESTONE_NOT_PROMOTED: yolox_model_v1.json mantém "
+            "system_ready_for_training=false; não bloqueia `app.ml.training --run`"
+        ),
         "accepted_model_v1_risks": [
             "RDD2022 não publica rota/sessão por imagem",
             "domain shift forte por país no split",

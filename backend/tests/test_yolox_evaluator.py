@@ -171,9 +171,7 @@ def test_ground_truth_comes_from_dataset_batch_and_preserves_fingerprints() -> N
     targets[0, 1] = torch.tensor([3, 200, 200, 50, 50])
     dataset = _validation_dataset(targets=[targets[0], targets[1]])
 
-    truths = targets_to_ground_truths(
-        targets, [(640, 640), (640, 640)], [0, 1], dataset
-    )
+    truths = targets_to_ground_truths(targets, [(640, 640), (640, 640)], [0, 1], dataset)
 
     assert len(truths) == 2
     assert [truth.class_name for truth in truths] == ["D00", "D40"]
@@ -207,7 +205,11 @@ def test_evaluator_uses_eval_inference_mode_keeps_negatives_and_restores_mode(
     dataset = _validation_dataset(targets=[positive, negative])
     loader = DataLoader(dataset, batch_size=2, shuffle=False)
     model = _NoDetectionModel().train()
-    monkeypatch.setattr(evaluator, "assert_authorized_validation_dataset", lambda dataset: None)
+    monkeypatch.setattr(
+        evaluator,
+        "assert_authorized_evaluation_dataset",
+        lambda dataset, *, role, manifest_path=None: None,
+    )
 
     run = YOLOXEvaluator(
         model, loader, EvaluationConfig.from_model_metadata(_metadata()), device="cpu"
@@ -240,7 +242,10 @@ def test_evaluator_rejects_validation_rows_not_bound_to_authorized_manifest() ->
     loader = DataLoader(dataset, batch_size=1)
     with pytest.raises(EvaluationGateError, match="manifesto VALIDATION autorizado"):
         YOLOXEvaluator(
-            _NoDetectionModel(), loader, EvaluationConfig.from_model_metadata(_metadata()), device="cpu"
+            _NoDetectionModel(),
+            loader,
+            EvaluationConfig.from_model_metadata(_metadata()),
+            device="cpu",
         )
 
 
@@ -250,3 +255,61 @@ def test_training_engine_exposes_validation_evaluator_without_test_path() -> Non
 
     assert "evaluate_validation" in text
     assert 'manifest_for_evaluation("TEST")' not in text
+
+
+def test_serving_operating_threshold_does_not_truncate_ap_predictions(monkeypatch) -> None:
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from app.ml import detection_dataset, evaluator, serving
+    from app.ml.metrics import Box, GroundTruth, Prediction
+
+    captured = {}
+
+    class FakeDataset:
+        def __init__(self, rows, *, input_size, mode):
+            captured["mode"] = mode
+
+    class FakeModel:
+        def cuda(self):
+            return self
+
+    class FakeEvaluator:
+        def __init__(self, model, loader, config, *, device, role, manifest_path=None):
+            captured["inference_threshold"] = config.confidence_threshold
+
+        def evaluate(self):
+            return SimpleNamespace(
+                predictions=[
+                    Prediction("image", "D00", Box(0, 0, 10, 10), 0.10, 0),
+                    Prediction("image", "D00", Box(20, 20, 30, 30), 0.30, 0),
+                ],
+                ground_truths=[GroundTruth("image", "D00", Box(0, 0, 10, 10), 0)],
+                samples=1,
+                positive_images=1,
+                negative_images=0,
+            )
+
+    monkeypatch.setattr(detection_dataset, "AuthorizedDetectionDataset", FakeDataset)
+    row = {"image_path": "image", "boxes": [{}], "group": "country:Teste"}
+    monkeypatch.setattr(detection_dataset, "load_authorized_manifest", lambda *a, **k: [row])
+    monkeypatch.setattr(detection_dataset, "build_yolox_dataloader", lambda *a, **k: object())
+    monkeypatch.setattr(evaluator, "YOLOXEvaluator", FakeEvaluator)
+    monkeypatch.setattr(
+        serving,
+        "load_checkpoint_model",
+        lambda path, **kwargs: (FakeModel(), {"checkpoint_sha256": "0" * 64, "epoch": 0}),
+    )
+
+    report = serving.evaluate_checkpoint_for_role(
+        Path("best.pt"),
+        role="VALIDATION",
+        confidence_threshold=0.25,
+        nms_threshold=0.5,
+        batch_size=1,
+    )
+
+    assert captured == {"mode": "validation", "inference_threshold": 0.01}
+    assert report["score_threshold"] == 0.25
+    assert report["per_class"]["D00"]["true_positives"] == 0
+    assert report["per_class"]["D00"]["ap50"] == 0.5

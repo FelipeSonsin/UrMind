@@ -1,5 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { EventDetail } from '../components/EventDetail';
 import { classes, statuses, type UrbanEvent } from '../domain/contracts';
+import { labelFor } from '../domain/public';
 
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
 export function EventsPage({
@@ -8,12 +10,16 @@ export function EventsPage({
   error,
   onReload,
   map = false,
+  changed,
+  linkDetails = false,
 }: {
   events: UrbanEvent[] | null;
   loading: boolean;
   error: string;
   onReload: () => void;
   map?: boolean;
+  changed?: { eventId: string | null; at: number };
+  linkDetails?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -25,7 +31,7 @@ export function EventsPage({
         (event) =>
           (!status || event.status === status) &&
           (!category || event.urmind_class === category) &&
-          `${event.event_key} ${classes[event.urmind_class]}`
+          `${event.event_key} ${labelFor(event.urmind_class)}`
             .toLocaleLowerCase('pt-BR')
             .includes(query.toLocaleLowerCase('pt-BR')),
       ),
@@ -88,7 +94,7 @@ export function EventsPage({
       {loading && <p role="status">Carregando ocorrências…</p>}
       {map && (
         <Suspense fallback={<p>Carregando mapa…</p>}>
-          <UrbanMap events={filtered} />
+          <UrbanMap events={filtered} allowExport />
         </Suspense>
       )}
       <section className="panel">
@@ -121,7 +127,7 @@ export function EventsPage({
                 {filtered.map((event) => (
                   <tr key={event.id}>
                     <td>
-                      <strong>{classes[event.urmind_class]}</strong>
+                      <strong>{labelFor(event.urmind_class)}</strong>
                       <small className="record-id">{event.event_key}</small>
                     </td>
                     <td>
@@ -134,9 +140,13 @@ export function EventsPage({
                         : `${(event.visual_confidence * 100).toFixed(1)}%`}
                     </td>
                     <td>
-                      <button className="secondary compact" onClick={() => setSelected(event)}>
-                        Ver registro
-                      </button>
+                      {linkDetails ? (
+                        <a href={`#/app/eventos/${event.id}`}>Ver registro</a>
+                      ) : (
+                        <button className="secondary compact" onClick={() => setSelected(event)}>
+                          Ver registro
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -146,50 +156,15 @@ export function EventsPage({
         )}
       </section>
       {selected && (
-        <section className="panel detail" aria-label="Detalhes da ocorrência">
-          <div className="section-heading">
-            <h2>{classes[selected.urmind_class]}</h2>
-            <button className="secondary compact" onClick={() => setSelected(null)}>
-              Fechar detalhes
-            </button>
-          </div>
-          <dl>
-            <dt>ID da ocorrência</dt>
-            <dd>{selected.id}</dd>
-            <dt>Evidência</dt>
-            <dd>{selected.evidence_mode}</dd>
-            <dt>Coordenada original</dt>
-            <dd>
-              {selected.latitude != null && selected.longitude != null
-                ? `${selected.latitude}, ${selected.longitude}`
-                : 'Não disponível'}
-            </dd>
-            <dt>Ponto ajustado à via</dt>
-            <dd>
-              {selected.snapped_latitude != null && selected.snapped_longitude != null
-                ? `${selected.snapped_latitude}, ${selected.snapped_longitude}`
-                : 'Não disponível'}
-            </dd>
-            <dt>Precisão informada</dt>
-            <dd>
-              {selected.location_accuracy_m == null
-                ? 'Não disponível'
-                : `${selected.location_accuracy_m} m`}
-            </dd>
-            <dt>Trecho viário</dt>
-            <dd>{selected.road_segment_id || 'Não disponível'}</dd>
-            <dt>Responsável / ação</dt>
-            <dd>Não disponíveis no contrato HTTP atual</dd>
-          </dl>
-          <details>
-            <summary>Fatores estruturados recebidos</summary>
-            <pre>{JSON.stringify(selected.factors, null, 2)}</pre>
-          </details>
-          <p className="notice">
-            Revisão humana ainda não conectada. Confirmações e correções dependerão de autenticação
-            e auditoria no backend.
-          </p>
-        </section>
+        <EventDetail
+          key={selected.id}
+          id={selected.id}
+          onClose={() => setSelected(null)}
+          onChanged={onReload}
+          refreshAt={
+            changed && (!changed.eventId || changed.eventId === selected.id) ? changed.at : 0
+          }
+        />
       )}
     </>
   );

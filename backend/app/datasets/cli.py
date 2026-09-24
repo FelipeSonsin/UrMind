@@ -23,7 +23,12 @@ from app.datasets.adapters import AdapterError, read_records
 from app.datasets.catalog import SOURCES, DatasetRole, get_source
 from app.datasets.inventory import DatasetState, inspect_all, inspect_source
 from app.datasets.records import AnnotatedImage, MaskSample
-from app.datasets.registration import RegistrationRefused, build_dataset_version, summarize
+from app.datasets.registration import (
+    RegistrationRefused,
+    build_dataset_version,
+    preserve_manifest_metadata,
+    summarize,
+)
 from app.ml.splits import SplitRatios, split_by_group
 
 
@@ -132,14 +137,22 @@ def _cmd_register(args: argparse.Namespace) -> int:
         print(f"recusado: {exc}", file=sys.stderr)
         return 2
 
-    texto = json.dumps(payload, indent=2, ensure_ascii=False)
     if args.write:
         destino = datasets_manifests_dir()
         destino.mkdir(parents=True, exist_ok=True)
         caminho = destino / f"{source.id}.json"
+        if caminho.is_file():
+            try:
+                existing = json.loads(caminho.read_text(encoding="utf-8-sig"))
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"manifesto existente invalido: {exc}", file=sys.stderr)
+                return 1
+            payload = preserve_manifest_metadata(payload, existing)
+        texto = json.dumps(payload, indent=2, ensure_ascii=False)
         caminho.write_text(texto + "\n", encoding="utf-8")
         print(f"manifesto gravado em {caminho}")
     else:
+        texto = json.dumps(payload, indent=2, ensure_ascii=False)
         print(texto)
     return 0
 

@@ -10,6 +10,8 @@ interpretar sozinho [R10][R43].
 """
 
 import asyncio
+import selectors
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -21,7 +23,7 @@ import app.models.core  # noqa: F401
 from alembic import context
 from app.config import get_settings
 from app.db.base import Base
-from app.db.session import normalize_database_url
+from app.db.session import connect_args, is_transaction_pooler_port, normalize_database_url
 
 config = context.config
 
@@ -42,14 +44,26 @@ def include_object(obj, name, type_, reflected, compare_to):
     return not (type_ == "index" and name and name.endswith("_gix"))
 
 
-def _database_url() -> str:
+def _raw_database_url() -> str:
+    """Migrations usam MIGRATION_DATABASE_URL (Session Pooler 5432); DATABASE_URL é
+    fallback legado opcional. Nunca DATABASE_POOLER_URL."""
     settings = get_settings()
-    if not settings.database_url:
+    url = settings.migration_database_url or settings.database_url
+    if not url:
         raise RuntimeError(
-            "DATABASE_URL não configurada. As migrations exigem o PostgreSQL do "
-            "Supabase; não existe fallback local (MASTER_PLAN §18.2)."
+            "MIGRATION_DATABASE_URL não configurada. As migrations usam o Session Pooler "
+            "do Supabase (5432); não existe fallback para DATABASE_POOLER_URL."
         )
-    return normalize_database_url(settings.database_url)
+    if is_transaction_pooler_port(url):
+        raise RuntimeError(
+            "A URL de migrations aponta para o transaction pooler (porta 6543). "
+            "Migrations usam o Session Pooler (5432) ou a conexão direta (5432)."
+        )
+    return url
+
+
+def _database_url() -> str:
+    return normalize_database_url(_raw_database_url())
 
 
 def run_migrations_offline() -> None:
@@ -83,6 +97,7 @@ async def run_async_migrations() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args(_raw_database_url()),
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
@@ -90,6 +105,14 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
+    if sys.platform == "win32":
+        # psycopg 3 async depende de add_reader/add_writer, indisponíveis no
+        # ProactorEventLoop que é o padrão do asyncio no Windows.
+        asyncio.run(
+            run_async_migrations(),
+            loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()),
+        )
+        return
     asyncio.run(run_async_migrations())
 
 

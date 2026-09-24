@@ -58,6 +58,21 @@ except ModuleNotFoundError as exc:  # pragma: no cover - depende do ambiente
     ) from exc
 
 FORMAT_AUDIT = DATASETS_DIR / "reports" / "dataset_format_audit.json"
+READINESS_REPORT = DATASETS_DIR / "reports" / "dataset_readiness.json"
+
+
+def _preserve_generated_at(payload: dict) -> None:
+    """Nao trata uma regeneracao idempotente como nova medicao."""
+    if not READINESS_REPORT.is_file():
+        return
+    try:
+        existing = json.loads(READINESS_REPORT.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return
+    current_semantic = {k: v for k, v in payload.items() if k != "generated_at"}
+    previous_semantic = {k: v for k, v in existing.items() if k != "generated_at"}
+    if current_semantic == previous_semantic and existing.get("generated_at"):
+        payload["generated_at"] = existing["generated_at"]
 
 
 def _catalog_block(dataset_id: str) -> dict:
@@ -169,6 +184,7 @@ def main() -> int:
             "note": "rode scripts/datasets/audit_readiness.py para gerar",
         }
 
+    _preserve_generated_at(payload)
     destino = write_json_report("dataset_readiness.json", payload)
 
     print(f"{destino.relative_to(PROJECT_ROOT).as_posix()}: {len(profiles)} fontes")

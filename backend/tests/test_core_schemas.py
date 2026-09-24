@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +16,24 @@ from app.schemas.core import (
 )
 
 NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
+
+
+def test_human_review_accepts_candidate_class_but_never_unknown_code():
+    from app.schemas.core import ReviewCreate
+
+    result = ReviewCreate(decision="correct", corrected_class="URMIND_FALLEN_TREE")
+    assert result.corrected_class == "URMIND_FALLEN_TREE"
+    with pytest.raises(ValidationError):
+        ReviewCreate(decision="correct", corrected_class="INVENTED_CLASS")
+
+
+def test_gate_configuration_rejects_unsafe_or_contradictory_thresholds():
+    from app.schemas.core import PhotoGatePolicy
+
+    with pytest.raises(ValidationError):
+        PhotoGatePolicy(brightness_min=240, brightness_max=20)
+    with pytest.raises(ValidationError):
+        PhotoGatePolicy(min_side=0)
 
 
 def test_bounding_box_rejects_box_outside_frame():
@@ -54,10 +73,29 @@ def test_capture_accepts_photo_with_gps_and_detection():
                 "urmind_class": UrmindClass.ROAD_D40,
                 "confidence": 0.91,
                 "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+                "model_version_id": UUID("00000000-0000-4000-8000-000000000001"),
             }
         ],
     )
     assert capture.detections[0].urmind_class is UrmindClass.ROAD_D40
+
+
+def test_detection_without_model_lineage_is_rejected():
+    with pytest.raises(ValidationError, match="model_version_id"):
+        CaptureCreate(
+            capture_key="cap-no-model",
+            source=CaptureSource.PWA_PHOTO,
+            source_location=LocationSource.GPS_DEVICE,
+            captured_at=NOW,
+            coordinate=Coordinate(latitude=-23.55, longitude=-46.63),
+            detections=[
+                {
+                    "urmind_class": UrmindClass.ROAD_D40,
+                    "confidence": 0.91,
+                    "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
+                }
+            ],
+        )
 
 
 def test_image_only_event_cannot_carry_coordinate():

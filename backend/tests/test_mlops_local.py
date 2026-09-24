@@ -49,12 +49,22 @@ def test_mlflow_controlled_local_run_persists_all_contracts(tmp_path: Path) -> N
     assert run.data.params["config_fingerprint"]
     assert run.data.params["dataset_fingerprint"]
     assert run.data.params["split_fingerprint"]
+    assert run.data.params["git_dirty"] in {"True", "False"}
+    assert len(run.data.params["code_state_sha256"]) == 64
     assert run.data.metrics["synthetic_metric"] == pytest.approx(0.75)
     assert run.data.tags["test_fixture"] == "true"
-    artifacts = mlflow.tracking.MlflowClient(
-        tracking_uri=tracker.tracking_uri
-    ).list_artifacts(run_id, "controlled")
+    artifacts = mlflow.tracking.MlflowClient(tracking_uri=tracker.tracking_uri).list_artifacts(
+        run_id, "controlled"
+    )
     assert [artifact.path for artifact in artifacts] == ["controlled/controlled-test.json"]
+    code_state = mlflow.tracking.MlflowClient(tracking_uri=tracker.tracking_uri).download_artifacts(
+        run_id, "run-metadata/code-state.json"
+    )
+    persisted = json.loads(Path(code_state).read_text(encoding="utf-8"))
+    assert persisted["git_commit"] == run.data.params["git_commit"]
+    assert persisted["code_state_sha256"] == run.data.params["code_state_sha256"]
+    assert len(persisted["tracked_patch_sha256"]) == 64
+    assert isinstance(persisted["untracked_sha256"], dict)
 
 
 def test_training_validation_and_checkpoint_logging_use_one_tracker(tmp_path: Path) -> None:
@@ -207,3 +217,87 @@ def test_official_environment_installer_validates_mlops_on_reuse() -> None:
     stack = json.loads((PROJECT_ROOT / "backend/ml-stack.json").read_text(encoding="utf-8"))
     assert stack["mlflow_skinny"] == "3.16.0"
     assert stack["dvc"] == "3.67.1"
+
+
+def test_resume_reopens_original_run_and_refuses_foreign_lineage(tmp_path: Path) -> None:
+    """Um resume continua o mesmo run MLflow; outro contrato ou run fechado é recusado."""
+    import mlflow
+
+    from app.ml.tracking import MLflowTracker, TrackingError
+
+    root = tmp_path / "mlruns"
+
+    def tracker() -> MLflowTracker:
+        return MLflowTracker(_metadata(), _config(tmp_path), tracking_root=root)
+
+    first = tracker()
+    run_id = first.start_run(tags={"contract": "c.json", "pretrained": "coco.pth"})
+    first.log_metrics({"validation/map50_95": 0.1}, step=1)
+    mlflow.end_run(status="KILLED")  # processo morto sem fechar o run
+
+    resumed = tracker()
+    assert (
+        resumed.start_run(
+            tags={"contract": "c.json", "resumed_from": "last.pt@x"}, resume_run_id=run_id
+        )
+        == run_id
+    )
+    resumed.end_run()
+    client = mlflow.tracking.MlflowClient(tracking_uri=resumed.tracking_uri)
+    run = client.get_run(run_id)
+    assert run.data.tags["pretrained"] == "coco.pth"
+    assert run.data.tags["resumed_from"] == "last.pt@x"
+    assert run.info.status == "FINISHED"
+
+    with pytest.raises(TrackingError, match="finalizado"):
+        tracker().start_run(tags={"contract": "c.json"}, resume_run_id=run_id)
+    other = tracker()
+    other_id = other.start_run(tags={"contract": "c.json"})
+    mlflow.end_run(status="KILLED")
+    with pytest.raises(TrackingError, match="contrato"):
+        tracker().start_run(tags={"contract": "outro.json"}, resume_run_id=other_id)
+    assert mlflow.active_run() is None
+
+
+def test_mlflow_run_id_requires_resume() -> None:
+    from app.ml.training import main
+
+    with pytest.raises(ValueError, match="--resume"):
+        main(["--run", "--mlflow-run-id", "abc"])
+
+
+def test_empty_pretrained_startup_run_can_be_reopened_but_run_with_metrics_cannot(
+    tmp_path: Path,
+) -> None:
+    """A launcher retry reuses one empty run, never a partially trained run."""
+    import mlflow
+
+    from app.ml.tracking import MLflowTracker, TrackingError
+
+    root = tmp_path / "mlruns"
+
+    def tracker() -> MLflowTracker:
+        return MLflowTracker(_metadata(), _config(tmp_path), tracking_root=root)
+
+    first = tracker()
+    empty_id = first.start_run(tags={"contract": "c.json", "pretrained": "coco.pth"})
+    mlflow.end_run(status="KILLED")
+    retried = tracker()
+    assert (
+        retried.start_run(
+            tags={"contract": "c.json", "pretrained": "coco.pth"},
+            resume_run_id=empty_id,
+            allow_empty_pretrained_retry=True,
+        )
+        == empty_id
+    )
+    retried.log_metrics({"training/total_loss": 1.0}, step=0)
+    mlflow.end_run(status="KILLED")
+
+    with pytest.raises(TrackingError, match="métricas"):
+        tracker().start_run(
+            tags={"contract": "c.json", "pretrained": "coco.pth"},
+            resume_run_id=empty_id,
+            allow_empty_pretrained_retry=True,
+        )
+    assert mlflow.active_run() is None

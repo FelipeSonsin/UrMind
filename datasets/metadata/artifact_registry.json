@@ -29,8 +29,8 @@
     },
     {
       "path": "datasets/manifests/camber.json",
-      "sha256": "0ce156bf6977ba31dbcfc994ce99905a4215d914e97e8c3c5f1aecc4639b854e",
-      "size_bytes": 3010
+      "sha256": "761c46001edf05947183b89ee4649cf9d256da351002535c2a3b8ff4fb0b31ef",
+      "size_bytes": 2693
     },
     {
       "path": "datasets/manifests/detection_external_test.jsonl",
@@ -89,8 +89,8 @@
     },
     {
       "path": "datasets/manifests/univali_br.json",
-      "sha256": "5c6fbed49326d9f64e46fe6a77a5111e33b28514e07ec0d26cd50fcc664424ae",
-      "size_bytes": 9514
+      "sha256": "e8274e7170acc0aabb40a976f21a692262ad4e3621c53a65c76dccd46ee7d4aa",
+      "size_bytes": 4711
     },
     {
       "path": "datasets/manifests/univali_br_boxes.jsonl",
@@ -119,13 +119,13 @@
     },
     {
       "path": "datasets/metadata/acquisition_plan.json",
-      "sha256": "6c775cfb7365397ca64d1c3954d26fd53d0004700bc660ab5ae65bed9f937ab2",
-      "size_bytes": 5963
+      "sha256": "6860a1600457962654f969dd0719d55a5fa9c5cf5cf818557014ab15640c0d75",
+      "size_bytes": 7884
     },
     {
       "path": "datasets/metadata/artifact_contract.yaml",
-      "sha256": "c4fb7d8703987938f95ac365c6af474faddc0625c4cfbb38b0e3f36674f4d5da",
-      "size_bytes": 19020
+      "sha256": "264d0e2f0d04d7aa8cc5d09fe7839ff3fa71e188d545f86fd87f5c0e5a5ed252",
+      "size_bytes": 18860
     },
     {
       "path": "datasets/metadata/bdd100k_acquisition_plan.json",
@@ -144,8 +144,13 @@
     },
     {
       "path": "datasets/metadata/licenses.md",
-      "sha256": "e28272fdf9d5a7b6622001b7b1ec7e99ea72be0a5de9a15f94f85631c7f0be49",
-      "size_bytes": 3536
+      "sha256": "3aef4172af1f170417f3ff5b7b75754078ad0a595742189142ecf730276d95fc",
+      "size_bytes": 5654
+    },
+    {
+      "path": "datasets/metadata/photo_reference_export.json",
+      "sha256": "601648e113262406d8dd85bec1edfeace66b98c794cefefe59b82506a9fcde16",
+      "size_bytes": 226016
     },
     {
       "path": "datasets/metadata/removed_sources.json",
@@ -154,13 +159,13 @@
     },
     {
       "path": "datasets/metadata/sources.csv",
-      "sha256": "c6a7f893b133b1cdd768ea9a43a1492dc141a83b877a98560ef0c9b05e84a39b",
-      "size_bytes": 5030
+      "sha256": "454c223705b64ebb0796ee8abcf79716a1d66e15b96601dd1669b4f76187f5c1",
+      "size_bytes": 5957
     },
     {
       "path": "datasets/metadata/storage_budget.yaml",
-      "sha256": "50eec80414ad3a93cc94ecf30a924606fdf37e01f49ac22c74bc5fd8b8fd9966",
-      "size_bytes": 3945
+      "sha256": "11ce73c40a5eaeacbf0cad8be30734d1dd1e767750abb31087a19037e17aa44e",
+      "size_bytes": 4407
     },
     {
       "path": "datasets/metadata/taxonomy.yaml",
@@ -194,13 +199,23 @@
     },
     {
       "path": "datasets/reports/dataset_readiness.json",
-      "sha256": "2e1095f95fb3b9561d06665923ef001272baffc39dd4b787f7ae0cc676481115",
-      "size_bytes": 36397
+      "sha256": "754508415bcc71555d99968773d98fd8d32c3558c30deaaadfabf40e487b2033",
+      "size_bytes": 37805
     },
     {
       "path": "datasets/reports/detection_loader_smoke.json",
       "sha256": "24aec067619acd01689d2696a51108a889482c76513355bd5558ddb44e64f5fd",
       "size_bytes": 1134
+    },
+    {
+      "path": "datasets/reports/ird_dashcam_candidate_acquisition.json",
+      "sha256": "ab28f1629cf228bd164913a2ba81ce35db37d7c2c7b7ca54b3f10abcd2834ff6",
+      "size_bytes": 131141
+    },
+    {
+      "path": "datasets/reports/ird_dashcam_candidate_audit.json",
+      "sha256": "0a4a8e54b6e884801c8ec38bf40adf89b99735a9ae1952058eafd4946e2ce790",
+      "size_bytes": 3916
     },
     {
       "path": "datasets/reports/norway_profile.jsonl",
@@ -221,6 +236,11 @@
       "path": "datasets/reports/rdd2022_duplicates.json",
       "sha256": "6b81048d290afbd5f12a7d1742f36d24258712e18d4960860c0fc1e02428ae8d",
       "size_bytes": 123051
+    },
+    {
+      "path": "datasets/reports/rdd2022_geometry.json",
+      "sha256": "5f4938c75996b0151c0d1921e8d76a7d3ede8ff46f38bfcc2b184e3d9d541643",
+      "size_bytes": 50356
     },
     {
       "path": "datasets/reports/rdd2022_legacy_artifact_status.json",
@@ -380,9 +400,19 @@
       "size_bytes": 18491
     },
     {
+      "path": "scripts/datasets/acquire_ird_dashcam.py",
+      "sha256": "32c08f56735620b209f895ad72189894b1c629c652293c1bb7eed37308e1b1b9",
+      "size_bytes": 12462
+    },
+    {
       "path": "scripts/datasets/acquire_registered.py",
-      "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4",
-      "size_bytes": 15194
+      "sha256": "d5c0f2ac7b7eac2086b4ac305fbcb1500083ce57f3870c6e3fe67a02d82fbf57",
+      "size_bytes": 23239
+    },
+    {
+      "path": "scripts/datasets/analyze_rdd2022_geometry.py",
+      "sha256": "b6788f3c4f3dcf2837a336b83ea1d51892c034db31caa260bae5364522b40106",
+      "size_bytes": 8733
     },
     {
       "path": "scripts/datasets/audit_acquired.py",
@@ -393,6 +423,11 @@
       "path": "scripts/datasets/audit_external.py",
       "sha256": "5d8cfd1bf9596239b400a5ab31642ea61b5b67807c5a87c0a96e92c5d19e8a5f",
       "size_bytes": 3215
+    },
+    {
+      "path": "scripts/datasets/audit_ird_dashcam.py",
+      "sha256": "cf7098e11b6ad4d286edf72f7f54b86064ec360e3cee395fd5c7890a74c3c104",
+      "size_bytes": 11698
     },
     {
       "path": "scripts/datasets/audit_rdd2022.py",
@@ -436,13 +471,13 @@
     },
     {
       "path": "scripts/datasets/build_detection_manifests.py",
-      "sha256": "9c6917436346ca206fcbad929f4f1e798930ef926b907ef761b54449410525ee",
-      "size_bytes": 13328
+      "sha256": "a5a9fc5cfb5ac1c73e9499298e07234ca0ae5bcfb17f427abafd42a748f04ae9",
+      "size_bytes": 20743
     },
     {
       "path": "scripts/datasets/build_report.py",
-      "sha256": "5f3ad8c28586b1056815c3f3e8840d37cf0e1e1c96758ba23a2f9db788031e1c",
-      "size_bytes": 22248
+      "sha256": "425902b4f2c97e6e645b8a7e1019cc9b7d65226dd93be1245253ee0034874b00",
+      "size_bytes": 22475
     },
     {
       "path": "scripts/datasets/convert_univali_masks.py",
@@ -465,6 +500,11 @@
       "size_bytes": 8673
     },
     {
+      "path": "scripts/datasets/make_splits_v2.py",
+      "sha256": "4183b8966d87d79b03c8ade92832786a1ef3ab85ee1027528445976db2fa1263",
+      "size_bytes": 20315
+    },
+    {
       "path": "scripts/datasets/make_univali_splits.py",
       "sha256": "c9cbc9e99e7066585cb5130ec3c45c76ead77c0432af7beba2de292576f380d8",
       "size_bytes": 20858
@@ -476,8 +516,8 @@
     },
     {
       "path": "scripts/datasets/prepare_rdd_split_authorization.py",
-      "sha256": "18a5c30e84d415b83aa6bdc0c77b096103d6cd15ceba43e7574ca4b65cb189c6",
-      "size_bytes": 6309
+      "sha256": "38eb8d7a23c3425edddbb18ee5f91623b2270dbbee04203a7412eef8a091ec99",
+      "size_bytes": 12528
     },
     {
       "path": "scripts/datasets/prepare_univali_human_audit.py",
@@ -511,18 +551,18 @@
     },
     {
       "path": "scripts/datasets/refresh_readiness.py",
-      "sha256": "ba145515bb056939d61a63ef787dae63c42447f6388e188848c43a2797011a4a",
-      "size_bytes": 8723
+      "sha256": "393d0a5df17634cfaac5c757f554f950625cecf88cf568e16b6024016f983625",
+      "size_bytes": 9470
     },
     {
       "path": "scripts/datasets/refresh_registry.py",
-      "sha256": "c58337e90691e5dd17f314e9c2981085c6f71e5aa81e4e0402d1d7a33c214d6c",
-      "size_bytes": 7791
+      "sha256": "d8b430b0cde7ef3809cceb7cc8bd82c46df5abc5a549b72cd1873f68d3461c84",
+      "size_bytes": 8064
     },
     {
       "path": "scripts/datasets/refresh_sources.py",
-      "sha256": "e539bab51c1c1733b4d322ae207f3c0e646a4ebb06301b3341111e16392ea2d4",
-      "size_bytes": 11320
+      "sha256": "fdfb7916721d60eebdd13e2e08a670b4e89fc3994da2f4fac7389e00e873b80a",
+      "size_bytes": 14396
     },
     {
       "path": "scripts/datasets/refresh_status.py",
@@ -585,5 +625,5 @@
       "size_bytes": 7387
     }
   ],
-  "updated": "2026-09-15"
+  "updated": "2026-09-24"
 }

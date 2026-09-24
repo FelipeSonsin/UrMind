@@ -1,4 +1,4 @@
-"""Modelos ORM do núcleo do UrMind (espelham migrations/0001_core_geospatial.sql).
+"""Modelos ORM do núcleo do UrMind (espelham 0002_align_urmind_core).
 
 As migrations SQL continuam sendo a fonte da verdade do esquema; estes modelos
 existem para consultas tipadas e para o teste de paridade em tests/test_migrations.py.
@@ -12,10 +12,16 @@ from typing import Any
 
 from geoalchemy2 import Geography, Geometry
 from sqlalchemy import (
+    BigInteger,
     Boolean,
+    CheckConstraint,
+    Computed,
     DateTime,
+    FetchedValue,
     Float,
     ForeignKey,
+    Identity,
+    Index,
     Integer,
     String,
     Text,
@@ -27,6 +33,27 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 _UUID = UUID(as_uuid=True)
+
+
+class PublicImageAdmission(Base):
+    """Ephemeral antiabuse ledger; never exposed by the public Data API."""
+
+    __tablename__ = "public_image_admissions"
+    __table_args__ = (
+        CheckConstraint("stage in ('lookup', 'download')", name="stage"),
+        CheckConstraint("caller_hash ~ '^[0-9a-f]{64}$'", name="caller"),
+        CheckConstraint(
+            "(stage = 'lookup' and resource_id is null) or "
+            "(stage = 'download' and resource_id is not null)",
+            name="resource",
+        ),
+        Index("public_image_admissions_window_idx", "stage", "admitted_at"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    stage: Mapped[str] = mapped_column(Text)
+    caller_hash: Mapped[str] = mapped_column(Text)
+    resource_id: Mapped[uuid.UUID | None] = mapped_column(_UUID)
+    admitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 def _pk() -> Mapped[uuid.UUID]:
@@ -81,6 +108,29 @@ class ModelVersion(Base):
     metrics: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
+
+    @property
+    def operational_status(self) -> str:
+        """Serving lifecycle, distinct from the immutable scientific verdict."""
+        metrics = self.metrics if isinstance(self.metrics, dict) else {}
+        lifecycle = metrics.get("lifecycle_status")
+        if lifecycle in {"ARCHIVED", "QUARANTINED"}:
+            return lifecycle
+        if self.promoted_at is not None:
+            return (
+                "PRODUCTION_APPROVED"
+                if metrics.get("quality_classification") == "APPROVED"
+                else "QUARANTINED"
+            )
+        if (
+            metrics.get("shadow_authorized") is True
+            and metrics.get("serving_status") == "EXPERIMENTAL_SHADOW"
+            and metrics.get("quality_classification") in {"REJECTED", "EXPERIMENTAL"}
+        ):
+            return "EXPERIMENTAL_SHADOW"
+        if metrics.get("quality_classification") == "REJECTED":
+            return "REJECTED"
+        return "REFERENCE"
 
 
 class ActionCatalog(Base):
@@ -145,7 +195,11 @@ class RoadSegment(Base):
     highway: Mapped[str | None] = mapped_column(Text)
     jurisdiction: Mapped[str | None] = mapped_column(Text)
     geom = mapped_column(Geometry("LINESTRING", srid=4326), nullable=False)
-    geog = mapped_column(Geography("LINESTRING", srid=4326), nullable=True)
+    geog = mapped_column(
+        Geography("LINESTRING", srid=4326),
+        Computed("geom::geography", persisted=True),
+        nullable=True,
+    )
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = _created_at()
 
@@ -154,6 +208,8 @@ class Capture(Base):
     __tablename__ = "captures"
 
     id: Mapped[uuid.UUID] = _pk()
+    public_id: Mapped[str] = mapped_column(Text, unique=True, server_default=FetchedValue())
+    protocol_code: Mapped[str] = mapped_column(Text, unique=True, server_default=FetchedValue())
     capture_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     mission_id: Mapped[uuid.UUID | None] = mapped_column(
         _UUID, ForeignKey("public.missions.id", ondelete="SET NULL")
@@ -165,6 +221,7 @@ class Capture(Base):
     source_location: Mapped[str] = mapped_column(Text, nullable=False)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     storage_path: Mapped[str | None] = mapped_column(Text)
+    user_description: Mapped[str | None] = mapped_column(Text)
     point = mapped_column(Geography("POINT", srid=4326), nullable=True)
     accuracy_m: Mapped[float | None] = mapped_column(Float)
     heading_deg: Mapped[float | None] = mapped_column(Float)
@@ -206,8 +263,8 @@ class Detection(Base):
     urmind_class: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     bbox: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    model_version_id: Mapped[uuid.UUID | None] = mapped_column(
-        _UUID, ForeignKey("public.model_versions.id", ondelete="SET NULL")
+    model_version_id: Mapped[uuid.UUID] = mapped_column(
+        _UUID, ForeignKey("public.model_versions.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = _created_at()
 
@@ -218,6 +275,14 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[uuid.UUID] = _pk()
+    public_id: Mapped[str] = mapped_column(
+        Text, unique=True, server_default=func.replace(func.gen_random_uuid().cast(Text), "-", "")
+    )
+    event_sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
     event_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     capture_id: Mapped[uuid.UUID | None] = mapped_column(
         _UUID, ForeignKey("public.captures.id", ondelete="SET NULL")
@@ -264,6 +329,9 @@ class EventContext(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     fetched_at: Mapped[datetime] = _created_at()
+    ingested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
 
     event: Mapped[Event] = relationship(back_populates="context")
 
@@ -272,6 +340,13 @@ class RiskAssessment(Base):
     __tablename__ = "risk_assessments"
 
     id: Mapped[uuid.UUID] = _pk()
+    assessment_sequence: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), nullable=False
+    )
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
     event_id: Mapped[uuid.UUID] = mapped_column(
         _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=False
     )
@@ -317,8 +392,16 @@ class Review(Base):
     __tablename__ = "reviews"
 
     id: Mapped[uuid.UUID] = _pk()
-    event_id: Mapped[uuid.UUID] = mapped_column(
-        _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=False
+    review_sequence: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
+    commit_order: Mapped[int | None] = mapped_column(BigInteger)
+    order_source: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="serialized_commit_order"
+    )
+    event_id: Mapped[uuid.UUID | None] = mapped_column(
+        _UUID, ForeignKey("public.events.id", ondelete="CASCADE"), nullable=True
+    )
+    capture_id: Mapped[uuid.UUID | None] = mapped_column(
+        _UUID, ForeignKey("public.captures.id", ondelete="RESTRICT")
     )
     reviewer: Mapped[str] = mapped_column(String, nullable=False)
     decision: Mapped[str] = mapped_column(Text, nullable=False)

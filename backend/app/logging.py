@@ -6,6 +6,9 @@ import structlog
 
 def configure_logging() -> None:
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
+    # O logger interno do httpx inclui query params completos; somente o cliente
+    # canônico deve registrar endpoints externos, pois ele aplica redaction.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

@@ -65,8 +65,14 @@ def relatorio_completo(**kwargs) -> str:
 def test_relatorio_completo_traz_as_secoes_do_planejamento():
     texto = relatorio_completo()
 
-    for secao in ("LOCALIZAÇÃO", "EVIDÊNCIAS", "AVALIAÇÃO", "RESPONSÁVEL",
-                  "AÇÃO SUGERIDA", "LIMITAÇÕES"):
+    for secao in (
+        "LOCALIZAÇÃO",
+        "EVIDÊNCIAS",
+        "AVALIAÇÃO",
+        "RESPONSÁVEL",
+        "AÇÃO SUGERIDA",
+        "LIMITAÇÕES",
+    ):
         assert secao in texto
 
 
@@ -101,8 +107,12 @@ def test_sem_confianca_o_texto_diz_nao_disponivel_em_vez_de_numero():
 
 def test_sem_coordenada_o_relatorio_admite_que_nao_ha_posicao():
     texto = relatorio_completo(
-        latitude=None, longitude=None, location_accuracy_m=None,
-        location_source=None, road_segment_name=None, distance_to_road_m=None,
+        latitude=None,
+        longitude=None,
+        location_accuracy_m=None,
+        location_source=None,
+        road_segment_name=None,
+        distance_to_road_m=None,
     )
 
     assert "Coordenada: não disponível" in texto
@@ -204,8 +214,12 @@ def test_nenhum_numero_aparece_quando_nada_foi_medido():
     """O caso mais perigoso: evento sem nada. O texto não pode fabricar valor."""
     texto = relatorio_completo(
         urmind_class=UrmindClass.UNKNOWN,
-        risk=risco(urmind_class=UrmindClass.UNKNOWN, visual_confidence=None,
-                   location_accuracy_m=None, context=ContextInput()),
+        risk=risco(
+            urmind_class=UrmindClass.UNKNOWN,
+            visual_confidence=None,
+            location_accuracy_m=None,
+            context=ContextInput(),
+        ),
         visual_confidence=None,
         model_version=None,
         latitude=None,
@@ -226,3 +240,118 @@ def test_nenhum_numero_aparece_quando_nada_foi_medido():
     # Só a incerteza máxima e a cobertura zero podem aparecer como número.
     assert "Incerteza: 1.00" in texto
     assert "Fatores disponíveis: 0%" in texto
+
+
+def public_detail(**changes):
+    """Safe boundary fixture: no ORM or unfiltered provider data enters analysis."""
+    from app.schemas.public import EventDetailPublic
+
+    values = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "occurred_at": "2026-01-01T00:00:00Z",
+        "urmind_class": UrmindClass.ROAD_D40.value,
+        "status": "open",
+        "evidence_mode": "photo",
+        "visual_confidence": None,
+        "severity": None,
+        "priority_score": None,
+        "latitude": None,
+        "longitude": None,
+        "snapped_latitude": None,
+        "snapped_longitude": None,
+        "road_name": None,
+        "distance_to_road_m": None,
+        "location_accuracy_m": None,
+        "road": None,
+        "image": {"available": False, "privacy_redacted": False},
+        "risk": None,
+        "action": None,
+        "responsibility": {"status": "requires_triage"},
+        "prediction": {"available": False},
+        "model_version": None,
+        "model_stage": None,
+        "dataset_version": None,
+        "reviewed": False,
+    }
+    return EventDetailPublic.model_validate({**values, **changes})
+
+
+def test_analysis_is_deterministic_and_missing_data_stays_missing():
+    from app.services.report import build_urban_analysis
+
+    detail = public_detail(urmind_class="URMIND_UNKNOWN", severity="critical", priority_score=99)
+    result = build_urban_analysis(detail)
+    assert result == build_urban_analysis(detail)
+    assert result.schema_version == "urmind-urban-analysis-v1"
+    assert result.severity is result.risk_level is result.priority_lane is None
+    assert result.action is result.responsibility.responsible is None
+    assert result.possible_causes == result.potential_consequences == []
+    assert result.identification.visual_confidence is None
+    assert result.provenance.assessment_source == "unavailable"
+    assert detail.analysis is None
+
+
+@pytest.mark.parametrize("source", [None, "legacy", "phase5"])
+def test_analysis_only_copies_persisted_phase5_assessment(source):
+    from app.schemas.public import RiskPublic
+    from app.services.report import build_urban_analysis
+
+    risk = RiskPublic(
+        assessment_source=source,
+        severity="medium",
+        risk_level="high",
+        priority_lane="expedited",
+        priority_score=None,
+        impact=["mobility"],
+        uncertainty=None,
+        uncertainty_band="partial",
+        coverage=None,
+        ruleset_version="recorded-v1",
+        thresholds_are_calibrated=False,
+        explanation={},
+    )
+    result = build_urban_analysis(public_detail(risk=risk))
+    assert result.possible_causes == []
+    if source == "phase5":
+        assert result.severity == risk.severity
+        assert result.risk_level == risk.risk_level
+        assert result.priority_lane == risk.priority_lane
+        assert result.provenance.ruleset_version == "recorded-v1"
+        assert result.potential_consequences[0].conditional is True
+        assert result.potential_consequences[0].statement.startswith("Se ")
+    else:
+        assert result.severity is result.risk_level is result.priority_lane is None
+        assert result.potential_consequences == []
+
+
+def test_analysis_uses_catalog_action_and_responsibility_without_inference():
+    from app.services.report import build_urban_analysis
+
+    detail = public_detail(
+        action={"code": "INSPECAO", "label": "Inspeção", "version": "v1"},
+        responsibility={
+            "status": "assigned",
+            "responsible": "Órgão da regra",
+            "source": "Regra registrada",
+            "version": "v2",
+        },
+    )
+    result = build_urban_analysis(detail)
+    assert result.action == detail.action
+    assert result.responsibility == detail.responsibility
+    assert "experimental" in " ".join(result.limitations)
+    assert "não mede profundidade" in " ".join(result.limitations)
+
+
+def test_all_candidate_classes_remain_explicitly_without_visual_support():
+    from app.schemas.issue_taxonomy import ISSUES, ModelSupportStatus
+    from app.services.report import build_urban_analysis
+
+    for issue in ISSUES:
+        if issue.model_support_status != ModelSupportStatus.DATA_REQUIRED:
+            continue
+        result = build_urban_analysis(public_detail(urmind_class=issue.issue_code))
+        assert "Não há detector habilitado" in result.description
+        assert result.identification.model_support_status == "DATA_REQUIRED"
+        assert result.possible_causes == result.potential_consequences == []
+        assert result.severity is result.risk_level is result.priority_lane is None

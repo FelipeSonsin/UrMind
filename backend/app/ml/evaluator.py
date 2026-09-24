@@ -16,9 +16,8 @@ from app.ml.metrics import Box, EvaluationResult, GroundTruth, Prediction, evalu
 from app.ml.taxonomy import MODEL_V1_CLASS_ORDER
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-VALIDATION_MANIFEST_PATH = (
-    PROJECT_ROOT / "datasets/manifests/detection_validation_authorized.jsonl"
-)
+VALIDATION_MANIFEST_PATH = PROJECT_ROOT / "datasets/manifests/detection_validation_authorized.jsonl"
+TEST_MANIFEST_PATH = PROJECT_ROOT / "datasets/manifests/detection_test_authorized.jsonl"
 
 
 class EvaluationGateError(RuntimeError):
@@ -75,24 +74,31 @@ class EvaluationRun:
     multi_box_images: int
 
 
-def manifest_for_evaluation(role: str) -> Path:
-    if role != "VALIDATION":
-        raise ValueError("evaluator aceita somente VALIDATION; TEST permanece selado")
-    return VALIDATION_MANIFEST_PATH
+def manifest_for_evaluation(role: str, *, allow_test: bool = False) -> Path:
+    if role == "VALIDATION":
+        return VALIDATION_MANIFEST_PATH
+    if role == "TEST" and allow_test:
+        return TEST_MANIFEST_PATH
+    raise ValueError("evaluator aceita somente VALIDATION; TEST exige fechamento canônico")
 
 
-def assert_authorized_validation_dataset(dataset: AuthorizedDetectionDataset) -> None:
-    """Vincula cada linha consumida ao manifesto registrado, permitindo subsets de smoke."""
+def assert_authorized_evaluation_dataset(
+    dataset: AuthorizedDetectionDataset, *, role: str, manifest_path: Path | None = None
+) -> None:
+    """Vincula cada linha consumida ao manifesto registrado do papel declarado.
+
+    `manifest_path` permite a outra geração de dataset (V2) declarar o próprio
+    manifest; sem ele o binding é exatamente o do V1.
+    """
     authorized_rows = load_authorized_manifest(
-        manifest_for_evaluation("VALIDATION"), intended_split="VALIDATION"
+        manifest_path or manifest_for_evaluation(role, allow_test=role == "TEST"),
+        intended_split=role,
     )
     authorized_by_image = {str(row["image_path"]): row for row in authorized_rows}
     if not dataset.samples or any(
         authorized_by_image.get(str(row.get("image_path"))) != row for row in dataset.samples
     ):
-        raise EvaluationGateError(
-            "dataset não está vinculado ao manifesto VALIDATION autorizado"
-        )
+        raise EvaluationGateError(f"dataset não está vinculado ao manifesto {role} autorizado")
 
 
 def postprocess_batch(
@@ -222,19 +228,25 @@ class YOLOXEvaluator:
         config: EvaluationConfig,
         *,
         device: str | torch.device = "cuda",
+        role: str = "VALIDATION",
+        manifest_path: Path | None = None,
     ) -> None:
+        if role not in {"VALIDATION", "TEST"}:
+            raise EvaluationGateError("role de evaluation inválido")
         dataset = dataloader.dataset
         if not isinstance(dataset, AuthorizedDetectionDataset):
             raise EvaluationGateError("evaluator exige AuthorizedDetectionDataset")
-        if dataset.mode != "validation" or any(
-            row.get("split") != "VALIDATION" for row in dataset.samples
+        expected_mode = "validation" if role == "VALIDATION" else "test"
+        if dataset.mode != expected_mode or any(
+            row.get("split") != role for row in dataset.samples
         ):
-            raise EvaluationGateError("evaluator aceita somente dataset VALIDATION autorizado")
-        assert_authorized_validation_dataset(dataset)
+            raise EvaluationGateError(f"evaluator exige dataset {role} autorizado")
+        assert_authorized_evaluation_dataset(dataset, role=role, manifest_path=manifest_path)
         self.model = model
         self.dataloader = dataloader
         self.dataset = dataset
         self.config = config
+        self.role = role
         self.device = torch.device(device)
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise EvaluationGateError("CUDA solicitado, mas indisponível; fallback proibido")
@@ -262,13 +274,9 @@ class YOLOXEvaluator:
                             detections, infos, indices, self.dataset, self.config
                         )
                     )
-                    batch_truths = targets_to_ground_truths(
-                        targets, infos, indices, self.dataset
-                    )
+                    batch_truths = targets_to_ground_truths(targets, infos, indices, self.dataset)
                     truths.extend(batch_truths)
-                    counts = [
-                        int(((item[:, 3] > 0) & (item[:, 4] > 0)).sum()) for item in targets
-                    ]
+                    counts = [int(((item[:, 3] > 0) & (item[:, 4] > 0)).sum()) for item in targets]
                     sample_count += len(counts)
                     positive += sum(count > 0 for count in counts)
                     negative += sum(count == 0 for count in counts)
