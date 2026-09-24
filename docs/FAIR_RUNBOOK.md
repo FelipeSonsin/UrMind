@@ -18,6 +18,8 @@ O script lê, mas não altera, os dois `.env`. Confirma DEV sem mostrar valores,
 compila o frontend com API relativa `/api/v1`, define SERVE_FRONTEND_DIR somente
 no processo, inicia API em loopback e Worker, verifica health/readiness e abre
 quick tunnel. Os logs e `fair_qr.png` ficam em `%LOCALAPPDATA%/UrMind/fair/<run>`.
+Se já existir um Worker em outro terminal, o script recusa iniciar. Encerre esse
+Worker manualmente no terminal de origem antes de começar; o script não o encerra.
 Não versionar esses arquivos. Não compartilhar logs sem revisão de privacidade.
 
 Dependências: Node/npm, ambiente backend, `qrcode[pil]==8.2` (extra `fair`),
@@ -38,7 +40,7 @@ Não fornecer tokens/credenciais como argumentos ou em mensagens.
 ## Supervisão e encerramento
 
 Manter o terminal aberto. Se API, Worker ou túnel terminarem, o supervisor encerra
-os demais processos que criou e conserva os logs. Não mata serviços preexistentes.
+as árvores dos processos que criou e conserva os logs. Não mata serviços preexistentes.
 Ctrl+C encerra a sessão. Corrigir a causa e executar novamente é o procedimento de
 restart/rollback operacional; não há serviço permanente instalado nem reboot automático.
 `-Port 8765 -RunSeconds 40` permite uma sessão curta de verificação com encerramento.

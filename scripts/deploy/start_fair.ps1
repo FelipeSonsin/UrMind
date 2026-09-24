@@ -58,6 +58,12 @@ if (-not $tunnel) { throw 'Instale cloudflared pelo canal oficial antes de inici
 & $python -c 'import qrcode'
 if ($LASTEXITCODE -ne 0) { throw 'Dependencia QR ausente; instale qrcode[pil] no ambiente backend.' }
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw 'Porta em uso; nenhum processo existente sera encerrado.' }
+$existingWorkers = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -eq 'python.exe' -and $_.CommandLine -match '(^|\s)-m\s+app\.worker(\s|$)'
+})
+if ($existingWorkers.Count -gt 0) {
+    throw 'Ja existe um Worker ativo. Encerre-o manualmente no terminal que o iniciou antes de iniciar a feira.'
+}
 $runDirectory = Join-Path $outputPath ([Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
 $previousApi = $env:VITE_API_BASE_URL
@@ -113,7 +119,13 @@ try {
     throw 'Um servico encerrou. A sessao sera desligada; corrija a causa nos logs e execute novamente.'
 } finally {
     foreach ($process in @($tunnelProcess,$workerProcess,$apiProcess)) {
-        if ($null -ne $process -and -not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }
+        if ($null -eq $process -or $process.HasExited) { continue }
+        $live = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+        if ($null -ne $live -and $live.StartTime -eq $process.StartTime) {
+            # Windows venv launchers may spawn a child Python process. Stop only
+            # this exact process tree; never terminate a pre-existing Worker.
+            & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+        }
     }
     $env:VITE_API_BASE_URL = $previousApi
     $env:SERVE_FRONTEND_DIR = $previousServe
