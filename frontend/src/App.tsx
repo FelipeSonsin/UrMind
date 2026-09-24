@@ -52,6 +52,18 @@ const CaptureReviewPanel = lazy(() =>
   import('./components/EventDetail').then((m) => ({ default: m.CaptureReviewPanel })),
 );
 const SignIn = lazy(() => import('./components/SignIn').then((m) => ({ default: m.SignIn })));
+const OperationsPage = lazy(() =>
+  import('./pages/OperationsPage').then((m) => ({ default: m.OperationsPage })),
+);
+const OperationalRegistryPage = lazy(() =>
+  import('./pages/OperationsPage').then((m) => ({ default: m.OperationalRegistryPage })),
+);
+const ReportIndicators = lazy(() =>
+  import('./pages/OperationsPage').then((m) => ({ default: m.ReportIndicators })),
+);
+const GroundTruthPage = lazy(() =>
+  import('./pages/OperationsPage').then((m) => ({ default: m.GroundTruthPage })),
+);
 
 /** Releitura do painel público: curta o bastante para parecer vivo, longa o bastante
  * para não pesar na API. */
@@ -108,6 +120,8 @@ const privateNavigation = [
   { id: 'ground-truth', label: 'Ground truth', href: '#/app/ground-truth' },
   { id: 'private-map', label: 'Mapa interno', href: '#/app/mapa' },
   { id: 'admin', label: 'Administração', href: '#/app/admin' },
+  { id: 'models', label: 'Modelos', href: '#/app/modelos' },
+  { id: 'audit', label: 'Auditoria', href: '#/app/auditoria' },
 ] as const;
 type Page =
   | (typeof navigation)[number]['id']
@@ -140,6 +154,7 @@ function parseRoute(): Route {
   if (first === 'system') return { page: 'settings' };
   if (first === 'login') return { page: 'login' };
   if (first === 'app') {
+    if (!second) return { page: 'dashboard' };
     if (second === 'eventos' && third) return { page: 'private-detail', eventId: third };
     return {
       page:
@@ -235,7 +250,11 @@ export default function App() {
       ? reports.data
       : [];
   const showReports =
-    page === 'processing' || page === 'private-map' || page === 'map' || page === 'my-reports';
+    page === 'processing' ||
+    page === 'private-map' ||
+    page === 'map' ||
+    page === 'my-reports' ||
+    (canReview && (page === 'review' || page === 'dashboard'));
   useEffect(() => {
     locationOperation.current?.abort();
     setManualPoint(null);
@@ -826,7 +845,7 @@ export default function App() {
                   Relatos sem análise não são problemas confirmados pela IA. Localização declarada,
                   não exata.
                 </p>
-                {page !== 'map' && (
+                {page !== 'map' && page !== 'review' && (
                   <UrbanMap
                     events={ownReports}
                     selectedId={selectedReport}
@@ -837,7 +856,7 @@ export default function App() {
                       ownReports.some((report) => report.id === selectedReport) && (
                         <>
                           <h2>Relato do cidadão</h2>
-                          {canReview && page === 'private-map' && (
+                          {canReview && privatePage && (
                             <CaptureReviewPanel
                               key={selectedReport}
                               id={selectedReport}
@@ -896,6 +915,16 @@ export default function App() {
                   </button>
                 )}
                 {reportError && <p role="alert">{reportError}</p>}
+                {page === 'review' &&
+                  canReview &&
+                  selectedReport &&
+                  ownReports.some((report) => report.id === selectedReport) && (
+                    <CaptureReviewPanel
+                      key={selectedReport}
+                      id={selectedReport}
+                      onChanged={() => setRevision((value) => value + 1)}
+                    />
+                  )}
                 <ul>
                   {ownReports.map((report) => (
                     <li key={report.id}>
@@ -1172,26 +1201,22 @@ export default function App() {
                     </button>
                   </section>
                 )}
-                {page === 'ground-truth' && (
-                  <section className="panel">
-                    <h1>Ground truth</h1>
-                    <p>
-                      A gestão de consenso e adjudicação ainda não está disponível nesta interface.
-                      Uma ocorrência confirmada não equivale automaticamente a ground truth.
-                    </p>
-                    <a href="#/app/reviews">Consultar revisões de ocorrências</a>
-                  </section>
+                {(page === 'dashboard' || page === 'login') && (
+                  <ReportIndicators key={`${session?.access_token}:${revision}`} />
                 )}
-                {page === 'admin' && (
-                  <section className="panel">
-                    <h1>{canAdmin ? 'Administração' : 'Acesso restrito'}</h1>
-                    <p>
-                      {canAdmin
-                        ? 'Sua conta tem permissão administrativa. A gestão de contas e permissões ainda não está disponível nesta interface.'
-                        : 'Esta página exige permissão de administrador.'}
-                    </p>
-                  </section>
+                {page === 'ground-truth' && <GroundTruthPage key={session?.access_token} />}
+                {(page === 'models' || page === 'audit') && (
+                  <OperationalRegistryPage key={`${session?.access_token}:${page}`} mode={page} />
                 )}
+                {page === 'admin' &&
+                  (canAdmin ? (
+                    <OperationsPage key={session?.access_token} />
+                  ) : (
+                    <section className="panel">
+                      <h1>Acesso restrito</h1>
+                      <p>Esta página exige permissão de administrador.</p>
+                    </section>
+                  ))}
                 {page === 'private-not-found' && (
                   <section className="panel">
                     <h1>Página interna não encontrada</h1>

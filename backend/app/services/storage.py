@@ -21,6 +21,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 
 from app.config import Settings
+from app.schemas.core import PhotoGatePolicy
 
 BUCKET = "captures"
 MAX_BYTES = 10 * 1024 * 1024
@@ -132,13 +133,14 @@ def validate_image(data: bytes) -> ValidatedImage:
     )
 
 
-def validate_report_photo(data: bytes) -> ValidatedImage:
+def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None) -> ValidatedImage:
     """Conservative technical admission, not scene classification or detection.
 
-    Fixed v1 operational thresholds, not scientifically calibrated. Review stays
+    Bounded operational thresholds, not scientifically calibrated. Review stays
     mandatory while scene/face checks lack validated reference artifacts.
     Work is bounded by validate_image and the upload executor's two slots.
     """
+    policy = policy if policy is not None else PhotoGatePolicy()
     image = validate_image(data)
     with Image.open(io.BytesIO(data)) as source:
         gray = source.convert("L")
@@ -157,13 +159,13 @@ def validate_report_photo(data: bytes) -> ValidatedImage:
     else:
         sharpness = 0.0
     reasons = []
-    if min(image.width, image.height) < 640:
+    if min(image.width, image.height) < policy.min_side:
         reasons.append("resolution")
-    if brightness < 20:
+    if brightness < policy.brightness_min:
         reasons.append("underexposed")
-    if brightness > 240:
+    if brightness > policy.brightness_max:
         reasons.append("overexposed")
-    if sharpness < 25:
+    if sharpness < policy.laplacian_min:
         reasons.append("blur")
     result: dict[str, Any] = {
         "version": "urmind-photo-quality-v1",
@@ -179,15 +181,15 @@ def validate_report_photo(data: bytes) -> ValidatedImage:
             "laplacian_variance": round(sharpness, 3),
         },
         "thresholds": {
-            "min_side": 640,
-            "brightness_min": 20,
-            "brightness_max": 240,
-            "laplacian_min": 25,
+            "min_side": policy.min_side,
+            "brightness_min": policy.brightness_min,
+            "brightness_max": policy.brightness_max,
+            "laplacian_min": policy.laplacian_min,
         },
     }
     if reasons:
         hints = {
-            "resolution": "Foto pequena: use uma imagem com pelo menos 640 pixels em cada lado.",
+            "resolution": f"Foto pequena: use uma imagem com pelo menos {policy.min_side} pixels em cada lado.",
             "underexposed": "Foto muito escura: tente com mais luz.",
             "overexposed": "Foto muito clara: evite luz direta na câmera.",
             "blur": "Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.",

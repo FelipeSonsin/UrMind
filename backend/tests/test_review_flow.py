@@ -6,6 +6,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -24,6 +25,33 @@ from app.services.review_export import (
     verify_candidate_objects,
     write_batch,
 )
+
+
+@pytest.mark.asyncio
+async def test_tabular_internal_export_does_not_invent_ground_truth_or_features():
+    decisions = SimpleNamespace(dataset_candidates=AsyncMock(return_value=[]))
+    service = CoreService(SimpleNamespace(), SimpleNamespace(), decisions)
+    empty = await service.tabular_ground_truth()
+    assert empty["rows"] == [] and empty["training_authorized"] is False
+    vote = {
+        "event_id": str(uuid4()),
+        "review_id": uuid4(),
+        "decision": "confirm",
+        "reviewer": "private-user",
+        "reviewer_role": "admin",
+        "adjudicated": True,
+        "reviewed_at": datetime(2026, 9, 24, tzinfo=UTC),
+        "inferred_class": "URMIND_ROAD_D40",
+    }
+    decisions.dataset_candidates.return_value = [vote]
+    decisions.snapshot_before_review = AsyncMock(return_value=None)
+    decisions.persisted_review = AsyncMock(return_value=None)
+    result = await service.tabular_ground_truth()
+    assert result["rows"] == []
+    assert result["entries"][0]["status"] == "adjudicated"
+    assert result["entries"][0]["eligible"] is False
+    assert "private-user" not in str(result)
+
 
 ROW = {
     "review_id": "r1",

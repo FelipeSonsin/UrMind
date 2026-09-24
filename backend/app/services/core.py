@@ -10,10 +10,13 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections import Counter
 from copy import deepcopy
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from app.ml.tabular import TabularExportError, build_example, build_tabular_dataset_version
 from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
 from app.schemas.core import (
     CaptureCreate,
@@ -644,6 +647,69 @@ class CoreService:
                 }
                 for r in await self.decisions.reviews(event_id)
             ],
+        }
+
+    async def tabular_ground_truth(self) -> dict[str, Any]:
+        if self.decisions is None:
+            raise RuntimeError("Ground Truth indisponível")
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for row in await self.decisions.dataset_candidates():
+            grouped.setdefault(str(row["event_id"]), []).append(row)
+        examples = []
+        entries = []
+        counts: Counter[str] = Counter()
+        for event_id, votes in grouped.items():
+            resolution = review_resolution(votes)
+            selected = resolution["selected"]
+            entry = {
+                "event_id": event_id,
+                "status": resolution["status"],
+                "issue_code": None,
+                "eligible": False,
+                "reason": "consenso pendente",
+            }
+            if selected is not None:
+                entry["issue_code"] = selected.get("corrected_class") or selected.get(
+                    "inferred_class"
+                )
+                counts[str(entry["issue_code"])] += 1
+                # Never use an assessment collected after any reviewer started
+                # labeling this event, even if final adjudication came later.
+                cutoff = min(row["reviewed_at"] for row in votes)
+                assessment = await self.decisions.snapshot_before_review(
+                    uuid.UUID(event_id), cutoff
+                )
+                review = await self.decisions.persisted_review(selected["review_id"])
+                snapshot = (assessment.factors or {}).get("phase4_snapshot") if assessment else None
+                if selected["decision"] not in {"confirm", "reject"}:
+                    entry["reason"] = "correção de classe não é rótulo binário do pipeline tabular"
+                elif not snapshot or review is None:
+                    entry["reason"] = "snapshot anterior ao início da revisão indisponível"
+                else:
+                    try:
+                        collected_at = datetime.fromisoformat(snapshot["collected_at"])
+                        if collected_at >= cutoff:
+                            raise TabularExportError("snapshot posterior ao início da revisão")
+                        example = build_example(
+                            snapshot["features"],
+                            snapshot_collected_at=collected_at,
+                            label_at=review.created_at,
+                            review_confirmed=review.decision == "confirm",
+                            capture_ids=(selected.get("evidence") or {}).get("capture_ids") or (),
+                            review=review,
+                        )
+                        examples.append(example)
+                        entry.update(eligible=True, reason=None)
+                    except (TabularExportError, KeyError, ValueError, TypeError):
+                        entry["reason"] = "contrato temporal ou de features não elegível"
+            entries.append(entry)
+        version = build_tabular_dataset_version("review-export", examples)
+        return {
+            "entries": entries,
+            "counts_by_class": dict(counts),
+            "dataset": asdict(version),
+            "rows": [asdict(row) for row in examples],
+            "training_authorized": False,
         }
 
     async def review_capture(

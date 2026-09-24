@@ -1,9 +1,10 @@
-import { lazy, Suspense, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Camera as CameraIcon, Upload, LocateFixed, Save } from 'lucide-react';
 import { Camera } from '../components/Camera';
 import { Photo } from '../components/Photo';
 import { parseCoordinate, coordinateSchema } from '../domain/contracts';
-import { drafts, validatePhoto, type CaptureDraft } from '../services/drafts';
+import { defaultPhotoPolicy, drafts, validatePhoto, type CaptureDraft } from '../services/drafts';
+import { publicApi } from '../services/publicApi';
 import { gps } from 'exifr';
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
 
@@ -46,6 +47,19 @@ export function CapturePage({
   } | null>(null);
   const [showMap, setShowMap] = useState(false);
   const selectionVersion = useRef(0);
+  const [photoPolicy, setPhotoPolicy] = useState(defaultPhotoPolicy);
+  useEffect(() => {
+    const controller = new AbortController();
+    void publicApi
+      .photoPolicy(controller.signal)
+      .then((policy) => {
+        if (!controller.signal.aborted) setPhotoPolicy(policy);
+      })
+      .catch(() => {
+        /* Offline drafts use conservative defaults; server always rechecks. */
+      });
+    return () => controller.abort();
+  }, []);
   const candidateCenter = coordinateSchema.safeParse({
     latitude: Number(latitude),
     longitude: Number(longitude),
@@ -56,7 +70,7 @@ export function CapturePage({
     setBusy(true);
     setError('');
     try {
-      await validatePhoto(file);
+      await validatePhoto(file, photoPolicy);
       if (version !== selectionVersion.current) return;
       // Browser EXIF is a preview only. The backend re-reads the original bytes
       // and decides the persisted location/timestamp independently.

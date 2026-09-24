@@ -27,6 +27,15 @@ def test_human_review_accepts_candidate_class_but_never_unknown_code():
         ReviewCreate(decision="correct", corrected_class="INVENTED_CLASS")
 
 
+def test_gate_configuration_rejects_unsafe_or_contradictory_thresholds():
+    from app.schemas.core import PhotoGatePolicy
+
+    with pytest.raises(ValidationError):
+        PhotoGatePolicy(brightness_min=240, brightness_max=20)
+    with pytest.raises(ValidationError):
+        PhotoGatePolicy(min_side=0)
+
+
 def test_bounding_box_rejects_box_outside_frame():
     with pytest.raises(ValidationError):
         BoundingBox(x=0.8, y=0.1, width=0.5, height=0.1)

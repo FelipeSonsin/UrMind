@@ -41,11 +41,97 @@ OTHER_KEY = ec.generate_private_key(ec.SECP256R1())
 
 @pytest.fixture(autouse=True)
 def isolated_upload_attempt_budget():
-    from app.api.v1.core import upload_admission
+    from app.api.v1.core import get_photo_gate_policy, upload_admission
+    from app.main import app
+    from app.schemas.core import PhotoGatePolicy
 
     upload_admission.cache_clear()
+    app.dependency_overrides[get_photo_gate_policy] = lambda: PhotoGatePolicy()
     yield
+    app.dependency_overrides.pop(get_photo_gate_policy, None)
     upload_admission.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [None, "reviewer"])
+async def test_photo_gate_configuration_write_requires_admin(role):
+    from fastapi import HTTPException, Response
+
+    from app.api.v1.core import update_photo_gate
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import PhotoGatePolicy
+
+    with pytest.raises(HTTPException) as denied:
+        await update_photo_gate(
+            PhotoGatePolicy(),
+            AuthenticatedUser("owner", None, "authenticated", urmind_role=role),
+            SimpleNamespace(),
+            Response(),
+        )
+    assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_photo_gate_configuration_commit_and_audit_are_atomic():
+    from fastapi import Response
+
+    from app.api.v1.core import update_photo_gate
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import PhotoGatePolicy
+
+    decisions = SimpleNamespace(
+        photo_gate_policy=AsyncMock(return_value=PhotoGatePolicy()),
+        save_photo_gate_policy=AsyncMock(),
+        add_audit=AsyncMock(),
+    )
+    session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    service = SimpleNamespace(decisions=decisions, captures=SimpleNamespace(session=session))
+    admin = AuthenticatedUser("admin", None, "authenticated", urmind_role="admin")
+    policy = PhotoGatePolicy(min_side=800)
+    assert await update_photo_gate(policy, admin, service, Response()) == policy
+    decisions.photo_gate_policy.assert_awaited_once_with(lock=True)
+    assert decisions.add_audit.await_args.kwargs["after"]["min_side"] == 800
+    session.commit.assert_awaited_once()
+    session.commit.side_effect = RuntimeError("commit unavailable")
+    with pytest.raises(RuntimeError):
+        await update_photo_gate(policy, admin, service, Response())
+    session.rollback.assert_awaited_once()
+
+
+def test_photo_gate_uses_configured_resolution_and_reports_effective_threshold():
+    from app.schemas.core import PhotoGatePolicy
+    from app.services.storage import PhotoRejectedError, validate_report_photo
+
+    with pytest.raises(PhotoRejectedError) as rejected:
+        validate_report_photo(_jpeg(), policy=PhotoGatePolicy(min_side=4096))
+    assert rejected.value.result["thresholds"]["min_side"] == 4096
+    assert "resolution" in rejected.value.result["reasons"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "operational_models",
+        "operational_audit",
+        "read_photo_gate",
+        "operational_reports",
+        "operational_ground_truth",
+    ],
+)
+async def test_operational_reads_deny_customer_before_repository_access(endpoint):
+    from fastapi import HTTPException, Response
+
+    from app.api.v1 import core
+    from app.auth import AuthenticatedUser
+
+    with pytest.raises(HTTPException) as denied:
+        await getattr(core, endpoint)(
+            user=AuthenticatedUser("customer", None, "authenticated"),
+            service=SimpleNamespace(),
+            response=Response(),
+        )
+    assert denied.value.status_code == 403
 
 
 def _token(key=KEY, **overrides) -> str:

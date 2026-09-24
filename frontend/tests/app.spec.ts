@@ -78,7 +78,7 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
     located = true;
     return route.fulfill({ json: { capture_id: id, location_source: 'manual' } });
   });
-  await page.route('**/api/v1/captures/markers', (route) =>
+  await page.route('**/api/v1/captures/markers*', (route) =>
     route.fulfill({
       json: located
         ? [

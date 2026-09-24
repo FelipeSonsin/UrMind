@@ -33,7 +33,7 @@ from app.models.core import (
     RiskAssessment,
     RoadSegment,
 )
-from app.schemas.core import CaptureCreate, Coordinate, EventCreate, NearbyQuery
+from app.schemas.core import CaptureCreate, Coordinate, EventCreate, NearbyQuery, PhotoGatePolicy
 
 if TYPE_CHECKING:
     from app.services.osm_import import RoadWay
@@ -776,6 +776,84 @@ class DecisionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def photo_gate_policy(self, *, lock: bool = False) -> PhotoGatePolicy:
+        if lock:
+            await self.session.execute(text("select pg_advisory_xact_lock(730025)"))
+        result = await self.session.execute(
+            text("select payload from public.operational_configuration where key='photo_gate'")
+        )
+        payload = result.scalar_one_or_none()
+        # Only an absent row has defaults. Invalid saved configuration/database
+        # failure must not silently disable an admission or privacy guard.
+        return PhotoGatePolicy.model_validate(payload if payload is not None else {})
+
+    async def save_photo_gate_policy(self, policy: PhotoGatePolicy) -> None:
+        await self.session.execute(
+            text("""insert into public.operational_configuration(key,payload)
+                values ('photo_gate',cast(:payload as jsonb))
+                on conflict(key) do update set payload=excluded.payload, updated_at=now()"""),
+            {"payload": policy.model_dump_json()},
+        )
+
+    async def operational_models(self) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            select(ModelVersion).order_by(ModelVersion.created_at.desc())
+        )
+        return [
+            {
+                "id": model.id,
+                "name": model.name,
+                "version": model.version,
+                "kind": model.kind,
+                "status": model.operational_status,
+                "created_at": model.created_at,
+            }
+            for model in result.scalars()
+        ]
+
+    async def report_totals(self) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(f"""select
+            count(*) filter(where created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') as today,
+            count(*) filter(where created_at >= now()-interval '7 days') as week,
+            count(*) filter(where coalesce(quality->'human_review'->>'status','') not in ('confirmed','rejected')) as awaiting_review,
+            count(*) filter(where point is null) as without_location,
+            count(*) filter(where quality->>'location_conflict'='true') as location_conflicts,
+            count(*) filter(where exists(select 1 from public.events e where e.capture_id=c.id and {PublicRepository._PUBLISHED})) as published
+            from public.captures c where source in ('pwa_photo','exif_upload')""")
+        )
+        totals = dict(result.mappings().one())
+        rejected = await self.session.execute(
+            text("""select reason, count(*) as total
+            from public.audit_log a cross join lateral
+                jsonb_array_elements_text(a.after_data->'reasons') as reason
+            where operation='photo_gate_rejected' group by reason order by reason""")
+        )
+        totals["rejected_by_reason"] = {row.reason: row.total for row in rejected}
+        totals["day_timezone"] = "UTC"
+        return totals
+
+    async def audit_page(
+        self, *, operation: str | None, offset: int, limit: int
+    ) -> list[dict[str, Any]]:
+        query = select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        if operation:
+            query = query.where(AuditLog.operation == operation)
+        result = await self.session.execute(query.offset(offset).limit(limit))
+        # Raw payloads/actor can contain private identifiers. This operational
+        # listing deliberately exposes only the audit envelope.
+        return [
+            {
+                "id": row.id,
+                "operation": row.operation,
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "created_at": row.created_at,
+                "event_hash": row.event_hash,
+            }
+            for row in result.scalars()
+        ]
+
     async def dataset_version_for_model(self, model_version_id: uuid.UUID) -> uuid.UUID | None:
         result = await self.session.execute(
             select(ModelVersion.dataset_version_id).where(ModelVersion.id == model_version_id)
@@ -964,6 +1042,24 @@ class DecisionRepository:
                 if (d := by_id.get(value)) is not None
             ]
         return rows
+
+    async def snapshot_before_review(
+        self, event_id: uuid.UUID, cutoff: datetime
+    ) -> RiskAssessment | None:
+        result = await self.session.execute(
+            select(RiskAssessment)
+            .where(
+                RiskAssessment.event_id == event_id,
+                RiskAssessment.created_at < cutoff,
+                RiskAssessment.order_source == "serialized_commit_order",
+            )
+            .order_by(RiskAssessment.commit_order.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def persisted_review(self, review_id: uuid.UUID) -> Review | None:
+        return await self.session.get(Review, review_id)
 
     async def reviews(self, event_id: uuid.UUID) -> list[Review]:
         result = await self.session.execute(

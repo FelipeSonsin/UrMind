@@ -1,5 +1,14 @@
 # Estado operacional do UrMind
 
+## Área interna persistida (24/09/2026)
+
+DEV head `0025_operational_configuration` (up/down/up verificados). Administração com
+limiares persistidos/AuditLog/RLS; modelos, auditoria e indicadores consultam APIs reais.
+Ground Truth conectado ao export tabular, sem treino autorizado nem features inventadas.
+Flag pública genérica: default OFF no banco; .env/Auth preservados.
+Playwright interno 20 passed; DEV configuração/RLS 1 passed; full anterior à última
+extensão 1258 passed / 24 skipped. Blocos 4–6 e lacunas de A2 seguem OPEN.
+
 ## Revisão humana de relatos sem modelo (24/09/2026)
 
 DEV head `0024_capture_reviews`. Review/AuditLog canônicos atendem relatos sem Event;

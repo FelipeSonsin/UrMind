@@ -41,6 +41,17 @@ export interface EventQuery {
 }
 
 export const publicApi = {
+  photoPolicy: (signal?: AbortSignal) =>
+    get(
+      '/photo-policy',
+      z.object({
+        min_side: z.number().min(256).max(4096),
+        brightness_min: z.number().min(0).max(100),
+        brightness_max: z.number().min(150).max(255),
+        laplacian_min: z.number().min(1).max(1000),
+      }),
+      signal,
+    ),
   publishedEvent: (id: string, signal?: AbortSignal) =>
     get(`/events/${id}`, publicEventDetailSchema, signal),
   captureMarkers: (signal?: AbortSignal) =>

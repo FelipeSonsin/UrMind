@@ -1,5 +1,15 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Bloco 3 — operação interna persistida (continuação 24/09/2026)
+
+- `0025_operational_configuration`: upgrade/downgrade/upgrade no DEV comprovados. Sem alteração de .env/Auth. Defaults apenas para linha ausente; erro/contrato inválido não libera upload. Escrita admin, leitura interna reviewer/admin, AuditLog atômico, RLS e grants sem acesso direto anon/authenticated. Camada pública genérica permanece desligada por default; configuração passa a ser canônica no banco, não na antiga flag de ambiente.
+- Administração agora salva limiares técnicos; navegador lê subconjunto público e servidor revalida. Modelos somente leitura com classificação canônica; auditoria paginada/filtrada mostra envelope, não actor/payload privado.
+- Painel usa contagens reais de Capture e motivos de rejeição; dia em UTC explicitado. Fila inclui Capture sem Event/localização; detalhe reutiliza CaptureReviewPanel. Ground Truth reutiliza consenso/adjudicação e exportador tabular; exige snapshot persistido anterior ao início da revisão, não inventa features ou autorização de treino.
+- Endpoint de publicação resolve deep link independentemente da lista em cache; falha reproduzida no Playwright e corrigida. Configuração salva é cancelada na saída/troca de sessão na UI.
+- Evidências: focused backend 148 passed; DEV política/RLS/contadores/modelos/auditoria/export vazio 1 passed (22 deselected); Playwright interno 20 passed desktop/mobile após correção; Ruff/mypy/build/TypeScript passaram. Full backend anterior à última extensão: 1258 passed / 24 skipped. Nova regressão final obrigatória permanece pendente.
+- Limites ainda OPEN: filtros completos da fila, detalhe por rota própria, prova de export não vazio com GT real, publicação/Realtime integrada sem mocks e blocos 4–6. Não é declaração de A2 integralmente concluída.
+- Classificação no-duplicate: repositórios, CoreService, APIs, upload e mapa EXTENDED_EXISTING_COMPONENT; OperationsPage extrai conteúdo operacional da rota admin existente e recebe páginas reais relacionadas, sem frontend paralelo.
+
 ## Continuação — identidade, 24/09/2026
 
 ### Bloco 2 — revisão humana sem Event de modelo

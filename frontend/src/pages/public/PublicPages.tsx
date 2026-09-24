@@ -292,7 +292,9 @@ export function PublicMapPage({
     const controller = new AbortController();
     setPointDetail(null);
     setPointError('');
-    if (selected && events.some((event) => event.id === selected)) {
+    // A deep link may refer to a publication newer than the cached map page,
+    // or outside its bounded listing. The publication endpoint is the authority.
+    if (selected) {
       publicApi
         .publishedEvent(selected, controller.signal)
         .then((value) => {
@@ -303,7 +305,7 @@ export function PublicMapPage({
         });
     }
     return () => controller.abort();
-  }, [selected, events]);
+  }, [selected]);
   const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
   const markers = useMemo(() => {
     const reportIds = new Set(reports.map((report) => report.public_id));

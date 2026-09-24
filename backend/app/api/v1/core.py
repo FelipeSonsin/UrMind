@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
-from functools import lru_cache
+from functools import lru_cache, partial
 from threading import BoundedSemaphore
 from typing import Annotated, Any
 
@@ -43,6 +43,7 @@ from app.schemas.core import (
     EventStatus,
     LocationSource,
     NearbyQuery,
+    PhotoGatePolicy,
     PublicationRequest,
     ReviewCreate,
     UrmindClass,
@@ -124,6 +125,48 @@ Inference = Annotated[InferenceRepository, Depends(get_inference_repository)]
 Storage = Annotated[StorageClient, Depends(get_storage)]
 
 
+async def get_photo_gate_policy(service: Core) -> PhotoGatePolicy:
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Configuração do porteiro indisponível")
+    return await service.decisions.photo_gate_policy()
+
+
+@router.get("/ops/photo-gate", response_model=PhotoGatePolicy)
+async def read_photo_gate(user: CurrentUser, service: Core, response: Response) -> PhotoGatePolicy:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Configuração exige papel interno")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await get_photo_gate_policy(service)
+
+
+@router.put("/ops/photo-gate", response_model=PhotoGatePolicy)
+async def update_photo_gate(
+    payload: PhotoGatePolicy, user: CurrentUser, service: Core, response: Response
+) -> PhotoGatePolicy:
+    if not user.can_review or user.urmind_role != "admin":
+        raise HTTPException(status_code=403, detail="Alteração exige administrador")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Configuração indisponível")
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        before = await service.decisions.photo_gate_policy(lock=True)
+        await service.decisions.save_photo_gate_policy(payload)
+        await service.decisions.add_audit(
+            operation="photo_gate_configuration",
+            entity_type="operational_configuration",
+            entity_id=uuid.uuid5(uuid.NAMESPACE_URL, "urmind:configuration:photo_gate"),
+            actor=user.id,
+            before=before.model_dump(),
+            after=payload.model_dump(),
+            event_hash=hashlib.sha256(uuid.uuid4().bytes).hexdigest(),
+        )
+        await service.captures.session.commit()
+    except Exception:
+        await service.captures.session.rollback()
+        raise
+    return payload
+
+
 @router.get("/ops/metrics")
 async def ops_metrics(user: CurrentUser, inference: Inference) -> dict[str, Any]:
     """Métricas do Worker e da fila (§19), medidas na hora — nenhuma é estimada.
@@ -135,6 +178,57 @@ async def ops_metrics(user: CurrentUser, inference: Inference) -> dict[str, Any]
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Métricas de operação exigem papel de revisor")
     return await inference.stats()
+
+
+@router.get("/ops/models")
+async def operational_models(
+    user: CurrentUser, service: Core, response: Response
+) -> list[dict[str, Any]]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Registro de modelos exige papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Registro indisponível")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.decisions.operational_models()
+
+
+@router.get("/ops/reports")
+async def operational_reports(
+    user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Indicadores exigem papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Indicadores indisponíveis")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.decisions.report_totals()
+
+
+@router.get("/ops/ground-truth")
+async def operational_ground_truth(
+    user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Ground Truth exige papel interno")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.tabular_ground_truth()
+
+
+@router.get("/ops/audit")
+async def operational_audit(
+    user: CurrentUser,
+    service: Core,
+    response: Response,
+    operation: Annotated[str | None, Query(max_length=100)] = None,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[dict[str, Any]]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Auditoria exige papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Auditoria indisponível")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.decisions.audit_page(operation=operation, offset=offset, limit=limit)
 
 
 @router.get("/me")
@@ -229,6 +323,7 @@ async def upload_photo(
     service: Core,
     storage: Storage,
     file: Annotated[UploadFile, File()],
+    gate_policy: Annotated[PhotoGatePolicy | None, Depends(get_photo_gate_policy)] = None,
     source: Annotated[CaptureSource, Form()] = CaptureSource.PWA_PHOTO,
     latitude: Annotated[float | None, Form(ge=-90, le=90)] = None,
     longitude: Annotated[float | None, Form(ge=-180, le=180)] = None,
@@ -276,7 +371,7 @@ async def upload_photo(
 
     data = await file.read(MAX_BYTES + 1)
     try:
-        image = await _decode_upload(data, validate_report_photo)
+        image = await _decode_upload(data, partial(validate_report_photo, policy=gate_policy))
     except PhotoRejectedError as exc:
         # Store metrics/reasons only. No image, hash, EXIF or storage object.
         attempt_id = uuid.uuid4()

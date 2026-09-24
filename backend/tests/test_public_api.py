@@ -21,8 +21,14 @@ NOW = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
 @pytest.mark.parametrize("enabled", [False, True])
 def test_generic_capture_layer_is_explicitly_opt_in(client, monkeypatch, enabled):
     from app.api.v1 import public as public_api
+    from app.schemas.core import PhotoGatePolicy
 
     service = SimpleNamespace(
+        decisions=SimpleNamespace(
+            photo_gate_policy=AsyncMock(
+                return_value=PhotoGatePolicy(public_capture_markers_enabled=enabled)
+            )
+        ),
         capture_markers=AsyncMock(
             return_value=[
                 {
@@ -32,7 +38,7 @@ def test_generic_capture_layer_is_explicitly_opt_in(client, monkeypatch, enabled
                     "report_status": "received",
                 }
             ]
-        )
+        ),
     )
     monkeypatch.setattr(
         public_api, "get_settings", lambda: Settings(PUBLIC_CAPTURE_MARKERS_ENABLED=enabled)

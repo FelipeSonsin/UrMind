@@ -52,7 +52,13 @@ export const drafts = {
     }
   },
 };
-export async function validatePhoto(file: File): Promise<void> {
+export const defaultPhotoPolicy = {
+  min_side: 640,
+  brightness_min: 20,
+  brightness_max: 240,
+  laplacian_min: 25,
+};
+export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Promise<void> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
     throw new Error('Use uma imagem JPEG, PNG ou WebP.');
   if (!/\.(jpe?g|png|webp)$/i.test(file.name))
@@ -68,8 +74,8 @@ export async function validatePhoto(file: File): Promise<void> {
   try {
     if (bitmap.width * bitmap.height > 40_000_000)
       throw new Error('Imagem com dimensões acima do limite.');
-    if (Math.min(bitmap.width, bitmap.height) < 640)
-      throw new Error('Foto pequena: use pelo menos 640 pixels em cada lado.');
+    if (Math.min(bitmap.width, bitmap.height) < policy.min_side)
+      throw new Error(`Foto pequena: use pelo menos ${policy.min_side} pixels em cada lado.`);
     const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
@@ -85,8 +91,10 @@ export async function validatePhoto(file: File): Promise<void> {
       sum += gray[i];
     }
     const brightness = sum / gray.length;
-    if (brightness < 20) throw new Error('Foto muito escura: tente com mais luz.');
-    if (brightness > 240) throw new Error('Foto muito clara: evite luz direta na câmera.');
+    if (brightness < policy.brightness_min)
+      throw new Error('Foto muito escura: tente com mais luz.');
+    if (brightness > policy.brightness_max)
+      throw new Error('Foto muito clara: evite luz direta na câmera.');
     let lapSum = 0,
       lapSquares = 0,
       count = 0;
@@ -99,7 +107,7 @@ export async function validatePhoto(file: File): Promise<void> {
         lapSquares += lap * lap;
         count++;
       }
-    if (!count || lapSquares / count - (lapSum / count) ** 2 < 25)
+    if (!count || lapSquares / count - (lapSum / count) ** 2 < policy.laplacian_min)
       throw new Error('Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.');
   } finally {
     bitmap.close();

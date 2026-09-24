@@ -94,7 +94,95 @@ async function request<T>(
   });
 }
 
+export const photoGatePolicySchema = z.object({
+  public_capture_markers_enabled: z.boolean(),
+  min_side: z.number(),
+  brightness_min: z.number(),
+  brightness_max: z.number(),
+  laplacian_min: z.number(),
+  phash_distance: z.number(),
+  old_photo_days: z.number(),
+  scene_accept_margin: z.number(),
+  scene_reject_margin: z.number(),
+  dominant_face_ratio: z.number(),
+  nearby_radius_m: z.number(),
+});
+
 export const api = {
+  groundTruth: (signal?: AbortSignal) =>
+    request(
+      '/ops/ground-truth',
+      z.object({
+        entries: z.array(
+          z.object({
+            event_id: z.string(),
+            status: z.string(),
+            issue_code: z.string().nullable(),
+            eligible: z.boolean(),
+            reason: z.string().nullable(),
+          }),
+        ),
+        counts_by_class: z.record(z.string(), z.number()),
+        dataset: z.record(z.string(), z.unknown()),
+        rows: z.array(z.record(z.string(), z.unknown())),
+        training_authorized: z.literal(false),
+      }),
+      { signal },
+    ),
+  reportTotals: (signal?: AbortSignal) =>
+    request(
+      '/ops/reports',
+      z.object({
+        today: z.number(),
+        week: z.number(),
+        awaiting_review: z.number(),
+        without_location: z.number(),
+        location_conflicts: z.number(),
+        published: z.number(),
+        day_timezone: z.literal('UTC'),
+        rejected_by_reason: z.record(z.string(), z.number()),
+      }),
+      { signal },
+    ),
+  operationalModels: (signal?: AbortSignal) =>
+    request(
+      '/ops/models',
+      z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          version: z.string(),
+          kind: z.string(),
+          status: z.string(),
+          created_at: z.string(),
+        }),
+      ),
+      { signal },
+    ),
+  operationalAudit: (operation: string, offset: number, signal?: AbortSignal) =>
+    request(
+      `/ops/audit?operation=${encodeURIComponent(operation)}&offset=${offset}&limit=50`,
+      z.array(
+        z.object({
+          id: z.string(),
+          operation: z.string(),
+          entity_type: z.string(),
+          entity_id: z.string(),
+          created_at: z.string(),
+          event_hash: z.string(),
+        }),
+      ),
+      { signal },
+    ),
+  photoGatePolicy: (signal?: AbortSignal) =>
+    request('/ops/photo-gate', photoGatePolicySchema, { signal }),
+  savePhotoGatePolicy: (policy: z.infer<typeof photoGatePolicySchema>, signal?: AbortSignal) =>
+    request('/ops/photo-gate', photoGatePolicySchema, {
+      method: 'PUT',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy),
+    }),
   captureReview: (id: string, signal?: AbortSignal) =>
     request(
       `/captures/${id}/review`,
@@ -166,7 +254,7 @@ export const api = {
     ),
   captureMarkers: (signal?: AbortSignal, onlyMine = false) =>
     request(
-      `/captures/markers${onlyMine ? '?only_mine=true&include_unlocated=true' : ''}`,
+      `/captures/markers?include_unlocated=true${onlyMine ? '&only_mine=true' : ''}`,
       z.array(captureMarkerSchema),
       { signal },
     ),

@@ -54,6 +54,41 @@ NOW = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
 LAT, LON = -23.5613, -46.6560
 
 
+@pytest.mark.asyncio
+async def test_operational_policy_persistence_and_rls(database):
+    from app.repositories.core import DecisionRepository
+    from app.schemas.core import PhotoGatePolicy
+
+    async with database.session() as session:
+        repo = DecisionRepository(session)
+        await repo.photo_gate_policy(lock=True)
+        await repo.save_photo_gate_policy(PhotoGatePolicy(min_side=800))
+        assert (await repo.photo_gate_policy()).min_side == 800
+        totals = await repo.report_totals()
+        assert totals["day_timezone"] == "UTC"
+        assert totals["published"] >= 0
+        models = await repo.operational_models()
+        assert all("metrics" not in row and "checksum" not in row for row in models)
+        rows = await repo.audit_page(operation=None, offset=0, limit=3)
+        assert len(rows) <= 3 and all("actor" not in row for row in rows)
+        service = CoreService(CaptureRepository(session), EventRepository(session), repo)
+        assert (await service.tabular_ground_truth())["training_authorized"] is False
+        assert await session.scalar(
+            text(
+                "select relrowsecurity from pg_class where oid='public.operational_configuration'::regclass"
+            )
+        )
+        assert not await session.scalar(
+            text(
+                "select has_table_privilege('authenticated', 'public.operational_configuration', 'SELECT')"
+            )
+        )
+        assert not await session.scalar(
+            text("select has_table_privilege('anon', 'public.operational_configuration', 'UPDATE')")
+        )
+        await session.rollback()
+
+
 @pytest.fixture(scope="module")
 async def database():
     db = Database(get_settings())

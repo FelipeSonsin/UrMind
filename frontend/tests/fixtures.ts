@@ -352,7 +352,15 @@ export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   // Generated from app.schemas.issue_taxonomy; a backend test keeps it in sync.
   await page.route('**/api/v1/public/taxonomy', (route) => json(route, taxonomyFixture));
   await page.route('**/api/v1/public/capture-markers', (route) => json(route, []));
-  await page.route('**/api/v1/captures/markers', (route) => json(route, []));
+  await page.route('**/api/v1/captures/markers*', (route) => json(route, []));
+  await page.route('**/api/v1/public/photo-policy', (route) =>
+    json(route, {
+      min_side: 640,
+      brightness_min: 20,
+      brightness_max: 240,
+      laplacian_min: 25,
+    }),
+  );
   // Predicado em vez de glob: a lista e o detalhe diferem só pela barra e pela query.
   await page.route(
     (url) => url.pathname === '/api/v1/public/events',

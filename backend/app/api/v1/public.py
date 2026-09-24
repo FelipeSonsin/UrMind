@@ -127,11 +127,26 @@ async def repositories(request: Request) -> AsyncIterator[dict[str, Any]]:
 Repos = Annotated[dict[str, Any], Depends(repositories)]
 
 
+@router.get("/photo-policy")
+async def public_photo_policy(repos: Repos) -> dict[str, Any]:
+    decisions = repos["service"].decisions
+    if decisions is None:
+        raise HTTPException(status_code=503, detail="Política indisponível")
+    policy = await decisions.photo_gate_policy()
+    return policy.model_dump(
+        include={"min_side", "brightness_min", "brightness_max", "laplacian_min"}
+    )
+
+
 @router.get("/capture-markers")
 async def public_capture_markers(repos: Repos) -> list[dict[str, Any]]:
-    if not get_settings().public_capture_markers_enabled:
+    service = repos["service"]
+    if service.decisions is None:
         return []
-    return await repos["service"].capture_markers("", public=True)
+    policy = await service.decisions.photo_gate_policy()
+    if not policy.public_capture_markers_enabled:
+        return []
+    return await service.capture_markers("", public=True)
 
 
 async def optional_user(

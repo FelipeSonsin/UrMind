@@ -10,6 +10,8 @@ const paths = [
   'ground-truth',
   'mapa',
   'admin',
+  'modelos',
+  'auditoria',
 ];
 const record = {
   id: EVENT_ID,
@@ -48,6 +50,31 @@ async function session(page: Page, anonymous = false) {
 
 test.beforeEach(async ({ page }) => {
   await stubPublicApi(page);
+  await page.route('**/api/v1/ops/reports', (route) =>
+    route.fulfill({
+      json: {
+        today: 3,
+        week: 8,
+        awaiting_review: 4,
+        without_location: 1,
+        location_conflicts: 2,
+        published: 2,
+        day_timezone: 'UTC',
+        rejected_by_reason: { blur: 2 },
+      },
+    }),
+  );
+  await page.route('**/api/v1/ops/ground-truth', (route) =>
+    route.fulfill({
+      json: {
+        entries: [],
+        counts_by_class: {},
+        dataset: {},
+        rows: [],
+        training_authorized: false,
+      },
+    }),
+  );
   await page.route('**/api/v1/ops/metrics', (route) =>
     route.fulfill({
       json: {
@@ -283,11 +310,30 @@ test('admin verificado acessa administração; login autenticado abre painel', a
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: true } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  let policy = {
+    public_capture_markers_enabled: false,
+    min_side: 640,
+    brightness_min: 20,
+    brightness_max: 240,
+    laplacian_min: 25,
+    phash_distance: 6,
+    old_photo_days: 30,
+    scene_accept_margin: 0.02,
+    scene_reject_margin: -0.02,
+    dominant_face_ratio: 0.15,
+    nearby_radius_m: 25,
+  };
+  await page.route('**/api/v1/ops/photo-gate', (route) => {
+    if (route.request().method() === 'PUT') policy = route.request().postDataJSON();
+    return route.fulfill({ json: policy });
+  });
   await page.goto('/#/app/admin');
   await expect(page.getByRole('heading', { name: 'Administração' })).toBeVisible();
-  await expect(
-    page.getByText('Sua conta tem permissão administrativa.', { exact: false }),
-  ).toBeVisible();
+  await page.getByLabel('Menor lado da imagem (px)').fill('800');
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  await expect(page.getByText('Configuração salva com auditoria.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Menor lado da imagem (px)')).toHaveValue('800');
   await page.goto('/#/login');
   await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fila de processamento' })).toBeVisible();
@@ -306,4 +352,65 @@ test('falha de métricas não vira contagem zero', async ({ page }) => {
   await page.goto('/#/app/dashboard');
   await expect(page.getByRole('alert')).toContainText('Métricas indisponíveis');
   await expect(page.getByText('Pendentes', { exact: true })).toHaveCount(0);
+});
+
+test('modelos e auditoria interna carregam dados e filtros sem identidades', async ({ page }) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/ops/models', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: EVENT_ID,
+          name: 'Registro histórico',
+          version: '1',
+          kind: 'visual',
+          status: 'ARCHIVED',
+          created_at: '2026-09-24T12:00:00Z',
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/v1/ops/audit?*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: EVENT_ID,
+          operation: 'photo_gate_configuration',
+          entity_type: 'operational_configuration',
+          entity_id: EVENT_ID,
+          created_at: '2026-09-24T12:00:00Z',
+          event_hash: 'a'.repeat(64),
+        },
+      ],
+    }),
+  );
+  await page.goto('/#/app/modelos');
+  await expect(page.getByRole('heading', { name: 'Modelos registrados' })).toBeVisible();
+  await expect(page.getByText('ARCHIVED · visual')).toBeVisible();
+  await page.goto('/#/app/auditoria');
+  await expect(page.getByRole('heading', { name: 'Auditoria operacional' })).toBeVisible();
+  await page.getByLabel('Operação', { exact: true }).fill('photo_gate_configuration');
+  await expect(page.getByText('photo_gate_configuration', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Anterior' })).toBeDisabled();
+});
+
+test('ground truth vazio não habilita exportação científica', async ({ page }) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  await page.goto('/#/app/ground-truth');
+  await expect(page.getByText('Nenhuma revisão de ocorrência disponível.')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Exportar snapshot tabular elegível (0)' }),
+  ).toBeDisabled();
+  await page.goto('/#/app');
+  await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
+  await expect(page.getByText('Dia civil em UTC; semana = últimos sete dias.')).toBeVisible();
+  await expect(page.getByText('blur: 2')).toBeVisible();
 });

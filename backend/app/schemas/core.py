@@ -21,6 +21,30 @@ class PublicationRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=1000)
 
 
+class PhotoGatePolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    public_capture_markers_enabled: bool = False
+    min_side: int = Field(default=640, ge=256, le=4096)
+    brightness_min: float = Field(default=20, ge=0, le=100)
+    brightness_max: float = Field(default=240, ge=150, le=255)
+    laplacian_min: float = Field(default=25, ge=1, le=1000)
+    phash_distance: int = Field(default=6, ge=0, le=16)
+    old_photo_days: int = Field(default=30, ge=1, le=365)
+    scene_accept_margin: float = Field(default=0.02, ge=-1, le=1)
+    scene_reject_margin: float = Field(default=-0.02, ge=-1, le=1)
+    dominant_face_ratio: float = Field(default=0.15, ge=0.01, le=0.5)
+    nearby_radius_m: float = Field(default=25, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def ordered_thresholds(self) -> PhotoGatePolicy:
+        if (
+            self.brightness_min >= self.brightness_max
+            or self.scene_reject_margin >= self.scene_accept_margin
+        ):
+            raise ValueError("limiares contraditórios")
+        return self
+
+
 class UrmindClass(StrEnum):
     """Taxonomia canônica (§8.2). Nunca inferir classe fora desta lista."""
 
