@@ -405,7 +405,18 @@ async def test_me_admin_capability_excludes_anonymous_users() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure",
-    [None, "role", "review", "status", "attestation", "checksum", "commit", "changed_during_io"],
+    [
+        None,
+        "role",
+        "review",
+        "status",
+        "attestation",
+        "checksum",
+        "commit",
+        "changed_during_io",
+        "operational_update_during_io",
+        "review_metadata_changed_during_io",
+    ],
 )
 async def test_publication_requires_review_and_compensates_db_failure(failure):
     from fastapi import HTTPException
@@ -450,6 +461,21 @@ async def test_publication_requires_review_and_compensates_db_failure(failure):
             return True
 
         storage.upload.side_effect = change_review_during_upload
+    if failure == "operational_update_during_io":
+
+        async def update_context_during_upload(path, image):
+            capture.quality["inference"] = {"status": "model_not_available"}
+            capture.quality["report_context"] = {"status": "processed"}
+            return True
+
+        storage.upload.side_effect = update_context_during_upload
+    if failure == "review_metadata_changed_during_io":
+
+        async def change_capture_review_during_upload(path, image):
+            capture.quality["human_review"] = {"status": "rejected"}
+            return True
+
+        storage.upload.side_effect = change_capture_review_during_upload
     user = AuthenticatedUser(
         "reviewer", None, "authenticated", "reviewer" if failure != "role" else None
     )
@@ -467,10 +493,10 @@ async def test_publication_requires_review_and_compensates_db_failure(failure):
         visible_content_reviewed=failure != "attestation",
         reason="fixture privacy review",
     )
-    if failure:
+    if failure and failure != "operational_update_during_io":
         with pytest.raises(RuntimeError if failure == "commit" else HTTPException):
             await publish_event(event_id, payload, user, service, storage)
-        if failure in {"commit", "changed_during_io"}:
+        if failure in {"commit", "changed_during_io", "review_metadata_changed_during_io"}:
             storage.delete.assert_awaited_once()
             assert session.rollback.await_count == 2
         else:

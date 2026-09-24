@@ -6,7 +6,28 @@ type Policy = Awaited<ReturnType<typeof api.photoGatePolicy>>;
 export function GroundTruthPage() {
   const [cursors, setCursors] = useState<Array<string | null>>([null]);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.groundTruth>> | null>(null);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof api.groundTruthSummary>> | null>(
+    null,
+  );
   const [error, setError] = useState('');
+  const [exportError, setExportError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const exportController = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void api
+      .groundTruthSummary(controller.signal)
+      .then((value) => {
+        if (!controller.signal.aborted) setSummary(value);
+      })
+      .catch((failure: Error) => {
+        if (!controller.signal.aborted) setError(failure.message);
+      });
+    return () => {
+      controller.abort();
+      exportController.current?.abort();
+    };
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     setData(null);
@@ -33,14 +54,20 @@ export function GroundTruthPage() {
       {data && (
         <>
           <h2>Rótulos por classe</h2>
-          <p>Contagens e exportação referentes a esta página; cada Event mantém todos os votos.</p>
+          <p>Contagens de todas as páginas; cada Event mantém todos os votos.</p>
           <ul>
-            {Object.entries(data.counts_by_class).map(([issue, count]) => (
+            {Object.entries(summary?.counts_by_class ?? {}).map(([issue, count]) => (
               <li key={issue}>
                 {issue}: {count}
               </li>
             ))}
           </ul>
+          {summary && (
+            <p>
+              {summary.reviewed_events} Events revisados; {summary.eligible_events} elegíveis para
+              exportação. A exportação não autoriza treinamento.
+            </p>
+          )}
           {data.entries.length === 0 && <p>Nenhuma revisão de ocorrência disponível.</p>}
           <ul>
             {data.entries.map((entry) => (
@@ -56,20 +83,37 @@ export function GroundTruthPage() {
             ))}
           </ul>
           <button
-            disabled={data.rows.length === 0}
+            disabled={exporting || !summary?.eligible_events}
             onClick={() => {
-              const url = URL.createObjectURL(
-                new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
-              );
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = 'urmind-tabular-review-export.json';
-              link.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
+              exportController.current?.abort();
+              const controller = new AbortController();
+              exportController.current = controller;
+              setExporting(true);
+              setExportError('');
+              void api
+                .exportGroundTruth(controller.signal)
+                .then((blob) => {
+                  if (controller.signal.aborted) return;
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'urmind-ground-truth.ndjson';
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                })
+                .catch((failure: Error) => {
+                  if (!controller.signal.aborted) setExportError(failure.message);
+                })
+                .finally(() => {
+                  if (!controller.signal.aborted) setExporting(false);
+                });
             }}
           >
-            Exportar snapshot tabular elegível ({data.rows.length})
+            {exporting
+              ? 'Exportando…'
+              : `Exportar rótulos elegíveis (${summary?.eligible_events ?? 0})`}
           </button>
+          {exportError && <p role="alert">{exportError}</p>}
           <a href="#/app/reviews">Consultar revisões de ocorrências</a>
           <div className="actions">
             <button

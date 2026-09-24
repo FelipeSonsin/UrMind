@@ -888,6 +888,10 @@ async def test_photo_admission_lease_is_shared_and_expiring(database):
 
 @pytest.mark.asyncio
 async def test_operational_policy_persistence_and_rls(database):
+    from fastapi import Response
+
+    from app.api.v1.core import export_ground_truth, ground_truth_summary
+    from app.auth import AuthenticatedUser
     from app.repositories.core import DecisionRepository
     from app.schemas.core import PhotoGatePolicy
 
@@ -916,6 +920,14 @@ async def test_operational_policy_persistence_and_rls(database):
         assert len(rows) <= 3 and all("actor" not in row for row in rows)
         service = CoreService(CaptureRepository(session), EventRepository(session), repo)
         assert (await service.tabular_ground_truth())["training_authorized"] is False
+        reviewer = AuthenticatedUser("test-reviewer", None, "authenticated", urmind_role="reviewer")
+        summary = await ground_truth_summary(reviewer, service, Response())
+        assert summary["training_authorized"] is False
+        assert summary["eligible_events"] <= summary["reviewed_events"]
+        export = await export_ground_truth(reviewer, service)
+        lines = [json.loads(line) async for line in export.body_iterator]
+        assert lines[0]["training_authorized"] is False
+        assert len(lines) - 1 == summary["eligible_events"]
         assert await session.scalar(
             text(
                 "select relrowsecurity from pg_class where oid='public.operational_configuration'::regclass"
@@ -1117,7 +1129,8 @@ async def test_photo_report_marker_exif_storage_owner_and_missing_location(datab
                 assert (
                     await session.scalar(
                         text(
-                            "select count(*) from pgmq.q_inference_jobs where message->>'capture_id'=:id"
+                            "select (select count(*) from pgmq.q_inference_jobs where message->>'capture_id'=:id) "
+                            "+ (select count(*) from pgmq.a_inference_jobs where message->>'capture_id'=:id)"
                         ),
                         {"id": str(capture_id)},
                     )

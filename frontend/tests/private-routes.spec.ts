@@ -110,6 +110,16 @@ test.beforeEach(async ({ page }) => {
       },
     }),
   );
+  await page.route('**/api/v1/ops/ground-truth/summary', (route) =>
+    route.fulfill({
+      json: {
+        reviewed_events: 0,
+        eligible_events: 0,
+        counts_by_class: {},
+        training_authorized: false,
+      },
+    }),
+  );
   await page.route('**/api/v1/ops/metrics', (route) =>
     route.fulfill({
       json: {
@@ -472,11 +482,40 @@ test('ground truth vazio não habilita exportação científica', async ({ page 
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
   await page.goto('/#/app/ground-truth');
   await expect(page.getByText('Nenhuma revisão de ocorrência disponível.')).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Exportar snapshot tabular elegível (0)' }),
-  ).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Exportar rótulos elegíveis (0)' })).toBeDisabled();
   await page.goto('/#/app');
   await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
   await expect(page.getByText('Dia civil em UTC; semana = últimos sete dias.')).toBeVisible();
   await expect(page.getByText('blur: 2')).toBeVisible();
+});
+
+test('ground truth agrega todas as páginas e exporta em lotes autenticados', async ({ page }) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/ops/ground-truth/summary', (route) =>
+    route.fulfill({
+      json: {
+        reviewed_events: 1200,
+        eligible_events: 1190,
+        counts_by_class: { D40: 1200 },
+        training_authorized: false,
+      },
+    }),
+  );
+  await page.route('**/api/v1/ops/ground-truth/export', (route) => {
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    return route.fulfill({
+      body: '{"schema":"urmind-ground-truth-export-v1","training_authorized":false}\n',
+      contentType: 'application/x-ndjson',
+      headers: { 'Content-Disposition': 'attachment; filename="urmind-ground-truth.ndjson"' },
+    });
+  });
+  await page.goto('/#/app/ground-truth');
+  await expect(page.getByText('1200 Events revisados')).toBeVisible();
+  await expect(page.getByText('D40: 1200')).toBeVisible();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar rótulos elegíveis (1190)' }).click();
+  expect((await download).suggestedFilename()).toBe('urmind-ground-truth.ndjson');
 });

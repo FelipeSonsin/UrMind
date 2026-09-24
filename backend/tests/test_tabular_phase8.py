@@ -6,13 +6,17 @@ is test fixture data only; it is never evidence for a model.
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException, Response
 
+from app.api.v1.core import export_ground_truth, ground_truth_summary
+from app.auth import AuthenticatedUser
 from app.ml.tabular import (
     FEATURE_COLUMNS,
     FORBIDDEN_FEATURE_PATHS,
@@ -30,6 +34,49 @@ from app.ml.tabular import (
     train_xgboost,
     training_readiness,
 )
+
+
+@pytest.mark.asyncio
+async def test_ground_truth_summary_and_export_traverse_1200_events_without_cap():
+    event_ids = [uuid.UUID(int=value) for value in range(1200, 0, -1)]
+
+    class Decisions:
+        async def reviewed_event_ids(self, after, limit):
+            return [
+                identifier
+                for identifier in event_ids
+                if after is None or identifier.int < after.int
+            ][:limit]
+
+    class Service:
+        decisions = Decisions()
+
+        async def tabular_ground_truth(self, ids):
+            return {
+                "entries": [{"event_id": str(identifier)} for identifier in ids],
+                "rows": [{"event_id": str(identifier), "target": 1} for identifier in ids],
+                "counts_by_class": {"D40": len(ids)},
+            }
+
+    reviewer = AuthenticatedUser("reviewer", None, "authenticated", urmind_role="reviewer")
+    ordinary = AuthenticatedUser("owner", None, "authenticated")
+    with pytest.raises(HTTPException) as denied:
+        await ground_truth_summary(ordinary, Service(), Response())
+    assert denied.value.status_code == 403
+    summary = await ground_truth_summary(reviewer, Service(), Response())
+    assert summary == {
+        "reviewed_events": 1200,
+        "eligible_events": 1200,
+        "counts_by_class": {"D40": 1200},
+        "training_authorized": False,
+    }
+    stream = await export_ground_truth(reviewer, Service())
+    lines = [json.loads(chunk) async for chunk in stream.body_iterator]
+    assert lines[0]["training_authorized"] is False
+    assert len(lines) == 1201
+    assert len({row["event_id"] for row in lines[1:]}) == 1200
+
+
 from app.services.features import FeatureInput, build_features
 
 T0 = datetime(2026, 9, 1, 12, tzinfo=UTC)

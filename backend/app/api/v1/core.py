@@ -273,6 +273,71 @@ async def operational_ground_truth(
     return result
 
 
+async def ground_truth_batches(service: CoreService) -> AsyncIterator[dict[str, Any]]:
+    """Read every reviewed Event through the existing keyset and eligibility gate."""
+    if service.decisions is None:
+        return
+    after = None
+    while True:
+        ids = await service.decisions.reviewed_event_ids(after, 100)
+        if not ids:
+            break
+        yield await service.tabular_ground_truth(ids)
+        after = ids[-1]
+        if len(ids) < 100:
+            break
+
+
+@router.get("/ops/ground-truth/summary")
+async def ground_truth_summary(
+    user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Ground Truth exige papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Ground Truth indisponível")
+    counts: dict[str, int] = {}
+    reviewed = eligible = 0
+    async for batch in ground_truth_batches(service):
+        reviewed += len(batch["entries"])
+        eligible += len(batch["rows"])
+        for issue, count in batch["counts_by_class"].items():
+            counts[issue] = counts.get(issue, 0) + count
+    response.headers["Cache-Control"] = "private, no-store"
+    return {
+        "reviewed_events": reviewed,
+        "eligible_events": eligible,
+        "counts_by_class": counts,
+        "training_authorized": False,
+    }
+
+
+@router.get("/ops/ground-truth/export")
+async def export_ground_truth(user: CurrentUser, service: Core) -> StreamingResponse:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Ground Truth exige papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Ground Truth indisponível")
+
+    async def lines() -> AsyncIterator[str]:
+        yield (
+            json.dumps({"schema": "urmind-ground-truth-export-v1", "training_authorized": False})
+            + "\n"
+        )
+        async for batch in ground_truth_batches(service):
+            for row in batch["rows"]:
+                yield json.dumps(row, default=str, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        lines(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": 'attachment; filename="urmind-ground-truth.ndjson"',
+        },
+    )
+
+
 @router.get("/ops/audit")
 async def operational_audit(
     user: CurrentUser,
@@ -1084,6 +1149,12 @@ async def review_event(
     return review
 
 
+def _publication_evidence_quality(quality: dict[str, Any]) -> dict[str, Any]:
+    """Compare review/evidence fields while allowing independent Worker enrichment."""
+    volatile = {"inference", "address", "address_history", "report_context"}
+    return {key: value for key, value in quality.items() if key not in volatile}
+
+
 @router.post("/events/{event_id}/publication")
 async def publish_event(
     event_id: uuid.UUID,
@@ -1168,7 +1239,8 @@ async def publish_event(
             review = reviews[-1] if reviews else None
             if (
                 capture.storage_path != expected_path
-                or (capture.quality or {}) != expected_quality
+                or _publication_evidence_quality(capture.quality or {})
+                != _publication_evidence_quality(expected_quality)
                 or review is None
                 or review.id != expected_review_id
                 or review.reviewer != user.id

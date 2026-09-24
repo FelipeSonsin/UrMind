@@ -108,14 +108,27 @@ export const photoGatePolicySchema = z.object({
   nearby_radius_m: z.number(),
 });
 
+async function authenticatedDownload(path: string, signal: AbortSignal): Promise<Blob> {
+  const token = await auth.accessToken();
+  if (!token) throw new UnauthorizedError();
+  const response = await fetch(`${base}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+    signal,
+  });
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) throw new Error(`Exportação indisponível (${response.status})`);
+  const blob = await response.blob();
+  if (signal.aborted || (await auth.accessToken()) !== token) throw new UnauthorizedError();
+  return blob;
+}
+
 export const api = {
   exportReports: async (
     format: 'csv' | 'geojson',
     filters: { status: string; family: string; issue: string; from: string; to: string },
     signal: AbortSignal,
   ) => {
-    const token = await auth.accessToken();
-    if (!token) throw new UnauthorizedError();
     const params = new URLSearchParams({
       format,
       status: filters.status,
@@ -124,16 +137,21 @@ export const api = {
     });
     if (filters.from) params.set('start', `${filters.from}T00:00:00Z`);
     if (filters.to) params.set('end', `${filters.to}T23:59:59.999999Z`);
-    const response = await fetch(`${base}/captures/export?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-      signal,
-    });
-    if (!response.ok) throw new Error(`Exportação indisponível (${response.status})`);
-    const blob = await response.blob();
-    if (signal.aborted || (await auth.accessToken()) !== token) throw new UnauthorizedError();
-    return blob;
+    return authenticatedDownload(`/captures/export?${params}`, signal);
   },
+  exportGroundTruth: (signal: AbortSignal) =>
+    authenticatedDownload('/ops/ground-truth/export', signal),
+  groundTruthSummary: (signal?: AbortSignal) =>
+    request(
+      '/ops/ground-truth/summary',
+      z.object({
+        reviewed_events: z.number(),
+        eligible_events: z.number(),
+        counts_by_class: z.record(z.string(), z.number()),
+        training_authorized: z.literal(false),
+      }),
+      { signal },
+    ),
   groundTruth: (signal?: AbortSignal, cursor: string | null = null) =>
     request(
       `/ops/ground-truth${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
