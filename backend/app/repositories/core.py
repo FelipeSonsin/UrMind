@@ -157,6 +157,61 @@ class CaptureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def notify_evidence_change(self, parent: uuid.UUID) -> None:
+        # Parent subscribers may not read another visitor's child Capture. Emit an
+        # owner-visible parent update without exposing that visitor's identity.
+        await self.session.execute(
+            text("""update public.captures
+            set quality=jsonb_set(coalesce(quality,'{}'::jsonb),'{evidence_updated_at}',to_jsonb(clock_timestamp()))
+            where id=:parent"""),
+            {"parent": parent},
+        )
+
+    async def nearby_reports(
+        self, actor: str, coordinate: Coordinate, radius: float
+    ) -> list[dict[str, Any]]:
+        rows = await self.session.execute(
+            text(
+                """select c.id,c.public_id,c.protocol_code,
+            ST_Distance(c.point,ST_SetSRID(ST_MakePoint(:lon,:lat),4326)::geography) distance_m
+            from public.captures c where c.point is not null
+            and c.source in ('pwa_photo','exif_upload')
+            and not (c.quality ? 'additional_evidence')
+            and coalesce(c.quality->'human_review'->>'status','') <> 'rejected'
+            and ST_DWithin(c.point,ST_SetSRID(ST_MakePoint(:lon,:lat),4326)::geography,:radius)
+            and (c.quality->>'uploaded_by'=:actor or exists(select 1 from public.events e
+                where e.capture_id=c.id and """
+                + PublicRepository._PUBLISHED
+                + """))
+            order by distance_m,c.created_at limit 10"""
+            ),
+            {
+                "actor": actor,
+                "lon": coordinate.longitude,
+                "lat": coordinate.latitude,
+                "radius": radius,
+            },
+        )
+        return [dict(row) for row in rows.mappings()]
+
+    async def has_privacy_consent(self, owner: str, version: str) -> bool:
+        return bool(
+            await self.session.scalar(
+                text("""select exists(
+            select 1 from public.capture_privacy_consents
+            where owner_id=cast(:owner as uuid) and notice_version=:version)"""),
+                {"owner": owner, "version": version},
+            )
+        )
+
+    async def accept_privacy_notice(self, owner: str, version: str) -> None:
+        await self.session.execute(
+            text("""insert into public.capture_privacy_consents
+            (owner_id,notice_version) values (cast(:owner as uuid),:version)
+            on conflict(owner_id,notice_version) do nothing"""),
+            {"owner": owner, "version": version},
+        )
+
     async def acquire_photo_lease(self, owner: str, token: uuid.UUID) -> bool:
         await self.session.execute(
             text("delete from public.photo_admission_leases where expires_at<=clock_timestamp()")
@@ -197,6 +252,9 @@ class CaptureRepository:
                    c.quality->'photo_gate' as photo_gate,
                    c.quality->'address' as address,
                    c.quality->'human_review' as human_review,
+                   c.quality->'additional_evidence' as additional_evidence,
+                   (select count(distinct p.quality->>'uploaded_by') from public.captures p
+                    where p.id=c.id or p.quality->'additional_evidence'->>'capture_id'=c.id::text) as reporters_count,
                    c.quality->'inference'->>'status' as processing_status,
                    c.quality->'inference'->>'model_status' as model_status,
                    e.id as event_id, e.public_id as event_public_id,
@@ -220,7 +278,10 @@ class CaptureRepository:
                 order by commit_order desc nulls last, assessment_sequence desc limit 1
             ) risk on true
             where c.source in ('pwa_photo', 'exif_upload')
-              and (c.point is not null or (:include_unlocated and not :public))
+              and (not (c.quality ? 'additional_evidence') or (:include_unlocated and not :public))
+              and (c.point is not null or (:include_unlocated and not :public)
+                or (not :public and e.status='confirmed'
+                    and jsonb_typeof(c.quality->'human_review'->'corrected_location')='object'))
               and (:public or :reviewer or c.quality->>'uploaded_by' = :actor)
             and not (:public and exists(select 1 from public.events e where e.capture_id=c.id and
         """
@@ -985,7 +1046,11 @@ class DecisionRepository:
     async def attach_report_event(self, capture_id: uuid.UUID, event_id: uuid.UUID) -> None:
         await self.session.execute(
             update(Review)
-            .where(Review.capture_id == capture_id, Review.event_id.is_(None))
+            .where(
+                Review.capture_id == capture_id,
+                Review.event_id.is_(None),
+                Review.decision != "detach_evidence",
+            )
             .values(event_id=event_id)
         )
 
@@ -1127,7 +1192,7 @@ class DecisionRepository:
                 "coalesce(a.after_data->>'adjudicated', 'false') = 'true' as adjudicated "
                 "from public.reviews r left join public.audit_log a "
                 "on a.after_data->>'review_id' = r.id::text and a.operation = 'review' "
-                f"where {predicate} "
+                f"where {predicate} and r.decision in ('confirm','correct','reject') "
                 "order by r.commit_order nulls first, r.review_sequence"
             ),
             {"event_id": event_id, "capture_id": capture_id},
@@ -1145,6 +1210,12 @@ class InferenceRepository:
     """Fila `inference_jobs` (pgmq) e modelo promovido (§7, §9)."""
 
     QUEUE = "inference_jobs"
+
+    async def enqueue_capture(self, capture_id: uuid.UUID) -> None:
+        await self.session.execute(
+            text("select pgmq.send(:queue, jsonb_build_object('capture_id',cast(:id as text)))"),
+            {"queue": self.QUEUE, "id": str(capture_id)},
+        )
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session

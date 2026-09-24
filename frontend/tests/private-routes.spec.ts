@@ -168,10 +168,18 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
     return route.fulfill({ json: { event_id: EVENT_ID, publication_status: 'published' } });
   });
   await page.goto('/#/app/mapa');
+  const csvDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar CSV', exact: true }).click();
+  expect((await csvDownload).suggestedFilename()).toBe('urmind-pontos-filtrados.csv');
   await page.getByText(/Lista acessível de pontos/).click();
   await page.getByRole('button', { name: /Selecionar ponto: Análise indisponível/ }).click();
   const panel = page.getByRole('region', { name: 'Revisão do relato' });
   await panel.getByLabel('Classe humana').selectOption('URMIND_ROAD_D40');
+  await expect(panel.getByText('Sugestão, não encaminhamento')).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'canal oficial SP156' })).toHaveAttribute(
+    'href',
+    'https://sp156.prefeitura.sp.gov.br/portal',
+  );
   await panel.getByLabel('Adjudicar como admin').check();
   await panel.getByRole('button', { name: 'Confirmar rótulo humano' }).click();
   await expect(panel.getByText(/correct URMIND_ROAD_D40/)).toBeVisible();
@@ -337,6 +345,7 @@ test('admin verificado acessa administração; login autenticado abre painel', a
   await page.goto('/#/login');
   await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fila de processamento' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Classes de problemas urbanos' })).toBeVisible();
   await expect(page.getByText('Não disponível', { exact: true })).toHaveCount(2);
 });
 

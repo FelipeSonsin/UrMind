@@ -390,6 +390,47 @@ export function severityOf(severity: string | null | undefined) {
   return severityPresentation[severity ?? 'unknown'] ?? severityPresentation.unknown;
 }
 
+/** Explicit export allowlist: never spread a private Capture/Event into a download. */
+export function exportMapRecords(
+  records: Array<{
+    latitude?: number | null;
+    longitude?: number | null;
+    urmind_class?: string | null;
+    report_status?: string;
+    status?: string;
+    created_at?: string | null;
+    occurred_at?: string | null;
+  }>,
+) {
+  const rows = records
+    .filter((row) => row.latitude != null && row.longitude != null)
+    .map((row) => ({
+      latitude: row.latitude!,
+      longitude: row.longitude!,
+      issue_code: row.urmind_class ?? '',
+      status: row.report_status ?? row.status ?? '',
+      date: row.created_at ?? row.occurred_at ?? '',
+    }));
+  const cell = (value: unknown) => {
+    const text = String(value);
+    return `"${(/^[=+@\-\t\r]/.test(text) ? `'${text}` : text).replaceAll('"', '""')}"`;
+  };
+  return {
+    csv: [
+      'latitude,longitude,issue_code,status,date',
+      ...rows.map((row) => Object.values(row).map(cell).join(',')),
+    ].join('\r\n'),
+    geojson: {
+      type: 'FeatureCollection',
+      features: rows.map(({ latitude, longitude, ...properties }) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [longitude, latitude] },
+        properties,
+      })),
+    },
+  };
+}
+
 /** Prioridade 0–1 vira faixa legível. Mantém o número ao lado, nunca no lugar. */
 export function priorityBand(score: number | null | undefined): string {
   if (score == null) return 'não calculada';

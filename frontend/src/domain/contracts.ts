@@ -21,9 +21,9 @@ const optionalNumber = z.number().finite().nullable().optional();
 export const eventSchema = z.object({
   id: z.string().uuid(),
   event_key: z.string(),
-  urmind_class: z.enum(
-    Object.keys(classes) as [keyof typeof classes, ...Array<keyof typeof classes>],
-  ),
+  // Human reviews may use any canonical candidate class. The backend registry
+  // validates membership; the visual Worker's four-class allowlist is separate.
+  urmind_class: z.string().regex(/^[A-Z][A-Z0-9_]{1,79}$/),
   status: z.enum(Object.keys(statuses) as [keyof typeof statuses, ...Array<keyof typeof statuses>]),
   occurred_at: z.string().datetime({ offset: true }),
   evidence_mode: z.string(),
@@ -60,6 +60,7 @@ export function parseCoordinate(latitude: string, longitude: string): Coordinate
 }
 
 export const uploadResultSchema = z.object({
+  additional_evidence: z.boolean().optional(),
   protocol_code: z.string().optional(),
   id: z.string().uuid(),
   capture_key: z.string(),
@@ -71,6 +72,7 @@ export const uploadResultSchema = z.object({
 export type UploadResult = z.infer<typeof uploadResultSchema>;
 
 export const captureProcessingSchema = z.object({
+  additional_evidence: z.boolean().optional(),
   protocol_code: z.string().nullable().optional(),
   event_public_ids: z.array(z.string()).default([]),
   capture_id: z.string().uuid(),
@@ -103,6 +105,7 @@ export const captureMarkerSchema = z.object({
   id: z.string().min(12),
   protocol_code: z.string().nullable().optional(),
   public_id: z.string().nullable().optional(),
+  reporters_count: z.number().int().nonnegative().nullable().optional(),
   latitude: z.number().finite().min(-90).max(90).nullable(),
   longitude: z.number().finite().min(-180).max(180).nullable(),
   created_at: z.string().nullable().optional(),

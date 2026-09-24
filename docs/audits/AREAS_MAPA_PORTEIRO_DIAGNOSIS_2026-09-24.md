@@ -1,5 +1,166 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Fechamento do bloco 6 e verificação — 24/09/2026
+
+Esta seção substitui os estados anteriores para a continuação atual. As seções
+abaixo são evidência histórica, não uma declaração do estado vigente.
+**IMPLEMENTATION_STATUS=PARTIAL; VERIFICATION_GATE=BLOCKED.** Nenhuma suíte executada
+tem falha residual; calibração, aparelho físico e entrega Realtime ao vivo não foram
+comprovados. Não chamar a entrega completa de DONE com base em mocks.
+
+### Implementado nesta continuação
+
+- D7: aviso versionado público e aceite explícito por identidade. Migration
+  `0027_capture_privacy_consent`, RLS de leitura exclusivamente do titular, gravação
+  pelo backend. Sem aceite atual, o upload para antes do Storage. Versão antiga
+  recebe 409; o rascunho permanece local. Aceite idempotente não muda a data original.
+- D2: consulta PostGIS no raio configurado (25 m default) mostra somente relatos
+  próprios ou já publicados. Não enumera relatos privados de terceiros. Confirmação
+  anexa a nova Capture como evidência, preservando foto/local originais, sem um
+  segundo marcador ou Event. Revalidação sob lock curto após Storage e compensação
+  em falha. Contagem de pessoas usa proprietários distintos, sem divulgar identidades.
+  O revisor desanexa, com Review operacional + AuditLog + reenfileiramento.
+  Atualização do pai notifica seus assinantes sem revelar o proprietário da filha.
+- Migration `0028_report_evidence_actions`: decisão operacional `detach_evidence`
+  não é voto científico, não se vincula a Event e não entra no consenso/Ground Truth.
+  Downgrade recusa remover semântica com revisões existentes. `0027` também recusa
+  apagar consentimentos existentes. Up/down/up das duas revisions exercitados no DEV.
+- D4: exportação CSV/GeoJSON dos pontos carregados e filtrados, com allowlist explícita;
+  sem identidade, Storage path, imagem ou EXIF. CSV protege células de fórmula.
+- D5: sugestão condicional por domínio canônico e link SP156 somente com aviso de
+  jurisdição de São Paulo. Nunca afirma encaminhamento ou órgão validado.
+- D8: mesmo TaxonomyPanel no público e painel interno, sem registry paralelo.
+- Fila interna: filtros de status/família/classe/período/conflito/verificação pendente,
+  prioridade existente primeiro, senão mais antigos. Link direto `/app/relato/:id`
+  protegido pelo backend; detalhe inclui original assinado, porteiro e histórico.
+- Correção: localização humana confirmada permite marcador mesmo se original era
+  ausente, sem substituir original. Classes humanas candidatas passam pelo contrato
+  frontend sem ampliar a allowlist do Worker.
+- Tema claro/escuro segue preferência do dispositivo; controles de captura com
+  alvos de toque de 44 px. Sem inverter foto/tiles. Teste 320 px reproduziu ausência
+  de tema e passou após correção. O input file transparente é medido pelo label clicável.
+
+Componentes: EXTENDED_EXISTING_COMPONENT (Capture, Review, AuditLog, fila, UrbanMap,
+drafts, export e taxonomia). Novas migrations justificadas por consentimento persistido
+e separação explícita de ação operacional/voto; nenhum backend/mapa/fila paralelo.
+
+### Evidências novas e limites
+
+| Verificação / comando | Resultado fresco | Nível |
+|---|---|---|
+| `python -m pytest tests/test_core_service.py tests/test_auth_storage.py -q` | 145 passed | unit/contratos HTTP com dependências substituídas |
+| `python -m pytest -q -ra` no backend | **1276 passed / 29 skipped**, 2 warnings, 93,34 s | suíte offline |
+| `pytest tests/test_db_integration.py -q -k 'not supabase_auth_real_roles_login_and_jwks and not realtime_delivers_event_change_to_reviewer'` com env DEV carregado somente no processo | **26 passed / 2 deselected**, 29,85 s | PostgreSQL/PostGIS/Storage/Queue/RLS reais |
+| `npm test -- --run` | **48 passed**, 5 arquivos | Vitest |
+| `npx playwright test --workers=2` | **120 passed / 2 skipped**, 56,3 s | browser desktop/mobile com APIs simuladas |
+| `python -m ruff check app tests` + migrations novas | PASS | estático |
+| `python -m mypy app` | PASS, 73 arquivos | estático |
+| `npx prettier --check .`; `npx tsc --noEmit`; `npm run build` | PASS | formato/tipos/build |
+| `python -m alembic heads` e SELECT DEV | **0028_report_evidence_actions**, head único | local + banco |
+| `git diff --check` | PASS | diff |
+
+Baseline solicitado 1246: +30 testes offline aprovados. Desde a última rodada1272,
++4 aprovados; novas integrações opt-in elevam os skips offline de25 para29. Os29 são
+os28 testes em `tests/test_db_integration.py` (lista autoritativa nesse arquivo) e
+`tests/live/test_external_sources_live.py` (externo opt-in). Dos28,26 executados no
+DEV; somente `test_supabase_auth_real_roles_login_and_jwks` e
+`test_realtime_delivers_event_change_to_reviewer` foram deselected porque criam/removem
+usuários Auth, proibido nesta tarefa. RLS/publication Realtime foram testados sem
+alterar Auth; isso NÃO prova entrega websocket de ponta a ponta. Os2 Playwright skips
+são `real-e2e.spec.ts` nos projetos desktop/mobile, sem foto/localização autorizadas;
+o harness científico antigo ainda exige shadow arquivado e não é prova deste fluxo
+humano sem modelo. SKIPPED != PASSED.
+
+`test_human_report_real_storage_publication_and_cleanup` comprovou imagem sintética
+própria + EXIF → Storage real → Capture → confirmação humana → Event human_review
+sem Detection → derivada sanitizada → DTO/publicação → retirada. Original byte a
+byte preservado, derivada sem EXIF, cleanup executado. Chamada de handler com identidade
+de fixture, NÃO login anônimo nem E2E de cidadão/celular. Teste de colisão executa
+corpo canônico do trigger com entropia forçada em tabelas temporárias isoladas;
+não substitui a função de produção. Consentimento e desanexação foram verificados
+com RLS real. Consulta pós-testes: zero consentimentos, revisões de desanexação e
+anexações de fixture remanescentes.
+
+Warnings: deprecações Starlette/httpx e anyio; chunk lazy MapLibre1038,00kB
+(276,17kB gzip). Entrada288,89kB (88,47kB gzip). Nenhum erro OneDrive/acesso negado.
+Proxy ECONNREFUSED em testes de falha/offline não representa backend real validado.
+Formatação final detectou apenas finais de linha em dois Python alterados; corrigidos
+somente nesses arquivos e verificados novamente.
+
+### Status por item (não confundir código funcional com validação real)
+
+| Item | Status | Evidência / detalhe restante |
+|---|---|---|
+| A1 | PARTIAL | Protocolo, titular, drafts, tema e320px testados; linha do tempo completa do titular ainda não expõe todo histórico de Review. |
+| A2 | PARTIAL | APIs/páginas internas reais, filtros, admin, GT, modelos/auditoria funcionais; menu interno ainda reutiliza layout geral, sem bottom-nav interna dedicada; listas limitadas ao recorte500. |
+| B | PARTIAL | IDs públicos, painel/foto, filtros/URL, clustering/lista/legenda/export testados; entrega Realtime ao vivo de duas sessões ainda não comprovada. |
+| C1 | DONE | Qualidade técnica, SHA/pHash, EXIF antigo, lease distribuído; unit + DEV. Limiares são heurísticos, não calibração científica. |
+| C2 | BLOCKED_INPUT | Artefato/ONNX/código prontos, mas faltam20 positivas +20 negativas próprias/licenciadas revisadas; UNCALIBRATED → NEEDS_REVIEW. |
+| C4 | PARTIAL | YuNet real carrega; rejeição/flag por caixas e contrato testados; falta medir recall/falsos positivos em fotos autorizadas com rosto. |
+| D1 | DONE | Identidade server-side, colisão/lookup restrito DEV, protocolo/refresh Playwright. |
+| D2 | DONE | Um ponto, anexação confirmada, contagem distinta, desanexação auditada; DEV + Playwright. Só sugere próprios/publicados; não revela outro titular privado. |
+| D3 | PARTIAL | Endereço persistido no upload com local; atribuição manual posterior não refaz reverse geocoding; limite Nominatim1req/s é por processo. |
+| D4 | DONE | CSV/GeoJSON allowlist e filtros, Vitest + download Playwright; export do recorte carregado, não de todo o banco. |
+| D5 | DONE | Domínio do registry + encaminhamento condicional, sem envio automático; detalhe Playwright. |
+| D6 | PARTIAL | Blur forte com margem na derivada, EXIF removido e original intacto; teste controlado não comprova recall de rosto real. |
+| D7 | DONE | Aceite explícito/versionado, falha antes do Storage, owner RLS e nova versão testados. |
+| D8 | DONE | TaxonomyPanel reutilizado no público/interno, equivalência registry e Playwright. |
+
+### Segurança, integridade e revisão
+
+DEV confirmado mascarado `impm…ggy` em ambos os envs, sem modificá-los. Advisors:
+15 INFO de RLS sem policies (tabelas backend-only/fail-closed preexistentes);3 WARN
+de anonymous access (consentimentos apenas auth.uid e Event/Risk exigem papel
+app_metadata). Não abrir policies para eliminar avisos. Referência oficial:
+[Anonymous access policies](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0012_auth_allow_anonymous_sign_ins).
+Nenhuma certificação ampla de segurança alegada.
+
+Revisão de correção rastreou upload/consentimento/compensação, fronteira de ownership,
+anexação concorrente/revalidação e distinção desanexação × voto. O defeito de voto
+operacional foi reproduzido e corrigido filtrando confirm/correct/reject no consumidor,
+não apagando a evidência. Formato/tipos/consumidores revisados; nenhum segundo fluxo.
+Hashes YuNet/CLIP/encoder ONNX recalculados e iguais aos registrados abaixo.
+Peso de origem yolox_s.pth continua SHA256
+`f55ded7181e1b0c13285c56e7790b8f0e8f8db590fe4edb37f0b7f345c913a30`.
+Nenhum Frozen Test, treino, benchmark científico, detector ou .env alterado/restaurado.
+
+### Gate e ações mínimas para PASS
+
+| Prioridade | OPEN | Ação |
+|---|---|---|
+| P1 | C2 sem calibração e C4/D6 sem recall real | Fotos próprias/licenciadas, revisão humana e protocolo do porteiro, sem usar datasets científicos. |
+| P1 | E2E físico e entrega Realtime não verificados | Executar com duas sessões existentes e telefone HTTPS, sem mudar Auth; registrar evidência. |
+| P2 | D3 endereço posterior/múltiplos processos | Enriquecimento explícito após localização e rate limit global antes de múltiplas instâncias. |
+| P2 | A1/A2 apresentação/histórico/paginação | Linha do tempo do titular, navegação interna mobile e paginação, reutilizando APIs atuais. |
+
+Para calibração, forneça pasta **fora do repositório e dos datasets científicos**, por
+exemplo `C:\Users\felip\Pictures\UrMindPorteiro\positivas` e `negativas`, com ao menos
+20 fotos reais de rua/calçada/via/infraestrutura e20 negativas distribuídas entre
+interior, selfie/rosto consentido, documento sem PII, print, comida e animal. Informar
+autoria/licença e rótulo humano de cada foto; incluir rostos grandes/pequenos consentidos
+para C4. Não versionar fotos pessoais. Não executar inferência nessas fotos sem o
+registro de origem/escopo. A pergunta sobre fotos já foi enviada; não há resposta ainda.
+
+Teste manual: use os três comandos do roteiro histórico abaixo. Aceite o aviso antes
+do envio, envie foto própria clara>=640px+GPS/manual, copie protocolo e recarregue.
+Foto escura deve rejeitar sem perder draft. Interior/selfie **não tem rejeição por
+cena garantida** até calibração; rosto grande identificado por YuNet pode rejeitar,
+mas não é detecção urbana. Reenvio igual rejeita; foto diferente até25m de relato
+próprio/publicado oferece anexação. Revisor existente abre `/app/reviews`, confirma
+classe humana (consenso/admin conforme regra), atesta privacidade e publica; conferir
+foto sanitizada no mapa público e testar despublicação. Desanexar mantém a evidência
+e não cria voto Ground Truth. Testar outro visitante, logout, rede lenta e GPS negado.
+
+Commits anteriores: e8853c7(base),10ba477(identidade),ce00127(revisão),
+c3b3da3(interno),a979475(mapa),16c9172(porteiro). Este fechamento entra em
+`feat(melhorias): consentimento, evidencias adicionais e verificacao final`, sem push.
+Os cinco relatórios/imagens IRD/RDD untracked preexistentes ficam fora do commit.
+Skills usadas no fechamento: karpathy-guidelines, no-duplicate-files,
+superpowers:systematic-debugging, correction-review, example-skills:frontend-design,
+supabase:supabase, urmind-verification-gate; leitura adversarial focada, sem subagentes.
+Conector Supabase: SELECT e advisors; integração pelo cliente existente. Estado final
+honesto: blocos funcionais integrados, não entrega100% nem autorização de treinamento.
+
 ## Bloco 5 — referências e porteiro (24/09/2026)
 
 - C1: pHash DCT 64 bits, comparação Postgres por proprietário/recebimento nos últimos

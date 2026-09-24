@@ -845,7 +845,7 @@ export function PublicSystemPage({
 }
 
 /** Classes da taxonomia canônica e o que o modelo atual realmente suporta. */
-function TaxonomyPanel({ revision }: { revision: number }) {
+export function TaxonomyPanel({ revision }: { revision: number }) {
   const { data, error } = usePublicData<IssueTaxonomy>(
     (signal) => publicApi.taxonomy(signal),
     [revision],

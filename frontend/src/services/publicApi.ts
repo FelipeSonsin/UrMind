@@ -41,6 +41,12 @@ export interface EventQuery {
 }
 
 export const publicApi = {
+  privacyNotice: (signal?: AbortSignal) =>
+    get(
+      '/privacy-notice',
+      z.object({ version: z.string().min(1), text: z.string().min(1) }),
+      signal,
+    ),
   photoPolicy: (signal?: AbortSignal) =>
     get(
       '/photo-policy',

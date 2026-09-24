@@ -287,6 +287,16 @@ class ReviewCreate(BaseModel):
         return self
 
 
+CAPTURE_PRIVACY_VERSION = "urmind-capture-privacy-v1"
+CAPTURE_PRIVACY_TEXT = (
+    "Sua foto original, descrição e localização serão armazenadas de forma privada. "
+    "Você e a equipe autorizada de revisão podem consultá-las. A publicação no mapa "
+    "público depende de revisão e utiliza uma cópia da foto sem metadados sensíveis. "
+    "Evite fotografar rostos e placas de veículos. A análise pode estar indisponível "
+    "ou ser experimental; enviar não confirma a existência de um problema."
+)
+
+
 class CaptureReviewCreate(ReviewCreate):
     duplicate_of_protocol: str | None = Field(default=None, pattern=r"^URM-[2-9A-HJ-NP-Z]{8}$")
 

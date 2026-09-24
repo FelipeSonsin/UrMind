@@ -24,6 +24,7 @@ import {
   PublicSystemPage,
   PublicTransparencyPage,
   PublicDemoPage,
+  TaxonomyPanel,
   usePublicEvents,
   useSystemStatus,
 } from './pages/public/PublicPages';
@@ -35,7 +36,13 @@ import {
   type CaptureProcessing,
   type UrbanEvent,
 } from './domain/contracts';
-import { registerTaxonomy } from './domain/public';
+import {
+  registerTaxonomy,
+  filterMapRecords,
+  familyFor,
+  labelFor,
+  type MapFilters,
+} from './domain/public';
 import { publicApi } from './services/publicApi';
 
 const CapturePage = lazy(() =>
@@ -156,6 +163,7 @@ function parseRoute(): Route {
   if (first === 'app') {
     if (!second) return { page: 'dashboard' };
     if (second === 'eventos' && third) return { page: 'private-detail', eventId: third };
+    if (second === 'relato' && third) return { page: 'review', captureId: third };
     return {
       page:
         privateNavigation.find((item) => item.href === `#/app/${second}`)?.id ??
@@ -238,6 +246,15 @@ export default function App() {
   } | null>(null);
   const [reportError, setReportError] = useState('');
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [queueFilters, setQueueFilters] = useState<MapFilters>({
+    status: '',
+    family: '',
+    issue: '',
+    from: '',
+    to: '',
+  });
+  const [queueConflict, setQueueConflict] = useState(false);
+  const [queuePending, setQueuePending] = useState(false);
   const [reportPhoto, setReportPhoto] = useState<{ owner: string; id: string; url: string } | null>(
     null,
   );
@@ -255,6 +272,23 @@ export default function App() {
     page === 'map' ||
     page === 'my-reports' ||
     (canReview && (page === 'review' || page === 'dashboard'));
+  const listedReports =
+    page === 'review'
+      ? filterMapRecords(ownReports, queueFilters)
+          .filter(
+            (row) =>
+              (!queueConflict || row.location_conflict) &&
+              (!queuePending || row.photo_gate?.status === 'NEEDS_REVIEW'),
+          )
+          .sort(
+            (a, b) =>
+              (b.priority_score ?? -1) - (a.priority_score ?? -1) ||
+              (a.created_at ?? '').localeCompare(b.created_at ?? ''),
+          )
+      : ownReports;
+  useEffect(() => {
+    if (page === 'review' && canReview && route.captureId) setSelectedReport(route.captureId);
+  }, [page, canReview, route.captureId]);
   useEffect(() => {
     locationOperation.current?.abort();
     setManualPoint(null);
@@ -521,7 +555,11 @@ export default function App() {
             'Foto preservada, mas não há modelo experimental autorizado para inferência.',
           failed: 'O processamento falhou. A foto permanece preservada para verificação.',
         };
-        setNotice(notices[result.status]);
+        setNotice(
+          result.additional_evidence
+            ? 'Foto anexada como evidência adicional. O ponto existente foi preservado; a equipe pode revisar o vínculo.'
+            : notices[result.status],
+        );
         if (
           [
             'completed',
@@ -613,7 +651,30 @@ export default function App() {
       if (!isCurrent()) return;
       operation.ownerId = active.user.id;
       if (session?.access_token !== active.access_token) setSession(active);
-      const result = await api.uploadPhoto(draft, operation.controller.signal, active.access_token);
+      let additionalTo: string | undefined;
+      if (draft.coordinate) {
+        const nearby = await api.nearbyReports(
+          draft.coordinate.latitude,
+          draft.coordinate.longitude,
+          operation.controller.signal,
+          active.access_token,
+        );
+        if (!isCurrent()) return;
+        if (
+          nearby.length &&
+          window.confirm(
+            `Já existe um relato a aproximadamente ${nearby[0].distance_m} m. É o mesmo problema? Confirmar anexa sua foto como evidência, sem criar outro ponto.`,
+          )
+        ) {
+          additionalTo = nearby[0].public_id;
+        }
+      }
+      if (!isCurrent()) return;
+      const result = await api.uploadPhoto(
+        { ...draft, additional_to: additionalTo },
+        operation.controller.signal,
+        active.access_token,
+      );
       if (!isCurrent()) return;
       location.hash = `#/processando/${result.id}`;
       setRoute({ page: 'processing', captureId: result.id });
@@ -622,11 +683,13 @@ export default function App() {
       await reloadDrafts();
       if (!isCurrent()) return;
       setNotice(
-        result.requires_manual_location
-          ? 'Foto enviada. Sem localização: marque o ponto antes que ela vire ocorrência.'
-          : result.created
-            ? 'Foto enviada e registrada. A detecção roda no processamento do backend.'
-            : 'Esta foto já estava registrada; nada foi duplicado.',
+        result.additional_evidence
+          ? 'Foto anexada como evidência adicional. O ponto existente foi preservado; a equipe pode revisar o vínculo.'
+          : result.requires_manual_location
+            ? 'Foto enviada. Sem localização: marque o ponto antes que ela vire ocorrência.'
+            : result.created
+              ? 'Foto enviada e registrada. A detecção roda no processamento do backend.'
+              : 'Esta foto já estava registrada; nada foi duplicado.',
       );
       setRevision((value) => value + 1);
     } catch (reason) {
@@ -848,6 +911,7 @@ export default function App() {
                 {page !== 'map' && page !== 'review' && (
                   <UrbanMap
                     events={ownReports}
+                    allowExport={canReview}
                     selectedId={selectedReport}
                     onSelect={setSelectedReport}
                     onCloseDetail={() => setSelectedReport(null)}
@@ -856,6 +920,11 @@ export default function App() {
                       ownReports.some((report) => report.id === selectedReport) && (
                         <>
                           <h2>Relato do cidadão</h2>
+                          <p>
+                            {ownReports.find((report) => report.id === selectedReport)
+                              ?.reporters_count ?? 1}{' '}
+                            pessoa(s) relataram
+                          </p>
                           <p>
                             {(() => {
                               const address = ownReports.find(
@@ -927,10 +996,107 @@ export default function App() {
                   </button>
                 )}
                 {reportError && <p role="alert">{reportError}</p>}
+                {page === 'review' && canReview && (
+                  <div className="filters panel" aria-label="Filtros da fila de relatos">
+                    <label>
+                      Status do relato
+                      <select
+                        value={queueFilters.status}
+                        onChange={(e) =>
+                          setQueueFilters({ ...queueFilters, status: e.target.value })
+                        }
+                      >
+                        <option value="">Todos</option>
+                        {Object.entries(reportLabels).map(([code, label]) => (
+                          <option key={code} value={code}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Família do relato
+                      <select
+                        value={queueFilters.family}
+                        onChange={(e) =>
+                          setQueueFilters({ ...queueFilters, family: e.target.value })
+                        }
+                      >
+                        <option value="">Todas</option>
+                        {[
+                          ...new Set(
+                            ownReports.map((r) => familyFor(r.urmind_class)).filter(Boolean),
+                          ),
+                        ].map((family) => (
+                          <option key={family}>{family}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Classe do relato
+                      <select
+                        value={queueFilters.issue}
+                        onChange={(e) =>
+                          setQueueFilters({ ...queueFilters, issue: e.target.value })
+                        }
+                      >
+                        <option value="">Todas</option>
+                        {[
+                          ...new Set(
+                            ownReports
+                              .map((r) => r.urmind_class)
+                              .filter((v): v is string => Boolean(v)),
+                          ),
+                        ].map((code) => (
+                          <option key={code} value={code}>
+                            {labelFor(code)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Recebido desde (UTC)
+                      <input
+                        type="date"
+                        value={queueFilters.from}
+                        onChange={(e) => setQueueFilters({ ...queueFilters, from: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Recebido até (UTC)
+                      <input
+                        type="date"
+                        value={queueFilters.to}
+                        onChange={(e) => setQueueFilters({ ...queueFilters, to: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={queueConflict}
+                        onChange={(e) => setQueueConflict(e.target.checked)}
+                      />
+                      Conflito de localização
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={queuePending}
+                        onChange={(e) => setQueuePending(e.target.checked)}
+                      />
+                      Verificação pendente
+                    </label>
+                    <p>
+                      {listedReports.length} relatos carregados. Prioridade disponível primeiro; em
+                      seguida, mais antigos.
+                    </p>
+                  </div>
+                )}
                 {page === 'review' &&
                   canReview &&
                   selectedReport &&
-                  ownReports.some((report) => report.id === selectedReport) && (
+                  (route.captureId === selectedReport ||
+                    ownReports.some((report) => report.id === selectedReport)) && (
                     <CaptureReviewPanel
                       key={selectedReport}
                       id={selectedReport}
@@ -938,14 +1104,22 @@ export default function App() {
                     />
                   )}
                 <ul>
-                  {ownReports.map((report) => (
+                  {listedReports.map((report) => (
                     <li key={report.id}>
                       <button onClick={() => setSelectedReport(report.id)}>
                         {reportLabels[report.report_status]}
                       </button>
                       {report.user_description && <p>{report.user_description}</p>}
                       {report.protocol_code && (
-                        <a href={`#/relato/${report.protocol_code}`}>{report.protocol_code}</a>
+                        <a
+                          href={
+                            canReview && privatePage
+                              ? `#/app/relato/${report.id}`
+                              : `#/relato/${report.protocol_code}`
+                          }
+                        >
+                          {report.protocol_code}
+                        </a>
                       )}
                       {report.created_at && (
                         <time dateTime={report.created_at}>
@@ -1214,7 +1388,10 @@ export default function App() {
                   </section>
                 )}
                 {(page === 'dashboard' || page === 'login') && (
-                  <ReportIndicators key={`${session?.access_token}:${revision}`} />
+                  <>
+                    <ReportIndicators key={`${session?.access_token}:${revision}`} />
+                    <TaxonomyPanel revision={revision} />
+                  </>
                 )}
                 {page === 'ground-truth' && <GroundTruthPage key={session?.access_token} />}
                 {(page === 'models' || page === 'audit') && (

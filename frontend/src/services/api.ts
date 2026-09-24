@@ -201,6 +201,7 @@ export const api = {
         location_conflict: z.boolean(),
         photo_gate: z.record(z.string(), z.unknown()).nullable(),
         human_review: z.record(z.string(), z.unknown()).nullable(),
+        additional_evidence: z.record(z.string(), z.unknown()).nullable().optional(),
         events: z.array(
           z.object({
             id: z.string(),
@@ -220,6 +221,21 @@ export const api = {
         ),
       }),
       { signal },
+    ),
+  detachEvidence: (id: string) =>
+    request(`/captures/${id}/detach-evidence`, z.object({ detached: z.boolean() }), {
+      method: 'POST',
+    }),
+  nearbyReports: (latitude: number, longitude: number, signal?: AbortSignal, token?: string) =>
+    request(
+      `/captures/nearby-reports?latitude=${latitude}&longitude=${longitude}`,
+      z.array(
+        z.object({
+          public_id: z.string().regex(/^[a-f0-9]{32}$/),
+          distance_m: z.number().nonnegative(),
+        }),
+      ),
+      { signal, token },
     ),
   reviewCapture: (id: string, payload: Record<string, unknown>) =>
     request(
@@ -324,6 +340,8 @@ export const api = {
     const form = new FormData();
     form.append('file', draft.photo, draft.filename || 'foto.jpg');
     form.append('source', draft.source);
+    if (draft.privacy_version) form.append('privacy_version', draft.privacy_version);
+    if (draft.additional_to) form.append('additional_to', draft.additional_to);
     if (draft.note.trim()) form.append('user_description', draft.note);
     if (draft.coordinate) {
       form.append('latitude', String(draft.coordinate.latitude));

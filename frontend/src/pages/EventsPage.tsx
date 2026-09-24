@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { EventDetail } from '../components/EventDetail';
 import { classes, statuses, type UrbanEvent } from '../domain/contracts';
+import { labelFor } from '../domain/public';
 
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
 export function EventsPage({
@@ -30,7 +31,7 @@ export function EventsPage({
         (event) =>
           (!status || event.status === status) &&
           (!category || event.urmind_class === category) &&
-          `${event.event_key} ${classes[event.urmind_class]}`
+          `${event.event_key} ${labelFor(event.urmind_class)}`
             .toLocaleLowerCase('pt-BR')
             .includes(query.toLocaleLowerCase('pt-BR')),
       ),
@@ -93,7 +94,7 @@ export function EventsPage({
       {loading && <p role="status">Carregando ocorrências…</p>}
       {map && (
         <Suspense fallback={<p>Carregando mapa…</p>}>
-          <UrbanMap events={filtered} />
+          <UrbanMap events={filtered} allowExport />
         </Suspense>
       )}
       <section className="panel">
@@ -126,7 +127,7 @@ export function EventsPage({
                 {filtered.map((event) => (
                   <tr key={event.id}>
                     <td>
-                      <strong>{classes[event.urmind_class]}</strong>
+                      <strong>{labelFor(event.urmind_class)}</strong>
                       <small className="record-id">{event.event_key}</small>
                     </td>
                     <td>

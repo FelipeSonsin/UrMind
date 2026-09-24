@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { eventSchema, parseCoordinate } from './contracts';
 
 describe('localização sem inferência', () => {
+  it('lê classe candidata confirmada por humano sem restringir ao detector visual', () => {
+    expect(
+      eventSchema.safeParse({
+        id: '3f8b9d3a-2f0c-4f1e-9b1a-4f6a0d5e7c11',
+        event_key: 'human',
+        urmind_class: 'URMIND_FALLEN_TREE',
+        status: 'confirmed',
+        occurred_at: '2026-09-24T12:00:00Z',
+        evidence_mode: 'photo',
+      }).success,
+    ).toBe(true);
+  });
   it('não transforma campos vazios em coordenada zero', () => {
     expect(() => parseCoordinate('', '')).toThrow();
     expect(() => parseCoordinate(' ', '10')).toThrow();

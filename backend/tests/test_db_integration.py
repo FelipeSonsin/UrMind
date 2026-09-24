@@ -55,6 +55,281 @@ LAT, LON = -23.5613, -46.6560
 
 
 @pytest.mark.asyncio
+async def test_human_report_real_storage_publication_and_cleanup(database):
+    """Synthetic isolated integration, not a citizen E2E or detector evaluation."""
+    from fastapi import UploadFile
+    from PIL import Image
+
+    from app.api.v1.core import publish_event, review_capture, upload_photo
+    from app.auth import AuthenticatedUser
+    from app.repositories.core import DecisionRepository, PublicRepository
+    from app.schemas.core import CaptureReviewCreate, PublicationRequest
+    from tests.test_exif import build_jpeg, gps_block
+
+    owner = str(uuid.uuid4())
+    user = AuthenticatedUser(owner, None, "authenticated", urmind_role="admin")
+    storage = StorageClient(get_settings())
+    paths: list[str] = []
+    capture_id = event_id = None
+    with Image.open(io.BytesIO(build_jpeg(gps=gps_block()))) as metadata:
+        buffer = io.BytesIO()
+        Image.effect_noise((640, 640), 30).convert("RGB").save(
+            buffer, format="JPEG", exif=metadata.getexif()
+        )
+    try:
+        async with database.sessionmaker() as session:
+            service = CoreService(
+                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+            )
+            result = await upload_photo(
+                user,
+                service,
+                storage,
+                UploadFile(filename="isolated.jpg", file=io.BytesIO(buffer.getvalue())),
+            )
+            capture_id = result["id"]
+            capture = await service.captures.get(capture_id)
+            paths.append(capture.storage_path)
+            assert not await service.events.for_capture(capture_id)
+            reviewed = await review_capture(
+                capture_id,
+                CaptureReviewCreate(
+                    decision="correct", corrected_class="URMIND_FALLEN_TREE", adjudicate=True
+                ),
+                user,
+                service,
+            )
+            event_id = reviewed["event_id"]
+            assert event_id is not None
+            event = await service.events.get(event_id)
+            assert event.factors["origin"] == "human_review"
+            assert not capture.detections
+            public = PublicRepository(session)
+            assert await public.event(event_id) is None
+            await publish_event(
+                event_id,
+                PublicationRequest(
+                    publish=True,
+                    review_id=reviewed["review_id"],
+                    visible_content_reviewed=True,
+                    reason="Synthetic integration privacy attestation",
+                ),
+                user,
+                service,
+                storage,
+            )
+            event = await service.events.get(event_id)
+            derived = event.factors["publication"]["public_image"]["storage_path"]
+            paths.append(derived)
+            assert derived != paths[0]
+            assert await storage.download(paths[0]) == buffer.getvalue()
+            with Image.open(io.BytesIO(await storage.download(derived))) as sanitized:
+                assert not sanitized.getexif()
+            assert (await public.event(event_id))["id"] == event_id
+            await publish_event(
+                event_id,
+                PublicationRequest(publish=False, reason="Fixture withdrawal"),
+                user,
+                service,
+                storage,
+            )
+            assert await public.event(event_id) is None
+    finally:
+        async with database.session() as session:
+            for identifier in (event_id, capture_id):
+                if identifier:
+                    await session.execute(
+                        text("delete from public.audit_log where entity_id=:id"), {"id": identifier}
+                    )
+            if capture_id:
+                await session.execute(
+                    text("delete from pgmq.q_inference_jobs where message->>'capture_id'=:id"),
+                    {"id": str(capture_id)},
+                )
+                await session.execute(
+                    text("delete from public.reviews where capture_id=:id"), {"id": capture_id}
+                )
+            if event_id:
+                await session.execute(
+                    text("delete from public.events where id=:id"), {"id": event_id}
+                )
+            if capture_id:
+                await session.execute(
+                    text("delete from public.captures where id=:id"), {"id": capture_id}
+                )
+        for path in paths:
+            await storage.delete(path)
+
+
+@pytest.mark.asyncio
+async def test_report_identity_retries_forced_collisions_in_isolated_temp_tables(database):
+    """Exercise the canonical trigger body; only entropy and table targets are isolated."""
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(
+        (Path(__file__).parents[1] / "alembic/versions/0023_report_identity.py").read_text(
+            encoding="utf-8"
+        )
+    )
+    sql = next(
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node.value.startswith("create function public.assign_report_identity")
+    )
+    sql = (
+        sql.replace("public.assign_report_identity", "pg_temp.assign_report_identity")
+        .replace("public.captures", "pg_temp.identity_fixture")
+        .replace("gen_random_uuid()", "pg_temp.identity_entropy()")
+    )
+    async with database.session() as session:
+        await session.execute(
+            text(
+                "create temporary table identity_fixture(public_id text unique, protocol_code text unique) on commit drop"
+            )
+        )
+        await session.execute(text("create temporary sequence identity_calls"))
+        await session.execute(
+            text("""create function pg_temp.identity_entropy() returns uuid language sql as $$
+            select (case nextval('pg_temp.identity_calls') when 1 then '00000000-0000-0000-0000-000000000000'
+                when 2 then '11111111-1111-1111-1111-111111111111'
+                when 3 then '00000000-0000-0000-0000-000000000000'
+                else 'ffffffff-ffff-ffff-ffff-ffffffffffff' end)::uuid $$""")
+        )
+        await session.execute(text(sql))
+        await session.execute(
+            text(
+                "insert into identity_fixture values('00000000000000000000000000000000','URM-22222222')"
+            )
+        )
+        await session.execute(
+            text("""create trigger identity_retry before insert on identity_fixture
+            for each row when(new.public_id is null) execute function pg_temp.assign_report_identity()""")
+        )
+        row = (
+            await session.execute(
+                text(
+                    "insert into identity_fixture default values returning public_id,protocol_code"
+                )
+            )
+        ).one()
+        assert row.public_id == "11111111111111111111111111111111"
+        assert row.protocol_code == "URM-ZZZZZZZZ"
+        assert await session.scalar(text("select last_value from identity_calls")) == 4
+        await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_additional_evidence_has_one_point_and_can_be_detached(database):
+    from app.api.v1.core import detach_evidence
+    from app.auth import AuthenticatedUser
+    from app.repositories.core import DecisionRepository
+
+    owner = str(uuid.uuid4())
+    ids = []
+    try:
+        async with database.session() as session:
+            repo = CaptureRepository(session)
+            parent = await repo.create(
+                CaptureCreate(
+                    capture_key=f"evidence-parent-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.MANUAL,
+                    captured_at=NOW,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON),
+                    quality={"uploaded_by": owner},
+                )
+            )
+            ids.append(parent.id)
+            assert (await repo.nearby_reports(owner, Coordinate(latitude=LAT, longitude=LON), 25))[
+                0
+            ]["id"] == parent.id
+            assert not await repo.nearby_reports(
+                str(uuid.uuid4()), Coordinate(latitude=LAT, longitude=LON), 25
+            )
+            child = await repo.create(
+                CaptureCreate(
+                    capture_key=f"evidence-child-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.MANUAL,
+                    captured_at=NOW,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON),
+                    quality={
+                        "uploaded_by": owner,
+                        "additional_evidence": {
+                            "capture_id": str(parent.id),
+                            "public_id": parent.public_id,
+                        },
+                        "inference": {"status": "needs_review"},
+                    },
+                )
+            )
+            ids.append(child.id)
+            service = CoreService(repo, EventRepository(session), DecisionRepository(session))
+            markers = await service.capture_markers(owner)
+            assert [row["id"] for row in markers] == [parent.id]
+            assert markers[0]["reporters_count"] == 1
+            assert len(await service.capture_markers(owner, include_unlocated=True)) == 2
+        async with database.session() as session:
+            service = CoreService(
+                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+            )
+            assert (
+                await detach_evidence(
+                    child.id,
+                    AuthenticatedUser(owner, None, "authenticated", urmind_role="reviewer"),
+                    service,
+                )
+            )["detached"]
+            assert len(await service.capture_markers(owner)) == 2
+            reviews = await service.decisions.capture_review_history(child.id)
+            assert reviews[0]["decision"] == "detach_evidence"
+            assert await service.decisions.review_votes(None, capture_id=child.id) == []
+            assert not await service.events.for_capture(child.id)
+    finally:
+        async with database.session() as session:
+            for identifier in reversed(ids):
+                await session.execute(
+                    text("delete from pgmq.q_inference_jobs where message->>'capture_id'=:id"),
+                    {"id": str(identifier)},
+                )
+                await session.execute(
+                    text("delete from public.audit_log where entity_id=:id"), {"id": identifier}
+                )
+                await session.execute(
+                    text("delete from public.reviews where capture_id=:id"), {"id": identifier}
+                )
+                await session.execute(
+                    text("delete from public.captures where id=:id"), {"id": identifier}
+                )
+
+
+@pytest.mark.asyncio
+async def test_privacy_consent_owner_rls_and_version(database):
+    owner, other = str(uuid.uuid4()), str(uuid.uuid4())
+    async with database.session() as session:
+        repo = CaptureRepository(session)
+        assert not await repo.has_privacy_consent(owner, "test-v1")
+        await repo.accept_privacy_notice(owner, "test-v1")
+        await repo.accept_privacy_notice(owner, "test-v1")
+        assert await repo.has_privacy_consent(owner, "test-v1")
+        assert not await repo.has_privacy_consent(owner, "test-v2")
+        assert not await repo.has_privacy_consent(other, "test-v1")
+        await session.execute(text("set local role authenticated"))
+        await session.execute(
+            text("select set_config('request.jwt.claim.sub',:owner,true)"), {"owner": other}
+        )
+        assert not await repo.has_privacy_consent(owner, "test-v1")
+        await session.execute(
+            text("select set_config('request.jwt.claim.sub',:owner,true)"), {"owner": owner}
+        )
+        assert await repo.has_privacy_consent(owner, "test-v1")
+        await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_photo_admission_lease_is_shared_and_expiring(database):
     owner, token, competing = str(uuid.uuid4()), uuid.uuid4(), uuid.uuid4()
     try:
@@ -673,7 +948,7 @@ async def test_storage_compensates_real_db_constraint_failure(database):
     from app.services.storage import StorageError
 
     buffer = io.BytesIO()
-    Image.new("RGB", (8, 8), (21, 45, 67)).save(buffer, format="JPEG")
+    Image.effect_noise((640, 640), 30).convert("RGB").save(buffer, format="JPEG")
     image = validate_image(buffer.getvalue())
     fixture_owner = f"integration-fixture-{uuid.uuid4()}"
     capture_key = f"photo-{hashlib.sha256(f'{fixture_owner}:{image.sha256}'.encode()).hexdigest()}"
@@ -711,6 +986,9 @@ async def test_storage_compensates_real_db_constraint_failure(database):
 
                 async def create(self, payload):
                     return await real_repo.create(payload)
+
+                async def recent_similar_photo(self, *args):
+                    return await real_repo.recent_similar_photo(*args)
 
             captures = RaceCaptureRepository()
             captures.session = session

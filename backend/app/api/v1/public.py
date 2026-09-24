@@ -138,6 +138,13 @@ async def public_photo_policy(repos: Repos) -> dict[str, Any]:
     )
 
 
+@router.get("/privacy-notice")
+async def public_privacy_notice() -> dict[str, str]:
+    from app.schemas.core import CAPTURE_PRIVACY_TEXT, CAPTURE_PRIVACY_VERSION
+
+    return {"version": CAPTURE_PRIVACY_VERSION, "text": CAPTURE_PRIVACY_TEXT}
+
+
 @router.get("/capture-markers")
 async def public_capture_markers(repos: Repos) -> list[dict[str, Any]]:
     service = repos["service"]

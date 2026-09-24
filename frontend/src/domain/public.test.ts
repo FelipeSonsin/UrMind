@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { eventDetail, urbanAnalysis } from '../../tests/fixtures';
 import {
   filterableClasses,
+  exportMapRecords,
   filterMapRecords,
   issueTaxonomySchema,
   labelFor,
@@ -14,6 +15,25 @@ import {
   publicScoutSchema,
   severityOf,
 } from './public';
+
+it('exporta somente campos permitidos e neutraliza fórmula CSV', () => {
+  const rows = [
+    {
+      latitude: -23,
+      longitude: -46,
+      status: '=CMD()',
+      urmind_class: 'D40',
+      uploaded_by: 'private-owner',
+      storage_path: 'private/photo',
+      description: 'private text',
+    },
+  ];
+  const exported = exportMapRecords(rows);
+  expect(exported.csv).toContain("'=CMD()");
+  expect(JSON.stringify(exported)).not.toContain('private');
+  expect(exported.geojson.features[0].geometry.coordinates).toEqual([-46, -23]);
+  expect(exportMapRecords([{ latitude: null, longitude: null }]).geojson.features).toEqual([]);
+});
 
 it('filtros do mapa não inventam período para relato sem data', () => {
   const rows = [

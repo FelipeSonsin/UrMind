@@ -35,6 +35,7 @@ from app.repositories.core import (
     InferenceRepository,
 )
 from app.schemas.core import (
+    CAPTURE_PRIVACY_VERSION,
     CaptureCreate,
     CaptureReviewCreate,
     CaptureSource,
@@ -326,6 +327,43 @@ async def capture_image(
     return {"image_url": await storage.signed_url(capture.storage_path)}
 
 
+@router.get("/captures/nearby-reports")
+async def nearby_reports(
+    user: CurrentUser,
+    service: Core,
+    latitude: float = Query(ge=-90, le=90),
+    longitude: float = Query(ge=-180, le=180),
+    policy: Annotated[PhotoGatePolicy | None, Depends(get_photo_gate_policy)] = None,
+) -> list[dict[str, Any]]:
+    if latitude == 0 and longitude == 0:
+        raise HTTPException(status_code=422, detail="Confirme a localização")
+    rows = await service.captures.nearby_reports(
+        user.id,
+        Coordinate(latitude=latitude, longitude=longitude),
+        (policy or PhotoGatePolicy()).nearby_radius_m,
+    )
+    # Cross-owner suggestions can only be published, and reveal no private protocol or image.
+    return [{"public_id": row["public_id"], "distance_m": round(row["distance_m"])} for row in rows]
+
+
+async def require_photo_consent(
+    user: CurrentUser,
+    service: Core,
+    privacy_version: Annotated[str | None, Form(max_length=100)] = None,
+) -> None:
+    if privacy_version is not None:
+        if privacy_version != CAPTURE_PRIVACY_VERSION:
+            raise HTTPException(
+                status_code=409, detail="Aviso de privacidade atualizado; leia e aceite novamente."
+            )
+        await service.captures.accept_privacy_notice(user.id, privacy_version)
+        await service.captures.session.commit()
+    elif not await service.captures.has_privacy_consent(user.id, CAPTURE_PRIVACY_VERSION):
+        raise HTTPException(
+            status_code=422, detail="Leia e aceite o aviso de privacidade antes de enviar."
+        )
+
+
 async def photo_admission_lease(user: CurrentUser, service: Core) -> AsyncIterator[None]:
     token = uuid.uuid4()
     acquired = await service.captures.acquire_photo_lease(user.id, token)
@@ -342,7 +380,11 @@ async def photo_admission_lease(user: CurrentUser, service: Core) -> AsyncIterat
         await service.captures.session.commit()
 
 
-@router.post("/captures/photo", status_code=201, dependencies=[Depends(photo_admission_lease)])
+@router.post(
+    "/captures/photo",
+    status_code=201,
+    dependencies=[Depends(require_photo_consent), Depends(photo_admission_lease)],
+)
 async def upload_photo(
     user: CurrentUser,
     service: Core,
@@ -362,6 +404,7 @@ async def upload_photo(
     speed_mps: Annotated[float | None, Form(ge=0)] = None,
     note: Annotated[str | None, Form(max_length=500)] = None,
     user_description: Annotated[str | None, Form(max_length=500)] = None,
+    additional_to: Annotated[str | None, Form(pattern=r"^[a-f0-9]{32}$")] = None,
 ) -> dict[str, Any]:
     """Foto real → Storage privado → Capture (§6.1, §6.3). Reenvio da mesma foto não duplica."""
     settings = get_settings()
@@ -518,6 +561,25 @@ async def upload_photo(
             status_code=409, detail="Você já enviou esta foto. Consulte Meus relatos."
         )
     await service.captures.session.rollback()
+    if additional_to is not None:
+        if ingest.capture.coordinate is None:
+            raise HTTPException(status_code=422, detail="Evidência adicional exige localização")
+        candidates = await service.captures.nearby_reports(
+            user.id, ingest.capture.coordinate, (gate_policy or PhotoGatePolicy()).nearby_radius_m
+        )
+        parent = next((row for row in candidates if row["public_id"] == additional_to), None)
+        if parent is None:
+            raise HTTPException(status_code=404, detail="Relato próximo não disponível")
+        ingest.capture.quality["additional_evidence"] = {
+            "capture_id": str(parent["id"]),
+            "public_id": additional_to,
+            "confirmed_by_sender": True,
+        }
+        ingest.capture.quality["inference"] = {
+            "status": "needs_review",
+            "reason": "additional_evidence",
+        }
+        await service.captures.session.rollback()
     if ingest.capture.coordinate is not None and address_provider is not None:
         address = await address_provider.fetch(
             ingest.capture.coordinate.latitude, ingest.capture.coordinate.longitude, received_at
@@ -548,7 +610,35 @@ async def upload_photo(
             ):
                 log.info("capture_rejected", reason="rate_limited", status_code=429)
                 raise HTTPException(status_code=429, detail="Limite de capturas por hora atingido")
+        if additional_to is not None:
+            link = ingest.capture.quality["additional_evidence"]
+            assert isinstance(link, dict) and ingest.capture.coordinate is not None
+            await service.captures.get_for_review(uuid.UUID(str(link["capture_id"])))
+            latest = await service.captures.nearby_reports(
+                user.id,
+                ingest.capture.coordinate,
+                (gate_policy or PhotoGatePolicy()).nearby_radius_m,
+            )
+            if not any(row["public_id"] == additional_to for row in latest):
+                raise HTTPException(
+                    status_code=409, detail="Relato alterado durante o envio; tente novamente"
+                )
         result = await service.register_capture(ingest.capture)
+        if additional_to is not None and result["created"]:
+            if service.decisions is None:
+                raise HTTPException(status_code=503, detail="Auditoria indisponível")
+            await service.captures.notify_evidence_change(uuid.UUID(str(link["capture_id"])))
+            await service.decisions.add_audit(
+                operation="attach_report_evidence",
+                entity_type="capture",
+                entity_id=result["id"],
+                actor=user.id,
+                before={},
+                after={"additional_to": additional_to},
+                event_hash=hashlib.sha256(
+                    f"attach:{result['id']}:{additional_to}".encode()
+                ).hexdigest(),
+            )
         # The dependency's deferred commit would otherwise happen after this
         # handler returns, too late to compensate a failed DB transaction.
         await service.captures.session.commit()
@@ -583,6 +673,7 @@ async def upload_photo(
         "requires_manual_location": ingest.requires_manual_location,
         "location_source": ingest.capture.source_location.value,
         "exif_status": ingest.exif.status.value,
+        "additional_evidence": additional_to is not None,
     }
 
 
@@ -719,6 +810,7 @@ async def capture_review_detail(
         "location_source": capture.source_location,
         "photo_gate": (capture.quality or {}).get("photo_gate"),
         "human_review": (capture.quality or {}).get("human_review"),
+        "additional_evidence": (capture.quality or {}).get("additional_evidence"),
         "location_conflict": (capture.quality or {}).get("location_conflict", False),
         "events": [
             {
@@ -731,6 +823,46 @@ async def capture_review_detail(
         ],
         "reviews": await service.decisions.capture_review_history(capture_id),
     }
+
+
+@router.post("/captures/{capture_id}/detach-evidence")
+async def detach_evidence(
+    capture_id: uuid.UUID, user: CurrentUser, service: Core
+) -> dict[str, bool]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
+    capture = await service.captures.get_for_review(capture_id)
+    if capture is None or service.decisions is None:
+        raise HTTPException(status_code=404, detail="Relato não encontrado")
+    quality = deepcopy(capture.quality or {})
+    link = quality.pop("additional_evidence", None)
+    if link is None:
+        return {"detached": False}
+    quality["inference"] = {"status": "queued"}
+    capture.quality = quality
+    await service.captures.notify_evidence_change(uuid.UUID(link["capture_id"]))
+    await service.decisions.add_review(
+        event_id=None,
+        capture_id=capture_id,
+        reviewer=user.id,
+        decision="detach_evidence",
+        corrected_class=None,
+        notes="Evidência desanexada para revisão independente",
+    )
+    await service.decisions.add_audit(
+        operation="detach_report_evidence",
+        entity_type="capture",
+        entity_id=capture_id,
+        actor=user.id,
+        before={"additional_evidence": link},
+        after={},
+        event_hash=hashlib.sha256(
+            f"detach:{capture_id}:{datetime.now(UTC).isoformat()}".encode()
+        ).hexdigest(),
+    )
+    await InferenceRepository(service.captures.session).enqueue_capture(capture_id)
+    await service.captures.session.commit()
+    return {"detached": True}
 
 
 @router.post("/captures/{capture_id}/reviews", status_code=201)

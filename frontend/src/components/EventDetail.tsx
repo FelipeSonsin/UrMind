@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { publicApi } from '../services/publicApi';
-import { type IssueDefinition, modelSupportLabel } from '../domain/public';
+import { type IssueDefinition, modelSupportLabel, labelFor } from '../domain/public';
 import { ExperimentalBadge } from './public/Diagnosis';
 import {
   classes,
@@ -28,21 +28,25 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     setDetail(null);
     setError('');
     setPrivacy(false);
+    setOriginalUrl(null);
     Promise.all([
       api.captureReview(id, controller.signal),
       publicApi.taxonomy(controller.signal),
       api.me(controller.signal),
+      api.captureImage(id, controller.signal).catch(() => null),
     ])
-      .then(([report, taxonomy, me]) => {
+      .then(([report, taxonomy, me, image]) => {
         if (!controller.signal.aborted) {
           setDetail(report);
           setIssues(taxonomy.issues);
           setAdmin(me.can_admin);
+          setOriginalUrl(image?.image_url ?? null);
         }
       })
       .catch((reason: Error) => {
@@ -82,6 +86,7 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
   };
   const event = detail?.events[0];
   const lastReview = detail?.reviews.at(-1);
+  const routing = issues.find((item) => item.issue_code === (issue || lastReview?.corrected_class));
   return (
     <section aria-label="Revisão do relato" className="review-panel">
       <h3>Revisão humana</h3>
@@ -93,6 +98,29 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
           <p>
             {detail.protocol_code} — {detail.location_source}
           </p>
+          {originalUrl ? (
+            <figure>
+              <img
+                src={originalUrl}
+                alt="Foto original privada do relato"
+                style={{ maxWidth: '100%' }}
+              />
+              <figcaption>
+                <a href={originalUrl} target="_blank" rel="noopener noreferrer">
+                  Ver original privado
+                </a>
+              </figcaption>
+            </figure>
+          ) : (
+            <p>Imagem privada indisponível.</p>
+          )}
+          <p>{detail.user_description}</p>
+          <details>
+            <summary>Resultado do porteiro</summary>
+            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {JSON.stringify(detail.photo_gate, null, 2)}
+            </pre>
+          </details>
           {detail.location && (
             <p>
               Original: {detail.location.latitude}, {detail.location.longitude}. Precisão declarada:{' '}
@@ -100,6 +128,14 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
             </p>
           )}
           {detail.location_conflict && <p>Conflito GPS × EXIF: conferir localização.</p>}
+          {detail.additional_evidence && (
+            <aside className="notice">
+              <p>Foto anexada a outro relato; não cria ponto independente.</p>
+              <button disabled={busy} onClick={() => void run(() => api.detachEvidence(id))}>
+                Desanexar evidência
+              </button>
+            </aside>
+          )}
           <label>
             Classe humana
             <select value={issue} onChange={(e) => setIssue(e.target.value)}>
@@ -115,6 +151,27 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
             Notas
             <textarea value={notes} maxLength={2000} onChange={(e) => setNotes(e.target.value)} />
           </label>
+          {routing && (
+            <aside className="notice">
+              <strong>Sugestão, não encaminhamento</strong>
+              <p>
+                Para {routing.display_name_pt}, consulte a equipe responsável pelo domínio{' '}
+                {routing.responsibility_domain}. A competência depende da jurisdição e deve ser
+                conferida pela equipe; nenhum pedido é enviado automaticamente.
+              </p>
+              <p>
+                Se o local estiver no município de São Paulo, consulte o{' '}
+                <a
+                  href="https://sp156.prefeitura.sp.gov.br/portal"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  canal oficial SP156
+                </a>
+                . Em outra cidade, use o canal oficial local.
+              </p>
+            </aside>
+          )}
           <label>
             Latitude corrigida
             <input value={latitude} onChange={(e) => setLatitude(e.target.value)} />
@@ -273,7 +330,7 @@ export function EventDetail({
   return (
     <section className="panel detail" aria-label="Detalhes da ocorrência">
       <div className="section-heading">
-        <h2>{detail ? classes[detail.urmind_class] : 'Carregando ocorrência…'}</h2>
+        <h2>{detail ? labelFor(detail.urmind_class) : 'Carregando ocorrência…'}</h2>
         <button className="secondary compact" onClick={onClose}>
           Fechar detalhes
         </button>

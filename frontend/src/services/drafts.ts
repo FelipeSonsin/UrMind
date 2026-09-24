@@ -14,6 +14,8 @@ export interface CaptureDraft {
   heading_deg: number | null;
   speed_mps: number | null;
   note: string;
+  privacy_version?: string;
+  additional_to?: string;
   status: 'local_draft';
 }
 interface DraftDatabase extends DBSchema {

@@ -48,8 +48,18 @@ export function CapturePage({
   const [showMap, setShowMap] = useState(false);
   const selectionVersion = useRef(0);
   const [photoPolicy, setPhotoPolicy] = useState(defaultPhotoPolicy);
+  const [privacy, setPrivacy] = useState<{ version: string; text: string } | null>(null);
+  const [acceptedVersion, setAcceptedVersion] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
+    void publicApi
+      .privacyNotice(controller.signal)
+      .then((notice) => {
+        if (!controller.signal.aborted) setPrivacy(notice);
+      })
+      .catch(() => {
+        // No network: a draft can remain local, but upload requires the current notice.
+      });
     void publicApi
       .photoPolicy(controller.signal)
       .then((policy) => {
@@ -195,6 +205,12 @@ export function CapturePage({
     setBusy(true);
     try {
       if (!draft.photo.size) throw new Error('Selecione ou tire uma foto antes de salvar.');
+      if (!privacy || acceptedVersion !== privacy.version) {
+        await drafts.save(draft);
+        throw new Error(
+          'Leia e aceite o aviso de privacidade antes de enviar. Rascunho preservado.',
+        );
+      }
       const coordinate =
         latitude.trim() || longitude.trim() ? parseCoordinate(latitude, longitude) : null;
       if (
@@ -207,6 +223,7 @@ export function CapturePage({
         throw new Error('Selecione e confirme a localização no mapa antes do envio.');
       const saved: CaptureDraft = {
         ...draft,
+        privacy_version: privacy.version,
         coordinate:
           coordinate && draft.source_location === 'gps_device' ? draft.coordinate : coordinate,
         source_location: coordinate ? draft.source_location : 'unknown',
@@ -392,6 +409,29 @@ export function CapturePage({
           </label>
           <p aria-live="polite">{draft.note.length}/500 caracteres</p>
           <p className="muted">Observações do usuário não são classificações do modelo.</p>
+          <section aria-label="Privacidade do relato">
+            <h3>Antes de enviar</h3>
+            {privacy ? (
+              <>
+                <p>{privacy.text}</p>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={acceptedVersion === privacy.version}
+                    onChange={(event) =>
+                      setAcceptedVersion(event.target.checked ? privacy.version : null)
+                    }
+                  />
+                  Li e aceito o armazenamento da foto e localização conforme este aviso
+                </label>
+              </>
+            ) : (
+              <p role="status">
+                Aviso de privacidade indisponível. O envio aguarda conexão; o rascunho pode ser
+                preservado.
+              </p>
+            )}
+          </section>
           {error && (
             <p className="error" role="alert">
               {error}

@@ -334,6 +334,15 @@ interface PublicStubs {
 
 /** Intercepta a API pública. Cada rota devolve exatamente o contrato do backend. */
 export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
+  await page.route('**/api/v1/captures/nearby-reports?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/public/privacy-notice', (route) =>
+    route.fulfill({
+      json: {
+        version: 'urmind-capture-privacy-v1',
+        text: 'Foto e localização ficam privadas; publicação depende de revisão.',
+      },
+    }),
+  );
   const json = (route: Route, body: unknown) => route.fulfill({ json: body as object });
   // A suíte comum não depende da internet. O runtime continua usando o style
   // OpenFreeMap real; apenas o navegador de teste recebe um style MapLibre mínimo.

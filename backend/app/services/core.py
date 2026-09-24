@@ -153,10 +153,19 @@ class CoreService:
                 markers.append(marker)
                 continue
             status = row.get("processing_status")
-            if row["latitude"] is None or row["longitude"] is None:
-                marker["report_status"] = "location_required"
-            elif row.get("has_review") and row.get("event_status") == "confirmed":
+            human = row.get("human_review") or {}
+            reviewed_location = human.get("corrected_location")
+            if (
+                row.get("has_review")
+                and row.get("event_status") == "confirmed"
+                and (
+                    (row["latitude"] is not None and row["longitude"] is not None)
+                    or isinstance(reviewed_location, dict)
+                )
+            ):
                 marker["report_status"] = "human_confirmed"
+            elif row["latitude"] is None or row["longitude"] is None:
+                marker["report_status"] = "location_required"
             elif row.get("event_id") and row.get("model_status") == "EXPERIMENTAL_SHADOW":
                 marker["report_status"] = "experimental"
             elif status == "model_not_available":
@@ -178,6 +187,8 @@ class CoreService:
                         "address",
                         "protocol_code",
                         "public_id",
+                        "reporters_count",
+                        "additional_evidence",
                     )
                 }
             )
@@ -204,6 +215,12 @@ class CoreService:
                     marker["longitude"] = correction["longitude"]
             elif human.get("status") == "rejected":
                 marker["report_status"] = "duplicate" if human.get("duplicate_of") else "rejected"
+            if row.get("additional_evidence"):
+                # Keep the owner's evidence in lists, without a second map point.
+                marker["original_latitude"] = marker["latitude"]
+                marker["original_longitude"] = marker["longitude"]
+                marker["latitude"] = marker["longitude"] = None
+                marker["report_status"] = "duplicate"
             markers.append(marker)
         return markers
 
@@ -263,6 +280,7 @@ class CoreService:
             "model_version_id": inference.get("model_version_id"),
             "model_status": inference.get("model_status"),
             "updated_at": inference.get("completed_at") or inference.get("at"),
+            "additional_evidence": bool(quality.get("additional_evidence")),
         }
 
     async def _analysis_status(self, events: list[Any]) -> CaptureProcessingStatus:
@@ -730,6 +748,8 @@ class CoreService:
         capture = await self.captures.get_for_review(capture_id)
         if capture is None:
             raise EventNotFoundError("Relato não encontrado")
+        if (capture.quality or {}).get("additional_evidence"):
+            raise ValueError("Desanexe a evidência antes de revisar como relato independente")
         duplicate = None
         if payload.duplicate_of_protocol:
             duplicate = await self.captures.protocol_target(payload.duplicate_of_protocol)

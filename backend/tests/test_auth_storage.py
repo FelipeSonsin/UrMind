@@ -45,6 +45,7 @@ def isolated_upload_attempt_budget():
         get_address_provider,
         get_photo_gate_policy,
         photo_admission_lease,
+        require_photo_consent,
         upload_admission,
     )
     from app.main import app
@@ -54,11 +55,93 @@ def isolated_upload_attempt_budget():
     app.dependency_overrides[get_photo_gate_policy] = lambda: PhotoGatePolicy()
     app.dependency_overrides[get_address_provider] = lambda: None
     app.dependency_overrides[photo_admission_lease] = lambda: None
+    app.dependency_overrides[require_photo_consent] = lambda: None
     yield
     app.dependency_overrides.pop(get_photo_gate_policy, None)
     app.dependency_overrides.pop(get_address_provider, None)
     app.dependency_overrides.pop(photo_admission_lease, None)
+    app.dependency_overrides.pop(require_photo_consent, None)
     upload_admission.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_privacy_notice_is_current_owned_and_explicit():
+    from fastapi import HTTPException
+
+    from app.api.v1.core import require_photo_consent
+    from app.schemas.core import CAPTURE_PRIVACY_VERSION
+
+    repo = SimpleNamespace(
+        has_privacy_consent=AsyncMock(return_value=False),
+        accept_privacy_notice=AsyncMock(),
+        session=SimpleNamespace(commit=AsyncMock()),
+    )
+    user = SimpleNamespace(id=str(uuid.uuid4()))
+    service = SimpleNamespace(captures=repo)
+    with pytest.raises(HTTPException) as absent:
+        await require_photo_consent(user, service)
+    assert absent.value.status_code == 422
+    repo.has_privacy_consent.assert_awaited_with(user.id, CAPTURE_PRIVACY_VERSION)
+    with pytest.raises(HTTPException) as stale:
+        await require_photo_consent(user, service, "old-notice")
+    assert stale.value.status_code == 409
+    repo.accept_privacy_notice.assert_not_awaited()
+    await require_photo_consent(user, service, CAPTURE_PRIVACY_VERSION)
+    repo.accept_privacy_notice.assert_awaited_once_with(user.id, CAPTURE_PRIVACY_VERSION)
+    repo.session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_nearby_suggestions_do_not_disclose_private_identifiers():
+    from fastapi import HTTPException
+
+    from app.api.v1.core import detach_evidence, nearby_reports
+    from app.auth import AuthenticatedUser
+
+    repo = SimpleNamespace(
+        nearby_reports=AsyncMock(
+            return_value=[
+                {
+                    "id": "internal",
+                    "protocol_code": "private",
+                    "public_id": "a" * 32,
+                    "distance_m": 12.3,
+                }
+            ]
+        )
+    )
+    user = AuthenticatedUser(str(uuid.uuid4()), None, "authenticated")
+    result = await nearby_reports(user, SimpleNamespace(captures=repo), -23, -46)
+    assert result == [{"public_id": "a" * 32, "distance_m": 12}]
+    with pytest.raises(HTTPException) as denied:
+        await detach_evidence(uuid.uuid4(), user, SimpleNamespace())
+    assert denied.value.status_code == 403
+
+
+def test_http_upload_without_privacy_consent_never_reaches_storage(client):
+    from app.api.v1.core import get_core_service, get_storage, require_photo_consent
+    from app.auth import AuthenticatedUser, require_user
+    from app.main import app
+
+    repo = SimpleNamespace(has_privacy_consent=AsyncMock(return_value=False))
+    storage = SimpleNamespace(upload=AsyncMock())
+    app.dependency_overrides.pop(require_photo_consent, None)
+    app.dependency_overrides[require_user] = lambda: AuthenticatedUser(
+        str(uuid.uuid4()), None, "authenticated"
+    )
+    app.dependency_overrides[get_core_service] = lambda: SimpleNamespace(captures=repo)
+    app.dependency_overrides[get_storage] = lambda: storage
+    try:
+        response = client.post(
+            "/api/v1/captures/photo",
+            files={"file": ("test.jpg", _jpeg(), "image/jpeg")},
+            headers={"Authorization": "Bearer fixture"},
+        )
+        assert response.status_code == 422
+        storage.upload.assert_not_awaited()
+    finally:
+        for dependency in (require_user, get_core_service, get_storage):
+            app.dependency_overrides.pop(dependency, None)
 
 
 @pytest.mark.asyncio

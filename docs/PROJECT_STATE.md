@@ -1,5 +1,24 @@
 # Estado operacional do UrMind
 
+## Áreas/Mapa/Porteiro — fechamento do bloco 6 (24/09/2026)
+
+Estado vigente acima dos registros históricos abaixo: IMPLEMENTATION_STATUS=PARTIAL;
+VERIFICATION_GATE=BLOCKED por calibração/fotos e E2E físico/Realtime não comprovados.
+Consentimento versionado/RLS, evidência adicional sem ponto duplicado, desanexação
+auditada sem voto Ground Truth, export CSV/GeoJSON filtrado, sugestão condicional,
+taxonomia interna e tema do dispositivo implementados. Head único DEV:
+`0028_report_evidence_actions`; migrations0027/0028 up/down/up exercitadas com guards.
+Backend1276 passed/29 skipped; DEV26 passed/2 deselected (testes que alteram Auth
+excluídos); Vitest48; Playwright120 passed/2 skipped; Ruff/mypy/Prettier/TS/build verdes.
+Os skips não são aprovação. Integração sintética real de Storage/publicação humana
+não é E2E cidadão/celular. Nenhum detector disponível/restaurado; C2 sem calibração
+continua NEEDS_REVIEW. OPEN:20+20 fotos autorizadas, recall C4/desfoque, Realtime ao
+vivo, telefone HTTPS, endereço após localização manual/limite global Nominatim,
+linha do tempo completa do titular/navegação interna dedicada/paginação.
+Relatório autoritativo desta rodada:
+`docs/audits/AREAS_MAPA_PORTEIRO_DIAGNOSIS_2026-09-24.md` (seção inicial).
+.env/Auth/Frozen Test/peso de origem preservados. Treinamentos não executados.
+
 ## Porteiro com referências verificadas (24/09/2026)
 
 pHash e aviso EXIF conectados; YuNet verificado para privacidade/blur da derivada.

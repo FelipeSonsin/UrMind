@@ -302,6 +302,30 @@ async def test_capture_marker_without_model_has_no_invented_analysis():
 
 
 @pytest.mark.asyncio
+async def test_human_corrected_marker_preserves_absent_original_location():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    row = {
+        "id": "capture",
+        "latitude": None,
+        "longitude": None,
+        "has_review": True,
+        "event_status": "confirmed",
+        "human_review": {
+            "class": "URMIND_FALLEN_TREE",
+            "corrected_location": {"latitude": -23, "longitude": -46},
+        },
+    }
+    service = CoreService(SimpleNamespace(report_markers=AsyncMock(return_value=[row])), None)
+    marker = (await service.capture_markers("owner"))[0]
+    assert marker["report_status"] == "human_confirmed"
+    assert marker["original_latitude"] is None
+    assert marker["latitude"] == -23
+    assert marker["urmind_class"] == "URMIND_FALLEN_TREE"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("inference", "has_point", "event_status", "expected"),
     [

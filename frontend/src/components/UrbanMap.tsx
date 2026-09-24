@@ -4,6 +4,7 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   familyFor,
+  exportMapRecords,
   filterMapRecords,
   labelFor,
   severityOf,
@@ -117,6 +118,7 @@ export default function UrbanMap({
   initialCenter,
   detail,
   onCloseDetail,
+  allowExport = false,
 }: {
   events: MapMarker[];
   selectedId?: string | null;
@@ -125,6 +127,7 @@ export default function UrbanMap({
   initialCenter?: { latitude: number; longitude: number } | null;
   detail?: ReactNode;
   onCloseDetail?: () => void;
+  allowExport?: boolean;
 }) {
   const [filters, setFilters] = useState<MapFilters>(() => {
     const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
@@ -394,6 +397,34 @@ export default function UrbanMap({
     <section className="panel map-panel">
       {!onPickLocation && (
         <div className="filters" aria-label="Filtros do mapa">
+          {allowExport && (
+            <div>
+              {(['csv', 'geojson'] as const).map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  onClick={() => {
+                    const data = exportMapRecords(events);
+                    const url = URL.createObjectURL(
+                      new Blob([format === 'csv' ? data.csv : JSON.stringify(data.geojson)], {
+                        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'application/geo+json',
+                      }),
+                    );
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `urmind-pontos-filtrados.${format}`;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  }}
+                >
+                  Exportar {format.toUpperCase()}
+                </button>
+              ))}
+              <small>
+                Somente os pontos carregados que correspondem aos filtros; sem fotos ou identidades.
+              </small>
+            </div>
+          )}
           <label>
             Status do ponto
             <select

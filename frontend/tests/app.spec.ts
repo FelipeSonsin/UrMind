@@ -34,6 +34,23 @@ test.beforeEach(async ({ page }) => {
   await stubPublicApi(page, { events: [], detail: null });
 });
 
+test('captura respeita tema do dispositivo e alvos de toque em 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/#/registrar');
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
+  await expect(page.locator('.panel').first()).toHaveCSS('background-color', 'rgb(28, 48, 42)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  for (const button of await page.getByRole('button').all()) {
+    // File input is intentionally transparent; its enclosing label is the touch target.
+    const target = (await button.getAttribute('type')) === 'file' ? button.locator('..') : button;
+    if (await target.isVisible())
+      expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light');
+});
+
 test('foto e descrição viram relato no mapa sem modelo e localização pode vir depois', async ({
   page,
 }) => {
@@ -105,6 +122,10 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
     buffer: Buffer.from(png, 'base64'),
   });
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await expect(page.getByRole('alert')).toContainText('Leia e aceite o aviso de privacidade');
+  expect(uploaded).toBe(false);
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect.poll(() => uploaded).toBe(true);
   await expect(page).toHaveURL(new RegExp(`processando/${id}`));
   await expect(page.getByText('Etapa: location_required')).toBeVisible();
@@ -116,6 +137,70 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
   await expect(page.getByRole('list', { name: 'Legenda de relatos' })).toContainText(
     'Análise indisponível',
   );
+});
+
+test('confirma relato próximo e envia evidência adicional com aceite', async ({ page }) => {
+  await signedIn(page);
+  const id = '2b120c24-7ff1-4f58-bda8-c2f82a94fc05';
+  const parent = 'a'.repeat(32);
+  await page.route('**/api/v1/public/auth-origin', (route) =>
+    route.fulfill({
+      json: {
+        auth_origin: `https://${supabaseStorageKey().split('-')[1]}.supabase.co`,
+        visitor_upload_enabled: true,
+      },
+    }),
+  );
+  await page.route('**/api/v1/captures/nearby-reports?*', (route) =>
+    route.fulfill({ json: [{ public_id: parent, distance_m: 12 }] }),
+  );
+  let linked = false;
+  await page.route('**/api/v1/captures/photo', (route) => {
+    const body = route.request().postData() ?? '';
+    expect(body).toContain('name="additional_to"');
+    expect(body).toContain(parent);
+    expect(body).toContain('urmind-capture-privacy-v1');
+    linked = true;
+    return route.fulfill({
+      json: {
+        id,
+        capture_key: 'photo-test',
+        created: true,
+        additional_evidence: true,
+        requires_manual_location: false,
+      },
+    });
+  });
+  await page.route(`**/api/v1/captures/${id}/processing`, (route) =>
+    route.fulfill({
+      json: {
+        capture_id: id,
+        status: 'needs_review',
+        additional_evidence: true,
+        requires_manual_location: false,
+        event_ids: [],
+        model_version_id: null,
+        model_status: null,
+        updated_at: null,
+      },
+    }),
+  );
+  page.on('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('É o mesmo problema?');
+    await dialog.accept();
+  });
+  await page.goto('/#/registrar');
+  await page.getByLabel('Escolher foto').setInputFiles({
+    name: 'report.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
+  });
+  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await expect.poll(() => linked).toBe(true);
+  await expect(page.getByText(/Foto anexada como evidência adicional/)).toBeVisible();
 });
 
 test('recupera a captura pela URL após refresh sem antecipar análise', async ({ page }) => {
@@ -253,6 +338,7 @@ test('bloqueia signup público se frontend e backend apontam para projetos difer
   });
   await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect(page.getByRole('alert')).toContainText('projetos diferentes');
   expect(authCalls).toBe(0);
@@ -300,6 +386,7 @@ test('logout durante upload cancela resposta tardia sem navegar para captura ant
   });
   await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect.poll(() => started).toBe(true);
   await page.evaluate((key) => {
@@ -426,6 +513,7 @@ for (const boundary of ['origin', 'signup'] as const) {
       });
       await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
       await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+      await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
       await page.getByRole('button', { name: 'Salvar e enviar' }).click();
       await expect.poll(() => started).toBe(true);
       const completed = Promise.race([
@@ -531,6 +619,7 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
     buffer: Buffer.from(png, 'base64'),
   });
   await expect(page.getByAltText('Evidência selecionada')).toBeVisible();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect(page.getByText('Localização pendente', { exact: true })).toBeVisible();
   await page.reload();
@@ -538,11 +627,13 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
   await page.getByRole('button', { name: 'Continuar edição' }).click();
   await page.getByLabel('Latitude', { exact: true }).fill('0');
   await page.getByLabel('Longitude', { exact: true }).fill('0');
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect(page.getByRole('alert')).toContainText('Selecione e confirme a localização no mapa');
   await page.getByRole('button', { name: 'Selecionar localização no mapa' }).click();
   await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect(page.getByRole('heading', { name: 'evidencia.png' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'evidencia.png' })).toHaveCount(1);

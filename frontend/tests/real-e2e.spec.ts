@@ -113,6 +113,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
     (response) =>
       response.url().includes('/api/v1/captures/photo') && response.request().method() === 'POST',
   );
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   const uploaded = await uploadResponse;
   const upload = await uploaded.json();
