@@ -333,6 +333,15 @@ class CaptureRepository:
               and (c.point is not null or (:include_unlocated and not :public)
                 or (not :public and e.status='confirmed'
                     and jsonb_typeof(c.quality->'human_review'->'corrected_location')='object'))
+              and (:include_unlocated or exists (
+                select 1 from public.operational_territory territory
+                where territory.code='BR' and ST_Covers(territory.geom,
+                  case when e.status='confirmed'
+                    and jsonb_typeof(c.quality->'human_review'->'corrected_location')='object'
+                  then ST_SetSRID(ST_MakePoint(
+                    (c.quality->'human_review'->'corrected_location'->>'longitude')::double precision,
+                    (c.quality->'human_review'->'corrected_location'->>'latitude')::double precision),4326)
+                  else c.point::geometry end)))
               and (:public or :reviewer or c.quality->>'uploaded_by' = :actor)
             and not (:public and exists(select 1 from public.events e where e.capture_id=c.id and
         """
@@ -1764,7 +1773,12 @@ class PublicRepository:
         status: str | None = None,
         since: datetime | None = None,
     ) -> list[dict[str, Any]]:
-        clauses = [self._PUBLISHED]
+        clauses = [
+            self._PUBLISHED,
+            """exists (select 1 from public.operational_territory territory
+                where territory.code='BR' and ST_Covers(territory.geom,
+                coalesce(hr.corrected_point,e.point)::geometry))""",
+        ]
         params: dict[str, Any] = {"limit": limit}
         if bbox is not None:
             clauses.append(

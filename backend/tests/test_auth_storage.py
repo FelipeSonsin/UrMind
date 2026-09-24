@@ -40,7 +40,7 @@ OTHER_KEY = ec.generate_private_key(ec.SECP256R1())
 
 
 @pytest.fixture(autouse=True)
-def isolated_upload_attempt_budget():
+def isolated_upload_attempt_budget(monkeypatch):
     from app.api.v1.core import (
         get_address_provider,
         get_photo_gate_policy,
@@ -50,6 +50,13 @@ def isolated_upload_attempt_budget():
     )
     from app.main import app
     from app.schemas.core import PhotoGatePolicy
+
+    # These unit cases exercise Auth/Storage independently of PostGIS. The
+    # country boundary has its own real-DB integration test.
+    monkeypatch.setattr(
+        "app.api.v1.core.assess_brazil_location",
+        AsyncMock(return_value=("inside", "0" * 64)),
+    )
 
     upload_admission.cache_clear()
     app.dependency_overrides[get_photo_gate_policy] = lambda: PhotoGatePolicy()
@@ -732,7 +739,7 @@ def test_upload_multipart_normal_atravessa_limite_asgi(client, location) -> None
 
 
 @pytest.mark.asyncio
-async def test_capture_manual_location_is_owner_only_and_never_overwrites():
+async def test_capture_manual_location_is_owner_only_and_never_overwrites(monkeypatch):
     from fastapi import HTTPException
 
     from app.api.v1.core import capture_location
@@ -742,6 +749,7 @@ async def test_capture_manual_location_is_owner_only_and_never_overwrites():
     repository = SimpleNamespace(
         get_for_review=AsyncMock(return_value=SimpleNamespace(quality={"uploaded_by": "A"})),
         fill_missing_location=AsyncMock(return_value=False),
+        session=SimpleNamespace(),
     )
     service = SimpleNamespace(captures=repository)
     with pytest.raises(HTTPException) as denied:
@@ -753,6 +761,11 @@ async def test_capture_manual_location_is_owner_only_and_never_overwrites():
         )
     assert denied.value.status_code == 404
     repository.fill_missing_location.assert_not_awaited()
+    from app.api.v1 import core
+
+    monkeypatch.setattr(
+        core, "assess_brazil_location", AsyncMock(return_value=("inside", "test-sha"))
+    )
     with pytest.raises(HTTPException) as conflict:
         await capture_location(
             uuid.uuid4(),
@@ -761,6 +774,60 @@ async def test_capture_manual_location_is_owner_only_and_never_overwrites():
             service,
         )
     assert conflict.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_capture_manual_location_outside_brazil_is_rejected_before_update(monkeypatch):
+    from fastapi import HTTPException
+
+    from app.api.v1 import core
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import Coordinate
+
+    monkeypatch.setattr(
+        core, "assess_brazil_location", AsyncMock(return_value=("outside", "test-sha"))
+    )
+    repository = SimpleNamespace(
+        get_for_review=AsyncMock(return_value=SimpleNamespace(quality={"uploaded_by": "A"})),
+        fill_missing_location=AsyncMock(),
+        session=SimpleNamespace(),
+    )
+    with pytest.raises(HTTPException) as rejected:
+        await core.capture_location(
+            uuid.uuid4(),
+            Coordinate(latitude=-34.6, longitude=-58.38),
+            AuthenticatedUser("A", None, "authenticated"),
+            SimpleNamespace(captures=repository),
+        )
+    assert rejected.value.status_code == 422
+    repository.fill_missing_location.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reviewer_cannot_move_operational_marker_outside_brazil(monkeypatch):
+    from fastapi import HTTPException
+
+    from app.api.v1 import core
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import CaptureReviewCreate, Coordinate
+
+    monkeypatch.setattr(core, "assess_brazil_location", AsyncMock(return_value=("outside", "test-sha")))
+    service = SimpleNamespace(
+        captures=SimpleNamespace(session=SimpleNamespace()),
+        review_capture=AsyncMock(),
+    )
+    with pytest.raises(HTTPException) as rejected:
+        await core.review_capture(
+            uuid.uuid4(),
+            CaptureReviewCreate(
+                decision="correct",
+                corrected_location=Coordinate(latitude=-34.6, longitude=-58.38),
+            ),
+            AuthenticatedUser("reviewer", None, "authenticated", urmind_role="reviewer"),
+            service,
+        )
+    assert rejected.value.status_code == 422
+    service.review_capture.assert_not_awaited()
 
 
 def test_upload_description_over_limit_is_422(client):
@@ -1072,6 +1139,41 @@ async def test_upload_pwa_preserva_claims_gps_sem_atestar_precisao() -> None:
     assert persisted.quality["location_attestation"] == "unverified_client_claim"
     assert persisted.quality["public_upload"] is False
     assert persisted.captured_at != recorded_at
+
+
+@pytest.mark.asyncio
+async def test_upload_outside_brazil_does_not_write_storage(monkeypatch):
+    from fastapi import HTTPException, UploadFile
+
+    from app.api.v1 import core
+    from app.auth import AuthenticatedUser
+    from app.schemas.core import LocationSource
+
+    monkeypatch.setattr(
+        core, "assess_brazil_location", AsyncMock(return_value=("outside", "test-sha"))
+    )
+    captures = SimpleNamespace(
+        get_by_key=AsyncMock(return_value=None),
+        recent_similar_photo=AsyncMock(return_value=False),
+        session=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock()),
+    )
+    service = SimpleNamespace(captures=captures, register_capture=AsyncMock())
+    storage = SimpleNamespace(upload=AsyncMock())
+    with pytest.raises(HTTPException) as rejected:
+        await core.upload_photo(
+            user=AuthenticatedUser(
+                id="owner", email=None, role="authenticated", urmind_role="reviewer"
+            ),
+            service=service,
+            storage=storage,
+            file=UploadFile(filename="fixture.jpg", file=io.BytesIO(_jpeg())),
+            latitude=-34.6,
+            longitude=-58.38,
+            location_source=LocationSource.GPS_DEVICE,
+        )
+    assert rejected.value.status_code == 422
+    storage.upload.assert_not_awaited()
+    service.register_capture.assert_not_awaited()
 
 
 @pytest.mark.asyncio

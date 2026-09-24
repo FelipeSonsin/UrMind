@@ -966,6 +966,75 @@ async def test_postgis_disponivel(database):
 
 
 @pytest.mark.asyncio
+async def test_brazil_operational_territory_is_installed_and_private(database):
+    """Only the active DEV has the pinned IBGE geometry; local DBs may install it separately."""
+    from urllib.parse import urlsplit
+
+    from app.config import URMIND_DEV_SHADOW_REF
+    from app.services.territory import IBGE_GEOJSON_SHA256, assess_brazil_location
+
+    if (
+        urlsplit(get_settings().supabase_url or "").hostname
+        != f"{URMIND_DEV_SHADOW_REF}.supabase.co"
+    ):
+        pytest.skip("pinned operational territory is provisioned only in Urmind DEV")
+    async with database.sessionmaker() as session:
+        privileges = (
+            await session.execute(
+                text("""select
+                    has_table_privilege('anon','public.operational_territory','SELECT') as anon_read,
+                    has_table_privilege('authenticated','public.operational_territory','SELECT') as user_read""")
+            )
+        ).mappings().one()
+        assert not privileges["anon_read"]
+        assert not privileges["user_read"]
+        inside, source_sha = await assess_brazil_location(
+            session, Coordinate(latitude=-23.55, longitude=-46.63)
+        )
+        outside, _ = await assess_brazil_location(
+            session, Coordinate(latitude=-34.6, longitude=-58.38)
+        )
+        assert inside == "inside"
+        assert outside == "outside"
+        assert source_sha == IBGE_GEOJSON_SHA256
+
+
+@pytest.mark.asyncio
+async def test_operational_markers_exclude_neighboring_country_inside_map_bounds(database):
+    """The browser's rectangular viewport is not the authorization boundary."""
+    from urllib.parse import urlsplit
+
+    from app.config import URMIND_DEV_SHADOW_REF
+
+    if (
+        urlsplit(get_settings().supabase_url or "").hostname
+        != f"{URMIND_DEV_SHADOW_REF}.supabase.co"
+    ):
+        pytest.skip("pinned operational territory is provisioned only in Urmind DEV")
+    owner = str(uuid.uuid4())
+    async with database.sessionmaker() as session:
+        repository = CaptureRepository(session)
+        for label, latitude, longitude in (
+            ("brazil", -23.55, -46.63),
+            ("argentina", -34.6, -58.38),
+        ):
+            await repository.create(
+                CaptureCreate(
+                    capture_key=f"territory-{label}-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.MANUAL,
+                    coordinate=Coordinate(latitude=latitude, longitude=longitude),
+                    captured_at=NOW,
+                    quality={"uploaded_by": owner},
+                )
+            )
+        markers = await repository.report_markers(owner)
+        assert len(markers) == 1
+        assert markers[0]["latitude"] == pytest.approx(-23.55)
+        await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_report_identity_unique_server_generated_and_owner_lookup(database):
     import re
 

@@ -1,5 +1,20 @@
 # UrMind — integrações externas aprovadas
 
+## Malha territorial IBGE — uso operacional
+
+A API de malhas do IBGE fornece a geometria simplificada do país `BR` em GeoJSON.
+O importador `python -m app.services.territory` só executa no Urmind DEV, confere
+SHA-256, código do país, estrutura e validade após reparo PostGIS, e não substitui
+silenciosamente uma malha já instalada. A tabela `operational_territory` tem RLS,
+sem leitura para `anon` ou `authenticated`. O grant `SELECT` para a role
+`urmind_runtime` é condicional: essa role ainda não existe no DEV; a URL runtime
+atual autentica como `postgres`. A troca para menor privilégio permanece aberta
+e exige provisionamento da role e ajuste manual da URL, sem alterar `.env` aqui.
+A fronteira é uma referência para admissão operacional de relatos e marcadores,
+não uma regra para descartar dados internacionais de treinamento. A simplificação
+exige o estado `uncertain` nas proximidades da borda. Fonte:
+https://servicodados.ibge.gov.br/api/docs/malhas?versao=3 .
+
 ## Observação vigente — 24/09/2026
 
 `python -m app.services.external_sources live-check --json` sondou com sucesso

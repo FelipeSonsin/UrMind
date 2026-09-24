@@ -74,6 +74,7 @@ from app.services.storage import (
     validate_image,
     validate_report_photo,
 )
+from app.services.territory import TerritoryUnavailable, assess_brazil_location
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_user)])
 log = structlog.get_logger()
@@ -514,6 +515,19 @@ async def export_capture_markers(
     )
 
 
+async def _validate_operational_location(session: Any, coordinate: Coordinate) -> tuple[str, str]:
+    try:
+        status, source_sha = await assess_brazil_location(session, coordinate)
+    except TerritoryUnavailable as exc:
+        raise HTTPException(status_code=503, detail="Validacao territorial indisponivel") from exc
+    if status == "outside":
+        raise HTTPException(
+            status_code=422,
+            detail="Localizacao fora do Brasil. Corrija o ponto antes de enviar; o rascunho foi preservado.",
+        )
+    return status, source_sha
+
+
 @router.patch("/captures/{capture_id}/location")
 async def capture_location(
     capture_id: uuid.UUID, payload: Coordinate, user: CurrentUser, service: Core
@@ -523,6 +537,9 @@ async def capture_location(
     capture = await service.captures.get_for_review(capture_id)
     if capture is None or (capture.quality or {}).get("uploaded_by") != user.id:
         raise HTTPException(status_code=404, detail="Captura não encontrada")
+    territory_status, territory_sha = await _validate_operational_location(
+        service.captures.session, payload
+    )
     if not await service.captures.fill_missing_location(capture_id, user.id, payload):
         raise HTTPException(status_code=409, detail="A localização original já está registrada")
     if service.decisions is None:
@@ -536,7 +553,15 @@ async def capture_location(
         after={"source": "manual"},
         event_hash=f"location-{uuid.uuid4()}",
     )
-    capture.quality = pending_address(capture.quality or {})
+    quality = pending_address(capture.quality or {})
+    quality["operational_territory"] = {
+        "country": "BR",
+        "status": territory_status,
+        "source_sha256": territory_sha,
+    }
+    if territory_status == "uncertain":
+        quality["location_review_required"] = True
+    capture.quality = quality
     await service.captures.session.commit()
     return {"capture_id": capture_id, "location_source": "manual"}
 
@@ -796,6 +821,17 @@ async def upload_photo(
             status_code=409, detail="Você já enviou esta foto. Consulte Meus relatos."
         )
     await service.captures.session.rollback()
+    if ingest.capture.coordinate is not None:
+        territory_status, territory_sha = await _validate_operational_location(
+            service.captures.session, ingest.capture.coordinate
+        )
+        ingest.capture.quality["operational_territory"] = {
+            "country": "BR",
+            "status": territory_status,
+            "source_sha256": territory_sha,
+        }
+        if territory_status == "uncertain":
+            ingest.capture.quality["location_review_required"] = True
     if additional_to is not None:
         if ingest.capture.coordinate is None:
             raise HTTPException(status_code=422, detail="Evidência adicional exige localização")
@@ -1112,6 +1148,8 @@ async def review_capture(
 ) -> dict[str, Any]:
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Revisão exige papel de revisor")
+    if payload.corrected_location is not None:
+        await _validate_operational_location(service.captures.session, payload.corrected_location)
     try:
         result = await service.review_capture(
             capture_id, payload, reviewer=user.id, reviewer_role=user.urmind_role

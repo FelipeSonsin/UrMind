@@ -1,6 +1,40 @@
 # Estado operacional do UrMind
 
-## Mobile Brasil/GPS — 24/09/2026, recorte em implementação
+## Validação territorial operacional — 24/09/2026
+
+No Urmind DEV, a migration `0030_brazil_territory` instalou uma tabela privada com
+malha simplificada do Brasil obtida da API oficial do IBGE, fixada por SHA-256.
+A geometria original retornou inválida; o importador aplicou `ST_MakeValid` e
+`ST_CollectionExtract` antes da gravação e comprovou a validade no PostGIS.
+O upload localizado, a definição manual posterior e a correção pelo revisor agora
+consultam essa malha antes da gravação da localização; ponto comprovadamente fora
+do Brasil retorna 422, e malha indisponível retorna 503. Um ponto próximo da
+borda, dentro da incerteza limitada do GPS ou da malha simplificada, é aceito
+como `uncertain` e sinalizado para revisão. Os endpoints de marcadores operacionais
+e de eventos publicados exigem cobertura espacial da mesma malha. O enquadramento
+retangular do MapLibre continua sendo apenas uma ajuda visual, não o gate.
+
+Esta política limita a operação do produto, **não** a seleção científica: imagens,
+datasets, provenance e candidatos de treino de outros países continuam preservados
+e não são filtrados nos exports científicos. Nenhum treino, avaliação ou Frozen
+Test foi executado. A malha simplificada não resolve todos os casos costeiros e
+fronteiriços; uma revisão humana deve decidir os casos sinalizados. O E2E físico
+com celular e a prontidão científica YOLOX/XGBoost continuam pendentes.
+
+Verificação: testes unitários de admissão e autoria; no DEV, teste com São Paulo
+`inside`, Buenos Aires `outside`, e marcadores com Capture temporária de cada lado
+mostraram só o ponto brasileiro. As fixtures foram revertidas por transação.
+Segurança residual: `DATABASE_POOLER_URL` está autenticando como `postgres` e
+`urmind_runtime` não existe no DEV. RLS nega leitura direta a `anon` e
+`authenticated`, mas o runtime ainda não está sob menor privilégio. Não foi
+alterado `.env`; F-04 permanece OPEN até provisionamento e troca manual da URL.
+Regressão desta rodada: backend offline `1312 passed / 36 skipped`; integração
+DEV sem criação de usuários Auth `32 passed / 3 deselected`; frontend Vitest
+`49 passed`, Playwright `132 passed / 2 skipped`, build/TypeScript, Prettier,
+Ruff, mypy e `git diff --check` passaram. Os skips/deselections não são provas
+de E2E físico nem dos testes Auth/Realtime excluídos nesta rodada.
+
+## Mobile Brasil/GPS — 24/09/2026, recorte anterior
 
 O mapa operacional agora inicia no enquadramento brasileiro, restringe a navegação
 e não mostra pontos fora **desse viewport**. Isso ainda não é uma validação
