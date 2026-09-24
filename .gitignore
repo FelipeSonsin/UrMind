@@ -41,6 +41,12 @@ __pycache__/
 *.part
 *.tmp
 
+# Integrações opcionais: credenciais e saídas grandes nunca entram no Git.
+/.kaggle/
+kaggle.json
+/simulation/outputs/
+/robot/webots/outputs/
+
 # Backups lógicos locais de banco podem conter dados e nunca são versionados.
 /backups/
 

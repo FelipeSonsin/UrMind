@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
+from app.services.external_sources.http import ExternalHttpClient
 from app.services.osm_import import (
     BBox,
     OsmImportError,
+    fetch_ways,
     jurisdiction_from_tags,
     overpass_query,
     parse_ways,
@@ -21,7 +24,12 @@ def test_way_vira_linestring_lon_lat_com_tags_uteis() -> None:
             {
                 "type": "way",
                 "id": 42,
-                "tags": {"highway": "residential", "name": "Rua A", "surface": "asphalt", "fixme": "x"},
+                "tags": {
+                    "highway": "residential",
+                    "name": "Rua A",
+                    "surface": "asphalt",
+                    "fixme": "x",
+                },
                 "geometry": [{"lat": -23.5, "lon": -46.6}, {"lat": -23.51, "lon": -46.61}],
             }
         ]
@@ -29,15 +37,29 @@ def test_way_vira_linestring_lon_lat_com_tags_uteis() -> None:
     (way,) = parse_ways(payload, batch=BATCH)
     assert way.osm_id == 42
     assert way.wkt == "LINESTRING(-46.6 -23.5, -46.61 -23.51)"
-    assert way.attributes["osm_tags"] == {"name": "Rua A", "highway": "residential", "surface": "asphalt"}
+    assert way.attributes["osm_tags"] == {
+        "name": "Rua A",
+        "highway": "residential",
+        "surface": "asphalt",
+    }
     assert way.attributes["osm_import"] == BATCH
 
 
 def test_way_degenerado_ou_sem_highway_e_ignorado() -> None:
     payload = {
         "elements": [
-            {"type": "way", "id": 1, "tags": {"highway": "service"}, "geometry": [{"lat": 0, "lon": 0}]},
-            {"type": "way", "id": 2, "tags": {"building": "yes"}, "geometry": [{"lat": 0, "lon": 0}, {"lat": 1, "lon": 1}]},
+            {
+                "type": "way",
+                "id": 1,
+                "tags": {"highway": "service"},
+                "geometry": [{"lat": 0, "lon": 0}],
+            },
+            {
+                "type": "way",
+                "id": 2,
+                "tags": {"building": "yes"},
+                "geometry": [{"lat": 0, "lon": 0}, {"lat": 1, "lon": 1}],
+            },
             {"type": "node", "id": 3},
         ]
     }
@@ -58,6 +80,31 @@ def test_query_restrita_ao_recorte() -> None:
     query = overpass_query(BBox(-23.56, -46.64, -23.55, -46.63))
     assert "(-23.56,-46.64,-23.55,-46.63)" in query
     assert "out tags geom" in query
+
+
+@pytest.mark.asyncio
+async def test_fetch_ways_usa_endpoint_configurado_e_cliente_compartilhado() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"elements": [], "osm3s": {}})
+
+    raw = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = ExternalHttpClient(client=raw, backoff_seconds=0)
+    try:
+        ways = await fetch_ways(
+            BBox(-23.56, -46.64, -23.55, -46.63),
+            "piloto",
+            client=client,
+            overpass_url="https://overpass.example/interpreter",
+        )
+    finally:
+        await raw.aclose()
+
+    assert ways == []
+    assert str(requests[0].url) == "https://overpass.example/interpreter"
+    assert requests[0].headers["X-Correlation-ID"]
 
 
 @pytest.mark.parametrize(

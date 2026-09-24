@@ -1,0 +1,1307 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "urmind-issue-taxonomy-v3",
+  "researched_at": "2026-09-23",
+  "policy": {
+    "target_domain": "street-level, mobile phone / dashcam / low-mounted camera, urban environment",
+    "download_policy": "catalog only; nothing downloaded in this round (local budget near 40 GB)",
+    "null_means": "not confirmed from a primary source in this round; never assume permissive",
+    "ground_truth": "no candidate here is Ground Truth or training authorization for UrMind"
+  },
+  "candidates": [
+    {
+      "id": "roadway_flooding_mendeley_v1",
+      "target_issue_codes": [
+        "URMIND_FLOODED_ROAD"
+      ],
+      "SOURCE": "Image Dataset for Roadway Flooding (Mendeley Data)",
+      "SOURCE_URL": "https://data.mendeley.com/datasets/t395bwcvbw/1",
+      "OWNER": "Cem Sazara, Mecit Cetin, Khan Iftekharuddin",
+      "VERSION": "1",
+      "PUBLICATION": "2019-10-09; DOI 10.17632/t395bwcvbw.1",
+      "LICENSE": "CC BY 4.0",
+      "LICENSE_URL": "https://creativecommons.org/licenses/by/4.0/",
+      "IMAGE_DOMAIN": "roadway flood photographs",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": "flood-prone coastal roadways (exact locations not confirmed)",
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": 441,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": {
+        "flooded roadway": "URMIND_FLOODED_ROAD (pending protocol review)"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": true,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "annotation format and semantics not confirmed; may be image-level or mask",
+        "441 images is small for a detector; capture device mix unknown",
+        "only the package-level CC BY 4.0 statement was read; origin and rights of each image were not verified"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "floodnet_supervised_v1",
+      "target_issue_codes": [
+        "URMIND_FLOODED_ROAD"
+      ],
+      "SOURCE": "FloodNet Supervised v1.0",
+      "SOURCE_URL": "https://github.com/BinaLab/FloodNet-Supervised_v1.0",
+      "OWNER": "BinaLab (UMBC)",
+      "VERSION": "Supervised v1.0",
+      "PUBLICATION": "arXiv:2012.02951",
+      "LICENSE": "Community Data License Agreement (variant not confirmed)",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "aerial UAV imagery after Hurricane Harvey",
+      "CAPTURE_DEVICE": "DJI Mavic Pro (sUAS)",
+      "GEOGRAPHY": "Texas, USA",
+      "ANNOTATION_TYPE": "semantic segmentation",
+      "IMAGE_COUNT": 2343,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "Background",
+        "Building Flooded",
+        "Building Non-Flooded",
+        "Road Flooded",
+        "Road Non-Flooded",
+        "Water",
+        "Tree",
+        "Vehicle",
+        "Pool",
+        "Grass"
+      ],
+      "CLASS_MAPPING": {
+        "Road Flooded": "no mapping: aerial view is not the UrMind capture domain"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "DOMAIN_MISMATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "drone view; not equivalent to phone/dashcam photos"
+      ],
+      "READINESS": "DOMAIN_MISMATCH"
+    },
+    {
+      "id": "taco",
+      "target_issue_codes": [
+        "URMIND_ILLEGAL_DUMPING",
+        "URMIND_ROAD_DEBRIS"
+      ],
+      "SOURCE": "TACO — Trash Annotations in Context",
+      "SOURCE_URL": "https://github.com/pedropro/TACO",
+      "OWNER": "Pedro F. Proença, Pedro Simões",
+      "VERSION": null,
+      "PUBLICATION": "arXiv:2003.06975",
+      "LICENSE": "repository MIT; per-image licensing of the photos not confirmed",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "litter in the wild (woods, roads, beaches), mostly close-ups",
+      "CAPTURE_DEVICE": "mixed phone cameras",
+      "GEOGRAPHY": "mixed",
+      "ANNOTATION_TYPE": "instance segmentation (COCO)",
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": {
+        "litter objects": "no direct mapping: single litter items are not dumping piles or road debris"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "repository notes strong class imbalance and unreviewed unofficial annotations",
+        "object scale and framing differ from street-level reports"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "roboflow_illegal_dumping_detection",
+      "target_issue_codes": [
+        "URMIND_ILLEGAL_DUMPING"
+      ],
+      "SOURCE": "Illegal Dumping Detection (Roboflow Universe community project)",
+      "SOURCE_URL": "https://universe.roboflow.com/bill-lhxqf/illegal-dumping-detection",
+      "OWNER": "Roboflow Universe user project",
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "person/garbage scenes (per search summary)",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": "bounding box (per search summary)",
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": {},
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "community upload: original image provenance and per-image rights unknown",
+        "focus appears to be the act of dumping (people), not the resulting pile"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "lost_and_found",
+      "target_issue_codes": [
+        "URMIND_ROAD_DEBRIS"
+      ],
+      "SOURCE": "Lost and Found: Detecting Small Road Hazards for Self-Driving Vehicles",
+      "SOURCE_URL": "https://arxiv.org/abs/1609.04653",
+      "OWNER": "Pinggera, Ramos, Gehrig, Franke, Rother, Mester",
+      "VERSION": null,
+      "PUBLICATION": "IROS 2016",
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "vehicle-mounted stereo camera, street scenes with small obstacles",
+      "CAPTURE_DEVICE": "vehicle stereo rig",
+      "GEOGRAPHY": "Germany (13 street scenarios)",
+      "ANNOTATION_TYPE": "pixel-wise obstacle and free-space",
+      "IMAGE_COUNT": 2104,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "37 obstacle types (per paper)"
+      ],
+      "CLASS_MAPPING": {
+        "road obstacle": "URMIND_ROAD_DEBRIS (pending protocol review)"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "license terms not confirmed from the official download page",
+        "obstacles were placed deliberately; sequences are highly correlated frames"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "urban_community_open_manhole",
+      "target_issue_codes": [
+        "URMIND_OPEN_MANHOLE"
+      ],
+      "SOURCE": "Urban Community Issues (Kaggle) — class open_manhole",
+      "SOURCE_URL": "https://www.kaggle.com/datasets/rajeevpaudel1/urban-community-issues",
+      "OWNER": "Kaggle uploader rajeevpaudel1",
+      "VERSION": "kaggle-2025",
+      "PUBLICATION": null,
+      "LICENSE": "CC0 declared by uploader; not valid for all content (third-party Open Images photos listed as CC BY 2.0)",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "mixed web photos",
+      "CAPTURE_DEVICE": "mixed",
+      "GEOGRAPHY": "mixed",
+      "ANNOTATION_TYPE": "YOLO bounding boxes",
+      "IMAGE_COUNT": 152,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "open_manhole"
+      ],
+      "CLASS_MAPPING": {
+        "open_manhole": "URMIND_OPEN_MANHOLE (pending protocol review)"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": false,
+      "ATTRIBUTION_REQUIRED": true,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "already on disk; publication BLOCKED (RED) in the existing catalog",
+        "class names inferred from folders, not an official data.yaml",
+        "only one weak group (class folder) for splitting"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "roboflow_open_manholes",
+      "target_issue_codes": [
+        "URMIND_OPEN_MANHOLE"
+      ],
+      "SOURCE": "Open-Manholes (Roboflow Universe community project)",
+      "SOURCE_URL": "https://universe.roboflow.com/aibased-solution-for-realtime-detection-of-road-anomalies-d6eay/open-manholes",
+      "OWNER": "Roboflow Universe user project",
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": "CC BY 4.0 (per search summary; not confirmed on the project page)",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": "instance segmentation",
+      "IMAGE_COUNT": 677,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": {},
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "community upload; original image rights and duplicates across Roboflow forks unknown"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "mapillary_vistas",
+      "target_issue_codes": [
+        "URMIND_OPEN_MANHOLE"
+      ],
+      "SOURCE": "Mapillary Vistas Dataset",
+      "SOURCE_URL": "https://www.mapillary.com/dataset/vistas",
+      "OWNER": "Mapillary (Meta)",
+      "VERSION": "v1.2 / v2.0",
+      "PUBLICATION": "ICCV 2017",
+      "LICENSE": "CC BY-NC-SA 4.0",
+      "LICENSE_URL": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "IMAGE_DOMAIN": "street-level crowdsourced imagery",
+      "CAPTURE_DEVICE": "mixed phones/dashcams",
+      "GEOGRAPHY": "global",
+      "ANNOTATION_TYPE": "semantic/instance segmentation",
+      "IMAGE_COUNT": 25000,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "66/124 categories; includes manhole (cover)"
+      ],
+      "CLASS_MAPPING": {
+        "manhole": "no mapping: a closed cover is not an open manhole"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "GOOD_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": false,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": true,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "NonCommercial license",
+        "class semantics do not match OPEN_MANHOLE"
+      ],
+      "READINESS": "LICENSE_BLOCKED"
+    },
+    {
+      "id": "tornado_treefall_rs2024",
+      "target_issue_codes": [
+        "URMIND_FALLEN_TREE"
+      ],
+      "SOURCE": "Automated Estimation of Tornado-Induced Treefall (Remote Sensing 16(7):1130)",
+      "SOURCE_URL": "https://doi.org/10.3390/rs16071130",
+      "OWNER": "paper authors (MDPI Remote Sensing)",
+      "VERSION": null,
+      "PUBLICATION": "2024",
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "aerial imagery of forest treefall",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": "instance-level (treefall, root ball)",
+      "IMAGE_COUNT": 5100,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "treefall",
+        "root ball"
+      ],
+      "CLASS_MAPPING": {
+        "treefall": "no mapping: overhead forest view is not the UrMind domain"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "DOMAIN_MISMATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "dataset availability not confirmed"
+      ],
+      "READINESS": "DOMAIN_MISMATCH"
+    },
+    {
+      "id": "milton_street_view",
+      "target_issue_codes": [
+        "URMIND_FALLEN_TREE",
+        "URMIND_FLOODED_ROAD"
+      ],
+      "SOURCE": "Milton-SV (DamageArbiter, arXiv:2603.14837)",
+      "SOURCE_URL": "https://arxiv.org/abs/2603.14837",
+      "OWNER": "paper authors",
+      "VERSION": null,
+      "PUBLICATION": "2026",
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "post-hurricane street-view",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": "Horseshoe Beach, Florida, USA",
+      "ANNOTATION_TYPE": "image-level damage severity (3 levels)",
+      "IMAGE_COUNT": 2556,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "3 severity levels"
+      ],
+      "CLASS_MAPPING": {
+        "severity level": "no mapping: image-level severity is not a per-object box"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "would need new per-object annotation; release status not confirmed"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "damaged_signs_kaggle_pt",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_TRAFFIC_SIGN"
+      ],
+      "SOURCE": "Damaged Signs Dataset (Kaggle, Portuguese signs)",
+      "SOURCE_URL": "https://www.kaggle.com/datasets/danielvareta/damaged-signs-dataset",
+      "OWNER": "Kaggle uploader danielvareta",
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "street-level photos of Portuguese traffic signs",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": "Portugal",
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "damage conditions incl. bending, graffiti, stickers, rust, peeling (per description)"
+      ],
+      "CLASS_MAPPING": {},
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "European sign designs differ from Brazilian CTB signs",
+        "license not confirmed"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW"
+    },
+    {
+      "id": "mapillary_traffic_sign_dataset",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_TRAFFIC_SIGN",
+        "URMIND_FALLEN_TRAFFIC_SIGN"
+      ],
+      "SOURCE": "Mapillary Traffic Sign Dataset",
+      "SOURCE_URL": "https://www.mapillary.com/dataset/trafficsign",
+      "OWNER": "Mapillary (Meta)",
+      "VERSION": null,
+      "PUBLICATION": "ECCV 2020 (arXiv:1909.04422)",
+      "LICENSE": "research-use license (terms not re-read in this round)",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "street-level crowdsourced imagery",
+      "CAPTURE_DEVICE": "mixed",
+      "GEOGRAPHY": "global",
+      "ANNOTATION_TYPE": "bounding boxes, 400 sign classes",
+      "IMAGE_COUNT": 105000,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "sign types, not sign condition"
+      ],
+      "CLASS_MAPPING": {
+        "sign type": "no mapping: labels describe type, not damage"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "GOOD_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "useful only as sign localizer; damage labels would need new annotation"
+      ],
+      "READINESS": "NOT_USABLE"
+    },
+    {
+      "id": "project_sidewalk_rampnet_round1",
+      "target_issue_codes": [
+        "URMIND_SIDEWALK_DAMAGE"
+      ],
+      "SOURCE": "Project Sidewalk — RampNet crop round 1 (already on disk)",
+      "SOURCE_URL": "https://huggingface.co/datasets/projectsidewalk/rampnet-crop-model-dataset-round1",
+      "OWNER": "Project Sidewalk (University of Washington)",
+      "VERSION": "521f74ff752d57824400c8f7d5ca4717efa7bf16",
+      "PUBLICATION": null,
+      "LICENSE": "MIT declared on the dataset card; Google Street View imagery rights not covered",
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "Street View panorama crops",
+      "CAPTURE_DEVICE": "Google Street View",
+      "GEOGRAPHY": "USA cities",
+      "ANNOTATION_TYPE": "pixel keypoints (curb ramps)",
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "curb ramp"
+      ],
+      "CLASS_MAPPING": {
+        "curb ramp": "no mapping: a ramp is not sidewalk damage"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": false,
+      "ATTRIBUTION_REQUIRED": true,
+      "PROVENANCE_VERIFIED": true,
+      "KNOWN_LIMITATIONS": [
+        "keypoint task, not boxes; labels are ramps, not damage"
+      ],
+      "READINESS": "NOT_USABLE"
+    },
+    {
+      "id": "road_obstacle21",
+      "target_issue_codes": [
+        "URMIND_ROAD_DEBRIS"
+      ],
+      "SOURCE": "RoadObstacle21 / ObstacleTrack-images",
+      "SOURCE_URL": "https://zenodo.org/records/5281633",
+      "OWNER": "Robin Chan, Krzysztof Lis, Svenja Uhlemeyer, Hermann Blum, Sina Honari, Roland Siegwart, Pascal Fua, Mathieu Salzmann, Matthias Rottmann",
+      "VERSION": "2.0.0",
+      "PUBLICATION": "2021; SegmentMeIfYouCan, NeurIPS Datasets and Benchmarks; arXiv:2104.14812",
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "ground-level road scenes with deliberately placed obstacles",
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": "pixel-level obstacle / not-obstacle / void; public validation labels, benchmark test labels not included in the stated release",
+      "IMAGE_COUNT": 357,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "obstacle",
+        "not obstacle",
+        "void"
+      ],
+      "CLASS_MAPPING": {
+        "obstacle": "candidate relation to URMIND_ROAD_DEBRIS; no automatic mapping because staged objects are not necessarily debris"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "PARTIAL_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "357 combines 327 benchmark test images and 30 extra public annotated images; preserve these roles and do not silently repurpose test data as training",
+        "staged toys, sleighs and tree stumps are obstacles, not automatically debris; semantic masks are not automatically object instances",
+        "dataset license was not exposed in the readable Zenodo rights section",
+        "official archive is listed as 207.6 MB; extracted size and local-cap compliance are unverified",
+        "record lists archive MD5 895fb36d18765482cc291f69e63d6da6; not locally verified"
+      ],
+      "READINESS": "NEEDS_HUMAN_REVIEW",
+      "CHECKED_AT": "2026-09-24",
+      "RESEARCH_SCOPE": "primary-source documentation only; no dataset acquired, sample audit, training or evaluation authorization",
+      "EVIDENCE_URLS": [
+        "https://segmentmeifyoucan.com/datasets",
+        "https://zenodo.org/records/5281633",
+        "https://arxiv.org/abs/2104.14812"
+      ]
+    },
+    {
+      "id": "sideguide",
+      "target_issue_codes": [
+        "URMIND_SIDEWALK_OBSTRUCTION"
+      ],
+      "SOURCE": "SideGuide: A Large-scale Sidewalk Dataset for Guiding Impaired People",
+      "SOURCE_URL": "https://ytaek-oh.github.io/sideguide",
+      "OWNER": "KAIST / TestWorks researchers; repository copyright statement names AI Hub",
+      "VERSION": null,
+      "PUBLICATION": "IROS 2020; DOI 10.1109/IROS45743.2020.9340734",
+      "LICENSE": "AI Hub custom notice: commercial/noncommercial research and development permitted with copyright notice; access requires terms acceptance and approval",
+      "LICENSE_URL": "https://github.com/ChelseaGH/sidewalk_prototype_AI_Hub#license",
+      "IMAGE_DOMAIN": "pedestrian and wheelchair-level sidewalk photographs",
+      "CAPTURE_DEVICE": "crowdsourced mobile phones and wheelchair-mounted ZED stereo cameras",
+      "GEOGRAPHY": "South Korea",
+      "ANNOTATION_TYPE": "bounding boxes; polygon instance masks on a subset; stereo disparity outside proposed scope",
+      "IMAGE_COUNT": 350000,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": [
+        "bicycle",
+        "bus",
+        "car",
+        "carrier",
+        "cat",
+        "dog",
+        "motorcycle",
+        "movable signage",
+        "person",
+        "scooter",
+        "stroller",
+        "truck",
+        "wheelchair",
+        "barricade",
+        "bench",
+        "bollard",
+        "chair",
+        "fire hydrant",
+        "kiosk",
+        "parking meter",
+        "pole",
+        "potted plant",
+        "power controller",
+        "stop",
+        "table",
+        "traffic light",
+        "traffic light controller",
+        "traffic sign",
+        "tree trunk"
+      ],
+      "CLASS_MAPPING": {
+        "sidewalk objects": "no direct mapping: presence alone does not prove URMIND_SIDEWALK_OBSTRUCTION; passage-blocking context and a human protocol are required"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "GOOD_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": true,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "owner repository permits commercial/noncommercial research and development conditionally with copyright notice; unrestricted commercial use and redistribution are not established",
+        "access remains approval-gated; no request submitted and full access terms not accepted or verified",
+        "350K is approximate bbox-image scope; polygon annotations cover 100K of those images, not an additional 100K",
+        "29 object categories are not infrastructure-defect categories; sequence/stereo peers require grouped splits",
+        "published de-identification and annotation inspection procedures do not establish UrMind human validation",
+        "immutable release, actual annotations, download size and per-image rights remain unverified"
+      ],
+      "READINESS": "LICENSE_BLOCKED",
+      "CHECKED_AT": "2026-09-24",
+      "RESEARCH_SCOPE": "primary-source documentation only; no dataset acquired, sample audit, training or evaluation authorization",
+      "EVIDENCE_URLS": [
+        "https://ytaek-oh.github.io/sideguide",
+        "https://github.com/ChelseaGH/sidewalk_prototype_AI_Hub#license",
+        "https://www.testworks.co.kr/pdf/blackolive/Datasheet_Testworks_MKT_Sidewalk_en.pdf"
+      ]
+    },
+    {
+      "id": "sideseeing_hospital_visual",
+      "target_issue_codes": [
+        "URMIND_SIDEWALK_OBSTRUCTION",
+        "URMIND_SIDEWALK_DAMAGE"
+      ],
+      "SOURCE": "SideSeeing Hospital Dataset - visual component only",
+      "SOURCE_URL": "https://sites.usp.br/sideseeing/",
+      "OWNER": "R. J. P. Damaceno, L. Ferreira, F. Miranda, M. Hosseini, R. M. Cesar Jr; USP/UIC/MIT",
+      "VERSION": null,
+      "PUBLICATION": "arXiv:2407.06464v2, 2024-07-12",
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": "chest-mounted mobile video of sidewalks near hospitals",
+      "CAPTURE_DEVICE": "Android smartphones, rear camera, chest mount, approximately 70-degree ground-facing collection angle",
+      "GEOGRAPHY": "Sao Paulo, Santos, Jundiai (Brazil), Chicago (USA)",
+      "ANNOTATION_TYPE": "68-element scene taxonomy described; per-object boxes/masks not established",
+      "IMAGE_COUNT": 325883,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": {
+        "scene taxonomy": "no direct detector mapping; new instance annotation and obstruction/damage definitions would be required"
+      },
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": "GOOD_MATCH",
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "image count is video frames, not independent labeled photographs",
+        "paper prose says 46 videos while its table reports 47 routes; release manifest must resolve this",
+        "software MIT license does not establish a license for captured imagery",
+        "nearby frames and shared routes/hospitals create substantial leakage risk",
+        "raw release location, immutable version, image license and usable detector annotations were not confirmed",
+        "only the visual component is a candidate; no multimodal pipeline change proposed"
+      ],
+      "READINESS": "LICENSE_BLOCKED",
+      "CHECKED_AT": "2026-09-24",
+      "RESEARCH_SCOPE": "primary-source documentation only; no dataset acquired, sample audit, training or evaluation authorization",
+      "EVIDENCE_URLS": [
+        "https://arxiv.org/html/2407.06464v2",
+        "https://sites.usp.br/sideseeing/",
+        "https://github.com/rafaelpezzuto/sideseeing-tools"
+      ]
+    },
+    {
+      "id": "needs_source_hazardous_tree",
+      "target_issue_codes": [
+        "URMIND_HAZARDOUS_TREE"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não comprova risco de queda; necessita inspeção especializada.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_vegetation_on_power_lines",
+      "target_issue_codes": [
+        "URMIND_VEGETATION_ON_POWER_LINES"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Se houver possível contato com a rede, não se aproxime. Foto não comprova energização.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_vegetation_obstruction",
+      "target_issue_codes": [
+        "URMIND_VEGETATION_OBSTRUCTION"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Registrar a vegetação como causa visível; não inferir visibilidade fora do enquadramento.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_fallen_power_line",
+      "target_issue_codes": [
+        "URMIND_FALLEN_POWER_LINE"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Se houver suspeita de cabo elétrico caído, não se aproxime nem toque. Foto não comprova energização; encaminhamento especializado pendente de validação.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_exposed_wiring",
+      "target_issue_codes": [
+        "URMIND_EXPOSED_WIRING"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Se houver suspeita de fiação exposta, não se aproxime nem toque. Foto não comprova tensão; necessita inspeção.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_sinkhole",
+      "target_issue_codes": [
+        "URMIND_SINKHOLE"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não mede profundidade nem comprova causa geotécnica.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_open_trench",
+      "target_issue_codes": [
+        "URMIND_OPEN_TRENCH"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Ausência de proteção só pode ser descrita no enquadramento; necessita revisão.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_damaged_manhole_cover",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_MANHOLE_COVER"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Não inferir estabilidade da tampa; foto não mede desnível.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_faded_road_marking",
+      "target_issue_codes": [
+        "URMIND_FADED_ROAD_MARKING"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Iluminação e perspectiva podem ocultar pintura; confirmar em revisão.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_road_erosion",
+      "target_issue_codes": [
+        "URMIND_ROAD_EROSION"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não comprova estabilidade nem evolução da erosão.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_damaged_curb",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_CURB"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Ausência pode ser projeto legítimo; confirmar contexto.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_missing_curb_ramp",
+      "target_issue_codes": [
+        "URMIND_MISSING_CURB_RAMP"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto parcial não comprova ausência em toda a travessia.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_damaged_tactile_paving",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_TACTILE_PAVING"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Não inferir exigência normativa nem continuidade fora da foto.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_damaged_bus_stop",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_BUS_STOP"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não determina órgão responsável nem comprova falha operacional.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_obstructed_traffic_sign",
+      "target_issue_codes": [
+        "URMIND_OBSTRUCTED_TRAFFIC_SIGN"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Distinguir obstrução visível de dano físico; causas podem coexistir.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_damaged_traffic_light",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_TRAFFIC_LIGHT"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não prova que o semáforo está apagado ou com defeito de funcionamento.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_abandoned_vehicle",
+      "target_issue_codes": [
+        "URMIND_ABANDONED_VEHICLE"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não comprova abandono. Nunca armazenar ou exibir placa; revisão e sanitização necessárias antes de ativação.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    },
+    {
+      "id": "needs_source_water_leak",
+      "target_issue_codes": [
+        "URMIND_WATER_LEAK"
+      ],
+      "SOURCE_STATUS": "NEEDS_DATA_SOURCE",
+      "SOURCE": null,
+      "SOURCE_URL": null,
+      "OWNER": null,
+      "VERSION": null,
+      "PUBLICATION": null,
+      "LICENSE": null,
+      "LICENSE_URL": null,
+      "IMAGE_DOMAIN": null,
+      "CAPTURE_DEVICE": null,
+      "GEOGRAPHY": null,
+      "ANNOTATION_TYPE": null,
+      "IMAGE_COUNT": null,
+      "INSTANCE_COUNT": null,
+      "CLASS_LIST": null,
+      "CLASS_MAPPING": null,
+      "NEGATIVE_IMAGES": null,
+      "EMPTY_IMAGES": null,
+      "DOMAIN_MATCH": null,
+      "TRAINING_ALLOWED": null,
+      "COMMERCIAL_USE_ALLOWED": null,
+      "REDISTRIBUTION_ALLOWED": null,
+      "ATTRIBUTION_REQUIRED": null,
+      "PROVENANCE_VERIFIED": false,
+      "KNOWN_LIMITATIONS": [
+        "Foto não confirma origem, duração, potabilidade nem causa.",
+        "Nenhuma fonte ou licença verificada."
+      ],
+      "READINESS": "NEEDS_MORE_DATA"
+    }
+  ]
+}

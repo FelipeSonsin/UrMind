@@ -46,6 +46,9 @@ artifact_registry_contract:
     - datasets/splits/rdd2022_subset_test.txt
     - datasets/splits/rdd2022_subset_train.txt
     - datasets/splits/rdd2022_subset_validation.txt
+    - datasets/reports/rdd2022_geometry.json
+    - datasets/reports/ird_dashcam_candidate_acquisition.json
+    - datasets/reports/ird_dashcam_candidate_audit.json
   optional: []
 authorized_exceptions:
   - new_registered_downloads_in_acquired_20260908

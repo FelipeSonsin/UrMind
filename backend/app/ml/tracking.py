@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import subprocess
@@ -59,7 +60,61 @@ class MLflowTracker:
         except (OSError, subprocess.CalledProcessError) as exc:
             raise TrackingError("Git commit indisponível para reprodução") from exc
 
-    def _parameters(self) -> dict[str, Any]:
+    def _code_state(self) -> dict[str, Any]:
+        """Fingerprint do código realmente executado, inclusive worktree dirty."""
+        try:
+            status = subprocess.run(
+                ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+            ).stdout
+            patch = subprocess.run(
+                [
+                    "git",
+                    "diff",
+                    "--binary",
+                    "HEAD",
+                    "--",
+                    ".",
+                    ":(exclude)mlruns",
+                    ":(exclude)models",
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+            ).stdout
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise TrackingError("estado Git indisponível para reprodução") from exc
+        entries = [entry for entry in status.split(b"\0") if entry]
+        untracked: dict[str, str] = {}
+        for entry in entries:
+            if not entry.startswith(b"?? "):
+                continue
+            relative = entry[3:].decode("utf-8", errors="strict")
+            path = (PROJECT_ROOT / relative).resolve()
+            try:
+                path.relative_to(PROJECT_ROOT.resolve())
+            except ValueError as exc:
+                raise TrackingError("arquivo untracked fora do projeto") from exc
+            if path.is_file():
+                untracked[relative.replace("\\", "/")] = hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+        document = {
+            "schema_version": 1,
+            "git_commit": self._git_commit(),
+            "dirty": bool(entries),
+            "status_sha256": hashlib.sha256(status).hexdigest(),
+            "tracked_patch_sha256": hashlib.sha256(patch).hexdigest(),
+            "tracked_patch": patch.decode("utf-8", errors="replace"),
+            "untracked_sha256": dict(sorted(untracked.items())),
+        }
+        canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        document["code_state_sha256"] = hashlib.sha256(canonical).hexdigest()
+        return document
+
+    def _parameters(self, code_state: Mapping[str, Any]) -> dict[str, Any]:
         fingerprints = checkpoint_fingerprints(self.metadata, self.config)
         device_name = (
             torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CUDA_UNAVAILABLE"
@@ -68,7 +123,9 @@ class MLflowTracker:
             "model_id": self.metadata["model_id"],
             "architecture": self.metadata["architecture"],
             "yolox_commit": self.metadata["source_commit"],
-            "git_commit": self._git_commit(),
+            "git_commit": code_state["git_commit"],
+            "git_dirty": code_state["dirty"],
+            "code_state_sha256": code_state["code_state_sha256"],
             "python_version": platform.python_version(),
             "torch_version": torch.__version__,
             "cuda_runtime": torch.version.cuda or "NONE",
@@ -76,6 +133,7 @@ class MLflowTracker:
             "seed": self.config.seed,
             "input_size": "x".join(map(str, self.config.input_size)),
             "batch_size": self.config.batch_size,
+            "max_epoch": self.config.max_epoch,
             "optimizer": self.config.optimizer,
             "basic_lr_per_image": self.config.basic_lr_per_image,
             "scheduler": self.config.scheduler,
@@ -94,8 +152,18 @@ class MLflowTracker:
             raise TrackingError("nenhuma run MLflow UrMind ativa")
 
     def start_run(
-        self, *, run_name: str | None = None, tags: Mapping[str, str] | None = None
+        self,
+        *,
+        run_name: str | None = None,
+        tags: Mapping[str, str] | None = None,
+        resume_run_id: str | None = None,
+        allow_empty_pretrained_retry: bool = False,
     ) -> str:
+        """Abre um run novo ou, num resume, reabre o run original do mesmo treino.
+
+        Reabrir mantém o histórico de métricas e o lineage num único run; um run
+        de outro experimento ou de outro contrato é recusado.
+        """
         if self.run_id is not None or mlflow.active_run() is not None:
             raise TrackingError("run MLflow concorrente/nested é proibida")
         try:
@@ -106,21 +174,45 @@ class MLflowTracker:
             experiment_id = (
                 experiment.experiment_id
                 if experiment is not None
-                else client.create_experiment(
-                    self.experiment, artifact_location=self.artifact_uri
+                else client.create_experiment(self.experiment, artifact_location=self.artifact_uri)
+            )
+            if resume_run_id is not None:
+                previous = client.get_run(resume_run_id)
+                expected_contract = (tags or {}).get("contract")
+                if previous.info.experiment_id != experiment_id or (
+                    expected_contract is not None
+                    and previous.data.tags.get("contract") != expected_contract
+                ):
+                    raise TrackingError(
+                        "run MLflow do resume pertence a outro experimento/contrato"
+                    )
+                if previous.info.status == "FINISHED":
+                    raise TrackingError("run MLflow já finalizado não pode ser retomado")
+                if allow_empty_pretrained_retry and previous.data.metrics:
+                    raise TrackingError("run MLflow com métricas não pode reiniciar de pretrained")
+                active = mlflow.start_run(run_id=resume_run_id)
+                mlflow.set_tags(dict(tags or {}))
+            else:
+                active = mlflow.start_run(
+                    experiment_id=experiment_id,
+                    run_name=run_name,
+                    tags=dict(tags or {}),
                 )
-            )
-            active = mlflow.start_run(
-                experiment_id=experiment_id,
-                run_name=run_name,
-                tags=dict(tags or {}),
-            )
             self.run_id = active.info.run_id
-            mlflow.log_params(self._parameters())
+            code_state = self._code_state()
+            mlflow.log_params(self._parameters(code_state))
+            self.log_lightweight_artifact(
+                "code-state.json", code_state, artifact_path="run-metadata"
+            )
             mlflow.set_tag("urmind.run_id", self.run_id)
             mlflow.set_tag("tracking.mode", "local_sqlite")
             mlflow.set_tag("data.policy", "fingerprints_only_no_dataset_artifacts")
             return self.run_id
+        except TrackingError:
+            if mlflow.active_run() is not None:
+                mlflow.end_run(status="FAILED")
+            self.run_id = None
+            raise
         except Exception as exc:
             if mlflow.active_run() is not None:
                 mlflow.end_run(status="FAILED")
@@ -148,12 +240,14 @@ class MLflowTracker:
             step=global_step,
         )
 
-    def log_validation(self, persisted: Mapping[str, Any], *, global_step: int) -> None:
+    def log_validation(
+        self, persisted: Mapping[str, Any], *, global_step: int, prefix: str = "validation"
+    ) -> None:
         metrics: dict[str, float] = {}
         for key in ("precision", "recall", "map50", "map50_95"):
             value = persisted.get(key)
             if isinstance(value, (int, float)):
-                metrics[f"validation/{key}"] = float(value)
+                metrics[f"{prefix}/{key}"] = float(value)
         per_class = persisted.get("per_class", {})
         if isinstance(per_class, Mapping):
             for class_name, values in per_class.items():
@@ -162,7 +256,7 @@ class MLflowTracker:
                 for key in ("precision", "recall", "ap50", "ap50_95"):
                     value = values.get(key)
                     if isinstance(value, (int, float)):
-                        metrics[f"validation/{class_name}/{key}"] = float(value)
+                        metrics[f"{prefix}/{class_name}/{key}"] = float(value)
         self.log_metrics(metrics, step=global_step)
 
     def log_lightweight_artifact(

@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import uuid
-from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta, timezone
+from collections.abc import AsyncIterator, Callable
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
+from functools import lru_cache
+from threading import BoundedSemaphore
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 
 from app.auth import CurrentUser, require_user
 from app.config import get_settings
@@ -26,6 +42,7 @@ from app.schemas.core import (
     EventStatus,
     LocationSource,
     NearbyQuery,
+    PublicationRequest,
     ReviewCreate,
     UrmindClass,
 )
@@ -37,12 +54,39 @@ from app.services.storage import (
     StorageClient,
     StorageError,
     StorageNotConfiguredError,
+    UploadAdmission,
+    UploadBusyError,
+    ValidatedImage,
     object_path,
+    sanitize_public_image,
     validate_image,
 )
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_user)])
 log = structlog.get_logger()
+_decode_slots = BoundedSemaphore(2)
+_image_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="image-decode")
+
+
+@lru_cache
+def upload_admission() -> UploadAdmission:
+    return UploadAdmission()
+
+
+async def _decode_upload(
+    data: bytes, operation: Callable[[bytes], ValidatedImage] = validate_image
+) -> ValidatedImage:
+    if not _decode_slots.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Processamento de imagens ocupado")
+    try:
+        future = _image_executor.submit(operation, data)
+    except BaseException:
+        _decode_slots.release()
+        raise
+    # The concurrent future completes only when its worker really stops (or
+    # cancellation succeeds before it starts), independently of HTTP task cancellation.
+    future.add_done_callback(lambda _: _decode_slots.release())
+    return await asyncio.wrap_future(future)
 
 
 async def get_inference_repository(request: Request) -> AsyncIterator[InferenceRepository]:
@@ -93,7 +137,12 @@ async def ops_metrics(user: CurrentUser, inference: Inference) -> dict[str, Any]
 @router.get("/me")
 async def me(user: CurrentUser) -> dict[str, Any]:
     """Papel decidido no servidor (JWT/app_metadata); o frontend só exibe."""
-    return {"id": user.id, "email": user.email, "can_review": user.can_review}
+    return {
+        "id": user.id,
+        "email": user.email,
+        "can_review": user.can_review,
+        "can_admin": user.can_review and user.urmind_role == "admin",
+    }
 
 
 async def create_capture(payload: CaptureCreate, service: Core) -> dict[str, Any]:
@@ -102,6 +151,56 @@ async def create_capture(payload: CaptureCreate, service: Core) -> dict[str, Any
             status_code=403, detail="Detecções e origem Scout são geradas pelo servidor"
         )
     return await service.register_capture(payload)
+
+
+@router.get("/captures/{capture_id}/processing")
+async def capture_processing(
+    capture_id: uuid.UUID, user: CurrentUser, service: Core, response: Response
+) -> dict[str, Any]:
+    """Owner/reviewer status; never disclose private Storage paths or provider payloads."""
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        return await service.capture_processing(capture_id, user.id, user.can_review)
+    except EventNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/captures/markers")
+async def capture_markers(
+    user: CurrentUser, service: Core, response: Response
+) -> list[dict[str, Any]]:
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.capture_markers(user.id, user.can_review)
+
+
+@router.patch("/captures/{capture_id}/location")
+async def capture_location(
+    capture_id: uuid.UUID, payload: Coordinate, user: CurrentUser, service: Core
+) -> dict[str, Any]:
+    if payload.latitude == 0 and payload.longitude == 0:
+        raise HTTPException(status_code=422, detail="confirme uma localização válida")
+    capture = await service.captures.get(capture_id)
+    if capture is None or (capture.quality or {}).get("uploaded_by") != user.id:
+        raise HTTPException(status_code=404, detail="Captura não encontrada")
+    if not await service.captures.fill_missing_location(capture_id, user.id, payload):
+        raise HTTPException(status_code=409, detail="A localização original já está registrada")
+    await service.captures.session.commit()
+    return {"capture_id": capture_id, "location_source": "manual"}
+
+
+@router.get("/captures/{capture_id}/image")
+async def capture_image(
+    capture_id: uuid.UUID, user: CurrentUser, service: Core, storage: Storage, response: Response
+) -> dict[str, str]:
+    response.headers["Cache-Control"] = "private, no-store"
+    capture = await service.captures.get(capture_id)
+    if capture is None or (
+        not user.can_review and (capture.quality or {}).get("uploaded_by") != user.id
+    ):
+        raise HTTPException(status_code=404, detail="Captura não encontrada")
+    if not capture.storage_path:
+        raise HTTPException(status_code=404, detail="Imagem não disponível")
+    return {"image_url": await storage.signed_url(capture.storage_path)}
 
 
 @router.post("/captures/photo", status_code=201)
@@ -116,8 +215,23 @@ async def upload_photo(
     accuracy_m: Annotated[float | None, Form(ge=0)] = None,
     location_source: Annotated[LocationSource, Form()] = LocationSource.GPS_DEVICE,
     tz_offset_minutes: Annotated[int | None, Form(ge=-840, le=840)] = None,
+    captured_at: Annotated[datetime | None, Form()] = None,
+    location_timestamp: Annotated[datetime | None, Form()] = None,
+    heading_deg: Annotated[float | None, Form(ge=0, le=360)] = None,
+    speed_mps: Annotated[float | None, Form(ge=0)] = None,
+    note: Annotated[str | None, Form(max_length=500)] = None,
+    user_description: Annotated[str | None, Form(max_length=500)] = None,
 ) -> dict[str, Any]:
     """Foto real → Storage privado → Capture (§6.1, §6.3). Reenvio da mesma foto não duplica."""
+    settings = get_settings()
+    if user.is_anonymous and not settings.visitor_upload_enabled:
+        raise HTTPException(status_code=503, detail="Registro público temporariamente indisponível")
+    try:
+        upload_admission().admit(user.id)
+    except UploadBusyError as exc:
+        raise HTTPException(
+            status_code=429, detail=str(exc), headers={"Retry-After": "60"}
+        ) from exc
     if source not in (CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD):
         raise HTTPException(status_code=422, detail="source deve ser pwa_photo ou exif_upload")
     if (latitude is None) != (longitude is None):
@@ -127,15 +241,36 @@ async def upload_photo(
         LocationSource.MANUAL,
     ):
         raise HTTPException(status_code=422, detail="location_source deve ser gps_device ou manual")
+    if (captured_at is not None and captured_at.tzinfo is None) or (
+        location_timestamp is not None and location_timestamp.tzinfo is None
+    ):
+        raise HTTPException(status_code=422, detail="timestamps do dispositivo exigem fuso")
+    if source is not CaptureSource.PWA_PHOTO and captured_at is not None:
+        raise HTTPException(status_code=422, detail="captured_at do cliente exige foto da PWA")
+    if location_source is not LocationSource.GPS_DEVICE and any(
+        value is not None for value in (location_timestamp, heading_deg, speed_mps)
+    ):
+        raise HTTPException(
+            status_code=422, detail="metadados GPS exigem location_source=gps_device"
+        )
 
     data = await file.read(MAX_BYTES + 1)
     try:
-        image = validate_image(data)
+        image = await _decode_upload(data)
     except InvalidImageError as exc:
         code = 413 if len(data) > MAX_BYTES else 415
+        log.info("capture_rejected", reason="invalid_image", status_code=code)
         raise HTTPException(status_code=code, detail=str(exc)) from exc
 
     received_at = datetime.now(UTC)
+    if captured_at is not None and captured_at > received_at + timedelta(minutes=5):
+        raise HTTPException(
+            status_code=422, detail="captured_at futuro além da tolerância de relógio"
+        )
+    if location_timestamp is not None and location_timestamp > received_at + timedelta(minutes=5):
+        raise HTTPException(
+            status_code=422, detail="location_timestamp futuro além da tolerância de relógio"
+        )
     # A unique object per attempt makes compensation safe under concurrent
     # uploads of identical bytes. The SHA-256 remains in the path and metadata.
     path = object_path(user.id, image, received_at, upload_id=uuid.uuid4().hex)
@@ -144,19 +279,22 @@ async def upload_photo(
         if latitude is not None and longitude is not None
         else None
     )
+    if coordinate is not None and coordinate.latitude == 0 and coordinate.longitude == 0:
+        raise HTTPException(status_code=422, detail="coordenada (0,0) inválida; confirme no mapa")
+    # Idempotency is scoped to the authenticated owner. A global image hash
+    # would return another user's private Capture/Storage path for the same bytes.
+    owner_image_key = hashlib.sha256(f"{user.id}:{image.sha256}".encode()).hexdigest()
     ingest = ingest_photo(
-        capture_key=f"photo-{image.sha256}",
+        capture_key=f"photo-{owner_image_key}",
         image_bytes=image.data,
         received_at=received_at,
         manual_coordinate=coordinate,
         manual_location_source=location_source,
-        client_timezone=(
-            timezone(timedelta(minutes=tz_offset_minutes))
-            if tz_offset_minutes is not None
-            else None
-        ),
+        client_captured_at=captured_at,
         storage_path=path,
         source=source,
+        user_description=user_description if user_description is not None else note,
+        location_conflict_distance_m=settings.location_conflict_distance_m,
     )
     ingest.capture.quality.update(
         {
@@ -166,27 +304,47 @@ async def upload_photo(
             "height": image.height,
             "bytes": len(image.data),
             "uploaded_by": user.id,
+            "public_upload": not user.can_review,
+            "location_attestation": "unverified_client_claim",
         }
     )
+    if tz_offset_minutes is not None:
+        ingest.capture.quality["upload_timezone_offset_minutes_unverified"] = tz_offset_minutes
+    if location_source is LocationSource.GPS_DEVICE and coordinate is not None:
+        ingest.capture.heading_deg = heading_deg
+        ingest.capture.speed_mps = speed_mps
+        if location_timestamp is not None:
+            ingest.capture.quality["location_timestamp"] = location_timestamp.isoformat()
     existing = await service.captures.get_by_key(ingest.capture.capture_key)
     if existing is not None:
-        log.info(
-            "capture_deduplicated",
-            capture_id=str(existing.id),
-            requires_manual_location=existing.point is None,
-        )
-        return {
-            "id": existing.id,
-            "capture_key": existing.capture_key,
-            "created": False,
-            "storage_path": existing.storage_path,
-            "requires_manual_location": existing.point is None,
-        }
+        return await _deduplicated_capture(existing, ingest.capture.coordinate, service, user.id)
+    if not user.can_review:
+        if (await service.captures.recent_public_uploads(received_at)) >= (
+            settings.public_capture_global_limit_per_hour
+        ) or (
+            await service.captures.recent_owner_uploads(user.id, received_at)
+            >= settings.public_capture_limit_per_hour
+        ):
+            log.info("capture_rejected", reason="rate_limited", status_code=429)
+            raise HTTPException(status_code=429, detail="Limite de capturas por hora atingido")
+        # Do not hold an idle transaction during the external Storage upload.
+        await service.captures.session.rollback()
     try:
         uploaded = await storage.upload(path, image)
     except StorageError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     try:
+        if not user.can_review:
+            await service.captures.lock_public_uploads()
+            await service.captures.lock_owner_uploads(user.id)
+            if (await service.captures.recent_public_uploads(received_at)) >= (
+                settings.public_capture_global_limit_per_hour
+            ) or (
+                await service.captures.recent_owner_uploads(user.id, received_at)
+                >= settings.public_capture_limit_per_hour
+            ):
+                log.info("capture_rejected", reason="rate_limited", status_code=429)
+                raise HTTPException(status_code=429, detail="Limite de capturas por hora atingido")
         result = await service.register_capture(ingest.capture)
         # The dependency's deferred commit would otherwise happen after this
         # handler returns, too late to compensate a failed DB transaction.
@@ -205,13 +363,9 @@ async def upload_photo(
         if uploaded:
             await storage.delete(path)
         existing = await service.captures.get_by_key(ingest.capture.capture_key)
-        return {
-            "id": result["id"],
-            "capture_key": result["capture_key"],
-            "created": False,
-            "storage_path": existing.storage_path if existing else None,
-            "requires_manual_location": existing.point is None if existing else True,
-        }
+        if existing is None:
+            raise RuntimeError("captura deduplicada não encontrada")
+        return await _deduplicated_capture(existing, ingest.capture.coordinate, service, user.id)
     log.info(
         "capture_stored",
         capture_id=str(result["id"]),
@@ -223,10 +377,42 @@ async def upload_photo(
     )
     return {
         **result,
-        "storage_path": path,
         "requires_manual_location": ingest.requires_manual_location,
         "location_source": ingest.capture.source_location.value,
         "exif_status": ingest.exif.status.value,
+    }
+
+
+async def _deduplicated_capture(
+    existing: Any, coordinate: Coordinate | None, service: CoreService, actor: str
+) -> dict[str, Any]:
+    if (existing.quality or {}).get("uploaded_by") != actor:
+        # Do not reveal even the existence of another user's private Capture.
+        raise HTTPException(status_code=409, detail="captura já registrada")
+    previous = await service.captures.location(existing.id)
+    if (previous is None) != (coordinate is None) or (
+        previous is not None
+        and coordinate is not None
+        and (
+            abs(previous["latitude"] - coordinate.latitude) > 1e-6
+            or abs(previous["longitude"] - coordinate.longitude) > 1e-6
+            or previous["accuracy_m"] != coordinate.accuracy_m
+        )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="foto já registrada com outra localização; correção requer revisão",
+        )
+    log.info(
+        "capture_deduplicated",
+        capture_id=str(existing.id),
+        requires_manual_location=existing.point is None,
+    )
+    return {
+        "id": existing.id,
+        "capture_key": existing.capture_key,
+        "created": False,
+        "requires_manual_location": existing.point is None,
     }
 
 
@@ -333,3 +519,128 @@ async def review_event(
         status=review["status"],
     )
     return review
+
+
+@router.post("/events/{event_id}/publication")
+async def publish_event(
+    event_id: uuid.UUID,
+    payload: PublicationRequest,
+    user: CurrentUser,
+    service: Core,
+    storage: Storage,
+) -> dict[str, Any]:
+    """Explicit reviewed publication; originals and inference remain unchanged."""
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Publicação exige papel de revisor")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Persistência de revisão indisponível")
+    session = service.captures.session
+    path: str | None = None
+    uploaded = False
+    try:
+        event = await service.events.get_for_review(event_id)
+        if event is None:
+            raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
+        before = dict((event.factors or {}).get("publication") or {})
+        now = datetime.now(UTC)
+        publication: dict[str, Any] = {
+            "policy_version": "urmind-publication-v1",
+            "status": "published" if payload.publish else "withdrawn",
+            "reviewer": user.id,
+            "published_at": now.isoformat(),
+        }
+        if payload.publish:
+            reviews = await service.decisions.reviews(event_id)
+            review = reviews[-1] if reviews else None
+            if (
+                event.status != "confirmed"
+                or review is None
+                or review.id != payload.review_id
+                or review.reviewer != user.id
+                or review.decision not in {"confirm", "correct"}
+                or not payload.visible_content_reviewed
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Exige revisão atual confirmada e inspeção de privacidade da imagem",
+                )
+            capture = await service.captures.get(event.capture_id) if event.capture_id else None
+            if capture is None or not capture.storage_path:
+                raise HTTPException(status_code=409, detail="Evidência original indisponível")
+            # Snapshot plain values before releasing ORM state/locks. No DB
+            # transaction is held during external I/O or raster sanitization.
+            expected_factors = deepcopy(event.factors or {})
+            expected_capture_id = capture.id
+            expected_path = capture.storage_path
+            expected_quality = deepcopy(capture.quality or {})
+            expected_review_id = review.id
+            await session.rollback()
+            raw = await storage.download(expected_path)
+            source_hash = hashlib.sha256(raw).hexdigest()
+            if source_hash != expected_quality.get("sha256"):
+                raise HTTPException(status_code=409, detail="Checksum da evidência não confere")
+            image = await _decode_upload(raw, sanitize_public_image)
+            path = f"public-derived/{event_id}/{uuid.uuid4().hex}.jpg"
+            uploaded = await storage.upload(path, image)
+            if not uploaded:
+                raise HTTPException(
+                    status_code=409, detail="Conflito na criação da cópia sanitizada"
+                )
+            event = await service.events.get_for_review(event_id)
+            if (
+                event is None
+                or event.status != "confirmed"
+                or event.capture_id != expected_capture_id
+                or (event.factors or {}) != expected_factors
+            ):
+                raise HTTPException(
+                    status_code=409, detail="Ocorrência alterada durante publicação"
+                )
+            capture = await service.captures.get(expected_capture_id)
+            if capture is None:
+                raise HTTPException(status_code=409, detail="Evidência alterada durante publicação")
+            await session.refresh(capture, with_for_update=True)
+            reviews = await service.decisions.reviews(event_id)
+            review = reviews[-1] if reviews else None
+            if (
+                capture.storage_path != expected_path
+                or (capture.quality or {}) != expected_quality
+                or review is None
+                or review.id != expected_review_id
+                or review.reviewer != user.id
+                or review.decision not in {"confirm", "correct"}
+            ):
+                raise HTTPException(
+                    status_code=409, detail="Revisão ou evidência alterada durante publicação"
+                )
+            publication["public_image"] = {
+                "storage_path": path,
+                "sha256": image.sha256,
+                "source_sha256": source_hash,
+                "content_type": image.mime,
+                "visible_content_reviewed": True,
+                "metadata_stripped": True,
+                "created_at": now.isoformat(),
+                "review_id": str(review.id),
+            }
+            publication["review_id"] = str(review.id)
+        event.factors = {**(event.factors or {}), "publication": publication}
+        await service.decisions.add_audit(
+            operation="publish_event" if payload.publish else "withdraw_event",
+            entity_type="event",
+            entity_id=event_id,
+            actor=user.id,
+            before=before,
+            after={**publication, "reason": payload.reason},
+            event_hash=f"publication-{uuid.uuid4()}",
+        )
+        await session.commit()
+        return {"event_id": event_id, "publication_status": publication["status"]}
+    except BaseException:
+        await session.rollback()
+        if uploaded and path:
+            try:
+                await storage.delete(path)
+            except StorageError:
+                log.error("publication_compensation_failed", event_id=str(event_id))
+        raise

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { eventDetail, urbanAnalysis } from '../../tests/fixtures';
 import {
+  filterableClasses,
+  issueTaxonomySchema,
   labelFor,
+  modelSupportLabel,
+  registerTaxonomy,
+  type IssueDefinition,
   priorityBand,
   publicEventDetailSchema,
   publicEventSchema,
@@ -62,6 +68,28 @@ describe('apresentação pública sem inventar dado', () => {
 });
 
 describe('contrato público espelha o backend', () => {
+  it('preserva análise determinística opcional e payload anterior', () => {
+    expect(publicEventDetailSchema.parse(eventDetail).analysis).toBeUndefined();
+    expect(publicEventDetailSchema.parse({ ...eventDetail, analysis: null }).analysis).toBeNull();
+    expect(
+      publicEventDetailSchema.parse({ ...eventDetail, analysis: urbanAnalysis }).analysis
+        ?.description,
+    ).toBe(urbanAnalysis.description);
+  });
+
+  it('recusa consequência incondicional e origem não persistida', () => {
+    for (const consequence of [
+      { ...urbanAnalysis.potential_consequences[0], conditional: false },
+      { ...urbanAnalysis.potential_consequences[0], source: 'generated' },
+    ]) {
+      expect(
+        publicEventDetailSchema.safeParse({
+          ...eventDetail,
+          analysis: { ...urbanAnalysis, potential_consequences: [consequence] },
+        }).success,
+      ).toBe(false);
+    }
+  });
   it('aceita a ocorrência pública real', () => {
     expect(publicEventSchema.safeParse(event).success).toBe(true);
   });
@@ -161,5 +189,49 @@ describe('contrato público espelha o backend', () => {
       mission: null,
     });
     expect(scout.success).toBe(false);
+  });
+});
+
+describe('taxonomia canônica', () => {
+  const issue = (code: string, status: IssueDefinition['model_support_status'], may: boolean) => ({
+    issue_code: code,
+    taxonomy_version: 'urmind-issue-taxonomy-v2',
+    family: 'ROAD_SURFACE',
+    display_name_pt: `rótulo ${code}`,
+    display_name_en: code,
+    description: 'd',
+    visual_definition: 'v',
+    included_examples: ['a'],
+    excluded_examples: ['b'],
+    model_support_status: status,
+    dataset_status: 'NEEDS_MORE_DATA',
+    review_status: 'PENDING_HUMAN_REVIEW',
+    responsibility_domain: 'x',
+    version: 1,
+    related_legacy_codes: [],
+    model_may_emit: may,
+  });
+
+  it('usa rótulos da API e filtra só classes que o modelo pode emitir', () => {
+    registerTaxonomy(
+      issueTaxonomySchema.parse({
+        taxonomy_version: 'urmind-issue-taxonomy-v2',
+        issues: [
+          issue('URMIND_ROAD_D40', 'EXPERIMENTAL_MODEL', true),
+          issue('URMIND_FALLEN_TREE', 'DATA_REQUIRED', false),
+        ],
+      }),
+    );
+    expect(labelFor('URMIND_FALLEN_TREE')).toBe('rótulo URMIND_FALLEN_TREE');
+    expect(filterableClasses().map(([code]) => code)).toEqual(['URMIND_ROAD_D40']);
+  });
+
+  it('classe sem dados nunca aparece como reconhecida pela IA', () => {
+    const label = modelSupportLabel({ model_support_status: 'DATA_REQUIRED' });
+    expect(label).toBe('Em desenvolvimento');
+    expect(label.toLowerCase()).not.toContain('reconhec');
+    expect(modelSupportLabel({ model_support_status: 'EXPERIMENTAL_MODEL' })).toBe(
+      'Análise experimental',
+    );
   });
 });

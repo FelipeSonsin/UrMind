@@ -5,13 +5,14 @@
 
 Regras do §7.2: idempotência por captura + versão de modelo; job só é arquivado
 depois da persistência; falha não vira `inference_completed`; retry limitado e
-erro final registrado na captura. Sem modelo promovido: `model_not_available`.
+erro final registrado na captura. Sem modelo shadow autorizado: `model_not_available`.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import selectors
 import sys
 import time
@@ -30,9 +31,11 @@ from app.repositories.core import (
     EventRepository,
     InferenceRepository,
 )
-from app.schemas.core import BoundingBox, UrmindClass
+from app.schemas.core import BoundingBox, CaptureProcessingStatus, UrmindClass
+from app.schemas.issue_taxonomy import model_may_emit
 from app.services.context import gather_context
 from app.services.core import CoreService
+from app.services.external_sources.sidra import municipal_population_query
 from app.services.storage import StorageClient, StorageError
 
 log = structlog.get_logger()
@@ -42,20 +45,84 @@ MAX_ATTEMPTS = 3
 IDLE_SLEEP_S = 5.0
 
 
+# Stored stages after detections and events are committed; a retry resumes the
+# analysis from the saved event_ids instead of re-running detection.
+_RESUMABLE_ANALYSIS_STAGES = frozenset(
+    {
+        CaptureProcessingStatus.DETECTION_COMPLETED.value,
+        CaptureProcessingStatus.ENRICHING_CONTEXT.value,
+        CaptureProcessingStatus.BUILDING_FEATURES.value,
+        CaptureProcessingStatus.ASSESSING.value,
+    }
+)
+
+
 class Worker:
     def __init__(self, database: Database, storage: StorageClient) -> None:
         self.database = database
         self.storage = storage
         self._detector: OnnxDetector | None = None
         self._detector_version: uuid.UUID | None = None
+        self._score_threshold: float | None = None
 
     def _detector_for(self, model) -> OnnxDetector:
         if self._detector is None or self._detector_version != model.id:
             serving = (model.metrics or {}).get("serving", {})
-            if not serving.get("onnx_path") or not model.checksum:
-                raise ModelNotAvailableError("model_versions sem onnx_path/checksum")
-            self._detector = OnnxDetector(PROJECT_ROOT / serving["onnx_path"], model.checksum)
+            required = (
+                "onnx_path",
+                "score_threshold",
+                "nms_threshold",
+                "input_size",
+                "class_names",
+                "model_contract_path",
+                "model_contract_sha256",
+            )
+            if (
+                not model.checksum
+                or not isinstance(serving.get("onnx_path"), str)
+                or not isinstance(serving.get("model_contract_path"), str)
+                or not isinstance(serving.get("model_contract_sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", serving["model_contract_sha256"]) is None
+                or any(serving.get(field) is None for field in required)
+                or isinstance(serving["score_threshold"], bool)
+                or not isinstance(serving["score_threshold"], (int, float))
+                or not 0.0 < float(serving["score_threshold"]) <= 1.0
+                or isinstance(serving["nms_threshold"], bool)
+                or not isinstance(serving["nms_threshold"], (int, float))
+                or not isinstance(serving["input_size"], list)
+                or len(serving["input_size"]) != 2
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int)
+                    for value in serving["input_size"]
+                )
+                or not isinstance(serving["class_names"], list)
+            ):
+                raise ModelNotAvailableError("ModelVersion sem contrato de serving completo")
+            try:
+                input_size = (
+                    int(serving["input_size"][0]),
+                    int(serving["input_size"][1]),
+                )
+                class_names = tuple(str(value) for value in serving["class_names"])
+                nms_threshold = float(serving["nms_threshold"])
+            except (TypeError, ValueError) as exc:
+                raise ModelNotAvailableError(
+                    "ModelVersion com contrato de serving inválido"
+                ) from exc
+            onnx_path = (PROJECT_ROOT / serving["onnx_path"]).resolve()
+            if not onnx_path.is_relative_to((PROJECT_ROOT / "models" / "serving").resolve()):
+                raise ModelNotAvailableError("ONNX fora do diretório de serving")
+            self._detector = OnnxDetector(
+                onnx_path,
+                model.checksum,
+                nms_threshold=nms_threshold,
+                expected_input_size=input_size,
+                expected_class_names=class_names,
+                contract_path=PROJECT_ROOT / serving["model_contract_path"],
+                expected_contract_sha256=serving["model_contract_sha256"],
+            )
             self._detector_version = model.id
+            self._score_threshold = float(serving["score_threshold"])
         return self._detector
 
     async def process_one(self) -> bool:
@@ -70,7 +137,7 @@ class Worker:
         capture_id = uuid.UUID(job["message"]["capture_id"])
         bound = log.bind(job_id=job["msg_id"], capture_id=str(capture_id), attempt=job["read_ct"])
         started = time.perf_counter()
-        created: list[uuid.UUID] = []
+        event_ids: list[uuid.UUID] = []
         async with self.database.sessionmaker() as session:
             queue = InferenceRepository(session)
             captures = CaptureRepository(session)
@@ -81,59 +148,120 @@ class Worker:
                 bound.warning("inference_capture_missing")
                 return True
             try:
-                model = await queue.promoted_vision_model()
-                if model is None:
-                    raise ModelNotAvailableError("nenhum modelo de visão promovido")
-                detector = self._detector_for(model)
-                if not await queue.has_detections_from(capture_id, model.id):
-                    if not capture.storage_path:
-                        raise ValueError("captura sem storage_path")
-                    image = await self.storage.download(capture.storage_path)
-                    found = await asyncio.to_thread(detector.detect, image)
-                    from app.models.core import Detection
-
-                    await captures.add_detections(
+                saved = (capture.quality or {}).get("inference") or {}
+                if capture.source in {"pwa_photo", "exif_upload"} and capture.point is None:
+                    await queue.set_capture_inference(capture, {"status": "location_required"})
+                    await queue.archive_job(job["msg_id"])
+                    await session.commit()
+                    return True
+                if saved.get("status") in {
+                    "analysis_completed",
+                    "no_detection",
+                    "no_supported_detection",
+                    "needs_review",
+                }:
+                    await queue.archive_job(job["msg_id"])
+                    await session.commit()
+                    return True
+                if saved.get("status") in _RESUMABLE_ANALYSIS_STAGES:
+                    event_ids = [uuid.UUID(value) for value in saved.get("event_ids") or []]
+                else:
+                    await queue.set_capture_inference(
                         capture,
-                        [
-                            Detection(
-                                urmind_class=UrmindClass(d.urmind_class).value,
-                                confidence=d.confidence,
-                                bbox=BoundingBox(**d.bbox).model_dump(),
-                                model_version_id=model.id,
-                            )
-                            for d in found
-                        ],
+                        {"status": "processing_detection", "at": datetime.now(UTC).isoformat()},
                     )
-                service = CoreService(
-                    captures, EventRepository(session), DecisionRepository(session)
-                )
-                consolidated = await service.consolidate_capture(capture_id)
-                await queue.set_capture_inference(
-                    capture,
-                    {
-                        "status": "inference_completed",
-                        "model_version_id": str(model.id),
-                        "model_version": model.version,
-                        "onnx_sha256": model.checksum,
-                        "execution_provider": detector.provider,
-                        "detections": len(capture.detections),
-                        "events": len(consolidated["events"]),
-                        "latency_ms": round((time.perf_counter() - started) * 1000),
-                        "completed_at": datetime.now(UTC).isoformat(),
-                    },
-                )
-                await queue.archive_job(job["msg_id"])
-                await session.commit()
-                bound.info(
-                    "inference_completed",
-                    detection_ids=[str(d.id) for d in capture.detections],
-                    event_ids=[str(o["event_id"]) for o in consolidated["events"]],
-                )
-                created = [o["event_id"] for o in consolidated["events"] if o.get("created")]
+                    await session.commit()
+                    settings = get_settings()
+                    model = await queue.configured_vision_model(
+                        settings.vision_execution_mode, settings.shadow_model_version_id
+                    )
+                    if model is None:
+                        raise ModelNotAvailableError("nenhum modelo autorizado neste modo")
+                    try:
+                        detector = self._detector_for(model)
+                    except ImportError as exc:
+                        raise ModelNotAvailableError("runtime ONNX indisponível") from exc
+                    if not await queue.has_detections_from(capture_id, model.id):
+                        if not capture.storage_path:
+                            raise ValueError("captura sem storage_path")
+                        image = await self.storage.download(capture.storage_path)
+                        if self._score_threshold is None:
+                            raise ModelNotAvailableError(
+                                "ModelVersion sem confidence threshold operacional"
+                            )
+                        try:
+                            found = await asyncio.to_thread(
+                                detector.detect, image, score_threshold=self._score_threshold
+                            )
+                        except ImportError as exc:
+                            raise ModelNotAvailableError("runtime YOLOX indisponível") from exc
+                        from app.models.core import Detection
+
+                        unsupported = sorted(
+                            {d.urmind_class for d in found if not model_may_emit(d.urmind_class)}
+                        )
+                        if unsupported:
+                            # DATA_REQUIRED/REVIEW_ONLY classes never become a
+                            # model Detection, whatever the ONNX outputs.
+                            raise ModelNotAvailableError(
+                                f"modelo emitiu classe sem suporte na taxonomia: {unsupported}"
+                            )
+                        await captures.add_detections(
+                            capture,
+                            [
+                                Detection(
+                                    urmind_class=UrmindClass(d.urmind_class).value,
+                                    confidence=d.confidence,
+                                    bbox=BoundingBox(**d.bbox).model_dump(),
+                                    model_version_id=model.id,
+                                )
+                                for d in found
+                            ],
+                        )
+                    # Detections persist before consolidation. A crash here resumes
+                    # through the normal path: detection is skipped for this model
+                    # and event consolidation is idempotent by event_key.
+                    await queue.set_capture_inference(
+                        capture,
+                        {
+                            "status": CaptureProcessingStatus.BUILDING_EVENT.value,
+                            "at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                    await session.commit()
+                    service = CoreService(
+                        captures, EventRepository(session), DecisionRepository(session)
+                    )
+                    consolidated = await service.consolidate_capture(capture_id)
+                    event_ids = [item["event_id"] for item in consolidated["events"]]
+                    await queue.set_capture_inference(
+                        capture,
+                        {
+                            "status": "detection_completed",
+                            "model_version_id": str(model.id),
+                            "model_version": model.version,
+                            "model_status": model.operational_status,
+                            "onnx_sha256": model.checksum,
+                            "execution_provider": detector.provider,
+                            "detections": len(capture.detections),
+                            "events": len(event_ids),
+                            "event_ids": [str(item) for item in event_ids],
+                            "context_done_event_ids": [],
+                            "latency_ms": round((time.perf_counter() - started) * 1000),
+                            "detection_completed_at": datetime.now(UTC).isoformat(),
+                        },
+                    )
+                    await session.commit()
+                    bound.info(
+                        "detection_completed",
+                        detection_ids=[str(d.id) for d in capture.detections],
+                        event_ids=[str(item) for item in event_ids],
+                    )
             except ModelNotAvailableError as exc:
                 await session.rollback()
                 await self._final_state(capture_id, job, "model_not_available", str(exc))
                 bound.warning("model_not_available", reason=str(exc))
+                return True
             except (StorageError, ValueError, OSError) as exc:
                 await session.rollback()
                 if job["read_ct"] >= MAX_ATTEMPTS:
@@ -141,36 +269,149 @@ class Worker:
                     bound.error("inference_failed", error=type(exc).__name__)
                 else:
                     bound.warning("inference_retry", error=type(exc).__name__)
-        for event_id in created:
-            await self.enrich_event(event_id, bound)
+                return True
+        if not event_ids:
+            async with self.database.sessionmaker() as session:
+                capture = await CaptureRepository(session).get(capture_id)
+                inference = ((capture.quality or {}).get("inference") or {}) if capture else {}
+                detection_count = inference.get(
+                    "detections", len(getattr(capture, "detections", [])) if capture else 0
+                )
+            await self._set_capture_stage(
+                capture_id, "no_event" if detection_count else "no_supported_detection"
+            )
+        else:
+            try:
+                await self._finish_analysis(capture_id, event_ids, bound)
+            except Exception as exc:  # noqa: BLE001 — qualquer falha persistente deve encerrar o job
+                if job["read_ct"] >= MAX_ATTEMPTS:
+                    await self._final_state(capture_id, job, "inference_failed", type(exc).__name__)
+                    bound.error("analysis_failed", error=type(exc).__name__)
+                else:
+                    bound.warning("analysis_retry", error=type(exc).__name__)
+                return True
+        async with self.database.sessionmaker() as session:
+            await InferenceRepository(session).archive_job(job["msg_id"])
+            await session.commit()
         return True
 
-    async def enrich_event(self, event_id: uuid.UUID, bound) -> None:
-        """Contexto externo depois da inferência persistida (§13): falha nunca desfaz o Event."""
-        try:
-            async with self.database.sessionmaker() as session:
-                service = CoreService(
-                    CaptureRepository(session),
-                    EventRepository(session),
-                    DecisionRepository(session),
+    async def _finish_analysis(
+        self, capture_id: uuid.UUID, event_ids: list[uuid.UUID], bound
+    ) -> None:
+        await self._set_capture_stage(capture_id, "enriching_context")
+        async with self.database.sessionmaker() as session:
+            capture = await CaptureRepository(session).get(capture_id)
+            completed_context = (
+                set(
+                    ((capture.quality or {}).get("inference") or {}).get("context_done_event_ids")
+                    or []
                 )
-                location = await service.event_location(event_id)
-            if location is None:
-                return
-            results = await gather_context(
-                location["latitude"], location["longitude"], location["occurred_at"]
+                if capture
+                else set()
             )
-            async with self.database.sessionmaker() as session:
+        for event_id in event_ids:
+            if str(event_id) not in completed_context:
+                await self.enrich_event(event_id, bound, capture_id)
+        # FeatureBuilder snapshot and RiskAssessment/DecisionTrace are written in
+        # one transaction per event; `assessing` is reported by the API while the
+        # stored stage is complete but the snapshot/trace is still missing.
+        await self._set_capture_stage(capture_id, CaptureProcessingStatus.BUILDING_FEATURES.value)
+        async with self.database.sessionmaker() as session:
+            service = CoreService(
+                CaptureRepository(session),
+                EventRepository(session),
+                DecisionRepository(session),
+            )
+            complete = True
+            for event_id in event_ids:
+                event = await service.events.get(event_id)
+                if event is None:
+                    complete = False
+                    break
+                assessment = await DecisionRepository(session).latest_risk(event_id)
+                factors = (assessment.factors or {}) if assessment else {}
+                if not factors.get("phase4_snapshot") or not factors.get("decision_trace"):
+                    await service.assess_event(event_id)
+                    assessment = await DecisionRepository(session).latest_risk(event_id)
+                    factors = (assessment.factors or {}) if assessment else {}
+                if not factors.get("phase4_snapshot") or not factors.get("decision_trace"):
+                    complete = False
+                    break
+            await session.commit()
+        if not complete:
+            raise RuntimeError("análise incompleta; job permanece na fila para retomada")
+        await self._set_capture_stage(capture_id, "analysis_completed")
+
+    async def _set_capture_stage(self, capture_id: uuid.UUID, status: str, **details) -> None:
+        async with self.database.sessionmaker() as session:
+            capture = await CaptureRepository(session).get(capture_id)
+            if capture is None:
+                return
+            quality = capture.quality or {}
+            inference = quality.get("inference") or {}
+            await InferenceRepository(session).set_capture_inference(
+                capture,
+                {**inference, "status": status, "at": datetime.now(UTC).isoformat(), **details},
+            )
+            await session.commit()
+
+    async def enrich_event(self, event_id: uuid.UUID, bound, capture_id: uuid.UUID) -> bool:
+        """Contexto externo depois da inferência persistida (§13): falha nunca desfaz o Event."""
+        async with self.database.sessionmaker() as session:
+            service = CoreService(
+                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+            )
+            location = await service.event_location(event_id)
+        results = None
+        if location is not None:
+            settings = get_settings()
+            sidra_query = (
+                municipal_population_query(settings.ibge_sidra_municipality_code)
+                if settings.ibge_sidra_municipality_code
+                else None
+            )
+            try:
+                with structlog.contextvars.bound_contextvars(event_id=str(event_id)):
+                    results = await gather_context(
+                        location["latitude"],
+                        location["longitude"],
+                        location["occurred_at"],
+                        include_sidra=True,
+                        sidra_query=sidra_query,
+                        include_administrative=True,
+                    )
+            except Exception as exc:  # noqa: BLE001 — falha externa não apaga o Event
+                bound.warning(
+                    "event_context_failed", event_id=str(event_id), error=type(exc).__name__
+                )
+        async with self.database.sessionmaker() as session:
+            if results is not None:
                 service = CoreService(
                     CaptureRepository(session),
                     EventRepository(session),
                     DecisionRepository(session),
                 )
                 applied = await service.apply_context(event_id, results)
-                await session.commit()
-            bound.info("event_context_applied", event_id=str(event_id), context=applied["context"])
-        except Exception as exc:  # noqa: BLE001 — contexto é opcional; o evento já existe
-            bound.warning("event_context_failed", event_id=str(event_id), error=type(exc).__name__)
+                bound.info(
+                    "event_context_applied", event_id=str(event_id), context=applied["context"]
+                )
+            capture = await CaptureRepository(session).get(capture_id)
+            if capture is None:
+                raise RuntimeError("Capture ausente durante conclusão de contexto")
+            inference = (capture.quality or {}).get("inference") or {}
+            done = set(inference.get("context_done_event_ids") or [])
+            done.add(str(event_id))
+            await InferenceRepository(session).set_capture_inference(
+                capture,
+                {
+                    **inference,
+                    "context_done_event_ids": sorted(done),
+                    "context_unavailable": results is None
+                    or inference.get("context_unavailable", False),
+                },
+            )
+            await session.commit()
+        return results is not None
 
     async def _final_state(
         self, capture_id: uuid.UUID, job: dict, status: str, detail: str
@@ -179,9 +420,11 @@ class Worker:
             queue = InferenceRepository(session)
             capture = await CaptureRepository(session).get(capture_id)
             if capture is not None:
+                inference = (capture.quality or {}).get("inference") or {}
                 await queue.set_capture_inference(
                     capture,
                     {
+                        **inference,
                         "status": status,
                         "detail": detail,
                         "attempts": job["read_ct"],

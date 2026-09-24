@@ -3,6 +3,7 @@ import {
   ContextPanel,
   DecisionTrace,
   EventTraceability,
+  ExperimentalBadge,
   LocationPanel,
   PredictionPanel,
   QuickDiagnosis,
@@ -13,17 +14,19 @@ import { EventFeed } from '../../components/public/EventFeed';
 import { ScoutLivePanel } from '../../components/public/ScoutLivePanel';
 import { SystemStatusBar } from '../../components/public/SystemStatusBar';
 import {
+  filterableClasses,
   labelFor,
+  modelSupportLabel,
   priorityBand,
-  publicClassLabels,
   severityOf,
+  type IssueTaxonomy,
   type PublicEvent,
   type PublicEventDetail,
   type PublicScout,
   type PublicStatus,
   type Transparency,
 } from '../../domain/public';
-import { statuses } from '../../domain/contracts';
+import { statuses, type CaptureMarker } from '../../domain/contracts';
 import { publicApi } from '../../services/publicApi';
 
 const UrbanMap = lazy(() => import('../../components/UrbanMap'));
@@ -251,7 +254,7 @@ function Filters({
         <label htmlFor="public-class">Classe</label>
         <select id="public-class" value={urmindClass} onChange={(e) => onClass(e.target.value)}>
           <option value="">Todas as classes</option>
-          {Object.entries(publicClassLabels).map(([value, label]) => (
+          {filterableClasses().map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
@@ -273,8 +276,22 @@ function Filters({
   );
 }
 
-export function PublicMapPage({ events }: { events: PublicEvent[] }) {
+export function PublicMapPage({
+  events,
+  reports = [],
+}: {
+  events: PublicEvent[];
+  reports?: CaptureMarker[];
+}) {
   const [selected, setSelected] = useState<string | null>(null);
+  const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
+  const reportIds = new Set(reports.map((report) => report.id));
+  const eventIds = new Set(reports.map((report) => report.event_id));
+  const markers = [
+    ...events.filter((event) => !eventIds.has(event.id)),
+    ...(generic ?? []).filter((report) => !reportIds.has(report.id)),
+    ...reports,
+  ];
   return (
     <>
       <div className="page-heading public">
@@ -285,7 +302,7 @@ export function PublicMapPage({ events }: { events: PublicEvent[] }) {
         </div>
       </div>
       <Suspense fallback={<p role="status">Carregando mapa…</p>}>
-        <UrbanMap events={events} selectedId={selected} onSelect={setSelected} />
+        <UrbanMap events={markers} selectedId={selected} onSelect={setSelected} />
       </Suspense>
       <EventFeed events={events} selectedId={selected} onSelect={(event) => openEvent(event.id)} />
     </>
@@ -357,6 +374,7 @@ export function PublicEventDetailPage({ id, revision }: { id: string; revision: 
       <div className="page-heading public">
         <div>
           <p className="eyebrow">ANÁLISE COMPLETA</p>
+          <ExperimentalBadge stage={event.model_stage} />
           <h1>{labelFor(event.urmind_class)}</h1>
           <p>
             <span className={`risk-tag risk-${severity.level}`}>
@@ -491,7 +509,7 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
           </li>
           <li>
             <strong>YOLOX</strong>
-            <span>{data.model_version ?? 'nenhum modelo promovido'}</span>
+            <span>{data.model_version ?? 'nenhum modelo autorizado neste modo'}</span>
           </li>
           <li>
             <strong>Contexto urbano</strong>
@@ -511,6 +529,7 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
           número vem de medição registrada.
         </p>
       </section>
+      <TaxonomyPanel revision={revision} />
       <div className="detail-grid">
         <section className="panel" aria-label="Modelo">
           <div className="section-heading">
@@ -748,6 +767,88 @@ export function PublicSystemPage({
           </dl>
         </section>
       </div>
+    </>
+  );
+}
+
+/** Classes da taxonomia canônica e o que o modelo atual realmente suporta. */
+function TaxonomyPanel({ revision }: { revision: number }) {
+  const { data, error } = usePublicData<IssueTaxonomy>(
+    (signal) => publicApi.taxonomy(signal),
+    [revision],
+  );
+  if (error) return null;
+  if (!data) return <Skeleton lines={3} />;
+  return (
+    <section className="panel" aria-label="Classes de problemas urbanos">
+      <div className="section-heading">
+        <h2>Problemas urbanos</h2>
+        <span className="muted">{data.taxonomy_version}</span>
+      </div>
+      <p className="muted">
+        Só classes com modelo são detectadas automaticamente. As demais estão em desenvolvimento:
+        precisam de dados revisados antes de qualquer detecção.
+      </p>
+      <ul className="taxonomy-list">
+        {data.issues.map((issue) => (
+          <li key={issue.issue_code} data-support={issue.model_support_status}>
+            <strong>{issue.display_name_pt}</strong>
+            <span className="badge">{modelSupportLabel(issue)}</span>
+            {issue.limitations?.map((limitation) => (
+              <small key={limitation}>{limitation}</small>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Exemplos reais já revisados por humano. Nunca representam o resultado de uma
+ * foto recém-enviada: cada cartão leva o selo EXEMPLO REVISADO.
+ */
+export function PublicDemoPage({ revision }: { revision: number }) {
+  const { data, error, loading } = usePublicData<PublicEvent[]>(
+    (signal) => publicApi.events({ limit: 12, status: 'confirmed' }, signal),
+    [revision],
+  );
+  return (
+    <>
+      <div className="page-heading public">
+        <div>
+          <p className="eyebrow">DEMONSTRAÇÃO</p>
+          <h1>Exemplos revisados</h1>
+          <p>
+            Ocorrências reais confirmadas por revisão humana. Não são o resultado da sua foto; o
+            resultado de um envio aparece em “Processando”.
+          </p>
+        </div>
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && !data && <Skeleton lines={4} />}
+      {data && data.length === 0 && (
+        <p className="panel muted">Nenhum exemplo revisado disponível ainda.</p>
+      )}
+      {data && data.length > 0 && (
+        <ul className="demo-list">
+          {data.map((event) => (
+            <li key={event.id} className="panel">
+              <span className="badge demo-badge">EXEMPLO REVISADO</span>
+              <strong>{labelFor(event.urmind_class)}</strong>
+              <span className="muted">
+                {new Date(event.occurred_at).toLocaleDateString('pt-BR')} · severidade{' '}
+                {severityOf(event.severity).label}
+              </span>
+              <a href={`#/events/${event.id}`}>Ver diagnóstico</a>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

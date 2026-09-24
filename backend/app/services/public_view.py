@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.schemas.core import UrmindClass
+from app.schemas.issue_taxonomy import get_issue
 from app.schemas.public import (
     ActionPublic,
     ComponentStatus,
@@ -59,7 +60,10 @@ CONTEXT_LABELS = {
 
 
 def class_label(urmind_class: str) -> str:
-    return CLASS_LABELS.get(urmind_class, urmind_class)
+    if urmind_class in CLASS_LABELS:
+        return CLASS_LABELS[urmind_class]
+    issue = get_issue(urmind_class)
+    return issue.display_name_pt if issue else urmind_class
 
 
 def summary(row: dict[str, Any]) -> EventSummaryPublic:
@@ -86,8 +90,25 @@ def summary(row: dict[str, Any]) -> EventSummaryPublic:
 def image_availability(
     capture: dict[str, Any] | None, quality: dict[str, Any] | None
 ) -> ImageAvailability:
-    """Portão de privacidade: sem `privacy_redacted` registrado, a imagem não sai."""
-    redacted = bool((quality or {}).get("privacy_redacted") is True)
+    """Only a separately stored, metadata-stripped, reviewed derivative may leave."""
+    derivative = (quality or {}).get("public_image")
+    derivative = derivative if isinstance(derivative, dict) else {}
+    path = derivative.get("storage_path")
+    digest = derivative.get("sha256")
+    redacted = bool(
+        derivative.get("metadata_stripped") is True
+        and derivative.get("visible_content_reviewed") is True
+        and derivative.get("content_type") == "image/jpeg"
+        and isinstance(path, str)
+        and path
+        and path != (capture or {}).get("storage_path")
+        and isinstance(digest, str)
+        and len(digest) == 64
+        and all(char in "0123456789abcdef" for char in digest)
+        and derivative.get("source_sha256") == (quality or {}).get("sha256")
+        and isinstance(derivative.get("source_sha256"), str)
+        and bool(derivative.get("review_id"))
+    )
     if capture is None:
         return ImageAvailability(
             available=False, privacy_redacted=False, reason="evento sem captura associada"
@@ -135,6 +156,19 @@ def context_public(rows: list[dict[str, Any]]) -> list[ContextSourcePublic]:
     return public
 
 
+def assessed_context_records(
+    risk_factors: dict[str, Any] | None, current_records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Do not present newer provider data as an earlier assessment's evidence."""
+    if risk_factors is None:
+        return current_records
+    snapshot = risk_factors.get("phase4_snapshot")
+    if not isinstance(snapshot, dict):
+        return []  # legacy assessment: temporal lineage is unavailable
+    records = snapshot.get("context_records")
+    return records if isinstance(records, list) else []
+
+
 def risk_public(row: dict[str, Any] | None) -> RiskPublic | None:
     if row is None:
         return None
@@ -146,8 +180,10 @@ def risk_public(row: dict[str, Any] | None) -> RiskPublic | None:
         else {"increased": [], "decreased": [], "unavailable": [], "baseline": None}
     )
     return RiskPublic(
+        assessment_source="phase5" if phase5 else "legacy",
         severity=row["severity"],
         priority_score=row.get("priority_score"),
+        impact=list((phase5.get("impact") or {}).get("potential_domains") or []),
         risk_level=(phase5.get("risk") or {}).get("ordinal_level"),
         priority_lane=(phase5.get("priority") or {}).get("attention_lane"),
         uncertainty=row.get("uncertainty"),
@@ -289,11 +325,13 @@ def status_public(
         ),
         detector=ComponentStatus(
             name="Detector",
-            status="ok" if detector else "unavailable",
+            status=("degraded" if detector.get("stage") == "EXPERIMENTAL_SHADOW" else "ok")
+            if detector
+            else "unavailable",
             detail=(
                 f"{detector['version']} ({detector.get('stage', 'sem estágio')})"
                 if detector
-                else "nenhum modelo promovido"
+                else "nenhum modelo autorizado para este modo"
             ),
         ),
         scout=ComponentStatus(
@@ -352,8 +390,13 @@ def transparency_public(
     return TransparencyPublic(
         model_name=(model or {}).get("name"),
         model_version=(model or {}).get("version"),
-        stage=metrics.get("stage"),
-        stage_note=metrics.get("stage_note"),
+        stage=(model or {}).get("operational_status") or metrics.get("stage"),
+        stage_note=(
+            "Análise experimental; rejeitado para produção no Frozen Test."
+            if (model or {}).get("operational_status") == "EXPERIMENTAL_SHADOW"
+            and metrics.get("quality_classification") == "REJECTED"
+            else metrics.get("stage_note")
+        ),
         classes=list(serving.get("class_names") or []),
         input_size=list(serving.get("input_size") or []),
         score_threshold=serving.get("score_threshold"),

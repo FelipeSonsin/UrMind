@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.issue_taxonomy import ResponsibilityDomain
+
 
 class PublicModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -62,8 +64,10 @@ class RiskExplanationPublic(PublicModel):
 
 
 class RiskPublic(PublicModel):
+    assessment_source: Literal["phase5", "legacy"] | None = None
     severity: str
     priority_score: float | None
+    impact: list[str] = Field(default_factory=list)
     risk_level: str | None = None
     priority_lane: str | None = None
     uncertainty: float | None
@@ -140,7 +144,53 @@ class EventSummaryPublic(PublicModel):
     road_name: str | None
 
 
+class UrbanIdentificationPublic(PublicModel):
+    issue_code: str
+    display_name: str
+    family: str | None
+    model_support_status: str | None
+    visual_confidence: float | None
+    reviewed: bool
+
+
+class PotentialConsequencePublic(PublicModel):
+    domain: str
+    statement: str
+    conditional: Literal[True] = True
+    source: Literal["persisted_phase5"] = "persisted_phase5"
+
+
+class UrbanAnalysisProvenancePublic(PublicModel):
+    taxonomy_version: str
+    model_version: str | None
+    model_stage: str | None
+    dataset_version: str | None
+    ruleset_version: str | None
+    assessed_at: datetime | None
+    assessment_source: Literal["persisted_phase5", "unavailable"]
+    method: Literal["deterministic_template"] = "deterministic_template"
+
+
+class UrbanAnalysisPublic(PublicModel):
+    schema_version: Literal["urmind-urban-analysis-v1"] = "urmind-urban-analysis-v1"
+    identification: UrbanIdentificationPublic
+    description: str
+    diagnosis: str
+    potential_consequences: list[PotentialConsequencePublic] = Field(default_factory=list)
+    possible_causes: list[str] = Field(default_factory=list)
+    severity: str | None
+    risk_level: str | None
+    priority_lane: str | None
+    action: ActionPublic | None
+    responsibility: ResponsibilityPublic
+    responsibility_domain: ResponsibilityDomain | None
+    context: list[ContextSourcePublic] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    provenance: UrbanAnalysisProvenancePublic
+
+
 class EventDetailPublic(EventSummaryPublic):
+    analysis: UrbanAnalysisPublic | None = None
     distance_to_road_m: float | None
     location_accuracy_m: float | None
     road: RoadPublic | None
@@ -233,3 +283,36 @@ class TransparencyPublic(PublicModel):
     context_sources: list[dict[str, str]] = Field(default_factory=list)
     rules: dict[str, Any] = Field(default_factory=dict)
     limitations: list[str] = Field(default_factory=list)
+
+
+class IssueTaxonomyEntryPublic(PublicModel):
+    """Classe versionada; `model_may_emit=False` nunca é "IA já reconhece"."""
+
+    issue_code: str
+    taxonomy_version: str
+    family: str
+    display_name_pt: str
+    display_name_en: str
+    description: str
+    visual_definition: str
+    included_examples: list[str]
+    excluded_examples: list[str]
+    model_support_status: str
+    dataset_status: str
+    review_status: str
+    responsibility_domain: ResponsibilityDomain
+    legacy_responsibility_domain: str
+    possible_impact_domains: list[str]
+    applicable_context_features: list[str]
+    version: int
+    related_legacy_codes: list[str]
+    model_may_emit: bool
+    risk_groups: list[str] = Field(default_factory=list)
+    photo_detectable: bool | Literal["limited"] = "limited"
+    limitations: list[str] = Field(default_factory=list)
+    triage_priority_hint: str | None = None
+
+
+class IssueTaxonomyPublic(PublicModel):
+    taxonomy_version: str
+    issues: list[IssueTaxonomyEntryPublic]

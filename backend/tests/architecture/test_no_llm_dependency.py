@@ -12,6 +12,8 @@ generativa entre no núcleo sem que ninguém perceba.
 from __future__ import annotations
 
 import ast
+import os
+import sys
 import tomllib
 from pathlib import Path
 
@@ -67,9 +69,7 @@ FORBIDDEN_CONFIG_KEYS: tuple[str, ...] = (
 SCANNED_SOURCE_DIRS: tuple[str, ...] = ("backend/app", "scripts")
 
 #: pyproject.toml de cada projeto Python do repositório.
-SCANNED_PYPROJECTS: tuple[str, ...] = (
-    "backend/pyproject.toml",
-)
+SCANNED_PYPROJECTS: tuple[str, ...] = ("backend/pyproject.toml",)
 
 #: Arquivos varridos em busca de configuração proibida.
 CONFIG_SUFFIXES: frozenset[str] = frozenset(
@@ -96,17 +96,19 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
         ".pytest_cache",
         ".ruff_cache",
         "node_modules",
-        "datasets",
         "site-packages",
     }
 )
+EXCLUDED_ROOT_TREES: frozenset[str] = frozenset({"datasets"})
 
 #: Este próprio arquivo cita as listas proibidas e não pode se autoacusar.
 SELF = Path(__file__).resolve()
 
 
 def _is_excluded(path: Path) -> bool:
-    return any(part in EXCLUDED_DIR_NAMES for part in path.parts)
+    return bool(path.parts and path.parts[0] in EXCLUDED_ROOT_TREES) or any(
+        part in EXCLUDED_DIR_NAMES for part in path.parts
+    )
 
 
 def _python_files() -> list[Path]:
@@ -115,9 +117,7 @@ def _python_files() -> list[Path]:
         base = REPO_ROOT / rel
         if not base.is_dir():
             continue
-        files.extend(
-            p for p in base.rglob("*.py") if not _is_excluded(p.relative_to(REPO_ROOT))
-        )
+        files.extend(p for p in base.rglob("*.py") if not _is_excluded(p.relative_to(REPO_ROOT)))
     return files
 
 
@@ -152,14 +152,24 @@ def _declared_distributions(pyproject: Path) -> set[str]:
 
 def _config_files() -> list[Path]:
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("*"):
-        if not path.is_file() or path.resolve() == SELF:
-            continue
-        relative = path.relative_to(REPO_ROOT)
-        if _is_excluded(relative):
-            continue
-        if path.name in CONFIG_FILENAMES or path.suffix in CONFIG_SUFFIXES:
-            files.append(path)
+
+    # Excluir antes de descer: rglob atravessava .venv/node_modules/datasets
+    # (inclusive placeholders OneDrive) para descartá-los só depois.
+    def fail_on_unreadable_tree(error: OSError) -> None:
+        raise RuntimeError("Diretório de configuração inacessível") from error
+
+    for base, dirs, names in os.walk(
+        REPO_ROOT, topdown=True, followlinks=False, onerror=fail_on_unreadable_tree
+    ):
+        dirs[:] = sorted(
+            name for name in dirs if not _is_excluded((Path(base) / name).relative_to(REPO_ROOT))
+        )
+        for name in names:
+            path = Path(base) / name
+            if path == SELF:
+                continue
+            if name in CONFIG_FILENAMES or path.suffix in CONFIG_SUFFIXES:
+                files.append(path)
     return files
 
 
@@ -170,6 +180,42 @@ def test_scanned_trees_are_not_silently_empty() -> None:
         f"{SCANNED_SOURCE_DIRS} a partir de {REPO_ROOT}. "
         "O teste arquitetural estaria passando sem varrer nada."
     )
+
+
+def test_config_scan_prunes_only_excluded_trees(monkeypatch, tmp_path: Path) -> None:
+    included = (
+        "backend/app/config.py",
+        "backend/app/datasets/rules.yaml",
+        "scripts/setup.py",
+        "models/model.yaml",
+        "mlruns/run.yaml",
+    )
+    excluded = (
+        "datasets/raw/metadata.yaml",
+        ".venv/lib/settings.toml",
+        "frontend/node_modules/pkg/config.yaml",
+    )
+    for relative in (*included, *excluded):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("safe: true", encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+
+    found = {path.relative_to(tmp_path).as_posix() for path in _config_files()}
+
+    assert found == set(included)
+
+
+def test_config_scan_fails_closed_on_unreadable_tree(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+
+    def unreadable(_root, **kwargs):
+        kwargs["onerror"](PermissionError("inaccessible"))
+        yield tmp_path, [], []
+
+    monkeypatch.setattr(os, "walk", unreadable)
+    with pytest.raises(RuntimeError, match="inacessível"):
+        _config_files()
 
 
 def test_no_forbidden_import_in_source_trees() -> None:
@@ -207,17 +253,32 @@ def test_no_forbidden_distribution_in_pyproject() -> None:
 def test_no_forbidden_config_key_anywhere() -> None:
     """Nenhum segredo ou variável de LLM aparece em código ou configuração."""
     offenders: list[str] = []
-    for path in _config_files():
+    files = _config_files()
+    assert REPO_ROOT / "backend/pyproject.toml" in files, "Configuração canônica não foi varrida"
+    for path in files:
+        relative = path.relative_to(REPO_ROOT).as_posix()
         try:
             content = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        except (UnicodeDecodeError, OSError) as exc:
+            offenders.append(f"{relative}: leitura indisponível ({type(exc).__name__})")
             continue
         hits = [key for key in FORBIDDEN_CONFIG_KEYS if key in content]
         if hits:
-            relative = path.relative_to(REPO_ROOT).as_posix()
             offenders.append(f"{relative}: {', '.join(hits)}")
 
     assert not offenders, (
         "Configuração de modelo generativo de terceiros presente "
         "(Documento 1, §14.5):\n  " + "\n  ".join(offenders)
     )
+
+
+def test_config_scan_does_not_ignore_unreadable_config(monkeypatch, tmp_path: Path) -> None:
+    pyproject = tmp_path / "backend/pyproject.toml"
+    pyproject.parent.mkdir(parents=True)
+    pyproject.write_text("[project]", encoding="utf-8")
+    unreadable = tmp_path / "backend/broken.yaml"
+    unreadable.write_bytes(b"\xff")
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+
+    with pytest.raises(AssertionError, match="broken.yaml: leitura indisponível"):
+        test_no_forbidden_config_key_anywhere()

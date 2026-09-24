@@ -51,6 +51,13 @@ mlops = [
   "dvc==3.67.1",
   "mlflow-skinny==3.16.0",
 ]
+data-platforms = [
+  "huggingface-hub>=0.27,<2",
+]
+future-vision = [
+  # Metadado opcional apenas; não instalar durante o treino YOLOX ativo.
+  "timm>=1,<2",
+]
 
 [build-system]
 requires = ["setuptools>=75"]
@@ -70,12 +77,16 @@ testpaths = ["tests"]
 markers = [
   "architecture: regras que protegem as decisões estruturais do projeto",
   "integration: testes que exigem PostgreSQL/PostGIS real",
+  "live: testes opt-in que acessam serviços públicos externos",
 ]
 
 [tool.ruff]
-# Ancorado ao diretorio deste pyproject: sem isso o ruff grava o cache no
-# cwd, e uma invocacao a partir da raiz criava um segundo .ruff_cache la.
+# Cache do Ruff permanece junto ao projeto Python.
 cache-dir = ".ruff_cache"
 exclude = ["third_party", ".venv*"]
 line-length = 100
 target-version = "py312"
+
+[tool.mypy]
+# O mypy deve ser executado a partir de backend; assim o cache não polui a raiz.
+cache_dir = ".mypy_cache"

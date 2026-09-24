@@ -66,7 +66,7 @@ const riskFactor = z.object({
   reason: z.string().nullable().optional(),
 });
 
-export const publicEventDetailSchema = publicEventSchema.extend({
+const publicEventDetailBase = publicEventSchema.extend({
   distance_to_road_m: z.number().nullable(),
   location_accuracy_m: z.number().nullable(),
   road: z
@@ -96,6 +96,7 @@ export const publicEventDetailSchema = publicEventSchema.extend({
     .object({
       severity: z.string(),
       priority_score: z.number().nullable(),
+      impact: z.array(z.string()).default([]),
       uncertainty: z.number().nullable(),
       uncertainty_band: z.string(),
       coverage: z.number().nullable(),
@@ -153,6 +154,63 @@ export const publicEventDetailSchema = publicEventSchema.extend({
   model_stage: z.string().nullable(),
   dataset_version: z.string().nullable(),
   reviewed: z.boolean(),
+});
+export const urbanAnalysisSchema = z.object({
+  schema_version: z.literal('urmind-urban-analysis-v1').default('urmind-urban-analysis-v1'),
+  identification: z.object({
+    issue_code: z.string(),
+    display_name: z.string(),
+    family: z.string().nullable(),
+    model_support_status: z.string().nullable(),
+    visual_confidence: z.number().nullable(),
+    reviewed: z.boolean(),
+  }),
+  description: z.string(),
+  diagnosis: z.string(),
+  potential_consequences: z
+    .array(
+      z.object({
+        domain: z.string(),
+        statement: z.string(),
+        conditional: z.literal(true).default(true),
+        source: z.literal('persisted_phase5').default('persisted_phase5'),
+      }),
+    )
+    .default([]),
+  possible_causes: z.array(z.string()).default([]),
+  severity: z.string().nullable(),
+  risk_level: z.string().nullable(),
+  priority_lane: z.string().nullable(),
+  action: publicEventDetailBase.shape.action,
+  responsibility: publicEventDetailBase.shape.responsibility,
+  responsibility_domain: z
+    .enum([
+      'ROAD_MAINTENANCE',
+      'URBAN_FORESTRY',
+      'DRAINAGE',
+      'URBAN_CLEANING',
+      'PEDESTRIAN_INFRASTRUCTURE',
+      'TRAFFIC_AUTHORITY',
+      'PUBLIC_LIGHTING',
+      'CIVIL_DEFENSE',
+      'GENERAL_INSPECTION',
+    ])
+    .nullable(),
+  context: publicEventDetailBase.shape.context.default([]),
+  limitations: z.array(z.string()).default([]),
+  provenance: z.object({
+    taxonomy_version: z.string(),
+    model_version: z.string().nullable(),
+    model_stage: z.string().nullable(),
+    dataset_version: z.string().nullable(),
+    ruleset_version: z.string().nullable(),
+    assessed_at: z.string().nullable(),
+    assessment_source: z.enum(['persisted_phase5', 'unavailable']),
+    method: z.literal('deterministic_template').default('deterministic_template'),
+  }),
+});
+export const publicEventDetailSchema = publicEventDetailBase.extend({
+  analysis: urbanAnalysisSchema.nullable().optional(),
 });
 export type PublicEventDetail = z.infer<typeof publicEventDetailSchema>;
 
@@ -214,8 +272,80 @@ export const severityPresentation: Record<string, { label: string; shape: string
     unknown: { label: 'Não determinada', shape: '?', level: 'unknown' },
   };
 
+/** Taxonomia canônica servida por `/public/taxonomy` (fonte única de classes). */
+export const issueTaxonomySchema = z.object({
+  taxonomy_version: z.string(),
+  issues: z.array(
+    z.object({
+      issue_code: z.string(),
+      taxonomy_version: z.string(),
+      family: z.string(),
+      display_name_pt: z.string(),
+      display_name_en: z.string(),
+      description: z.string(),
+      visual_definition: z.string(),
+      included_examples: z.array(z.string()),
+      excluded_examples: z.array(z.string()),
+      model_support_status: z.enum([
+        'ACTIVE_MODEL',
+        'EXPERIMENTAL_MODEL',
+        'DATA_REQUIRED',
+        'REVIEW_ONLY',
+        'DISABLED',
+      ]),
+      dataset_status: z.string(),
+      review_status: z.string(),
+      responsibility_domain: z.string(),
+      version: z.number().int(),
+      related_legacy_codes: z.array(z.string()),
+      model_may_emit: z.boolean(),
+      risk_groups: z.array(z.string()).optional(),
+      photo_detectable: z.union([z.boolean(), z.literal('limited')]).optional(),
+      limitations: z.array(z.string()).optional(),
+      triage_priority_hint: z.string().nullable().optional(),
+    }),
+  ),
+});
+export type IssueTaxonomy = z.infer<typeof issueTaxonomySchema>;
+export type IssueDefinition = IssueTaxonomy['issues'][number];
+
+const taxonomyLabels = new Map<string, string>();
+let emittableCodes: string[] = [];
+
+/** Registra os rótulos canônicos; o mapa estático fica só como fallback offline. */
+export function registerTaxonomy(taxonomy: IssueTaxonomy): void {
+  taxonomyLabels.clear();
+  for (const issue of taxonomy.issues) taxonomyLabels.set(issue.issue_code, issue.display_name_pt);
+  emittableCodes = taxonomy.issues.filter((i) => i.model_may_emit).map((i) => i.issue_code);
+}
+
+/** Classes que podem aparecer como detecção de modelo (filtros de ocorrência). */
+export function filterableClasses(): [string, string][] {
+  const codes = emittableCodes.length ? emittableCodes : Object.keys(publicClassLabels);
+  return codes.map((code) => [code, labelFor(code)]);
+}
+
+/**
+ * O que o público pode ler sobre o suporte de modelo. DATA_REQUIRED nunca vira
+ * "IA já reconhece": a classe está em desenvolvimento e não é detectada.
+ */
+export function modelSupportLabel(issue: Pick<IssueDefinition, 'model_support_status'>): string {
+  switch (issue.model_support_status) {
+    case 'ACTIVE_MODEL':
+      return 'Reconhecida por modelo aprovado';
+    case 'EXPERIMENTAL_MODEL':
+      return 'Análise experimental';
+    case 'REVIEW_ONLY':
+      return 'Somente revisão humana';
+    case 'DISABLED':
+      return 'Desativada';
+    default:
+      return 'Em desenvolvimento';
+  }
+}
+
 export function labelFor(urmindClass: string): string {
-  return publicClassLabels[urmindClass] ?? urmindClass;
+  return taxonomyLabels.get(urmindClass) ?? publicClassLabels[urmindClass] ?? urmindClass;
 }
 
 export function severityOf(severity: string | null | undefined) {

@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import pytest
 
-from app.schemas.core import Coordinate, LocationSource
+from app.schemas.core import CaptureSource, Coordinate, LocationSource
 from app.services.exif import ExifStatus
 from app.services.photo_ingest import CapturedAtSource, ingest_photo
 from tests.test_exif import PAULISTA_LAT, PAULISTA_LON, build_jpeg, gps_block
 
 RECEBIDA_EM = datetime(2026, 9, 6, 18, 0, tzinfo=UTC)
-SAO_PAULO = timezone(-timedelta(hours=3))
 
 
 def ingest(image_bytes: bytes, **kwargs):
@@ -56,15 +55,36 @@ def test_ponto_marcado_no_mapa_entra_como_manual():
     assert result.capture.coordinate == marcado
 
 
-def test_correcao_manual_preserva_o_que_o_exif_dizia():
-    """§6.3: correção manual não apaga a posição anterior, registra em auditoria."""
+def test_device_exif_conflict_preserves_both_claims():
+    device = Coordinate(latitude=-22, longitude=-45, accuracy_m=8)
+    result = ingest(
+        build_jpeg(gps=gps_block()),
+        manual_coordinate=device,
+        manual_location_source=LocationSource.GPS_DEVICE,
+    )
+    assert result.capture.coordinate == device
+    assert result.capture.quality["location_conflict"] is True
+    assert result.capture.quality["exif_coordinate"]["latitude"] == pytest.approx(PAULISTA_LAT)
+
+
+def test_description_plain_text_and_length():
+    from pydantic import ValidationError
+
+    result = ingest(build_jpeg(gps=None), user_description="  <script>x</script>\x00  ")
+    assert result.capture.user_description == "<script>x</script>"
+    with pytest.raises(ValidationError):
+        ingest(build_jpeg(gps=None), user_description="a" * 501)
+
+
+def test_exif_tem_prioridade_sobre_fallback_manual():
+    """Server EXIF precedes manual fallback; neither claim is silently discarded."""
     marcado = Coordinate(latitude=-23.5000, longitude=-46.6000, accuracy_m=8)
 
     result = ingest(build_jpeg(gps=gps_block()), manual_coordinate=marcado)
 
-    assert result.capture.source_location is LocationSource.MANUAL
-    assert result.capture.coordinate == marcado
-    anterior = result.capture.quality["exif_coordinate_overridden"]
+    assert result.capture.source_location is LocationSource.EXIF
+    assert result.capture.coordinate.latitude == pytest.approx(PAULISTA_LAT)
+    anterior = result.capture.quality["exif_coordinate"]
     assert anterior["latitude"] == pytest.approx(PAULISTA_LAT, abs=1e-6)
     assert anterior["longitude"] == pytest.approx(PAULISTA_LON, abs=1e-6)
 
@@ -80,18 +100,22 @@ def test_arquivo_ilegivel_nao_impede_a_captura_mas_exige_marcacao():
 # ------------------------------------------------------------------ instante
 
 
-def test_exif_com_offset_define_o_instante():
+def test_exif_com_offset_fica_como_claim_nao_verificada():
     result = ingest(build_jpeg(gps=gps_block(), offset="-03:00"))
 
-    assert result.capture.quality["captured_at_source"] == CapturedAtSource.EXIF_WITH_OFFSET.value
-    assert result.capture.captured_at.astimezone(UTC) == datetime(2026, 9, 4, 15, 34, 56, tzinfo=UTC)
+    assert result.capture.quality["captured_at_source"] == CapturedAtSource.RECEIVED_AT.value
+    assert result.capture.captured_at == RECEBIDA_EM
+    assert result.capture.quality["exif_capture_time_unverified"]
+    assert result.capture.quality["exif_timezone_known"] is True
 
 
-def test_exif_sem_offset_usa_o_fuso_do_cliente():
-    result = ingest(build_jpeg(gps=gps_block()), client_timezone=SAO_PAULO)
+def test_exif_sem_offset_nao_usa_fuso_atual_do_cliente():
+    result = ingest(build_jpeg(gps=gps_block()))
 
-    assert result.capture.quality["captured_at_source"] == CapturedAtSource.EXIF_LOCAL_TIME.value
-    assert result.capture.captured_at.utcoffset() == -timedelta(hours=3)
+    assert result.capture.quality["captured_at_source"] == CapturedAtSource.RECEIVED_AT.value
+    assert result.capture.captured_at == RECEBIDA_EM
+    assert result.capture.quality["exif_capture_time_unverified"]
+    assert result.capture.quality["exif_timezone_known"] is False
 
 
 def test_exif_sem_offset_e_sem_fuso_do_cliente_cai_para_o_recebimento():
@@ -113,3 +137,35 @@ def test_received_at_sem_fuso_e_recusado():
     with pytest.raises(ValueError, match="fuso"):
         # O naive aqui é o próprio caso de teste: a função tem que recusá-lo.
         ingest(build_jpeg(gps=gps_block()), received_at=datetime(2026, 9, 6, 18, 0))  # noqa: DTZ001
+
+
+def test_foto_pwa_preserva_instante_do_dispositivo_sem_alterar_ocorrencia():
+    captured = datetime(2026, 9, 6, 17, 55, tzinfo=UTC)
+    result = ingest(
+        build_jpeg(gps=None),
+        source=CaptureSource.PWA_PHOTO,
+        client_captured_at=captured,
+        manual_coordinate=Coordinate(latitude=-23.5, longitude=-46.6, accuracy_m=10),
+        manual_location_source=LocationSource.GPS_DEVICE,
+    )
+    assert result.capture.captured_at == RECEBIDA_EM
+    assert result.capture.quality["captured_at_source"] == CapturedAtSource.RECEIVED_AT.value
+    assert result.capture.quality["client_captured_at"] == captured.isoformat()
+    assert result.capture.quality["client_captured_at_trust"] == "unverified"
+    assert result.capture.source_location is LocationSource.GPS_DEVICE
+
+
+def test_pwa_com_exif_antigo_nao_reescreve_ocorrencia():
+    result = ingest(build_jpeg(gps=gps_block(), offset="-03:00"), source=CaptureSource.PWA_PHOTO)
+    assert result.capture.captured_at == RECEBIDA_EM
+    assert result.capture.quality["captured_at_source"] == CapturedAtSource.RECEIVED_AT.value
+    assert result.capture.quality["exif_capture_time_unverified"]
+
+
+def test_foto_pwa_rejeita_instante_sem_fuso():
+    with pytest.raises(ValueError, match="fuso"):
+        ingest(
+            build_jpeg(gps=None),
+            source=CaptureSource.PWA_PHOTO,
+            client_captured_at=datetime(2026, 9, 6, 17, 55),  # noqa: DTZ001
+        )

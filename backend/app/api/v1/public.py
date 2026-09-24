@@ -1,6 +1,7 @@
 """Painel público, somente leitura (§16.1, §17).
 
-Sem autenticação e sem escrita. Cada resposta é montada por `app.services.public_view`
+Sem escrita. Acesso público exige publicação explícita; autenticação opcional
+permite ao titular consultar seu próprio resultado. Cada resposta é montada por `app.services.public_view`
 a partir dos schemas de `app.schemas.public`: o que não está no contrato não sai.
 
 A câmera do Scout nunca é exposta direto ao público: o backend fica no meio, aplica o
@@ -10,28 +11,39 @@ portão de privacidade e limita conexões simultâneas.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Annotated, Any
+from threading import BoundedSemaphore
+from typing import Annotated, Any, Literal
 
 import httpx
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.api.v1.core import get_storage
+from app.auth import AuthenticatedUser, require_user
 from app.config import Settings, get_settings
 from app.repositories.core import (
     CaptureRepository,
     DecisionRepository,
     EventRepository,
     InferenceRepository,
+    PublicImageQuota,
     PublicRepository,
+    QuotaExceededError,
+    QuotaUnavailableError,
 )
+from app.schemas.issue_taxonomy import taxonomy_payload
 from app.schemas.public import (
     ActionPublic,
     DetectionPublic,
     EventDetailPublic,
     EventSummaryPublic,
+    IssueTaxonomyPublic,
     RoadPublic,
     ScoutCameraPublic,
     ScoutPublic,
@@ -40,6 +52,13 @@ from app.schemas.public import (
 )
 from app.services import public_view
 from app.services.core import CoreService, EventNotFoundError
+from app.services.report import build_urban_analysis
+from app.services.storage import (
+    MAX_BYTES,
+    InvalidImageError,
+    StorageClient,
+    StorageError,
+)
 
 router = APIRouter(prefix="/api/v1/public", tags=["public"])
 
@@ -49,6 +68,38 @@ NO_CAMERA = "nenhuma fonte de câmera configurada para o Scout"
 STREAM_BUSY = "limite de espectadores simultâneos atingido"
 MAX_FRAME_BYTES = 8 * 1024 * 1024
 _stream_slots: asyncio.Semaphore | None = None
+# Local concurrency backpressure complements the shared PostgreSQL rate budget;
+# public reads cannot exhaust upload decode slots.
+_public_image_slots = BoundedSemaphore(4)
+# Cheap lookup attempts and expensive, verified downloads have independent budgets.
+# ASGI client is resolved by the server's trusted-proxy configuration; never parse
+# caller-supplied X-Forwarded-For here. JWT identity, when present, is verified.
+
+
+def image_quota(request: Request) -> PublicImageQuota:
+    database = getattr(request.app.state, "database", None)
+    if database is None:
+        raise HTTPException(status_code=503, detail="Controle de consultas indisponível")
+    return PublicImageQuota(database.sessionmaker)
+
+
+async def _admit_image(
+    quota: PublicImageQuota, caller: str, event_id: uuid.UUID | None = None
+) -> None:
+    stage: Literal["lookup", "download"] = "download" if event_id is not None else "lookup"
+    try:
+        await quota.admit(stage, hashlib.sha256(caller.encode()).hexdigest(), event_id)
+    except QuotaExceededError:
+        structlog.get_logger(__name__).info("public_image_quota_rejected", category=stage)
+        raise HTTPException(
+            status_code=429,
+            detail="Limite de consultas de imagem atingido",
+            headers={"Retry-After": "60"},
+        ) from None
+    except QuotaUnavailableError:
+        # Never expose SQL parameters, connection details or fall back to local memory.
+        structlog.get_logger(__name__).warning("public_image_quota_unavailable", category=stage)
+        raise HTTPException(status_code=503, detail="Controle de consultas indisponível") from None
 
 
 def stream_slots(settings: Settings) -> asyncio.Semaphore:
@@ -76,6 +127,60 @@ async def repositories(request: Request) -> AsyncIterator[dict[str, Any]]:
 Repos = Annotated[dict[str, Any], Depends(repositories)]
 
 
+@router.get("/capture-markers")
+async def public_capture_markers(repos: Repos) -> list[dict[str, Any]]:
+    if not get_settings().public_capture_markers_enabled:
+        return []
+    return await repos["service"].capture_markers("", public=True)
+
+
+async def optional_user(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))
+    ],
+) -> AuthenticatedUser | None:
+    """A supplied token must validate; missing credentials retain public-only access."""
+    return await require_user(credentials) if credentials else None
+
+
+OptionalUser = Annotated[AuthenticatedUser | None, Depends(optional_user)]
+
+
+@router.get("/auth-origin")
+async def public_auth_origin() -> dict[str, str | bool]:
+    """Publishable Auth origin, so a PWA cannot sign visitors into another project."""
+    settings = get_settings()
+    configured = settings.supabase_url
+    if not configured:
+        raise HTTPException(status_code=503, detail="Auth não configurado")
+    return {
+        "auth_origin": configured.rstrip("/"),
+        "visitor_upload_enabled": await _anonymous_auth_enabled(settings),
+    }
+
+
+async def _anonymous_auth_enabled(settings: Settings) -> bool:
+    """Advertise visitor upload only if Supabase Auth actually accepts it."""
+    if not (
+        settings.visitor_upload_enabled
+        and settings.supabase_url
+        and settings.supabase_publishable_key
+    ):
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            response = await client.get(
+                f"{settings.supabase_url}/auth/v1/settings",
+                headers={"apikey": settings.supabase_publishable_key},
+            )
+        if response.status_code != 200:
+            return False
+        external = response.json().get("external")
+        return isinstance(external, dict) and external.get("anonymous_users") is True
+    except (httpx.HTTPError, ValueError, TypeError):
+        return False
+
+
 def camera_state(settings: Settings) -> ScoutCameraPublic:
     """Modo da câmera a partir do que existe de verdade — nunca "LIVE" sem fonte."""
     if settings.scout_stream_url:
@@ -89,17 +194,15 @@ def camera_state(settings: Settings) -> ScoutCameraPublic:
 async def public_status(repos: Repos, response: Response) -> StatusPublic:
     settings = get_settings()
     overview = await repos["public"].overview()
-    model = await repos["inference"].promoted_vision_model()
+    model = await repos["inference"].configured_vision_model(
+        settings.vision_execution_mode, settings.shadow_model_version_id
+    )
     device = await repos["public"].scout_device()
     response.headers["Cache-Control"] = CACHE_SHORT
     return public_view.status_public(
         overview=overview,
         database_ok=True,
-        detector=(
-            {"version": model.version, "stage": (model.metrics or {}).get("stage")}
-            if model
-            else None
-        ),
+        detector=({"version": model.version, "stage": model.operational_status} if model else None),
         scout=public_view.scout_public(device, camera_state(settings)),
     )
 
@@ -137,8 +240,10 @@ async def public_events(
 
 
 @router.get("/events/{event_id}", response_model=EventDetailPublic)
-async def public_event(event_id: uuid.UUID, repos: Repos, response: Response) -> EventDetailPublic:
-    row = await repos["public"].event(event_id)
+async def public_event(
+    event_id: uuid.UUID, repos: Repos, response: Response, user: OptionalUser
+) -> EventDetailPublic:
+    row = await repos["public"].event(event_id, owner_id=user.id if user else None)
     if row is None:
         raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
     try:
@@ -151,7 +256,22 @@ async def public_event(event_id: uuid.UUID, repos: Repos, response: Response) ->
     if capture is not None:
         stored = await repos["service"].captures.get(capture["id"])
         quality = stored.quality if stored else None
-    image = public_view.image_availability(capture, quality)
+    published = await repos["public"].event(event_id) if user else row
+    derivative = published.get("publication_image") if published else None
+    derivative = derivative if isinstance(derivative, dict) else {}
+    image_quality = (
+        {**(quality or {}), "public_image": derivative}
+        if (
+            published
+            and derivative.get("review_id") == published.get("publication_review_id")
+            and isinstance(derivative.get("storage_path"), str)
+            and derivative["storage_path"].startswith(f"public-derived/{event_id}/")
+        )
+        else None
+    )
+    image = public_view.image_availability(capture, image_quality)
+    if image.available:
+        image = image.model_copy(update={"url": f"/api/v1/public/events/{event_id}/image"})
     detections = [
         DetectionPublic(
             urmind_class=item["urmind_class"],
@@ -184,16 +304,28 @@ async def public_event(event_id: uuid.UUID, repos: Repos, response: Response) ->
         if action_row
         else None
     )
+    current_context = [
+        {"source": item["source"], "payload": item, "fetched_at": item.get("fetched_at")}
+        for item in dossier.get("context", [])
+    ]
     context = public_view.context_public(
-        [
-            {"source": item["source"], "payload": item, "fetched_at": item.get("fetched_at")}
-            for item in dossier.get("context", [])
-        ]
+        public_view.assessed_context_records(
+            risk_row.factors if risk_row else None, current_context
+        )
     )
-    model = await repos["inference"].promoted_vision_model()
+    # Event lineage is immutable; the currently selected model may have changed.
+    model_id = row.get("model_version_id")
+    model = await repos["inference"].model_version(model_id) if model_id else None
+    inference = (quality or {}).get("inference") or {}
+    historical_model_stage = (
+        inference.get("model_status")
+        if model_id and inference.get("model_version_id") == str(model_id)
+        else None
+    )
     base = public_view.summary(row)
-    response.headers["Cache-Control"] = CACHE_SHORT
-    return EventDetailPublic(
+    response.headers["Cache-Control"] = "private, no-store" if user else "no-store"
+    response.headers["Vary"] = "Authorization"
+    detail = EventDetailPublic(
         **base.model_dump(),
         distance_to_road_m=row.get("distance_to_road_m"),
         location_accuracy_m=row.get("location_accuracy_m"),
@@ -225,15 +357,101 @@ async def public_event(event_id: uuid.UUID, repos: Repos, response: Response) ->
             event=base,
         ),
         model_version=model.version if model else None,
-        model_stage=(model.metrics or {}).get("stage") if model else None,
+        model_stage=historical_model_stage,
         dataset_version=None,
         reviewed=bool(dossier.get("reviews")),
     )
+    return detail.model_copy(update={"analysis": build_urban_analysis(detail)})
+
+
+@router.get("/events/{event_id}/image")
+async def public_event_image(
+    event_id: uuid.UUID,
+    repos: Repos,
+    storage: Annotated[StorageClient, Depends(get_storage)],
+    request: Request,
+    user: OptionalUser,
+    quota: Annotated[PublicImageQuota, Depends(image_quota)],
+) -> Response:
+    """Proxy only the derivative bound to this event's current public Review."""
+    caller = (
+        f"user:{user.id}"
+        if user
+        else f"peer:{request.client.host if request.client else 'unknown'}"
+    )
+    await _admit_image(quota, caller)
+    row = await repos["public"].event(event_id)
+    if row is None or not row.get("capture_id"):
+        raise HTTPException(status_code=404, detail="Imagem não disponível")
+    capture = await repos["service"].captures.get(row["capture_id"])
+    quality = (capture.quality or {}) if capture else {}
+    derivative = row.get("publication_image")
+    derivative = derivative if isinstance(derivative, dict) else {}
+    image = public_view.image_availability(
+        {"id": capture.id, "storage_path": capture.storage_path} if capture else None,
+        {**quality, "public_image": derivative},
+    )
+    path = derivative.get("storage_path", "")
+    if (
+        not image.available
+        or derivative.get("review_id") != row.get("publication_review_id")
+        or not path.startswith(f"public-derived/{event_id}/")
+    ):
+        raise HTTPException(status_code=404, detail="Imagem não disponível")
+    # The snapshot above contains plain values. Release this read transaction
+    # before quota opens its short transaction, even with a one-connection pool.
+    await repos["public"].session.rollback()
+    await _admit_image(quota, caller, event_id)
+    if not _public_image_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429, detail="Consultas de imagem ocupadas", headers={"Retry-After": "1"}
+        )
+    try:
+        try:
+            data = await storage.download(path)
+            # Bytes were generated/validated at publication time. Verify the
+            # immutable artifact, not a second raster decode on every read.
+            if (
+                len(data) > MAX_BYTES
+                or not data.startswith(b"\xff\xd8\xff")
+                or not data.endswith(b"\xff\xd9")
+                or hashlib.sha256(data).hexdigest() != derivative["sha256"]
+            ):
+                raise InvalidImageError("derivative mismatch")
+        except (StorageError, InvalidImageError):
+            raise HTTPException(status_code=404, detail="Imagem não disponível") from None
+    finally:
+        _public_image_slots.release()
+    # Download yielded control. A withdrawal, new Review or republish
+    # during that interval must invalidate this pending response.
+    current = await repos["public"].event(event_id)
+    if (
+        current is None
+        or current.get("capture_id") != row.get("capture_id")
+        or current.get("publication_review_id") != row.get("publication_review_id")
+        or current.get("publication_image") != derivative
+    ):
+        raise HTTPException(status_code=404, detail="Imagem não disponível")
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.get("/taxonomy", response_model=IssueTaxonomyPublic)
+async def public_taxonomy(response: Response) -> IssueTaxonomyPublic:
+    """Registro canônico da taxonomia; o frontend não mantém lista própria de classes."""
+    response.headers["Cache-Control"] = CACHE_MEDIUM
+    return IssueTaxonomyPublic.model_validate(taxonomy_payload())
 
 
 @router.get("/transparency", response_model=TransparencyPublic)
 async def public_transparency(repos: Repos, response: Response) -> TransparencyPublic:
-    model = await repos["inference"].promoted_vision_model()
+    settings = get_settings()
+    model = await repos["inference"].configured_vision_model(
+        settings.vision_execution_mode, settings.shadow_model_version_id
+    )
     dataset = None
     if model is not None and model.dataset_version_id is not None:
         dataset_row = await repos["inference"].dataset_version(model.dataset_version_id)
@@ -249,7 +467,14 @@ async def public_transparency(repos: Repos, response: Response) -> TransparencyP
         )
     response.headers["Cache-Control"] = CACHE_MEDIUM
     return public_view.transparency_public(
-        {"name": model.name, "version": model.version, "metrics": model.metrics} if model else None,
+        {
+            "name": model.name,
+            "version": model.version,
+            "metrics": model.metrics,
+            "operational_status": model.operational_status,
+        }
+        if model
+        else None,
         dataset,
     )
 

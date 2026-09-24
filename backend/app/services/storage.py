@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import hashlib
 import io
+import time
+import warnings
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
+from threading import Lock
 from typing import Any
 
 import httpx
@@ -19,6 +23,7 @@ from app.config import Settings
 
 BUCKET = "captures"
 MAX_BYTES = 10 * 1024 * 1024
+MAX_PIXELS = 40_000_000
 # Formato decodificado pelo Pillow → MIME e extensão aceitos. O Content-Type
 # declarado pelo cliente não é prova de nada: vale o que o conteúdo decodifica.
 ALLOWED_FORMATS = {
@@ -40,6 +45,37 @@ class StorageError(RuntimeError):
     """Falha do Storage. A mensagem nunca carrega chave nem URL assinada."""
 
 
+class UploadBusyError(ValueError):
+    """Admission limit reached before image decoding (not a scientific threshold)."""
+
+
+class UploadAdmission:
+    """Bound attempts, including invalid/duplicate images, in one API process.
+
+    DEV runs one API process. Persistent cross-process capture quotas remain in
+    Postgres. The global deque bounds memory even if identities keep changing.
+    """
+
+    def __init__(self, per_user: int = 8, global_limit: int = 30, window_seconds: int = 60):
+        self.per_user = per_user
+        self.global_limit = global_limit
+        self.window_seconds = window_seconds
+        self._attempts: deque[tuple[float, str]] = deque()
+        self._lock = Lock()
+
+    def admit(self, owner: str, *, now: float | None = None) -> None:
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            while self._attempts and self._attempts[0][0] <= now - self.window_seconds:
+                self._attempts.popleft()
+            if (
+                len(self._attempts) >= self.global_limit
+                or sum(user == owner for _, user in self._attempts) >= self.per_user
+            ):
+                raise UploadBusyError("Muitas tentativas de upload; tente novamente em um minuto")
+            self._attempts.append((now, owner))
+
+
 @dataclass(frozen=True)
 class ValidatedImage:
     data: bytes
@@ -56,14 +92,24 @@ def validate_image(data: bytes) -> ValidatedImage:
     if len(data) > MAX_BYTES:
         raise InvalidImageError(f"arquivo acima de {MAX_BYTES // (1024 * 1024)} MB")
     try:
-        with Image.open(io.BytesIO(data)) as probe:
-            image_format = probe.format
-            probe.verify()
-        # verify() invalida o objeto; reabrir e decodificar pega truncamento real.
-        with Image.open(io.BytesIO(data)) as image:
-            image.load()
-            width, height = image.size
-    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as probe:
+                image_format = probe.format
+                if probe.width * probe.height > MAX_PIXELS:
+                    raise InvalidImageError("imagem com dimensões acima do limite")
+                probe.verify()
+            # verify() invalida o objeto; reabrir e decodificar pega truncamento real.
+            with Image.open(io.BytesIO(data)) as image:
+                image.load()
+                width, height = image.size
+    except (
+        UnidentifiedImageError,
+        OSError,
+        SyntaxError,
+        Image.DecompressionBombWarning,
+        Image.DecompressionBombError,
+    ) as exc:
         raise InvalidImageError("conteúdo não é uma imagem válida") from exc
     if image_format not in ALLOWED_FORMATS:
         raise InvalidImageError("formato não aceito; use JPEG, PNG ou WebP")
@@ -76,6 +122,23 @@ def validate_image(data: bytes) -> ValidatedImage:
         width=width,
         height=height,
     )
+
+
+def sanitize_public_image(data: bytes) -> ValidatedImage:
+    """Create a metadata-free derivative; never mutate original evidence.
+
+    Preserve raster coordinates so existing normalized boxes remain valid.
+    This removes metadata, not visible faces/plates: publication still requires
+    an explicit reviewer attestation about the visible content.
+    """
+    validate_image(data)
+    with Image.open(io.BytesIO(data)) as source:
+        clean = Image.new("RGB", source.size, "white")
+        converted = source.convert("RGBA")
+        clean.paste(converted, mask=converted.getchannel("A"))
+        output = io.BytesIO()
+        clean.save(output, format="JPEG", quality=90)
+    return validate_image(output.getvalue())
 
 
 def object_path(
@@ -154,7 +217,10 @@ class StorageClient:
     async def delete(self, path: str) -> None:
         """Compensate a failed DB commit for an object unique to this upload."""
         response = await self._request(
-            "DELETE", f"{self._base}/object/{BUCKET}/{path}", headers=self._headers()
+            "DELETE",
+            f"{self._base}/object/{BUCKET}",
+            json={"prefixes": [path]},
+            headers=self._headers(),
         )
         if response.status_code not in (200, 204, 404):
             raise StorageError(f"Storage compensation refused (HTTP {response.status_code})")

@@ -10,6 +10,7 @@ export function EventsPage({
   onReload,
   map = false,
   changed,
+  linkDetails = false,
 }: {
   events: UrbanEvent[] | null;
   loading: boolean;
@@ -17,6 +18,7 @@ export function EventsPage({
   onReload: () => void;
   map?: boolean;
   changed?: { eventId: string | null; at: number };
+  linkDetails?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -137,9 +139,13 @@ export function EventsPage({
                         : `${(event.visual_confidence * 100).toFixed(1)}%`}
                     </td>
                     <td>
-                      <button className="secondary compact" onClick={() => setSelected(event)}>
-                        Ver registro
-                      </button>
+                      {linkDetails ? (
+                        <a href={`#/app/eventos/${event.id}`}>Ver registro</a>
+                      ) : (
+                        <button className="secondary compact" onClick={() => setSelected(event)}>
+                          Ver registro
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

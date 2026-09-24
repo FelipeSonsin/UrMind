@@ -475,3 +475,38 @@ def hard_cases(
         ],
         "images_with_missed_ground_truth": sum(1 for i in images if false_negatives[i] > 0),
     }
+
+
+def negative_image_false_positives(
+    predictions: list[Prediction],
+    negative_image_ids: set[str],
+    *,
+    score_threshold: float,
+    high_confidence: float = 0.5,
+) -> dict[str, object]:
+    """Falsos positivos em imagens sem nenhuma anotação, por classe prevista.
+
+    Em imagem negativa toda predição acima do limiar é FP por definição, então
+    esta é a medida direta da falha do V1 (superdisparo em fundo), que a
+    validation V1 com 5 negativos não conseguia enxergar.
+    """
+    confident = [
+        p for p in predictions if p.image_id in negative_image_ids and p.score >= score_threshold
+    ]
+    by_label: dict[str, int] = defaultdict(int)
+    high_by_label: dict[str, int] = defaultdict(int)
+    for prediction in confident:
+        by_label[prediction.label] += 1
+        if prediction.score >= high_confidence:
+            high_by_label[prediction.label] += 1
+    images = len(negative_image_ids)
+    return {
+        "negative_images": images,
+        "score_threshold": score_threshold,
+        "high_confidence": high_confidence,
+        "false_positives": len(confident),
+        "false_positives_per_negative_image": round(len(confident) / images, 6) if images else None,
+        "negative_images_with_false_positive": len({p.image_id for p in confident}),
+        "false_positives_by_class": dict(sorted(by_label.items())),
+        "high_confidence_false_positives_by_class": dict(sorted(high_by_label.items())),
+    }

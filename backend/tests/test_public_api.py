@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -13,6 +16,102 @@ from app.services import public_view
 from app.services.risk import explain_priority, uncertainty_band
 
 NOW = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_generic_capture_layer_is_explicitly_opt_in(client, monkeypatch, enabled):
+    from app.api.v1 import public as public_api
+
+    service = SimpleNamespace(
+        capture_markers=AsyncMock(
+            return_value=[
+                {
+                    "id": str(uuid.uuid4()),
+                    "latitude": -23,
+                    "longitude": -46,
+                    "report_status": "received",
+                }
+            ]
+        )
+    )
+    monkeypatch.setattr(
+        public_api, "get_settings", lambda: Settings(PUBLIC_CAPTURE_MARKERS_ENABLED=enabled)
+    )
+    client.app.dependency_overrides[public_api.repositories] = lambda: {"service": service}
+    try:
+        response = client.get("/api/v1/public/capture-markers")
+        assert response.status_code == 200
+        if enabled:
+            assert set(response.json()[0]) == {"id", "latitude", "longitude", "report_status"}
+            service.capture_markers.assert_awaited_once_with("", public=True)
+        else:
+            assert response.json() == []
+            service.capture_markers.assert_not_awaited()
+    finally:
+        client.app.dependency_overrides.pop(public_api.repositories)
+
+
+def test_public_image_requires_shared_quota_persistence(client):
+    from app.api.v1 import public as public_api
+
+    client.app.dependency_overrides[public_api.repositories] = lambda: {
+        "public": SimpleNamespace(event=AsyncMock(return_value=None))
+    }
+    client.app.dependency_overrides[public_api.get_storage] = lambda: SimpleNamespace()
+    try:
+        response = client.get(f"/api/v1/public/events/{uuid.uuid4()}/image")
+        assert response.status_code == 503
+    finally:
+        client.app.dependency_overrides.pop(public_api.repositories)
+        client.app.dependency_overrides.pop(public_api.get_storage)
+
+
+def test_public_image_ignores_untrusted_forwarded_identity(client):
+    import hashlib
+
+    from app.api.v1 import public as public_api
+
+    quota = SimpleNamespace(admit=AsyncMock())
+    client.app.dependency_overrides[public_api.image_quota] = lambda: quota
+    client.app.dependency_overrides[public_api.repositories] = lambda: {
+        "public": SimpleNamespace(event=AsyncMock(return_value=None))
+    }
+    client.app.dependency_overrides[public_api.get_storage] = lambda: SimpleNamespace()
+    try:
+        for spoofed in ("192.0.2.1", "192.0.2.2"):
+            response = client.get(
+                f"/api/v1/public/events/{uuid.uuid4()}/image", headers={"X-Forwarded-For": spoofed}
+            )
+            assert response.status_code == 404
+        assert [call.args for call in quota.admit.await_args_list] == [
+            ("lookup", hashlib.sha256(b"peer:testclient").hexdigest(), None)
+        ] * 2
+    finally:
+        for dependency in (public_api.image_quota, public_api.repositories, public_api.get_storage):
+            client.app.dependency_overrides.pop(dependency)
+
+
+def test_public_image_db_quota_failure_is_closed_and_redacted(client):
+    from app.api.v1 import public as public_api
+    from app.repositories.core import QuotaUnavailableError
+
+    quota = SimpleNamespace(
+        admit=AsyncMock(side_effect=QuotaUnavailableError("sensitive-db-detail"))
+    )
+    repo = SimpleNamespace(event=AsyncMock(return_value=None))
+    client.app.dependency_overrides[public_api.image_quota] = lambda: quota
+    client.app.dependency_overrides[public_api.repositories] = lambda: {"public": repo}
+    client.app.dependency_overrides[public_api.get_storage] = lambda: SimpleNamespace()
+    try:
+        response = client.get(f"/api/v1/public/events/{uuid.uuid4()}/image")
+        assert response.status_code == 503
+        assert "sensitive-db-detail" not in response.text
+        repo.event.assert_not_awaited()
+    finally:
+        for dependency in (public_api.image_quota, public_api.repositories, public_api.get_storage):
+            client.app.dependency_overrides.pop(dependency)
+
+
 ROW = {
     "id": "0b0e4c7e-1111-4222-8333-944445555666",
     "occurred_at": NOW,
@@ -81,9 +180,48 @@ def test_imagem_so_sai_com_sanitizacao_registrada() -> None:
     blocked = public_view.image_availability(capture, {"sha256": "abc"})
     assert blocked.available is False and blocked.privacy_redacted is False
     assert "sanitiza" in (blocked.reason or "")
-    released = public_view.image_availability(capture, {"privacy_redacted": True})
+    legacy = public_view.image_availability(capture, {"privacy_redacted": True})
+    assert legacy.available is False
+    released = public_view.image_availability(
+        capture,
+        {
+            "sha256": "b" * 64,
+            "public_image": {
+                "storage_path": "public-images/example.jpg",
+                "sha256": "a" * 64,
+                "content_type": "image/jpeg",
+                "metadata_stripped": True,
+                "visible_content_reviewed": True,
+                "source_sha256": "b" * 64,
+                "review_id": "review-1",
+            },
+        },
+    )
     assert released.available is True and released.privacy_redacted is True
     assert public_view.image_availability(None, None).available is False
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"metadata_stripped": False},
+        {"visible_content_reviewed": False},
+        {"storage_path": ""},
+        {"sha256": None},
+        {"content_type": "application/octet-stream"},
+    ],
+)
+def test_public_derivative_requires_complete_privacy_evidence(change):
+    derivative = {
+        "storage_path": "public-images/example.jpg",
+        "sha256": "a" * 64,
+        "content_type": "image/jpeg",
+        "metadata_stripped": True,
+        "visible_content_reviewed": True,
+    }
+    assert not public_view.image_availability(
+        {"id": "capture"}, {"public_image": {**derivative, **change}}
+    ).available
 
 
 def test_contexto_publico_nao_expoe_payload_cru() -> None:
@@ -311,6 +449,44 @@ def test_detalhe_publico_nao_tem_relatorio_operacional() -> None:
     assert "report" not in EventDetailPublic.model_fields
 
 
+def test_public_risk_exposes_only_declared_impact_domains():
+    risk = public_view.risk_public(
+        {
+            "severity": "medium",
+            "priority_score": None,
+            "uncertainty": None,
+            "factors": {
+                "phase5": {
+                    "impact": {"potential_domains": ["mobility", "infrastructure"]},
+                    "risk": {"ordinal_level": "high"},
+                    "priority": {"attention_lane": "review_required"},
+                    "ruleset_version": "urmind-risk-rules-v1",
+                }
+            },
+        }
+    )
+    assert risk is not None
+    assert risk.impact == ["mobility", "infrastructure"]
+    assert risk.risk_level == "high"
+    assert risk.priority_lane == "review_required"
+    assert risk.assessment_source == "phase5"
+    assert "phase5" not in risk.model_dump()
+
+
+def test_public_context_uses_assessment_snapshot_not_newer_provider_data():
+    old = [{"source": "open_meteo_rain", "payload": {"status": "context_unavailable"}}]
+    new = [{"source": "open_meteo_rain", "payload": {"status": "ok"}}]
+    assert (
+        public_view.assessed_context_records({"phase4_snapshot": {"context_records": old}}, new)
+        == old
+    )
+    assert (
+        public_view.assessed_context_records({"phase4_snapshot": {"context_records": []}}, new)
+        == []
+    )
+    assert public_view.assessed_context_records({}, new) == []
+
+
 def test_stream_recusa_espectador_alem_do_limite(client, monkeypatch) -> None:
     """Sem vaga, a resposta é 503 imediato — nunca uma requisição pendurada."""
     from app.api.v1 import public as public_api
@@ -323,3 +499,248 @@ def test_stream_recusa_espectador_alem_do_limite(client, monkeypatch) -> None:
     response = client.get("/api/v1/public/scout/stream")
     assert response.status_code == 503
     assert response.json()["detail"] == public_api.STREAM_BUSY
+
+
+@pytest.mark.asyncio
+async def test_public_repository_filters_list_detail_and_overview_by_review_publication():
+    from app.repositories.core import PublicRepository
+
+    class Result:
+        def mappings(self):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+        def first(self):
+            return None
+
+        def one(self):
+            return {}
+
+    session = SimpleNamespace(execute=AsyncMock(return_value=Result()))
+    repo = PublicRepository(session)
+    await repo.events(limit=20)
+    await repo.event(uuid.UUID(ROW["id"]))
+    await repo.overview()
+    for call in session.execute.call_args_list:
+        sql = str(call.args[0])
+        assert PublicRepository._PUBLISHED in sql
+        assert "urmind-publication-v1" in sql
+        assert "pr.event_id = e.id" in sql
+        assert "pr.reviewer = e.factors->'publication'->>'reviewer'" in sql
+        assert "order by lr.commit_order" in sql
+    await repo.event(uuid.UUID(ROW["id"]), owner_id="owner-value-not-SQL")
+    call = session.execute.call_args
+    assert "owner-value-not-SQL" not in str(call.args[0])
+    assert call.args[1]["owner_id"] == "owner-value-not-SQL"
+    assert "oc.quality->>'uploaded_by' = :owner_id" in str(call.args[0])
+
+
+@pytest.mark.parametrize(
+    ("published", "viewer", "expected"),
+    [
+        (False, None, 404),
+        (True, None, 200),
+        (False, "owner", 200),
+        (False, "other", 404),
+        (True, "other", 200),
+    ],
+)
+def test_detail_requires_publication_or_capture_owner(client, published, viewer, expected):
+    from app.api.v1 import public as public_api
+    from app.auth import AuthenticatedUser
+
+    # Repository result is authorization-scoped; the handler must never load
+    # the internal dossier before that boundary returns an accessible row.
+    async def event(_event_id, *, owner_id=None):
+        return ROW if published or owner_id == "owner" else None
+
+    service = SimpleNamespace(event_dossier=AsyncMock(return_value={}))
+    repos = {
+        "public": SimpleNamespace(
+            event=AsyncMock(side_effect=event), prediction=AsyncMock(return_value=None)
+        ),
+        "service": service,
+        "decisions": SimpleNamespace(latest_risk=AsyncMock(return_value=None)),
+        "inference": SimpleNamespace(),
+    }
+    user = AuthenticatedUser(id=viewer, email=None, role="authenticated") if viewer else None
+    client.app.dependency_overrides[public_api.repositories] = lambda: repos
+    client.app.dependency_overrides[public_api.optional_user] = lambda: user
+    try:
+        response = client.get(f"/api/v1/public/events/{ROW['id']}")
+    finally:
+        client.app.dependency_overrides.pop(public_api.repositories)
+        client.app.dependency_overrides.pop(public_api.optional_user)
+    assert response.status_code == expected
+    assert repos["public"].event.await_args_list[0].kwargs == {"owner_id": viewer}
+    if expected == 404:
+        service.event_dossier.assert_not_awaited()
+    else:
+        body = response.json()
+        assert body["analysis"]["schema_version"] == "urmind-urban-analysis-v1"
+        assert body["analysis"]["severity"] is None
+        assert body["image"]["available"] is False
+        assert "no-store" in response.headers["cache-control"]
+        assert response.headers["vary"] == "Authorization"
+        assert "uploaded_by" not in body and "publication" not in body
+
+
+@pytest.mark.asyncio
+async def test_optional_auth_validates_supplied_bearer(monkeypatch):
+    from fastapi import HTTPException
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    from app.api.v1 import public as public_api
+
+    validator = AsyncMock(side_effect=HTTPException(status_code=401))
+    monkeypatch.setattr(public_api, "require_user", validator)
+    assert await public_api.optional_user(None) is None
+    validator.assert_not_awaited()
+    with pytest.raises(HTTPException) as failure:
+        await public_api.optional_user(
+            HTTPAuthorizationCredentials(scheme="Bearer", credentials="bad")
+        )
+    assert failure.value.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "unpublished",
+        "raw",
+        "hash",
+        "mime",
+        "source",
+        "review",
+        "withdrawn_during_download",
+        "replaced_during_download",
+        "other_event_same_capture",
+        "too_large",
+        "concurrency_busy",
+        "attempt_budget",
+        "unknown_ids",
+        "ok",
+    ],
+)
+def test_public_image_only_serves_current_verified_derivative(client, case, monkeypatch):
+    import hashlib
+    import io
+
+    from PIL import Image
+
+    from app.api.v1 import public as public_api
+    from app.repositories.core import QuotaExceededError
+
+    async def admit(stage, caller, resource=None):
+        if stage == "download":
+            repo.session.rollback.assert_awaited_once()
+        if case == "attempt_budget" and stage == "download":
+            raise QuotaExceededError("limit")
+
+    quota = SimpleNamespace(admit=AsyncMock(side_effect=admit))
+    client.app.dependency_overrides[public_api.image_quota] = lambda: quota
+    if case == "concurrency_busy":
+        from threading import BoundedSemaphore
+
+        monkeypatch.setattr(public_api, "_public_image_slots", BoundedSemaphore(0))
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4)).save(buffer, format="PNG" if case == "mime" else "JPEG")
+    data = buffer.getvalue()
+    if case == "too_large":
+        monkeypatch.setattr(public_api, "MAX_BYTES", len(data) - 1)
+    path = f"public-derived/{ROW['id']}/sanitized.jpg"
+    derivative = {
+        "storage_path": "private/original.jpg" if case == "raw" else path,
+        "sha256": "0" * 64 if case == "hash" else hashlib.sha256(data).hexdigest(),
+        "source_sha256": "c" * 64 if case == "source" else "b" * 64,
+        "content_type": "image/jpeg",
+        "metadata_stripped": True,
+        "visible_content_reviewed": True,
+        "review_id": "stale-review" if case == "review" else "current-review",
+    }
+    capture = SimpleNamespace(
+        id=uuid.uuid4(),
+        storage_path="private/original.jpg",
+        quality={"sha256": "b" * 64, "public_image": derivative},
+    )
+    if case == "other_event_same_capture":
+        # A second published Event from this Capture must not replace the
+        # first Event's approved image. Legacy singleton metadata is ignored.
+        capture.quality["public_image"] = {
+            **derivative,
+            "review_id": "second-event-review",
+            "storage_path": f"public-derived/{uuid.uuid4()}/other.jpg",
+        }
+    repo = SimpleNamespace(
+        session=SimpleNamespace(rollback=AsyncMock()),
+        event=AsyncMock(
+            return_value=None
+            if case == "unpublished"
+            else {
+                **ROW,
+                "capture_id": capture.id,
+                "publication_review_id": "current-review",
+                "publication_image": derivative,
+            }
+        ),
+    )
+    if case in {"withdrawn_during_download", "replaced_during_download"}:
+        initial = repo.event.return_value
+        after = (
+            None
+            if case == "withdrawn_during_download"
+            else {
+                **initial,
+                "publication_image": {**derivative, "sha256": "f" * 64},
+            }
+        )
+        repo.event.side_effect = [initial, after]
+    storage = SimpleNamespace(download=AsyncMock(return_value=data))
+    captures = SimpleNamespace(get=AsyncMock(return_value=capture))
+    client.app.dependency_overrides[public_api.repositories] = lambda: {
+        "public": repo,
+        "service": SimpleNamespace(captures=captures),
+    }
+    client.app.dependency_overrides[public_api.get_storage] = lambda: storage
+    try:
+        if case == "unknown_ids":
+            published = repo.event.return_value
+            repo.event.return_value = None
+            for _ in range(60):
+                missing = client.get(f"/api/v1/public/events/{uuid.uuid4()}/image")
+                assert missing.status_code == 404
+            repo.event.return_value = published
+        response = client.get(f"/api/v1/public/events/{ROW['id']}/image")
+    finally:
+        client.app.dependency_overrides.pop(public_api.repositories)
+        client.app.dependency_overrides.pop(public_api.get_storage)
+        client.app.dependency_overrides.pop(public_api.image_quota)
+    downloads = [call for call in quota.admit.await_args_list if call.args[0] == "download"]
+    if case in {"unpublished", "raw", "source", "review"}:
+        assert not downloads
+    if case == "unknown_ids":
+        assert len(downloads) == 1
+    if case in {"ok", "other_event_same_capture", "unknown_ids"}:
+        assert response.status_code == 200
+        assert response.content == data
+        assert response.headers["content-type"] == "image/jpeg"
+        assert response.headers["cache-control"] == "no-store"
+        storage.download.assert_awaited_once_with(path)
+    elif case in {"concurrency_busy", "attempt_budget"}:
+        assert response.status_code == 429
+        assert response.headers["retry-after"]
+        storage.download.assert_not_awaited()
+    else:
+        assert response.status_code == 404
+        assert "private/" not in response.text and "public-derived/" not in response.text
+        if case not in {
+            "hash",
+            "mime",
+            "too_large",
+            "withdrawn_during_download",
+            "replaced_during_download",
+        }:
+            storage.download.assert_not_awaited()

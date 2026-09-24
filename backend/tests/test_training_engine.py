@@ -11,8 +11,8 @@ import torch
 from app.ml.yolox_model import MODEL_METADATA_PATH
 
 
-def _config() -> dict:
-    return json.loads(MODEL_METADATA_PATH.read_text(encoding="utf-8"))
+def _config(path: Path = MODEL_METADATA_PATH) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_training_config_has_one_authoritative_source() -> None:
@@ -117,7 +117,7 @@ def test_trainer_instantiation_reuses_official_optimizer_and_scheduler(
     from app.ml import training
 
     model = torch.nn.Sequential(torch.nn.BatchNorm2d(1), torch.nn.Conv2d(1, 1, 1))
-    monkeypatch.setattr(training, "validate_readiness", lambda metadata: None)
+    monkeypatch.setattr(training, "validate_readiness", lambda metadata, **kwargs: None)
     monkeypatch.setattr(training, "instantiate_model", lambda: model)
     monkeypatch.setattr(training.OfficialYOLOXExp, "get_model", lambda exp: exp.model)
     engine = training.build_training_engine(metadata=_config(), device="cpu")
@@ -273,7 +273,10 @@ def test_missing_gradients_fail_before_optimizer_step() -> None:
     class Disconnected(_FakeModel):
         def forward(self, images, targets):
             loss = torch.tensor(1.0, requires_grad=True)
-            return {key: loss for key in ("total_loss", "iou_loss", "conf_loss", "cls_loss", "l1_loss", "num_fg")}
+            return {
+                key: loss
+                for key in ("total_loss", "iou_loss", "conf_loss", "cls_loss", "l1_loss", "num_fg")
+            }
 
     model = Disconnected()
     engine = _engine(model)
@@ -288,11 +291,33 @@ def test_entrypoint_readiness_precedes_manifest_loading(monkeypatch: pytest.Monk
     from app.ml import training
 
     monkeypatch.setattr(training, "load_model_config", _config)
-    monkeypatch.setattr(training, "_parser", lambda: type("P", (), {"parse_args": lambda self, argv: type("A", (), {"batch_size": None, "pretrained": None, "resume": None, "single_step": True, "dry_run": False, "run": False})()})())
+    monkeypatch.setattr(
+        training,
+        "_parser",
+        lambda: type(
+            "P",
+            (),
+            {
+                "parse_args": lambda self, argv: type(
+                    "A",
+                    (),
+                    {
+                        "batch_size": None,
+                        "pretrained": None,
+                        "resume": None,
+                        "single_step": True,
+                        "dry_run": False,
+                        "run": False,
+                        "contract": training.MODEL_METADATA_PATH,
+                    },
+                )()
+            },
+        )(),
+    )
     monkeypatch.setattr(
         training,
         "validate_readiness",
-        lambda metadata: (_ for _ in ()).throw(training.TrainingGateError("blocked")),
+        lambda metadata, **kwargs: (_ for _ in ()).throw(training.TrainingGateError("blocked")),
     )
     monkeypatch.setattr(
         training,
@@ -301,16 +326,6 @@ def test_entrypoint_readiness_precedes_manifest_loading(monkeypatch: pytest.Monk
     )
     with pytest.raises(training.TrainingGateError, match="blocked"):
         training.main([])
-
-
-def test_validation_hook_uses_eval_and_inference_mode_then_restores() -> None:
-    model = _FakeModel()
-    engine = _engine(model)
-    model.train()
-    with engine.validation_mode():
-        assert model.training is False
-        assert torch.is_grad_enabled() is False
-    assert model.training is True
 
 
 def test_scheduler_has_warmup_and_normal_progression() -> None:
@@ -342,9 +357,7 @@ def test_amp_configuration_uses_grad_scaler(monkeypatch: pytest.MonkeyPatch) -> 
             calls.append((device, enabled, init_scale))
 
     monkeypatch.setattr(training.torch.amp, "GradScaler", Scaler)
-    training.make_grad_scaler(
-        torch.device("cuda"), enabled=True, initial_scale=128.0
-    )
+    training.make_grad_scaler(torch.device("cuda"), enabled=True, initial_scale=128.0)
     assert calls == [("cuda", True, 128.0)]
 
 
@@ -439,3 +452,252 @@ def test_gradient_infinito_sem_amp_continua_abortando() -> None:
     batch = (torch.ones((1, 3, 32, 32)), torch.zeros((1, 1, 5)), (), ())
     with pytest.raises(FloatingPointError, match="gradient"):
         engine.train_step(batch, epoch=0, iteration=0)
+
+
+# --- PHASE 3: geração V2 reaproveita o mesmo trainer -------------------------
+
+
+@pytest.fixture
+def screening_metadata(tmp_path: Path) -> dict:
+    """Independent disposable contract; never reads a removed experiment/split."""
+    metadata = _config()
+    metadata["training"].update(
+        {
+            "max_epoch": 10,
+            "no_aug_epochs": 2,
+            "ema": True,
+            "evaluation_representations": ["raw", "ema"],
+            "selection_representation": "ema",
+        }
+    )
+    metadata["training"]["augmentation"].update({"degrees": 0.0, "shear": 0.0})
+    train = tmp_path / "train.jsonl"
+    validation = tmp_path / "validation.jsonl"
+    train.write_text("", encoding="utf-8")
+    validation.write_text("", encoding="utf-8")
+    metadata["dataset"] = {
+        "manifests": {"TRAIN": str(train), "VALIDATION": str(validation)},
+        "split_manifest": str(tmp_path / "split.json"),
+        "authorization_status": str(tmp_path / "authorization.json"),
+        "authorized_status": "AUTHORIZED_FIXTURE",
+        "approved_decision": "APPROVED_FIXTURE",
+    }
+    return metadata
+
+
+def test_v1_config_fingerprint_is_unchanged_by_v2_fields() -> None:
+    """Os campos V2 no default não podem alterar a fórmula do fingerprint V1.
+
+    Referência: a fórmula anterior à PHASE 3 (`asdict` menos output_directory e
+    device). O `best.pt` do V1 já divergia do contrato V1 corrente antes desta
+    fase (drift pré-existente, registrado em DEFERRED_FINDINGS), por isso a
+    comparação é contra a fórmula, não contra o checkpoint.
+    """
+    from dataclasses import asdict
+
+    from app.ml.training import (
+        _V2_TRAINING_DEFAULTS,
+        TrainingConfig,
+        canonical_sha256,
+        checkpoint_fingerprints,
+    )
+
+    metadata = _config()
+    config = TrainingConfig.from_model_metadata(metadata)
+    legacy = {
+        key: value
+        for key, value in asdict(replace_dataset(config)).items()
+        if key not in {"output_directory", "device", "dataset", *_V2_TRAINING_DEFAULTS}
+    }
+    fields = (
+        "model_id",
+        "architecture",
+        "source_commit",
+        "num_classes",
+        "class_names",
+        "canonical_class_names",
+        "input_size",
+        "evaluation",
+        "checkpointing",
+        "mlflow",
+        "dry_run",
+        "architecture_parameters",
+    )
+    document = {field: metadata[field] for field in fields}
+    document["effective_training"] = legacy
+    assert checkpoint_fingerprints(metadata, config)["config_fingerprint"] == canonical_sha256(
+        document
+    )
+
+
+def replace_dataset(config):
+    from dataclasses import replace
+
+    # asdict não copia MappingProxyType; o legado não tinha esse campo.
+    return replace(config, dataset={})
+
+
+@pytest.mark.parametrize(
+    ("augmentation_enabled", "worker_count"),
+    [(False, 0), (True, 1), (True, 0)],
+    ids=["plain", "augmented", "low_memory"],
+)
+def test_explicit_contract_binds_its_own_dataset_and_never_test(
+    screening_metadata, augmentation_enabled, worker_count
+) -> None:
+    from app.ml.training import TrainingConfig, dataset_binding, manifest_for_role
+
+    metadata = screening_metadata
+    metadata["training"]["augmentation"]["enabled"] = augmentation_enabled
+    metadata["training"]["train_num_workers"] = worker_count
+    metadata["training"]["prefetch_factor"] = 1 if worker_count else None
+    config = TrainingConfig.from_model_metadata(metadata)
+    binding = dataset_binding(config.dataset)
+    assert binding.train_manifest.name == "train.jsonl"
+    assert binding.validation_manifest.name == "validation.jsonl"
+    assert binding.authorized_status == "AUTHORIZED_FIXTURE"
+    assert config.train_num_workers == worker_count
+    assert manifest_for_role("TRAIN", config.dataset) == binding.train_manifest
+    with pytest.raises(ValueError, match="TEST"):
+        manifest_for_role("TEST", config.dataset)
+    assert config.augmentation.get("degrees", 0.0) == 0.0
+    assert config.augmentation.get("shear", 0.0) == 0.0
+
+
+def test_dataset_section_declaring_test_manifest_is_rejected(screening_metadata) -> None:
+    from app.ml.training import TrainingGateError, dataset_binding
+
+    dataset = screening_metadata["dataset"]
+    dataset["manifests"]["TEST"] = "forbidden-test.jsonl"
+    with pytest.raises(TrainingGateError, match="TEST"):
+        dataset_binding(dataset)
+
+
+def test_ema_representation_requires_ema(screening_metadata) -> None:
+    from app.ml.training import TrainingConfig
+
+    metadata = screening_metadata
+    metadata["training"]["ema"] = False
+    with pytest.raises(ValueError, match="ema"):
+        TrainingConfig.from_model_metadata(metadata)
+
+
+def test_early_stopping_counts_patience_with_min_delta_and_restores() -> None:
+    from app.ml.training import EarlyStopping
+
+    rule = {"monitor": "map50_95", "patience_evaluations": 2, "min_delta": 0.01}
+    stopper = EarlyStopping(rule)
+    assert stopper.update(0.10, 1) is False
+    assert stopper.update(0.105, 3) is False  # melhora abaixo de min_delta
+    restored = EarlyStopping(rule, stopper.state())
+    assert restored.evaluations_without_improvement == 1
+    assert restored.best_epoch == 1
+    assert restored.update(0.109, 5) is True
+    assert EarlyStopping(None).update(0.0, 0) is False
+
+
+def test_close_mosaic_turns_off_once_in_no_aug_phase(screening_metadata) -> None:
+    from types import SimpleNamespace
+
+    from app.ml.training import TrainingConfig, close_mosaic_if_due
+
+    config = TrainingConfig.from_model_metadata(screening_metadata)
+    loader = SimpleNamespace(dataset=SimpleNamespace(enable_mosaic=True))
+    first_no_aug = config.max_epoch - config.no_aug_epochs
+    assert close_mosaic_if_due(loader, config, first_no_aug - 1) is False  # type: ignore[arg-type]
+    assert close_mosaic_if_due(loader, config, first_no_aug) is True  # type: ignore[arg-type]
+    assert loader.dataset.enable_mosaic is False
+    assert close_mosaic_if_due(loader, config, first_no_aug + 1) is False  # type: ignore[arg-type]
+
+
+def test_validation_loader_uses_few_ephemeral_workers(
+    monkeypatch: pytest.MonkeyPatch, screening_metadata
+) -> None:
+    """Regressão do OOM do E1: validation não pode manter workers persistentes."""
+    from app.ml import training
+
+    config = training.TrainingConfig.from_model_metadata(screening_metadata)
+    monkeypatch.setattr(training, "load_authorized_manifest", lambda path, intended_split: [])
+    monkeypatch.setattr(training, "build_train_dataset", lambda rows, **kwargs: [0])
+    monkeypatch.setattr(training, "AuthorizedDetectionDataset", lambda rows, mode: [0])
+    _, validation_loader = training.build_loaders(config)
+    assert validation_loader.num_workers == min(config.workers, training.VALIDATION_MAX_WORKERS)
+    assert validation_loader.persistent_workers is False
+
+
+def test_explicit_loader_contract_controls_train_and_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    screening_metadata,
+) -> None:
+    """The memory-efficient contract must govern both canonical loaders."""
+    from app.ml import training
+
+    metadata = screening_metadata
+    metadata["training"].update(
+        {
+            "train_num_workers": 1,
+            "validation_num_workers": 0,
+            "persistent_workers": False,
+            "prefetch_factor": 1,
+            "pin_memory": False,
+        }
+    )
+    config = training.TrainingConfig.from_model_metadata(metadata)
+    monkeypatch.setattr(training, "load_authorized_manifest", lambda path, intended_split: [])
+    monkeypatch.setattr(training, "build_train_dataset", lambda rows, **kwargs: [0])
+    monkeypatch.setattr(training, "AuthorizedDetectionDataset", lambda rows, mode: [0])
+
+    train_loader, validation_loader = training.build_loaders(config)
+
+    assert train_loader.num_workers == 1
+    assert train_loader.persistent_workers is False
+    assert train_loader.prefetch_factor == 1
+    assert train_loader.pin_memory is False
+    assert validation_loader.num_workers == 0
+    assert validation_loader.persistent_workers is False
+    assert validation_loader.prefetch_factor is None
+    assert validation_loader.pin_memory is False
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"train_num_workers": 0, "persistent_workers": True}, "persistent_workers"),
+        ({"train_num_workers": 0, "prefetch_factor": 1}, "prefetch_factor"),
+        ({"train_num_workers": 1, "prefetch_factor": 0}, "prefetch_factor"),
+    ],
+)
+def test_invalid_loader_contract_fails_closed(
+    updates: dict, message: str, screening_metadata
+) -> None:
+    from app.ml.training import TrainingConfig
+
+    metadata = screening_metadata
+    metadata["training"].update(
+        {
+            "train_num_workers": 1,
+            "validation_num_workers": 0,
+            "persistent_workers": False,
+            "prefetch_factor": 1,
+            "pin_memory": False,
+            **updates,
+        }
+    )
+    with pytest.raises(ValueError, match=message):
+        TrainingConfig.from_model_metadata(metadata)
+
+
+@pytest.mark.parametrize("role", ["TRAIN", "VALIDATION"])
+def test_missing_declared_manifest_has_explicit_status(screening_metadata, role):
+    from app.ml.training import TrainingGateError, manifest_for_role
+
+    Path(screening_metadata["dataset"]["manifests"][role]).unlink()
+    with pytest.raises(TrainingGateError, match="DATASET_SPLIT_NOT_AVAILABLE"):
+        manifest_for_role(role, screening_metadata["dataset"])
+
+
+def test_missing_declared_split_blocks_readiness(screening_metadata):
+    from app.ml.training import TrainingGateError, validate_readiness
+
+    with pytest.raises(TrainingGateError, match="DATASET_SPLIT_NOT_AVAILABLE"):
+        validate_readiness(screening_metadata)

@@ -17,6 +17,7 @@ from typing import Any
 from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
 from app.schemas.core import (
     CaptureCreate,
+    CaptureProcessingStatus,
     CaptureSource,
     Coordinate,
     EventCreate,
@@ -65,6 +66,22 @@ ACTION_BY_SEVERITY = {
 }
 ACTION_RULE_VERSION = "severity-to-action-v1"
 
+# Stored Worker stages exposed verbatim by the processing endpoint.
+_PASSTHROUGH_STAGES = frozenset(
+    status.value
+    for status in (
+        CaptureProcessingStatus.PROCESSING_DETECTION,
+        CaptureProcessingStatus.BUILDING_EVENT,
+        CaptureProcessingStatus.ENRICHING_CONTEXT,
+        CaptureProcessingStatus.BUILDING_FEATURES,
+        CaptureProcessingStatus.ASSESSING,
+        CaptureProcessingStatus.NEEDS_REVIEW,
+        CaptureProcessingStatus.NO_SUPPORTED_DETECTION,
+        CaptureProcessingStatus.NO_EVENT,
+        CaptureProcessingStatus.MODEL_NOT_AVAILABLE,
+    )
+)
+
 
 class DuplicateKeyError(RuntimeError):
     """Chave idempotente já usada; reenvio não deve duplicar (§7.2)."""
@@ -94,6 +111,129 @@ class CoreService:
             return {"id": existing.id, "capture_key": existing.capture_key, "created": False}
         capture = await self.captures.create(payload)
         return {"id": capture.id, "capture_key": capture.capture_key, "created": True}
+
+    async def capture_markers(
+        self, actor: str, can_review: bool = False, *, public: bool = False
+    ) -> list[dict[str, Any]]:
+        rows = await self.captures.report_markers(actor, can_review, public=public)
+        markers = []
+        for row in rows:
+            marker = {
+                "id": row["id"],
+                "latitude": row["latitude"],
+                "longitude": row["longitude"],
+                "report_status": "received",
+            }
+            if public:
+                # Opt-in public layer is deliberately generic: no analysis, owner, EXIF or media.
+                markers.append(marker)
+                continue
+            status = row.get("processing_status")
+            if row.get("has_review") and row.get("event_status") == "confirmed":
+                marker["report_status"] = "human_confirmed"
+            elif row.get("event_id") and row.get("model_status") == "EXPERIMENTAL_SHADOW":
+                marker["report_status"] = "experimental"
+            elif status == "model_not_available":
+                marker["report_status"] = "model_not_available"
+            elif status in {"no_supported_detection", "no_detection"}:
+                marker["report_status"] = "no_supported_detection"
+            marker.update(
+                {
+                    key: row.get(key)
+                    for key in (
+                        "location_source",
+                        "accuracy_m",
+                        "user_description",
+                        "location_conflict",
+                        "event_id",
+                    )
+                }
+            )
+            analyzed = marker["report_status"] in {"experimental", "human_confirmed"}
+            marker.update(
+                {
+                    key: row.get(key) if analyzed else None
+                    for key in (
+                        "urmind_class",
+                        "severity",
+                        "priority_score",
+                    )
+                }
+            )
+            markers.append(marker)
+        return markers
+
+    async def capture_processing(
+        self, capture_id: uuid.UUID, actor: str, can_review: bool
+    ) -> dict[str, Any]:
+        capture = await self.captures.get(capture_id)
+        if capture is None:
+            raise EventNotFoundError("Captura não encontrada")
+        quality = capture.quality or {}
+        if quality.get("uploaded_by") != actor:
+            raise EventNotFoundError("Captura não encontrada")
+        inference = quality.get("inference") or {}
+        events = await self.events.for_capture(capture_id)
+        known_ids = {event.id for event in events}
+        for raw_id in inference.get("event_ids") or []:
+            try:
+                event_id = uuid.UUID(raw_id)
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if event_id in known_ids:
+                continue
+            event = await self.events.get(event_id)
+            evidence = (event.factors or {}).get("evidence") if event else None
+            if (
+                event
+                and isinstance(evidence, dict)
+                and str(capture_id) in evidence.get("capture_ids", [])
+            ):
+                events.append(event)
+                known_ids.add(event_id)
+        stored_status = inference.get("status")
+        status: CaptureProcessingStatus
+        if capture.point is None:
+            status = CaptureProcessingStatus.LOCATION_REQUIRED
+        elif stored_status == "inference_failed":
+            status = CaptureProcessingStatus.FAILED
+        elif stored_status == "no_detection":
+            status = CaptureProcessingStatus.NO_SUPPORTED_DETECTION
+        elif stored_status in _PASSTHROUGH_STAGES:
+            status = CaptureProcessingStatus(stored_status)
+        elif stored_status in {"inference_completed", "detection_completed"}:
+            status = CaptureProcessingStatus.DETECTION_COMPLETED
+        elif stored_status == "analysis_completed":
+            status = await self._analysis_status(events)
+        else:
+            status = CaptureProcessingStatus.QUEUED
+        return {
+            "capture_id": capture.id,
+            "status": status.value,
+            "requires_manual_location": capture.point is None,
+            "event_ids": [event.id for event in events],
+            "model_version_id": inference.get("model_version_id"),
+            "model_status": inference.get("model_status"),
+            "updated_at": inference.get("completed_at") or inference.get("at"),
+        }
+
+    async def _analysis_status(self, events: list[Any]) -> CaptureProcessingStatus:
+        """`completed` only with Event + feature snapshot + RiskAssessment + DecisionTrace."""
+        if not events:
+            return CaptureProcessingStatus.NEEDS_REVIEW
+        if self.decisions is None:
+            return CaptureProcessingStatus.ASSESSING
+        for event in events:
+            assessment = await self.decisions.latest_risk(event.id)
+            factors = (assessment.factors or {}) if assessment else {}
+            if not factors.get("phase4_snapshot") or not factors.get("decision_trace"):
+                return CaptureProcessingStatus.ASSESSING
+        if any(
+            event.status in {EventStatus.REVIEW.value, EventStatus.TRIAGE_REQUIRED.value}
+            for event in events
+        ):
+            return CaptureProcessingStatus.NEEDS_REVIEW
+        return CaptureProcessingStatus.COMPLETED
 
     async def register_event(self, payload: EventCreate) -> dict[str, Any]:
         if await self.events.get_by_key(payload.event_key) is not None:
@@ -139,7 +279,13 @@ class CoreService:
         coordinate = Coordinate(
             latitude=location["latitude"],
             longitude=location["longitude"],
-            accuracy_m=location["accuracy_m"],
+            # The browser's reported GPS accuracy is retained on Capture for
+            # provenance, but is not independently verified for Event/risk.
+            accuracy_m=(
+                None
+                if (capture.quality or {}).get("location_attestation") == "unverified_client_claim"
+                else location["accuracy_m"]
+            ),
         )
         evidence_mode = (
             EvidenceMode.EXIF_PHOTO
@@ -164,11 +310,17 @@ class CoreService:
             if existing is not None:
                 outcomes.append({"event_id": existing.id, "created": False, "deduplicated": False})
                 continue
-            duplicate = await self.events.find_open_near(
-                urmind_class=urmind_class.value,
-                coordinate=coordinate,
-                radius_m=DEDUP_RADIUS_M,
-                since=capture.captured_at - DEDUP_WINDOW,
+            # A client-claimed point cannot establish that two separate photos
+            # show the same place. Keep their Event/Review lineage independent.
+            duplicate = (
+                None
+                if (capture.quality or {}).get("location_attestation") == "unverified_client_claim"
+                else await self.events.find_open_near(
+                    urmind_class=urmind_class.value,
+                    coordinate=coordinate,
+                    radius_m=DEDUP_RADIUS_M,
+                    since=capture.captured_at - DEDUP_WINDOW,
+                )
             )
             if duplicate is not None:
                 previous = (duplicate.factors or {}).get("evidence", {})
@@ -198,10 +350,11 @@ class CoreService:
                     visual_confidence=best.confidence,
                     model_version_id=best.model_version_id,
                     factors={
+                        "location_attestation": (capture.quality or {}).get("location_attestation"),
                         "evidence": {
                             "capture_ids": [str(capture_id)],
                             "detection_ids": detection_ids,
-                        }
+                        },
                     },
                 )
             )
@@ -240,6 +393,11 @@ class CoreService:
                 ]
         result = assess_features(features)
         assessment_id = uuid.uuid4()
+        dataset_version_id = (
+            await self.decisions.dataset_version_for_model(event.model_version_id)
+            if event.model_version_id
+            else None
+        )
         severity = Severity(result["severity"])
         segment = (
             await self.events.segment(event.road_segment_id) if event.road_segment_id else None
@@ -284,6 +442,32 @@ class CoreService:
             if action
             else {"reason": "sem severidade afirmável, nenhuma ação é sugerida"}
         )
+        # The Phase 4 snapshot and Phase 5 rule trace live in this same immutable
+        # assessment row. Keep references to those exact values, not to the
+        # mutable EventContext or to the current model registry entry.
+        persisted["factors"]["decision_trace"] = {
+            "trace_schema_version": "urmind-decision-trace-v1",
+            "assessment_id": str(assessment_id),
+            "event_id": str(event_id),
+            "feature_schema_version": features["feature_schema_version"],
+            "ruleset_version": result["ruleset_version"],
+            "feature_snapshot_key": "phase4_snapshot.features",
+            "context_snapshot_key": "phase4_snapshot.context_records",
+            "factors_used": result["factors_used"],
+            "factors_missing": result["factors_missing"],
+            "evaluated_rules": result["decision_trace"]["evaluated_rules"],
+            "provisional_parameters": result["decision_trace"]["provisional_parameters"],
+            "impact": result["impact"],
+            "severity": result["severity"],
+            "risk": result["risk"],
+            "priority": result["priority"],
+            "responsibility": persisted["factors"]["responsibility"],
+            "action": persisted["factors"]["action"],
+            "model_version_id": str(event.model_version_id) if event.model_version_id else None,
+            "dataset_version_id": str(dataset_version_id) if dataset_version_id else None,
+            "assessed_at": persisted["factors"]["phase4_snapshot"]["collected_at"],
+            "provenance": features["provenance"],
+        }
         assessment = await self.decisions.add_risk(
             event.id,
             persisted,
@@ -359,9 +543,15 @@ class CoreService:
                     else None,
                 )
             )
+        inference = (getattr(capture, "quality", None) or {}).get("inference") or {}
         return {
             **base,
             **coords,
+            "model_status": (
+                inference.get("model_status")
+                if capture and str(event.model_version_id) == inference.get("model_version_id")
+                else None
+            ),
             "capture": (
                 {
                     "id": capture.id,
@@ -386,6 +576,7 @@ class CoreService:
                 if row
                 else None
             ),
+            "decision_trace": (row.factors or {}).get("decision_trace") if row else None,
             "responsibility": (
                 {"responsible": rule.responsible, "source": rule.source, "version": rule.version}
                 if rule
@@ -697,6 +888,8 @@ def decide_status(payload: EventCreate, snap: dict[str, Any] | None) -> EventSta
         # Sensor sem câmera gera candidato, nunca classe visual afirmada.
         return EventStatus.REVIEW
     if payload.urmind_class.value == "URMIND_UNKNOWN":
+        return EventStatus.REVIEW
+    if payload.factors.get("location_attestation") == "unverified_client_claim":
         return EventStatus.REVIEW
 
     accuracy = payload.coordinate.accuracy_m if payload.coordinate else None

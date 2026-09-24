@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class PublicationRequest(BaseModel):
+    """Reviewer publication is separate from a model result or ground truth."""
+
+    model_config = ConfigDict(extra="forbid")
+    publish: bool
+    review_id: uuid.UUID | None = None
+    visible_content_reviewed: bool = False
+    reason: str = Field(min_length=3, max_length=1000)
 
 
 class UrmindClass(StrEnum):
@@ -59,6 +70,43 @@ class EventStatus(StrEnum):
     TRIAGE_REQUIRED = "triage_required"
 
 
+class CaptureProcessingStatus(StrEnum):
+    """Estado público do processamento de uma Capture (fonte única de verdade).
+
+    `detection_completed` não é `completed`: `completed` exige Event, snapshot de
+    features, RiskAssessment e DecisionTrace persistidos.
+    """
+
+    RECEIVED = "received"
+    QUEUED = "queued"
+    PROCESSING_DETECTION = "processing_detection"
+    DETECTION_COMPLETED = "detection_completed"
+    BUILDING_EVENT = "building_event"
+    ENRICHING_CONTEXT = "enriching_context"
+    BUILDING_FEATURES = "building_features"
+    ASSESSING = "assessing"
+    COMPLETED = "completed"
+    NO_SUPPORTED_DETECTION = "no_supported_detection"
+    NO_EVENT = "no_event"
+    NEEDS_REVIEW = "needs_review"
+    FAILED = "failed"
+    MODEL_NOT_AVAILABLE = "model_not_available"
+    LOCATION_REQUIRED = "location_required"
+
+
+TERMINAL_PROCESSING_STATUSES: frozenset[CaptureProcessingStatus] = frozenset(
+    {
+        CaptureProcessingStatus.COMPLETED,
+        CaptureProcessingStatus.NO_SUPPORTED_DETECTION,
+        CaptureProcessingStatus.NO_EVENT,
+        CaptureProcessingStatus.NEEDS_REVIEW,
+        CaptureProcessingStatus.FAILED,
+        CaptureProcessingStatus.MODEL_NOT_AVAILABLE,
+        CaptureProcessingStatus.LOCATION_REQUIRED,
+    }
+)
+
+
 class Coordinate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -97,11 +145,19 @@ class CaptureCreate(BaseModel):
     mission_id: uuid.UUID | None = None
     device_id: uuid.UUID | None = None
     storage_path: str | None = Field(default=None, max_length=500)
+    user_description: str | None = Field(default=None, max_length=500)
     coordinate: Coordinate | None = None
     heading_deg: float | None = Field(default=None, ge=0, le=360)
     speed_mps: float | None = Field(default=None, ge=0)
     quality: dict[str, Any] = Field(default_factory=dict)
     detections: list[DetectionCreate] = Field(default_factory=list)
+
+    @field_validator("user_description")
+    @classmethod
+    def plain_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return "".join(c for c in value if unicodedata.category(c) not in {"Cc", "Cf"}).strip()
 
     @model_validator(mode="after")
     def location_is_declared(self) -> CaptureCreate:

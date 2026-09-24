@@ -27,6 +27,7 @@ export const eventSchema = z.object({
   status: z.enum(Object.keys(statuses) as [keyof typeof statuses, ...Array<keyof typeof statuses>]),
   occurred_at: z.string().datetime({ offset: true }),
   evidence_mode: z.string(),
+  model_status: z.string().nullable().optional(),
   visual_confidence: z.number().min(0).max(1).nullable().optional(),
   fused_confidence: z.number().min(0).max(1).nullable().optional(),
   latitude: z.number().min(-90).max(90).nullable().optional(),
@@ -62,12 +63,67 @@ export const uploadResultSchema = z.object({
   id: z.string().uuid(),
   capture_key: z.string(),
   created: z.boolean(),
-  storage_path: z.string().nullable(),
   requires_manual_location: z.boolean(),
   location_source: z.string().optional(),
   exif_status: z.string().optional(),
 });
 export type UploadResult = z.infer<typeof uploadResultSchema>;
+
+export const captureProcessingSchema = z.object({
+  capture_id: z.string().uuid(),
+  status: z.enum([
+    'received',
+    'queued',
+    'processing_detection',
+    'detection_completed',
+    'building_event',
+    'enriching_context',
+    'building_features',
+    'assessing',
+    'completed',
+    'no_supported_detection',
+    'no_event',
+    'needs_review',
+    'failed',
+    'model_not_available',
+    'location_required',
+  ]),
+  requires_manual_location: z.boolean(),
+  event_ids: z.array(z.string().uuid()),
+  model_version_id: z.string().uuid().nullable(),
+  model_status: z.string().nullable().optional(),
+  updated_at: z.string().nullable(),
+});
+export type CaptureProcessing = z.infer<typeof captureProcessingSchema>;
+
+export const captureMarkerSchema = z.object({
+  id: z.string().uuid(),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  report_status: z.enum([
+    'received',
+    'model_not_available',
+    'experimental',
+    'human_confirmed',
+    'no_supported_detection',
+  ]),
+  event_id: z.string().uuid().nullable().optional(),
+  user_description: z.string().nullable().optional(),
+  location_source: z.string().optional(),
+  location_conflict: z.boolean().nullable().optional(),
+  accuracy_m: optionalNumber,
+  urmind_class: z.string().nullable().optional(),
+  severity: z.string().nullable().optional(),
+  priority_score: optionalNumber,
+});
+export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
+export const reportLabels: Record<CaptureMarker['report_status'], string> = {
+  received: 'Relato recebido — aguardando análise',
+  model_not_available: 'Análise indisponível — sem modelo autorizado',
+  experimental: 'Análise experimental',
+  human_confirmed: 'Confirmado por revisão humana',
+  no_supported_detection: 'Relato recebido — nenhum problema das classes suportadas identificado',
+};
 
 const detectionSchema = z.object({
   id: z.string().uuid(),

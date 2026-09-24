@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pytest
 
+from app.logging import configure_logging
 from app.observability import (
     MIN_SAMPLES_FOR_DRIFT,
     NOT_ENOUGH_DATA,
@@ -32,10 +34,18 @@ class FakeResult:
         return self._rows[0] if self._rows else None
 
 
+def test_httpx_library_logs_cannot_bypass_external_url_redaction() -> None:
+    configure_logging()
+
+    assert logging.getLogger("httpx").level >= logging.WARNING
+
+
 class FakeSession:
     """Devolve respostas na ordem em que as consultas aparecem na função."""
 
-    def __init__(self, *, scalars: list[Any] | None = None, results: list[list[dict]] | None = None):
+    def __init__(
+        self, *, scalars: list[Any] | None = None, results: list[list[dict]] | None = None
+    ):
         self._scalars = list(scalars or [])
         self._results = list(results or [])
 
@@ -107,6 +117,29 @@ async def test_lineage_aponta_o_elo_que_falta_em_vez_de_presumir() -> None:
     report = await model_lineage(FakeSession(results=[row], scalars=[0]))
     assert report["complete"] is False
     assert report["missing_links"] == ["training_run"]
+    assert report["promoted"] is False
+    assert report["chain"]["stage"] == "QUARANTINED"
+
+
+@pytest.mark.asyncio
+async def test_shadow_lineage_never_claims_production():
+    row = {
+        "id": "fixture",
+        "name": "shadow",
+        "version": "demo",
+        "checksum": "abc",
+        "promoted_at": None,
+        "dataset_name": None,
+        "dataset_version": None,
+        "metrics": {
+            "shadow_authorized": True,
+            "serving_status": "EXPERIMENTAL_SHADOW",
+            "quality_classification": "REJECTED",
+        },
+    }
+    report = await model_lineage(FakeSession(results=[[row]], scalars=[0]))
+    assert report["promoted"] is False
+    assert report["chain"]["stage"] == "EXPERIMENTAL_SHADOW"
 
 
 @pytest.mark.asyncio

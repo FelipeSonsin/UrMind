@@ -1658,7 +1658,7 @@ strong.risk-unknown {
 .detail-grid {
   display: grid;
   /* 300px espremia quatro colunas no desktop e quebrava rótulos no meio. */
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: var(--space);
 }
 .map-legend {
@@ -1750,4 +1750,57 @@ strong.risk-unknown {
   border-top: 1px solid var(--line);
   font-size: 12px;
   text-align: center;
+}
+
+/* Taxonomia canônica e exemplos revisados */
+.taxonomy-list,
+.demo-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.taxonomy-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+.taxonomy-list li {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #dce5d7;
+  border-radius: 6px;
+}
+.taxonomy-list li small {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.taxonomy-list li[data-support='DATA_REQUIRED'] strong {
+  color: #586b52;
+  font-weight: 500;
+}
+.demo-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.demo-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.demo-badge {
+  align-self: flex-start;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.experimental-badge {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #7a4b00;
+  background: #fff4dd;
+  border-color: #e9c77b;
+  margin-bottom: 6px;
 }

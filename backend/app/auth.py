@@ -32,10 +32,11 @@ class AuthenticatedUser:
     email: str | None
     role: str
     urmind_role: str | None = None
+    is_anonymous: bool = False
 
     @property
     def can_review(self) -> bool:
-        return self.urmind_role in REVIEWER_ROLES
+        return not self.is_anonymous and self.urmind_role in REVIEWER_ROLES
 
 
 class AuthNotConfiguredError(RuntimeError):
@@ -58,9 +59,11 @@ def decode_token(token: str, settings: Settings, *, key: Any | None = None) -> d
     """Valida e decodifica. `key` só é passado em teste, com par de chaves local."""
     if not settings.supabase_jwks_url:
         raise AuthNotConfiguredError("SUPABASE_JWKS_URL não configurada")
-    signing_key = key if key is not None else _jwks_client(
-        settings.supabase_jwks_url
-    ).get_signing_key_from_jwt(token).key
+    signing_key = (
+        key
+        if key is not None
+        else _jwks_client(settings.supabase_jwks_url).get_signing_key_from_jwt(token).key
+    )
     return jwt.decode(
         token,
         signing_key,
@@ -99,6 +102,7 @@ async def require_user(
         email=claims.get("email"),
         role=str(claims.get("role", "")),
         urmind_role=app_metadata.get("urmind_role") if isinstance(app_metadata, dict) else None,
+        is_anonymous=claims.get("is_anonymous") is True,
     )
 
 

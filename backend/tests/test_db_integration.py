@@ -13,6 +13,7 @@ Com Postgres+PostGIS local, sem pooler, as duas apontam para a mesma URL.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import os
@@ -75,6 +76,390 @@ async def test_postgis_disponivel(database):
 
 
 @pytest.mark.asyncio
+async def test_photo_report_marker_exif_storage_owner_and_missing_location(database):
+    """Real Storage + PostGIS + queue + RLS. No Auth change, model or fake Event."""
+    from fastapi import UploadFile
+
+    from app.api.v1.core import upload_photo
+    from app.auth import AuthenticatedUser
+    from tests.test_exif import build_jpeg, gps_block
+
+    owner = str(uuid.uuid4())
+    other = str(uuid.uuid4())
+    storage = StorageClient(get_settings())
+    ids = []
+    paths = []
+    try:
+        for located in (True, False):
+            # Synthetic image generated exclusively for this disposable integration test.
+            data = build_jpeg(gps=gps_block() if located else None)
+            async with database.sessionmaker() as session:
+                service = CoreService(CaptureRepository(session), EventRepository(session))
+                result = await upload_photo(
+                    user=AuthenticatedUser(owner, None, "authenticated"),
+                    service=service,
+                    storage=storage,
+                    file=UploadFile(filename="integration-report.jpg", file=io.BytesIO(data)),
+                    user_description="<script>plain text</script>",
+                )
+                capture_id = result["id"]
+                ids.append(capture_id)
+                capture = await service.captures.get(capture_id)
+                paths.append(capture.storage_path)
+                assert await storage.download(capture.storage_path) == data
+                assert result["requires_manual_location"] is not located
+                markers = await service.capture_markers(owner)
+                assert any(row["id"] == capture_id for row in markers) is located
+                assert not await service.capture_markers(other)
+                if not located:
+                    assert (
+                        await session.scalar(
+                            text(
+                                "select count(*) from pgmq.q_inference_jobs where message->>'capture_id'=:id"
+                            ),
+                            {"id": str(capture_id)},
+                        )
+                        == 0
+                    )
+                    assert await service.captures.fill_missing_location(
+                        capture_id, owner, Coordinate(latitude=LAT, longitude=LON)
+                    )
+                    await session.commit()
+                    assert not await service.captures.fill_missing_location(
+                        capture_id, owner, Coordinate(latitude=LAT + 1, longitude=LON)
+                    )
+                    markers = await service.capture_markers(owner)
+                marker = next(row for row in markers if row["id"] == capture_id)
+                assert marker["location_source"] == ("exif" if located else "manual")
+                assert marker["urmind_class"] is None and marker["severity"] is None
+                assert marker["user_description"] == "<script>plain text</script>"
+                assert (
+                    await session.scalar(
+                        text(
+                            "select count(*) from pgmq.q_inference_jobs where message->>'capture_id'=:id"
+                        ),
+                        {"id": str(capture_id)},
+                    )
+                    == 1
+                )
+                # Realtime SELECT authorization uses the same RLS as Data API.
+                await session.execute(text("set local role authenticated"))
+                for caller, role, anonymous, count in (
+                    (owner, None, True, 1),
+                    (other, None, True, 0),
+                    (other, "reviewer", False, 1),
+                    (other, "reviewer", True, 0),
+                ):
+                    await session.execute(
+                        text("select set_config('request.jwt.claims', :claims, true)"),
+                        {
+                            "claims": json.dumps(
+                                {
+                                    "sub": caller,
+                                    "is_anonymous": anonymous,
+                                    "app_metadata": {"urmind_role": role},
+                                }
+                            )
+                        },
+                    )
+                    assert (
+                        await session.scalar(
+                            text("select count(*) from public.captures where id=:id"),
+                            {"id": capture_id},
+                        )
+                        == count
+                    )
+                await session.rollback()
+    finally:
+        async with database.session() as session:
+            for capture_id in ids:
+                for table in ("q_inference_jobs", "a_inference_jobs"):
+                    await session.execute(
+                        text(f"delete from pgmq.{table} where message->>'capture_id'=:id"),
+                        {"id": str(capture_id)},
+                    )
+                await session.execute(
+                    text("delete from public.captures where id=:id"), {"id": capture_id}
+                )
+        for path in paths:
+            await storage.delete(path)
+
+
+@pytest.mark.asyncio
+async def test_history_archive_retains_observations_and_rejects_mutation(database):
+    from app.repositories.core import HistoryRepository
+    from app.services.history import snapshot_hash, snapshot_report
+
+    # Fully rolled back fixture. This is not evidence of the visual E2E pipeline.
+    async with database.sessionmaker() as session:
+        async with session.begin():
+            repository = HistoryRepository(session)
+            event_id = await session.scalar(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, occurred_at) "
+                    "values (:key, 'URMIND_ROAD_D40', 'photo', statement_timestamp() - interval '1 day') "
+                    "returning id"
+                ),
+                {"key": f"integration-history-{uuid.uuid4()}"},
+            )
+            payload = await repository.snapshot_observations(90)
+            digest = snapshot_hash(payload)
+            archive_id = await repository.save_snapshot(payload, digest)
+            first = snapshot_report(payload, digest)
+            loaded, loaded_digest = await repository.load_snapshot(archive_id)
+            assert snapshot_report(loaded, loaded_digest) == first
+            assert first["scientific_feature_eligible"] is False
+            original = next(r for r in payload["observations"] if r["event_id"] == str(event_id))
+            assert original["status"] != "confirmed"
+            await session.execute(
+                text("update public.events set status='confirmed' where id=:id"), {"id": event_id}
+            )
+            await session.execute(
+                text(
+                    "insert into public.events(event_key, urmind_class, evidence_mode, occurred_at) "
+                    "values (:key, 'URMIND_ROAD_D40', 'photo', statement_timestamp() - interval '2 days')"
+                ),
+                {"key": f"integration-history-backdated-{uuid.uuid4()}"},
+            )
+            newer = await repository.snapshot_observations(90)
+            assert len(newer["observations"]) == len(payload["observations"]) + 1
+            assert (
+                next(r for r in newer["observations"] if r["event_id"] == str(event_id))["status"]
+                == "confirmed"
+            )
+            archived, archived_digest = await repository.load_snapshot(archive_id)
+            assert snapshot_report(archived, archived_digest) == first
+            for statement in (
+                "update public.audit_log set after_data = '{}'::jsonb where id = :id",
+                "delete from public.audit_log where id = :id",
+            ):
+                with pytest.raises(exc.IntegrityError, match="immutable"):
+                    async with session.begin_nested():
+                        await session.execute(text(statement), {"id": archive_id})
+            await session.rollback()
+        assert not session.in_transaction()
+
+
+@pytest.mark.asyncio
+async def test_public_image_quota_shared_atomic_expiring_and_private(database):
+    from app.repositories.core import PublicImageQuota, QuotaExceededError
+
+    caller = hashlib.sha256(f"quota-test-{uuid.uuid4()}".encode()).hexdigest()
+    other = hashlib.sha256(f"quota-test-{uuid.uuid4()}".encode()).hexdigest()
+    resource = uuid.uuid4()
+    second = Database(get_settings())
+    first_quota = PublicImageQuota(database.sessionmaker)
+    second_quota = PublicImageQuota(second.sessionmaker)
+    try:
+        async with database.session() as session:
+            # Seed only ephemeral quota fixtures, never Detection/Event/evidence.
+            await session.execute(
+                text(
+                    "insert into public.public_image_admissions "
+                    "(stage, caller_hash, resource_id, admitted_at) "
+                    "select 'download', :caller, :resource, clock_timestamp() "
+                    "from generate_series(1,29)"
+                ),
+                {"caller": caller, "resource": resource},
+            )
+        results = await asyncio.gather(
+            first_quota.admit("download", caller, resource),
+            second_quota.admit("download", other, resource),
+            return_exceptions=True,
+        )
+        assert sum(value is None for value in results) == 1
+        assert sum(isinstance(value, QuotaExceededError) for value in results) == 1
+        async with database.session() as session:
+            assert (
+                await session.scalar(
+                    text(
+                        "select count(*) from public.public_image_admissions where resource_id=:resource"
+                    ),
+                    {"resource": resource},
+                )
+                == 30
+            )
+            # Another resource/caller cannot bypass the separate global download cap.
+            await session.execute(
+                text(
+                    "insert into public.public_image_admissions "
+                    "(stage, caller_hash, resource_id, admitted_at) "
+                    "select 'download', :caller, :resource, clock_timestamp() from generate_series(1,30)"
+                ),
+                {"caller": caller, "resource": uuid.uuid4()},
+            )
+        with pytest.raises(QuotaExceededError):
+            await second_quota.admit("download", other, uuid.uuid4())
+        # Lookup budget is independent of exhausted downloads and of other callers.
+        async with database.session() as session:
+            await session.execute(
+                text(
+                    "insert into public.public_image_admissions (stage, caller_hash, admitted_at) "
+                    "select 'lookup', :caller, clock_timestamp() from generate_series(1,120)"
+                ),
+                {"caller": caller},
+            )
+        with pytest.raises(QuotaExceededError):
+            await first_quota.admit("lookup", caller)
+        await second_quota.admit("lookup", other)
+        async with database.session() as session:
+            await session.execute(
+                text(
+                    "update public.public_image_admissions set admitted_at=clock_timestamp()-interval '61 seconds' "
+                    "where caller_hash=:caller"
+                ),
+                {"caller": caller},
+            )
+        await second_quota.admit("lookup", caller)
+        async with database.session() as session:
+            assert (
+                await session.scalar(
+                    text(
+                        "select count(*) from public.public_image_admissions where stage='lookup' and caller_hash=:caller"
+                    ),
+                    {"caller": caller},
+                )
+                == 1
+            )
+            for role in ("anon", "authenticated"):
+                assert not await session.scalar(
+                    text(
+                        "select has_table_privilege(:role, 'public.public_image_admissions', 'SELECT')"
+                    ),
+                    {"role": role},
+                )
+                assert not await session.scalar(
+                    text(
+                        "select has_table_privilege(:role, 'public.public_image_admissions', 'INSERT')"
+                    ),
+                    {"role": role},
+                )
+            assert await session.scalar(
+                text(
+                    "select relrowsecurity from pg_class where oid='public.public_image_admissions'::regclass"
+                )
+            )
+    finally:
+        async with database.session() as session:
+            await session.execute(
+                text(
+                    "delete from public.public_image_admissions where caller_hash in (:caller,:other)"
+                ),
+                {"caller": caller, "other": other},
+            )
+        await second.close()
+
+
+@pytest.mark.asyncio
+async def test_publication_owner_isolation_and_latest_review_gate_real_postgres(database):
+    from app.repositories.core import DecisionRepository, PublicRepository
+
+    owner = f"publication-owner-{uuid.uuid4()}"
+    fixture_time = datetime.now(UTC)
+    async with database.sessionmaker() as session:
+        try:
+            capture = await CaptureRepository(session).create(
+                CaptureCreate(
+                    capture_key=f"publication-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.MANUAL,
+                    captured_at=fixture_time,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON),
+                    quality={"uploaded_by": owner},
+                )
+            )
+            event = await EventRepository(session).create(
+                EventCreate(
+                    event_key=f"publication-{uuid.uuid4()}",
+                    capture_id=capture.id,
+                    urmind_class=UrmindClass.ROAD_D40,
+                    evidence_mode=EvidenceMode.PHOTO,
+                    occurred_at=fixture_time,
+                    coordinate=Coordinate(latitude=LAT, longitude=LON),
+                    visual_confidence=0.7,
+                )
+            )
+            public = PublicRepository(session)
+            decisions = DecisionRepository(session)
+            assert await public.event(event.id) is None
+            assert await public.event(event.id, owner_id="other-owner") is None
+            assert (await public.event(event.id, owner_id=owner))["id"] == event.id
+            assert event.id not in {r["id"] for r in await public.events(limit=200)}
+            review = await decisions.add_review(
+                event_id=event.id,
+                reviewer="integration-reviewer",
+                decision="confirm",
+                corrected_class=None,
+                notes="rollback fixture",
+            )
+            event.status = "confirmed"
+            publication = {
+                "policy_version": "urmind-publication-v1",
+                "status": "published",
+                "review_id": str(review.id),
+                "reviewer": review.reviewer,
+                "published_at": NOW.isoformat(),
+            }
+            event.factors = {**(event.factors or {}), "publication": publication}
+            await session.flush()
+            assert (await public.event(event.id))["id"] == event.id
+            # Filter by this fixture's ID after SQL publication evaluation; no
+            # assumption about unrelated rows already present in an opt-in DB.
+            rows = await public.events(limit=200, since=fixture_time, status="confirmed")
+            assert event.id in {r["id"] for r in rows}
+            event.factors = {
+                **event.factors,
+                "publication": {
+                    **publication,
+                    "policy_version": "unknown-policy",
+                },
+            }
+            await session.flush()
+            assert await public.event(event.id) is None
+            event.factors = {**event.factors, "publication": publication}
+            await decisions.add_review(
+                event_id=event.id,
+                reviewer="integration-reviewer",
+                decision="confirm",
+                corrected_class=None,
+                notes="later review invalidates old publication",
+            )
+            assert await public.event(event.id) is None
+            assert (await public.event(event.id, owner_id=owner))["id"] == event.id
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_public_capture_quota_uses_real_postgres_ordered_window(database):
+    owner = f"integration-quota-{uuid.uuid4()}"
+    now = datetime.now(UTC)
+    async with database.sessionmaker() as session:
+        repo = CaptureRepository(session)
+        try:
+            await repo.lock_public_uploads()
+            await repo.lock_owner_uploads(owner)
+            public_before = await repo.recent_public_uploads(now)
+            assert await repo.recent_owner_uploads(owner, now) == 0
+            await repo.create(
+                CaptureCreate(
+                    capture_key=f"quota-{uuid.uuid4()}",
+                    source=CaptureSource.PWA_PHOTO,
+                    source_location=LocationSource.MANUAL,
+                    captured_at=now,
+                    storage_path=f"integration-fixture/{uuid.uuid4()}.jpg",
+                    coordinate=Coordinate(latitude=LAT, longitude=LON),
+                    quality={"uploaded_by": owner, "public_upload": True},
+                )
+            )
+            assert await repo.recent_owner_uploads(owner, now) == 1
+            assert await repo.recent_public_uploads(now) == public_before + 1
+        finally:
+            # The Capture and its queue-triggered job are both test-only.
+            await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_storage_real_upload_download_signed_url_and_cleanup():
     import httpx
     from PIL import Image
@@ -112,7 +497,8 @@ async def test_storage_compensates_real_db_constraint_failure(database):
     buffer = io.BytesIO()
     Image.new("RGB", (8, 8), (21, 45, 67)).save(buffer, format="JPEG")
     image = validate_image(buffer.getvalue())
-    capture_key = f"photo-{image.sha256}"
+    fixture_owner = f"integration-fixture-{uuid.uuid4()}"
+    capture_key = f"photo-{hashlib.sha256(f'{fixture_owner}:{image.sha256}'.encode()).hexdigest()}"
     async with database.session() as session:
         await session.execute(
             text(
@@ -154,26 +540,35 @@ async def test_storage_compensates_real_db_constraint_failure(database):
             with pytest.raises(exc.IntegrityError):
                 await upload_photo(
                     user=AuthenticatedUser(
-                        id="integration-fixture", email=None, role="authenticated"
+                        id=fixture_owner,
+                        email=None,
+                        role="authenticated",
+                        urmind_role="reviewer",
                     ),
                     service=service,
                     storage=storage,
                     file=UploadFile(filename="fixture.jpg", file=io.BytesIO(image.data)),
                     source=CaptureSource.PWA_PHOTO,
-                    latitude=None,
-                    longitude=None,
+                    latitude=LAT,
+                    longitude=LON,
                     accuracy_m=None,
-                    location_source=LocationSource.GPS_DEVICE,
+                    location_source=LocationSource.MANUAL,
                     tz_offset_minutes=None,
                 )
             assert storage.uploaded_path == storage.deleted_path
             with pytest.raises(StorageError):
                 await storage.download(storage.uploaded_path)
     finally:
-        async with database.session() as session:
-            await session.execute(
-                text("delete from public.captures where capture_key=:key"), {"key": capture_key}
-            )
+        # Test cleanup is independent from the behavior under test: a failed
+        # compensation must still remove its uniquely identified fixture.
+        try:
+            if getattr(storage, "uploaded_path", None):
+                await storage.delete(storage.uploaded_path)
+        finally:
+            async with database.session() as session:
+                await session.execute(
+                    text("delete from public.captures where capture_key=:key"), {"key": capture_key}
+                )
 
 
 @pytest.mark.asyncio
@@ -185,8 +580,8 @@ async def test_capture_trigger_queue_read_archive_and_transaction_rollback(datab
             capture_id = await session.scalar(
                 text(
                     "insert into public.captures(capture_key, source, source_location, "
-                    "captured_at, storage_path) values (:key, 'pwa_photo', 'unknown', "
-                    "now(), :path) returning id"
+                    "captured_at, storage_path, point) values (:key, 'pwa_photo', 'manual', "
+                    "now(), :path, ST_SetSRID(ST_MakePoint(-46.63,-23.55),4326)::geography) returning id"
                 ),
                 {
                     "key": f"integration-queue-{uuid.uuid4().hex}",
@@ -223,7 +618,7 @@ async def test_rls_and_realtime_publication_are_narrow(database):
             .scalars()
             .all()
         )
-        assert set(published) == {"events", "risk_assessments"}
+        assert set(published) == {"events", "risk_assessments", "captures"}
         await session.execute(text("set local role anon"))
         with pytest.raises(exc.DBAPIError):
             await session.execute(text("select count(*) from public.events"))

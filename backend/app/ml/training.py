@@ -17,10 +17,10 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass, replace
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -32,6 +32,7 @@ from yolox.utils import LRScheduler, ModelEMA, load_ckpt  # type: ignore[import-
 
 from app.ml.detection_dataset import (
     AuthorizedDetectionDataset,
+    build_train_dataset,
     build_yolox_dataloader,
     load_authorized_manifest,
 )
@@ -51,13 +52,9 @@ AUTHORIZATION_STATUS_PATH = (
     PROJECT_ROOT / "datasets/reports/rdd2022_split_authorization_status.json"
 )
 SPLIT_MANIFEST_PATH = PROJECT_ROOT / "datasets/splits/rdd2022_subset_splits.json"
-SELECTION_MANIFEST_PATH = (
-    PROJECT_ROOT / "datasets/manifests/rdd2022_subset_selection.jsonl"
-)
+SELECTION_MANIFEST_PATH = PROJECT_ROOT / "datasets/manifests/rdd2022_subset_selection.jsonl"
 TRAIN_MANIFEST_PATH = PROJECT_ROOT / "datasets/manifests/detection_train_authorized.jsonl"
-VALIDATION_MANIFEST_PATH = (
-    PROJECT_ROOT / "datasets/manifests/detection_validation_authorized.jsonl"
-)
+VALIDATION_MANIFEST_PATH = PROJECT_ROOT / "datasets/manifests/detection_validation_authorized.jsonl"
 CLASS_MAPPING_PATH = PROJECT_ROOT / "datasets/metadata/class_mapping.yaml"
 DVC_CONFIG_PATH = PROJECT_ROOT / ".dvc/config"
 CHECKPOINT_SCHEMA_VERSION = 1
@@ -87,6 +84,8 @@ CHECKPOINT_REQUIRED_KEYS = {
 
 # Pulos de passo por overflow AMP tolerados em sequência antes de declarar divergência.
 MAX_CONSECUTIVE_AMP_SKIPS = 10
+# Teto de workers da validation; ver build_loaders.
+VALIDATION_MAX_WORKERS = 4
 
 
 class TrainingGateError(RuntimeError):
@@ -121,6 +120,18 @@ class TrainingConfig:
     output_directory: str
     device: str
     local_availability_policy: str
+    # Imutável de propósito: a config é frozen e o default não pode ser dict.
+    dataset: Mapping[str, Any] = MappingProxyType({})
+    # V2: quais representações são medidas em VALIDATION e qual decide o BEST.
+    evaluation_representations: tuple[str, ...] = ("raw",)
+    selection_representation: str = "raw"
+    # V2: {"monitor", "patience_evaluations", "min_delta"}; None mantém o V1.
+    early_stopping: Mapping[str, Any] | None = None
+    train_num_workers: int = 0
+    validation_num_workers: int = 0
+    persistent_workers: bool = False
+    prefetch_factor: int | None = None
+    pin_memory: bool = True
 
     @classmethod
     def from_model_metadata(cls, metadata: Mapping[str, Any]) -> TrainingConfig:
@@ -153,6 +164,21 @@ class TrainingConfig:
                 output_directory=training["output_directory"],
                 device=training["device"],
                 local_availability_policy=training["local_availability_policy"],
+                dataset=metadata.get("dataset", {}),
+                evaluation_representations=tuple(
+                    training.get("evaluation_representations", ("raw",))
+                ),
+                selection_representation=training.get("selection_representation", "raw"),
+                early_stopping=training.get("early_stopping"),
+                train_num_workers=training.get("train_num_workers", training["workers"]),
+                validation_num_workers=training.get(
+                    "validation_num_workers", min(training["workers"], VALIDATION_MAX_WORKERS)
+                ),
+                persistent_workers=training.get("persistent_workers", training["workers"] > 0),
+                prefetch_factor=training.get(
+                    "prefetch_factor", 2 if training["workers"] > 0 else None
+                ),
+                pin_memory=training.get("pin_memory", True),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("training config ausente ou malformada") from exc
@@ -160,8 +186,18 @@ class TrainingConfig:
         return config
 
     def validate(self) -> None:
-        if self.model_id != "yolox-s-model-v1" or self.num_classes != 4:
-            raise ValueError("training config diverge do MODEL V1")
+        # A geração V2 reutiliza a mesma arquitetura e taxonomia; só o dataset,
+        # a augmentation e o cronograma mudam. O trainer continua sendo um só.
+        if (
+            self.model_id
+            not in (
+                "yolox-s-model-v1",
+                "yolox-s-model-v2",
+                "yolox-s-quality-rebuild",
+            )
+            or self.num_classes != 4
+        ):
+            raise ValueError("training config diverge das gerações MODEL suportadas")
         if self.input_size != (640, 640):
             raise ValueError("input_size diverge da interface MODEL V1")
         if self.optimizer != "SGD":
@@ -182,12 +218,34 @@ class TrainingConfig:
             raise ValueError("parâmetros positivos da training config são inválidos")
         if self.workers < 0 or self.warmup_epochs < 0 or self.no_aug_epochs < 0:
             raise ValueError("workers/epochs de fase não podem ser negativos")
+        if self.train_num_workers < 0 or self.validation_num_workers < 0:
+            raise ValueError("num_workers do DataLoader não pode ser negativo")
+        if self.train_num_workers == 0:
+            if self.persistent_workers:
+                raise ValueError("persistent_workers exige train_num_workers > 0")
+            if self.prefetch_factor is not None:
+                raise ValueError("prefetch_factor exige train_num_workers > 0")
+        elif self.prefetch_factor is None or self.prefetch_factor < 1:
+            raise ValueError("prefetch_factor deve ser positivo com TRAIN workers")
         if not 0 < self.min_lr_ratio <= 1 or self.weight_decay < 0:
             raise ValueError("min_lr_ratio/weight_decay inválidos")
         if self.device != "cuda":
             raise ValueError("device oficial deve ser cuda")
         if self.local_availability_policy != "fail_on_sample_access_no_hydration":
             raise ValueError("local_availability_policy deve falhar sem hidratação")
+        representations = set(self.evaluation_representations)
+        if not representations or representations - {"raw", "ema"}:
+            raise ValueError("evaluation_representations aceita somente raw/ema")
+        if self.selection_representation not in representations:
+            raise ValueError("selection_representation precisa ser uma representação avaliada")
+        if "ema" in representations and not self.ema:
+            raise ValueError("representação ema exige ema=true")
+        if self.early_stopping is not None:
+            rule = self.early_stopping
+            if rule.get("monitor") != "map50_95" or int(rule.get("patience_evaluations", 0)) < 1:
+                raise ValueError("early_stopping exige monitor map50_95 e patience >= 1")
+            if float(rule.get("min_delta", -1)) < 0:
+                raise ValueError("early_stopping.min_delta não pode ser negativo")
 
     def with_overrides(self, **changes: Any) -> TrainingConfig:
         updated = replace(self, **changes)
@@ -288,16 +346,83 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _canonical_sha256(value: Any) -> str:
-    encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
-    ).encode("utf-8")
+def canonical_sha256(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+        "utf-8"
+    )
     return hashlib.sha256(encoded).hexdigest()
 
 
-def checkpoint_fingerprints(
-    metadata: Mapping[str, Any], config: TrainingConfig
-) -> dict[str, str]:
+@dataclass(frozen=True)
+class DatasetBinding:
+    """Arquivos que vinculam um contrato de modelo ao seu dataset autorizado."""
+
+    train_manifest: Path
+    validation_manifest: Path
+    split_manifest: Path
+    authorization_status: Path
+    authorized_status: str
+    approved_decision: str
+
+
+V1_DATASET_BINDING = DatasetBinding(
+    train_manifest=TRAIN_MANIFEST_PATH,
+    validation_manifest=VALIDATION_MANIFEST_PATH,
+    split_manifest=SPLIT_MANIFEST_PATH,
+    authorization_status=AUTHORIZATION_STATUS_PATH,
+    authorized_status="AUTHORIZED_FOR_MODEL_V1",
+    approved_decision="APPROVED_FOR_MODEL_V1",
+)
+
+
+def dataset_binding(dataset: Mapping[str, Any] | None) -> DatasetBinding:
+    """Sem seção `dataset` o binding é exatamente o do V1; com ela, tudo vem do contrato."""
+    if not dataset:
+        return V1_DATASET_BINDING
+    try:
+        manifests = dataset["manifests"]
+        binding = DatasetBinding(
+            train_manifest=PROJECT_ROOT / str(manifests["TRAIN"]),
+            validation_manifest=PROJECT_ROOT / str(manifests["VALIDATION"]),
+            split_manifest=PROJECT_ROOT / str(dataset["split_manifest"]),
+            authorization_status=PROJECT_ROOT / str(dataset["authorization_status"]),
+            authorized_status=str(dataset["authorized_status"]),
+            approved_decision=str(dataset["approved_decision"]),
+        )
+    except (KeyError, TypeError) as exc:
+        raise TrainingGateError("seção dataset do contrato incompleta") from exc
+    if "TEST" in manifests:
+        raise TrainingGateError("contrato de treino não pode declarar manifest TEST")
+    return binding
+
+
+# Campos acrescentados na geração V2. Ficam fora do fingerprint quando estão no
+# default, para que o fingerprint dos checkpoints V1 continue idêntico.
+_V2_TRAINING_DEFAULTS: dict[str, Any] = {
+    "evaluation_representations": ("raw",),
+    "selection_representation": "raw",
+    "early_stopping": None,
+    "train_num_workers": 0,
+    "validation_num_workers": 0,
+    "persistent_workers": False,
+    "prefetch_factor": None,
+    "pin_memory": True,
+}
+
+
+def _effective_training(config: TrainingConfig) -> dict[str, Any]:
+    effective = {
+        item.name: getattr(config, item.name)
+        for item in fields(config)
+        if item.name not in {"output_directory", "device", "dataset"}
+    }
+    for name, default in _V2_TRAINING_DEFAULTS.items():
+        if effective[name] == default:
+            effective.pop(name)
+    return json.loads(json.dumps(effective, default=dict))
+
+
+def checkpoint_fingerprints(metadata: Mapping[str, Any], config: TrainingConfig) -> dict[str, str]:
     """Recalcula os bindings operacionais; readiness mutável não integra config."""
     config_fields = (
         "model_id",
@@ -314,29 +439,38 @@ def checkpoint_fingerprints(
         "architecture_parameters",
     )
     config_document = {field: metadata[field] for field in config_fields}
-    effective_training = asdict(config)
-    effective_training.pop("output_directory")
-    effective_training.pop("device")
-    config_document["effective_training"] = effective_training
+    config_document["effective_training"] = _effective_training(config)
+    binding = dataset_binding(config.dataset)
     dataset = {
-        "TRAIN": _sha256(TRAIN_MANIFEST_PATH),
-        "VALIDATION": _sha256(VALIDATION_MANIFEST_PATH),
+        "TRAIN": _sha256(binding.train_manifest),
+        "VALIDATION": _sha256(binding.validation_manifest),
         "selection": _sha256(SELECTION_MANIFEST_PATH),
-        "authorization": _sha256(AUTHORIZATION_STATUS_PATH),
+        "authorization": _sha256(binding.authorization_status),
     }
     return {
-        "config_fingerprint": _canonical_sha256(config_document),
+        "config_fingerprint": canonical_sha256(config_document),
         "class_mapping_fingerprint": _sha256(CLASS_MAPPING_PATH),
-        "dataset_fingerprint": _canonical_sha256(dataset),
-        "split_fingerprint": _sha256(SPLIT_MANIFEST_PATH),
+        "dataset_fingerprint": canonical_sha256(dataset),
+        "split_fingerprint": _sha256(binding.split_manifest),
     }
 
 
-def manifest_for_role(role: str) -> Path:
-    if role == "TRAIN":
-        return TRAIN_MANIFEST_PATH
-    if role == "VALIDATION":
-        return VALIDATION_MANIFEST_PATH
+def manifest_for_role(role: str, dataset: Mapping[str, Any] | None = None) -> Path:
+    """Resolve o manifest do papel, preferindo o declarado no contrato do modelo.
+
+    O V1 fixava os caminhos no módulo, então treinar outra versão de dataset
+    exigiria duplicar o trainer. Agora o contrato declara `dataset.manifests` e
+    o trainer continua único; sem essa seção, o comportamento é exatamente o do
+    V1. TEST segue inacessível por aqui: abrir holdout não é papel do trainer.
+    """
+    if role in ("TRAIN", "VALIDATION"):
+        binding = dataset_binding(dataset)
+        path = binding.train_manifest if role == "TRAIN" else binding.validation_manifest
+        if not path.is_file():
+            raise TrainingGateError(
+                f"DATASET_SPLIT_NOT_AVAILABLE: manifest declarado ausente: {path}"
+            )
+        return path
     raise ValueError("TEST permanece selado na Prioridade 6")
 
 
@@ -353,12 +487,23 @@ def _dvc_local_ready() -> bool:
     )
 
 
-def validate_readiness(metadata: Mapping[str, Any]) -> None:
+def validate_readiness(
+    metadata: Mapping[str, Any], *, contract_path: Path = MODEL_METADATA_PATH
+) -> None:
+    binding = dataset_binding(metadata.get("dataset"))
+    for path in (
+        binding.split_manifest,
+        binding.authorization_status,
+        binding.train_manifest,
+        binding.validation_manifest,
+    ):
+        if not path.is_file():
+            raise TrainingGateError(f"DATASET_SPLIT_NOT_AVAILABLE: {path}")
     try:
         stack = json.loads(STACK_METADATA_PATH.read_text(encoding="utf-8"))
         report = json.loads(READINESS_REPORT_PATH.read_text(encoding="utf-8"))
         registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
-        authorization = json.loads(AUTHORIZATION_STATUS_PATH.read_text(encoding="utf-8"))
+        authorization = json.loads(binding.authorization_status.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise TrainingGateError("readiness/registry ausente ou malformado") from exc
     gates = {
@@ -393,12 +538,11 @@ def validate_readiness(metadata: Mapping[str, Any]) -> None:
         ),
         "AUTHORIZED_DATA": report["data_manifest_schema_ready"] is True,
         "SPLIT_AUTHORIZATION": (
-            authorization["status"] == "AUTHORIZED_FOR_MODEL_V1"
-            and authorization["decision"] == "APPROVED_FOR_MODEL_V1"
+            authorization["status"] == binding.authorized_status
+            and authorization["decision"] == binding.approved_decision
             and authorization["binding_mismatches"] == []
-            and authorization["split_manifest_sha256"] == _sha256(SPLIT_MANIFEST_PATH)
-            and authorization["selection_manifest_sha256"]
-            == _sha256(SELECTION_MANIFEST_PATH)
+            and authorization["split_manifest_sha256"] == _sha256(binding.split_manifest)
+            and authorization["selection_manifest_sha256"] == _sha256(SELECTION_MANIFEST_PATH)
         ),
     }
     failed = [name for name, passed in gates.items() if not passed]
@@ -407,10 +551,10 @@ def validate_readiness(metadata: Mapping[str, Any]) -> None:
     entries = {entry["path"]: entry for entry in registry.get("artifacts", [])}
     for path in (
         STACK_METADATA_PATH,
-        MODEL_METADATA_PATH,
-        TRAIN_MANIFEST_PATH,
-        VALIDATION_MANIFEST_PATH,
-        AUTHORIZATION_STATUS_PATH,
+        contract_path,
+        binding.train_manifest,
+        binding.validation_manifest,
+        binding.authorization_status,
     ):
         relative = path.relative_to(PROJECT_ROOT).as_posix()
         if relative not in entries or entries[relative].get("sha256") != _sha256(path):
@@ -432,9 +576,7 @@ def seed_everything(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def load_pretrained_compatible(
-    model: torch.nn.Module, path: Path | None
-) -> PretrainedLoadReport:
+def load_pretrained_compatible(model: torch.nn.Module, path: Path | None) -> PretrainedLoadReport:
     if path is None:
         raise ValueError("pretrained exige path explícito; download automático é proibido")
     if not path.is_file():
@@ -467,9 +609,7 @@ def load_pretrained_compatible(
     )
 
 
-def _official_optimizer(
-    model: torch.nn.Module, config: TrainingConfig
-) -> torch.optim.Optimizer:
+def _official_optimizer(model: torch.nn.Module, config: TrainingConfig) -> torch.optim.Optimizer:
     exp = OfficialYOLOXExp()
     exp.model = model
     exp.warmup_epochs = config.warmup_epochs
@@ -480,9 +620,7 @@ def _official_optimizer(
     return exp.get_optimizer(config.batch_size)
 
 
-def make_grad_scaler(
-    device: torch.device, *, enabled: bool, initial_scale: float
-) -> Any:
+def make_grad_scaler(device: torch.device, *, enabled: bool, initial_scale: float) -> Any:
     return torch.amp.GradScaler(device.type, enabled=enabled, init_scale=initial_scale)
 
 
@@ -495,7 +633,10 @@ class TrainingEngine:
         config: TrainingConfig,
         device: torch.device,
         tracker: Any | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
+        # Contrato que gerou este engine; fingerprints e resume se vinculam a ele.
+        self.metadata = dict(metadata) if metadata is not None else load_model_config()
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -510,6 +651,7 @@ class TrainingEngine:
         self.current_iteration = 0
         self.global_step = 0
         self.best_metric: float | None = None
+        self.training_metadata: dict[str, Any] = {}
 
     def prepare_epoch(self, epoch: int) -> None:
         """Aplica somente a transição oficial de loss da fase no-augmentation."""
@@ -548,9 +690,7 @@ class TrainingEngine:
             for name, parameter in self.model.named_parameters()
             if parameter.grad is not None
         ]
-        non_finite = [
-            name for name, gradient in gradients if not torch.isfinite(gradient).all()
-        ]
+        non_finite = [name for name, gradient in gradients if not torch.isfinite(gradient).all()]
         amp_overflow = (
             bool(non_finite) and bool(gradients) and self.config.amp and self.scaler.is_enabled()
         )
@@ -619,33 +759,37 @@ class TrainingEngine:
             self.tracker.log_training_step(result, global_step=self.global_step)
         return result
 
-    @contextmanager
-    def validation_mode(self) -> Iterator[None]:
-        was_training = self.model.training
-        self.model.eval()
-        try:
-            with torch.inference_mode():
-                yield
-        finally:
-            self.model.train(was_training)
-
     def evaluate_validation(
-        self, validation_loader: DataLoader, *, max_batches: int | None = None
+        self,
+        validation_loader: DataLoader,
+        *,
+        max_batches: int | None = None,
+        representation: str = "raw",
     ) -> Any:
-        """Executa somente VALIDATION; checkpoint selection não pertence a esta prioridade."""
+        """Executa somente VALIDATION, sobre os pesos raw ou EMA do mesmo passo."""
         from app.ml.evaluator import EvaluationConfig, YOLOXEvaluator
 
-        metadata = load_model_config()
+        if representation == "ema":
+            if self.ema is None:
+                raise TrainingGateError("representação ema solicitada sem EMA ativo")
+            model = self.ema.ema
+        elif representation == "raw":
+            model = self.model
+        else:
+            raise ValueError("representation deve ser raw ou ema")
         evaluator = YOLOXEvaluator(
-            self.model,
+            model,
             validation_loader,
-            EvaluationConfig.from_model_metadata(metadata),
+            EvaluationConfig.from_model_metadata(self.metadata),
             device=self.device,
+            manifest_path=dataset_binding(self.config.dataset).validation_manifest,
         )
         run = evaluator.evaluate(max_batches=max_batches)
         if self.tracker is not None:
             self.tracker.log_validation(
-                run.result.as_persisted(), global_step=self.global_step
+                run.result.as_persisted(),
+                global_step=self.global_step,
+                prefix="validation" if representation == "raw" else "validation_ema",
             )
         return run
 
@@ -670,7 +814,7 @@ class TrainingEngine:
     def _checkpoint_payload(
         self, training_metadata: Mapping[str, Any] | None = None
     ) -> dict[str, Any]:
-        metadata = load_model_config()
+        metadata = self.metadata
         fingerprints = checkpoint_fingerprints(metadata, self.config)
         return {
             "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
@@ -705,9 +849,7 @@ class TrainingEngine:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def save_last(
-        self, *, training_metadata: Mapping[str, Any] | None = None
-    ) -> Path:
+    def save_last(self, *, training_metadata: Mapping[str, Any] | None = None) -> Path:
         path = self.checkpoint_path("last")
         self._atomic_save(self._checkpoint_payload(training_metadata), path)
         if self.tracker is not None:
@@ -738,9 +880,7 @@ class TrainingEngine:
             self.best_metric = previous
             raise
         if self.tracker is not None:
-            self.tracker.log_checkpoint_reference(
-                self.checkpoint_path("best"), kind="best"
-            )
+            self.tracker.log_checkpoint_reference(self.checkpoint_path("best"), kind="best")
         return True
 
     def _validate_resume_payload(self, payload: Any) -> Mapping[str, Any]:
@@ -748,7 +888,7 @@ class TrainingEngine:
             raise TypeError("checkpoint não contém mapping de estado")
         if set(payload) != CHECKPOINT_REQUIRED_KEYS:
             raise ValueError("checkpoint possui keys obrigatórias ausentes ou desconhecidas")
-        metadata = load_model_config()
+        metadata = self.metadata
         expected = {
             "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
             "model_id": metadata["model_id"],
@@ -826,9 +966,7 @@ class TrainingEngine:
             ):
                 raise ValueError("checkpoint incompatível: scheduler")
             last_lrs = scheduler_state.get("last_lrs")
-            if not isinstance(last_lrs, list) or len(last_lrs) != len(
-                self.optimizer.param_groups
-            ):
+            if not isinstance(last_lrs, list) or len(last_lrs) != len(self.optimizer.param_groups):
                 raise ValueError("checkpoint incompatível: scheduler state")
             for group, lr in zip(self.optimizer.param_groups, last_lrs, strict=True):
                 group["lr"] = float(lr)
@@ -841,6 +979,7 @@ class TrainingEngine:
             self.current_iteration = payload["iteration"]
             self.global_step = payload["global_step"]
             self.best_metric = payload["best_metric"]
+            self.training_metadata = dict(payload["training_metadata"] or {})
         except Exception:
             self.model.load_state_dict(snapshot["model"], strict=True)
             self.optimizer.load_state_dict(snapshot["optimizer"])
@@ -871,23 +1010,40 @@ def _loss_float(value: Any) -> float:
 
 
 def build_loaders(config: TrainingConfig) -> tuple[DataLoader, DataLoader]:
-    train_rows = load_authorized_manifest(manifest_for_role("TRAIN"), intended_split="TRAIN")
-    validation_rows = load_authorized_manifest(
-        manifest_for_role("VALIDATION"), intended_split="VALIDATION"
+    train_rows = load_authorized_manifest(
+        manifest_for_role("TRAIN", config.dataset), intended_split="TRAIN"
     )
-    train_dataset = AuthorizedDetectionDataset(train_rows, mode="train")
+    validation_rows = load_authorized_manifest(
+        manifest_for_role("VALIDATION", config.dataset), intended_split="VALIDATION"
+    )
+    # A augmentation é decidida pelo contrato: `enabled=false` devolve o dataset
+    # determinístico do V1, e `enabled=true` monta o pipeline oficial do YOLOX.
+    train_dataset = build_train_dataset(
+        train_rows, input_size=config.input_size, augmentation=config.augmentation
+    )
+    # Validation nunca é aumentada: a métrica precisa ser comparável entre épocas.
     validation_dataset = AuthorizedDetectionDataset(validation_rows, mode="validation")
     train_loader = build_yolox_dataloader(
         train_dataset,
         batch_size=config.batch_size,
-        num_workers=config.workers,
+        num_workers=config.train_num_workers,
+        pin_memory=config.pin_memory,
         shuffle=True,
+        persistent_workers=config.persistent_workers,
+        prefetch_factor=config.prefetch_factor,
     )
+    # Cada worker spawn no Windows reserva ~1,7 GB de commit (torch + DLLs CUDA).
+    # Workers persistentes de validation somavam 8 processos ociosos aos 8 do
+    # treino e esgotaram o commit do sistema: o cudaMalloc seguinte falhou como
+    # OOM com VRAM livre (E1, 2026-09-21). Validation usa poucos workers efêmeros.
     validation_loader = build_yolox_dataloader(
         validation_dataset,
         batch_size=config.batch_size,
-        num_workers=config.workers,
+        num_workers=config.validation_num_workers,
+        pin_memory=config.pin_memory,
         shuffle=False,
+        persistent_workers=False,
+        prefetch_factor=(config.prefetch_factor if config.validation_num_workers > 0 else None),
     )
     return train_loader, validation_loader
 
@@ -901,11 +1057,12 @@ def build_training_engine(
     batch_size: int | None = None,
     iters_per_epoch: int = 1,
     tracker: Any | None = None,
+    contract_path: Path = MODEL_METADATA_PATH,
 ) -> TrainingEngine:
     if pretrained_path is not None and resume_path is not None:
         raise ValueError("pretrained e resume são operações mutuamente exclusivas")
-    document = load_model_config() if metadata is None else dict(metadata)
-    validate_readiness(document)
+    document = load_model_config(contract_path) if metadata is None else dict(metadata)
+    validate_readiness(document, contract_path=contract_path)
     config = TrainingConfig.from_model_metadata(document)
     overrides: dict[str, Any] = {}
     if batch_size is not None:
@@ -934,7 +1091,9 @@ def build_training_engine(
         no_aug_epochs=config.no_aug_epochs,
         min_lr_ratio=config.min_lr_ratio,
     )
-    engine = TrainingEngine(model, optimizer, scheduler, config, resolved, tracker=tracker)
+    engine = TrainingEngine(
+        model, optimizer, scheduler, config, resolved, tracker=tracker, metadata=document
+    )
     if resume_path is not None:
         engine.resume(resume_path)
     return engine
@@ -985,9 +1144,7 @@ def _state_digest(value: Any) -> str:
     return digest.hexdigest()
 
 
-def run_controlled_dry_run(
-    *, tracking_root: Path | None = None
-) -> DryRunResult:
+def run_controlled_dry_run(*, tracking_root: Path | None = None) -> DryRunResult:
     """Atravessa 2 steps TRAIN e 1 batch VALIDATION; nunca resolve TEST."""
     from app.ml.tracking import MLflowTracker, TrackingError
 
@@ -1023,9 +1180,7 @@ def run_controlled_dry_run(
     selected_train = [train_multi, train_negative]
     selected_validation = [validation_multi, validation_negative]
     train_dataset = AuthorizedDetectionDataset(selected_train, mode="train")
-    validation_dataset = AuthorizedDetectionDataset(
-        selected_validation, mode="validation"
-    )
+    validation_dataset = AuthorizedDetectionDataset(selected_validation, mode="validation")
     train_loader = build_yolox_dataloader(
         train_dataset, batch_size=1, num_workers=0, pin_memory=True, shuffle=False
     )
@@ -1034,9 +1189,7 @@ def run_controlled_dry_run(
     )
 
     base_config = TrainingConfig.from_model_metadata(metadata).with_overrides(batch_size=1)
-    checkpoint_root = Path(
-        tempfile.mkdtemp(prefix="urmind-dry-run-checkpoints-", dir=PROJECT_ROOT)
-    )
+    checkpoint_root = Path(tempfile.mkdtemp(prefix="urmind-dry-run-checkpoints-", dir=PROJECT_ROOT))
     dry_config = replace(
         base_config,
         output_directory=checkpoint_root.relative_to(PROJECT_ROOT).as_posix(),
@@ -1055,9 +1208,7 @@ def run_controlled_dry_run(
     timings: dict[str, float] = {}
     checkpoint_checks: dict[str, bool] = {}
     try:
-        engine = build_training_engine(
-            batch_size=1, iters_per_epoch=2, tracker=tracker
-        )
+        engine = build_training_engine(batch_size=1, iters_per_epoch=2, tracker=tracker)
         engine.config = dry_config
         torch.cuda.reset_peak_memory_stats(engine.device)
         results: list[StepResult] = []
@@ -1074,9 +1225,7 @@ def run_controlled_dry_run(
         metric = validation.result.map50_95
         if metric is None:
             raise TrainingGateError("dry-run VALIDATION produziu map50_95 indefinido")
-        engine.save_best(
-            metric, source="VALIDATION", training_metadata={"run_type": "dry_run"}
-        )
+        engine.save_best(metric, source="VALIDATION", training_metadata={"run_type": "dry_run"})
         last_path = engine.save_last(training_metadata={"run_type": "dry_run"})
         before = {
             "model": _state_digest(engine.model.state_dict()),
@@ -1096,12 +1245,14 @@ def run_controlled_dry_run(
             "atomic": not any(checkpoint_root.glob("*.tmp")),
             "load": resume.global_step == before["global_step"],
             "model_restored": _state_digest(restored.model.state_dict()) == before["model"],
-            "optimizer_restored": _state_digest(restored.optimizer.state_dict()) == before["optimizer"],
+            "optimizer_restored": _state_digest(restored.optimizer.state_dict())
+            == before["optimizer"],
             "scheduler_restored": _state_digest(restored._scheduler_state()) == before["scheduler"],
             "scaler_restored": _state_digest(restored.scaler.state_dict()) == before["scaler"],
             "ema_restored": restored.ema is not None
             and _state_digest(restored.ema.ema.state_dict()) == before["ema"],
-            "step_restored": resume.epoch == before["epoch"] and resume.global_step == before["global_step"],
+            "step_restored": resume.epoch == before["epoch"]
+            and resume.global_step == before["global_step"],
             "best_metric_restored": resume.best_metric == before["best_metric"],
             "fingerprints_validated": True,
         }
@@ -1112,12 +1263,8 @@ def run_controlled_dry_run(
             {
                 "train_steps": 2,
                 "validation_samples": validation.samples,
-                "test_records_resolved": split_audit.count(
-                    split_audit.records_resolved, "TEST"
-                ),
-                "test_files_opened": split_audit.count(
-                    split_audit.files_opened, "TEST"
-                ),
+                "test_records_resolved": split_audit.count(split_audit.records_resolved, "TEST"),
+                "test_files_opened": split_audit.count(split_audit.files_opened, "TEST"),
                 "checkpoint_checks": checkpoint_checks,
             },
             artifact_path="run-metadata",
@@ -1153,9 +1300,7 @@ def run_controlled_dry_run(
             validation_metrics=validation.result.as_persisted(),
             checkpoint=checkpoint_checks,
             mlflow_run_id=run_id,
-            test_records_resolved=split_audit.count(
-                split_audit.records_resolved, "TEST"
-            ),
+            test_records_resolved=split_audit.count(split_audit.records_resolved, "TEST"),
             test_files_opened=split_audit.count(split_audit.files_opened, "TEST"),
             gpu=gpu,
             timings_seconds=timings,
@@ -1185,7 +1330,80 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int)
     parser.add_argument("--pretrained", type=Path)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        default=MODEL_METADATA_PATH,
+        help="contrato do modelo (default: MODEL V1); a geração V2 usa o próprio contrato",
+    )
+    parser.add_argument(
+        "--mlflow-run-id",
+        help=(
+            "com --resume reabre o run original; com --pretrained reutiliza somente "
+            "uma run de startup ainda sem métricas"
+        ),
+    )
     return parser
+
+
+class EarlyStopping:
+    """Regra de parada por paciência sobre VALIDATION, persistida no checkpoint.
+
+    O V1 rodou ~150 épocas depois do último best porque não havia regra: a
+    parada dependeu de aprovação manual. Aqui o estado vive em
+    `training_metadata` do `last.pt`, então um resume continua a contagem.
+    """
+
+    def __init__(
+        self, rule: Mapping[str, Any] | None, state: Mapping[str, Any] | None = None
+    ) -> None:
+        self.rule = dict(rule) if rule else None
+        restored = dict(state or {})
+        self.best_value: float | None = restored.get("best_value")
+        self.best_epoch: int | None = restored.get("best_epoch")
+        self.evaluations_without_improvement = int(
+            restored.get("evaluations_without_improvement", 0)
+        )
+
+    def update(self, value: float, epoch: int) -> bool:
+        """Registra uma avaliação; devolve True quando a paciência se esgotou."""
+        min_delta = float(self.rule["min_delta"]) if self.rule else 0.0
+        if self.best_value is None or value > self.best_value + min_delta:
+            self.best_value, self.best_epoch = value, epoch
+            self.evaluations_without_improvement = 0
+        else:
+            self.evaluations_without_improvement += 1
+        return bool(
+            self.rule
+            and self.evaluations_without_improvement >= int(self.rule["patience_evaluations"])
+        )
+
+    def state(self) -> dict[str, Any]:
+        return {
+            "rule": self.rule,
+            "best_value": self.best_value,
+            "best_epoch": self.best_epoch,
+            "evaluations_without_improvement": self.evaluations_without_improvement,
+        }
+
+
+def close_mosaic_if_due(train_loader: DataLoader, config: TrainingConfig, epoch: int) -> bool:
+    """Fase no-aug oficial: desliga mosaico/mixup nas últimas `no_aug_epochs` épocas.
+
+    O YOLOX chama `train_loader.close_mosaic()`, que propaga a flag pelo batch
+    sampler; aqui o DataLoader é o do torch, então a flag é desligada no próprio
+    `MosaicDetection`. Workers persistentes guardam cópias do dataset e não
+    enxergariam a flag: quem chama precisa reconstruir o loader quando isto
+    devolve True. Flip/HSV do `TrainTransform` continuam, como no upstream.
+    """
+    dataset: Any = train_loader.dataset
+    if epoch >= config.max_epoch - config.no_aug_epochs and getattr(
+        dataset, "enable_mosaic", False
+    ):
+        dataset.enable_mosaic = False
+        logger.info("no_aug phase: mosaic/mixup desligados a partir da época {}", epoch)
+        return True
+    return False
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1197,22 +1415,47 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ValueError("dry-run usa exclusivamente sua política autoritativa")
         print(json.dumps(run_controlled_dry_run().as_dict(), ensure_ascii=False, indent=2))
         return 0
-    metadata = load_model_config()
-    validate_readiness(metadata)
+    resume_run_id = getattr(args, "mlflow_run_id", None)
+    if resume_run_id is not None and args.resume is None and args.pretrained is None:
+        raise ValueError("--mlflow-run-id exige --resume ou --pretrained")
+    contract_path = args.contract.resolve()
+    metadata = load_model_config(contract_path)
+    validate_readiness(metadata, contract_path=contract_path)
     config = TrainingConfig.from_model_metadata(metadata)
     if args.batch_size is not None:
         config = config.with_overrides(batch_size=args.batch_size)
     train_loader, validation_loader = build_loaders(config)
     tracker = MLflowTracker(metadata, config)
-    tracker.start_run(tags={"split_policy": "TRAIN_OPTIMIZATION_VALIDATION_ONLY"})
+    tracker.start_run(
+        tags={
+            "split_policy": "TRAIN_OPTIMIZATION_VALIDATION_ONLY",
+            "contract": contract_path.relative_to(PROJECT_ROOT).as_posix(),
+            # No resume o tag `pretrained` do run original é preservado.
+            **(
+                {"resumed_from": f"{args.resume.as_posix()}@{_sha256(args.resume)}"}
+                if args.resume is not None
+                else {"pretrained": args.pretrained.as_posix() if args.pretrained else "none"}
+            ),
+        },
+        resume_run_id=resume_run_id,
+        allow_empty_pretrained_retry=(
+            resume_run_id is not None and args.pretrained is not None and args.resume is None
+        ),
+    )
     tracker.log_effective_config()
+    stop_reason = "MAX_EPOCH"
     try:
         engine = build_training_engine(
+            metadata=metadata,
             pretrained_path=args.pretrained,
             resume_path=args.resume,
             batch_size=args.batch_size,
             iters_per_epoch=len(train_loader),
             tracker=tracker,
+            contract_path=contract_path,
+        )
+        stopper = EarlyStopping(
+            config.early_stopping, engine.training_metadata.get("early_stopping")
         )
         if args.single_step:
             engine.train_step(next(iter(train_loader)), epoch=0, iteration=0)
@@ -1220,23 +1463,76 @@ def main(argv: Sequence[str] | None = None) -> int:
             start_epoch = engine.current_epoch + 1 if args.resume is not None else 0
             for epoch in range(start_epoch, config.max_epoch):
                 engine.prepare_epoch(epoch)
+                if close_mosaic_if_due(train_loader, config, epoch):
+                    train_loader = build_yolox_dataloader(
+                        train_loader.dataset,
+                        batch_size=train_loader.batch_size or config.batch_size,
+                        num_workers=config.train_num_workers,
+                        pin_memory=config.pin_memory,
+                        shuffle=True,
+                        persistent_workers=config.persistent_workers,
+                        prefetch_factor=config.prefetch_factor,
+                    )
                 for iteration, batch in enumerate(train_loader):
                     engine.train_step(batch, epoch=epoch, iteration=iteration)
-                if (epoch + 1) % config.validation_interval_epochs == 0:
-                    validation = engine.evaluate_validation(validation_loader)
-                    logger.info("validation metrics: {}", validation.result.as_persisted())
-                    metric = validation.result.map50_95
+                exhausted = False
+                is_last_epoch = epoch + 1 == config.max_epoch
+                if (epoch + 1) % config.validation_interval_epochs == 0 or is_last_epoch:
+                    validation_metrics: dict[str, Any] = {}
+                    for representation in config.evaluation_representations:
+                        validation = engine.evaluate_validation(
+                            validation_loader, representation=representation
+                        )
+                        validation_metrics[representation] = validation.result.as_persisted()
+                        logger.info(
+                            "validation[{}] epoch={} metrics: {}",
+                            representation,
+                            epoch,
+                            validation_metrics[representation],
+                        )
+                    metric = validation_metrics[config.selection_representation]["map50_95"]
                     if metric is None:
                         raise TrainingGateError(
                             "VALIDATION map50_95 indefinido; BEST não pode ser selecionado"
                         )
+                    exhausted = stopper.update(float(metric), epoch)
+                    engine.training_metadata = {
+                        "completed_epoch": epoch,
+                        "selection_representation": config.selection_representation,
+                        "validation": validation_metrics,
+                        "early_stopping": stopper.state(),
+                    }
                     engine.save_best(
-                        metric,
-                        source="VALIDATION",
-                        training_metadata={"completed_epoch": epoch},
+                        metric, source="VALIDATION", training_metadata=engine.training_metadata
                     )
-                if (epoch + 1) % config.checkpoint_interval_epochs == 0:
-                    engine.save_last(training_metadata={"completed_epoch": epoch})
+                if (epoch + 1) % config.checkpoint_interval_epochs == 0 or exhausted:
+                    engine.save_last(
+                        training_metadata={
+                            **engine.training_metadata,
+                            "completed_epoch": epoch,
+                            "early_stopping": stopper.state(),
+                        }
+                    )
+                if exhausted:
+                    stop_reason = "EARLY_STOP_PATIENCE"
+                    logger.info(
+                        "early stop: {} avaliações sem melhora > min_delta; best epoch={}",
+                        stopper.evaluations_without_improvement,
+                        stopper.best_epoch,
+                    )
+                    break
+            tracker.log_lightweight_artifact(
+                "training_summary.json",
+                {
+                    "stop_reason": stop_reason,
+                    "last_completed_epoch": engine.current_epoch,
+                    "best_metric": engine.best_metric,
+                    "selection_representation": config.selection_representation,
+                    "early_stopping": stopper.state(),
+                    "checkpoint_directory": engine.checkpoint_directory.as_posix(),
+                },
+                artifact_path="summary",
+            )
     except Exception as training_error:
         try:
             tracker.end_run(status="FAILED")

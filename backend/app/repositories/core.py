@@ -7,14 +7,17 @@ precisam de PostGIS (ST_DWithin, KNN, ST_ClosestPoint) e transação real.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any, Literal
 
 from geoalchemy2 import Geometry
 from sqlalchemy import func, select, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.core import (
     ActionCatalog,
@@ -38,6 +41,21 @@ if TYPE_CHECKING:
 # Cast sem typmod: ST_X/ST_Y só aceitam geometry, e "geometry(GEOMETRY,-1)"
 # não é um tipo válido no PostGIS.
 GEOM_CAST = Geometry(geometry_type=None, srid=-1)
+logger = logging.getLogger(__name__)
+
+
+def _promotion_quality_approved(model: ModelVersion) -> bool:
+    metrics = model.metrics if isinstance(model.metrics, dict) else {}
+    return (
+        metrics.get("quality_classification") == "APPROVED"
+        and isinstance(metrics.get("frozen_test_quality"), dict)
+        and metrics["frozen_test_quality"].get("passed") is True
+        and isinstance(metrics.get("benchmark"), dict)
+        and metrics["benchmark"].get("passed") is True
+        and isinstance(metrics.get("closure_artifact"), dict)
+        and bool(metrics["closure_artifact"].get("path"))
+        and bool(metrics["closure_artifact"].get("sha256"))
+    )
 
 
 def _point(coordinate: Coordinate):
@@ -47,9 +65,160 @@ def _point(coordinate: Coordinate):
     )
 
 
+class QuotaExceededError(RuntimeError):
+    """The shared public image budget is exhausted."""
+
+
+class QuotaUnavailableError(RuntimeError):
+    """Admission persistence unavailable; API must fail closed."""
+
+
+class PublicImageQuota:
+    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+        self.sessions = sessions
+
+    async def admit(
+        self,
+        stage: Literal["lookup", "download"],
+        caller_hash: str,
+        resource_id: uuid.UUID | None = None,
+    ) -> None:
+        try:
+            await self._admit(stage, caller_hash, resource_id)
+        except SQLAlchemyError:
+            raise QuotaUnavailableError("quota persistence unavailable") from None
+
+    async def _admit(
+        self,
+        stage: Literal["lookup", "download"],
+        caller_hash: str,
+        resource_id: uuid.UUID | None = None,
+    ) -> None:
+        if stage not in {"lookup", "download"} or not re.fullmatch("[0-9a-f]{64}", caller_hash):
+            raise ValueError("invalid quota scope")
+        if (stage == "download") != (resource_id is not None):
+            raise ValueError("invalid quota resource")
+        caller_limit, global_limit, resource_limit = (
+            (120, 6000, None) if stage == "lookup" else (60, 60, 30)
+        )
+        async with self.sessions.begin() as session:
+            await session.execute(text("set local statement_timeout = '5s'"))
+            await session.execute(text("set local lock_timeout = '2s'"))
+            # Stable two-int namespace; transaction locks are safe with pooling.
+            await session.execute(
+                text("select pg_advisory_xact_lock(197045, :stage_id)"),
+                {"stage_id": 1 if stage == "lookup" else 2},
+            )
+            # Read time AFTER waiting for the lock, not transaction start time.
+            now = await session.scalar(text("select clock_timestamp()"))
+            params = {"stage": stage, "caller": caller_hash, "resource": resource_id, "now": now}
+            await session.execute(
+                text(
+                    "delete from public.public_image_admissions where stage = :stage "
+                    "and admitted_at <= cast(:now as timestamptz) - interval '60 seconds'"
+                ),
+                params,
+            )
+            counts = (
+                (
+                    await session.execute(
+                        text(
+                            "select count(*) as total, "
+                            "count(*) filter (where caller_hash = :caller) as caller, "
+                            "count(*) filter (where resource_id = cast(:resource as uuid)) as resource "
+                            "from public.public_image_admissions where stage = :stage"
+                        ),
+                        params,
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            rejected = (
+                counts["total"] >= global_limit
+                or counts["caller"] >= caller_limit
+                or (resource_limit is not None and counts["resource"] >= resource_limit)
+            )
+            if not rejected:
+                await session.execute(
+                    text(
+                        "insert into public.public_image_admissions "
+                        "(stage, caller_hash, resource_id, admitted_at) "
+                        "values (:stage, :caller, :resource, :now)"
+                    ),
+                    params,
+                )
+        # Commit cleanup even for rejection; no partial multi-budget consumption.
+        if rejected:
+            raise QuotaExceededError("public image quota exhausted")
+
+
 class CaptureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def report_markers(
+        self, actor: str, can_review: bool = False, *, public: bool = False, limit: int = 500
+    ) -> list[dict[str, Any]]:
+        """One original-location marker per mobile Capture, never a fabricated Event."""
+        rows = await self.session.execute(
+            text(
+                """
+            select c.id, ST_Y(c.point::geometry) latitude, ST_X(c.point::geometry) longitude,
+                   c.source_location as location_source, c.accuracy_m, c.user_description,
+                   c.quality->'location_conflict' as location_conflict,
+                   c.quality->'inference'->>'status' as processing_status,
+                   c.quality->'inference'->>'model_status' as model_status,
+                   e.id as event_id, e.urmind_class, e.status as event_status,
+                   exists(select 1 from public.reviews rv where rv.event_id=e.id) as has_review,
+                   risk.severity, risk.priority_score
+            from public.captures c
+            left join lateral (
+                select id, urmind_class, status, factors from public.events
+                where capture_id = c.id or (
+                    c.quality->'inference'->'event_ids' @> to_jsonb(events.id::text)
+                    and exists(select 1 from public.captures owner_capture
+                        where owner_capture.id=events.capture_id
+                        and owner_capture.quality->>'uploaded_by'=c.quality->>'uploaded_by')
+                )
+                order by commit_order desc nulls last, created_at desc, id limit 1
+            ) e on true
+            left join lateral (
+                select severity, priority_score from public.risk_assessments
+                where event_id = e.id
+                order by commit_order desc nulls last, assessment_sequence desc limit 1
+            ) risk on true
+            where c.source in ('pwa_photo', 'exif_upload') and c.point is not null
+              and (:public or :reviewer or c.quality->>'uploaded_by' = :actor)
+            and not (:public and exists(select 1 from public.events e where e.capture_id=c.id and
+        """
+                + PublicRepository._PUBLISHED
+                + """))
+            order by c.created_at desc, c.id limit :limit
+        """
+            ),
+            {"actor": actor, "reviewer": can_review, "public": public, "limit": limit},
+        )
+        return [dict(row) for row in rows.mappings()]
+
+    async def fill_missing_location(
+        self, capture_id: uuid.UUID, actor: str, coordinate: Coordinate
+    ) -> bool:
+        """Atomic first location only. Updates trigger the existing inference queue."""
+        result = await self.session.execute(
+            update(Capture)
+            .where(
+                Capture.id == capture_id,
+                Capture.point.is_(None),
+                Capture.source.in_(["pwa_photo", "exif_upload"]),
+                Capture.quality["uploaded_by"].astext == actor,
+            )
+            .values(
+                point=_point(coordinate), source_location="manual", accuracy_m=coordinate.accuracy_m
+            )
+            .returning(Capture.id)
+        )
+        return result.scalar_one_or_none() is not None
 
     async def create(self, payload: CaptureCreate) -> Capture:
         capture = Capture(
@@ -60,6 +229,7 @@ class CaptureRepository:
             source_location=payload.source_location.value,
             captured_at=payload.captured_at,
             storage_path=payload.storage_path,
+            user_description=payload.user_description,
             point=_point(payload.coordinate) if payload.coordinate else None,
             accuracy_m=payload.coordinate.accuracy_m if payload.coordinate else None,
             heading_deg=payload.heading_deg,
@@ -87,6 +257,43 @@ class CaptureRepository:
 
     async def get(self, capture_id: uuid.UUID) -> Capture | None:
         return await self.session.get(Capture, capture_id)
+
+    async def recent_owner_uploads(self, owner_id: str, now: datetime) -> int:
+        """Count only server-received photo uploads within the sliding window."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Capture)
+            .where(
+                Capture.captured_at >= now - timedelta(hours=1),
+                Capture.storage_path.is_not(None),
+                Capture.quality["uploaded_by"].astext == owner_id,
+            )
+        )
+        return int(result.scalar_one())
+
+    async def lock_owner_uploads(self, owner_id: str) -> None:
+        """Serialize the quota check and Capture commit across API processes."""
+        await self.session.execute(
+            text("select pg_advisory_xact_lock(hashtextextended(:owner_id, 0))"),
+            {"owner_id": owner_id},
+        )
+
+    async def recent_public_uploads(self, now: datetime) -> int:
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Capture)
+            .where(
+                Capture.captured_at >= now - timedelta(hours=1),
+                Capture.storage_path.is_not(None),
+                Capture.quality["public_upload"].astext == "true",
+            )
+        )
+        return int(result.scalar_one())
+
+    async def lock_public_uploads(self) -> None:
+        await self.session.execute(
+            text("select pg_advisory_xact_lock(hashtextextended('urmind-public-photo-global', 0))")
+        )
 
     async def location(self, capture_id: uuid.UUID) -> dict[str, Any] | None:
         """Coordenada original da captura (lat/lon/accuracy) ou None se não houver ponto."""
@@ -130,6 +337,12 @@ class EventRepository:
 
     async def get(self, event_id: uuid.UUID) -> Event | None:
         return await self.session.get(Event, event_id)
+
+    async def for_capture(self, capture_id: uuid.UUID) -> list[Event]:
+        result = await self.session.execute(
+            select(Event).where(Event.capture_id == capture_id).order_by(Event.event_sequence)
+        )
+        return list(result.scalars())
 
     async def get_for_review(self, event_id: uuid.UUID) -> Event | None:
         """Serialize votes and status changes for one event in the caller transaction."""
@@ -359,6 +572,95 @@ class EventRepository:
         )
 
 
+class HistoryRepository:
+    """Leitura descritiva de histórico (Fase 9). Nada aqui prevê o futuro."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def snapshot_observations(self, days: int) -> dict[str, Any]:
+        """One MVCC statement observes rows and the server cutoff together.
+
+        This is a forward-only observation, not a reconstruction of an arbitrary
+        past cutoff. Bounded output fails closed instead of silently truncating.
+        """
+        if type(days) is not int or not 1 <= days <= 3650:
+            raise ValueError("snapshot days must be between 1 and 3650")
+        result = await self.session.execute(
+            text("""
+                with bounds as materialized (
+                    select statement_timestamp() as cutoff,
+                           statement_timestamp() - make_interval(days => :days) as start
+                ), observations as (
+                    select e.id as event_id, e.road_segment_id, e.urmind_class, e.status,
+                           e.occurred_at, ST_Y(e.point::geometry) as latitude,
+                           ST_X(e.point::geometry) as longitude
+                    from public.events e cross join bounds b
+                    where e.occurred_at >= b.start and e.occurred_at < b.cutoff
+                      and e.status <> 'rejected'
+                    order by e.occurred_at, e.id limit 10001
+                )
+                select jsonb_build_object(
+                    'schema_version', 'urmind-history-snapshot-v1',
+                    'knowledge_cutoff', b.cutoff, 'coverage_start', b.start,
+                    'source', 'database_statement_mvcc_snapshot',
+                    'observations', coalesce((select jsonb_agg(to_jsonb(o)
+                        order by o.occurred_at, o.event_id) from observations o), '[]'::jsonb)
+                ) from bounds b
+            """),
+            {"days": days},
+        )
+        payload = dict(result.scalar_one())
+        if len(payload["observations"]) > 10000:
+            raise ValueError("history snapshot exceeds bounded archive; narrow days")
+        return payload
+
+    async def save_snapshot(self, payload: dict[str, Any], digest: str) -> uuid.UUID:
+        snapshot_id = uuid.uuid4()
+        self.session.add(
+            AuditLog(
+                id=snapshot_id,
+                operation="history_snapshot",
+                entity_type="history_snapshot",
+                entity_id=snapshot_id,
+                actor="history_cli",
+                after_data=payload,
+                event_hash=digest,
+            )
+        )
+        await self.session.flush()
+        return snapshot_id
+
+    async def load_snapshot(self, snapshot_id: uuid.UUID) -> tuple[dict[str, Any], str]:
+        result = await self.session.execute(
+            select(AuditLog).where(
+                AuditLog.id == snapshot_id,
+                AuditLog.operation == "history_snapshot",
+                AuditLog.entity_type == "history_snapshot",
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None or row.after_data is None:
+            raise ValueError("history snapshot not found")
+        return dict(row.after_data), row.event_hash
+
+    async def observations(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+        """Events observed in [start, end); human-rejected events are excluded."""
+        result = await self.session.execute(
+            text(
+                "select e.id as event_id, e.road_segment_id, e.urmind_class, e.status, "
+                "e.occurred_at, ST_Y(e.point::geometry) as latitude, "
+                "ST_X(e.point::geometry) as longitude "
+                "from public.events e "
+                "where e.occurred_at >= :start and e.occurred_at < :end "
+                "and e.status <> 'rejected' "
+                "order by e.occurred_at, e.id"
+            ),
+            {"start": start, "end": end},
+        )
+        return [dict(row) for row in result.mappings()]
+
+
 class RoadSegmentRepository:
     """Malha viária (§11.3). Upsert por `osm_id`: reimportar o mesmo recorte não duplica."""
 
@@ -413,6 +715,12 @@ class DecisionRepository:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def dataset_version_for_model(self, model_version_id: uuid.UUID) -> uuid.UUID | None:
+        result = await self.session.execute(
+            select(ModelVersion.dataset_version_id).where(ModelVersion.id == model_version_id)
+        )
+        return result.scalar_one_or_none()
 
     async def add_risk(
         self, event_id: uuid.UUID, persisted: dict[str, Any], **refs: Any
@@ -666,10 +974,50 @@ class InferenceRepository:
             .mappings()
             .one()
         )
+        pipeline = (
+            (
+                await self.session.execute(
+                    text(
+                        "select count(*) as captures_received, "
+                        "percentile_cont(0.5) within group (order by to_detection_ms) "
+                        "  as time_to_detection_p50_ms, "
+                        "percentile_cont(0.95) within group (order by to_detection_ms) "
+                        "  as time_to_detection_p95_ms, "
+                        "percentile_cont(0.5) within group (order by to_completion_ms) "
+                        "  as pipeline_completion_p50_ms, "
+                        "percentile_cont(0.95) within group (order by to_completion_ms) "
+                        "  as pipeline_completion_p95_ms "
+                        "from (select "
+                        "  extract(epoch from ((quality->'inference'->>'detection_completed_at')"
+                        "    ::timestamptz - created_at)) * 1000 as to_detection_ms, "
+                        "  case when quality->'inference'->>'status' = 'analysis_completed' then "
+                        "    extract(epoch from ((quality->'inference'->>'at')::timestamptz"
+                        "      - created_at)) * 1000 end as to_completion_ms "
+                        "  from public.captures where storage_path is not null) s"
+                    )
+                )
+            )
+            .mappings()
+            .one()
+        )
+        context = await self.session.execute(
+            text(
+                "select source, count(*) filter (where payload->>'status' is distinct from 'ok') "
+                "as failures, count(*) as total from public.event_context group by source"
+            )
+        )
         return {
             "queue": dict(queue),
             "outcomes": {row.status: row.total for row in outcomes},
+            # Detection-stage latency measured by the Worker (job start → detections).
             "latency_ms": dict(latency),
+            # Capture created → stage timestamps: includes queue wait.
+            "pipeline_ms": dict(pipeline),
+            "context_failures": {
+                row.source: {"failures": row.failures, "total": row.total} for row in context
+            },
+            # Rejected uploads (4xx) are never persisted; they are only in the API logs.
+            "captures_rejected": "not_persisted; see API log event capture_rejected",
         }
 
     async def merge_model_metrics(self, model_version_id: uuid.UUID, key: str, value: Any) -> None:
@@ -682,6 +1030,42 @@ class InferenceRepository:
 
     async def dataset_version(self, dataset_version_id: uuid.UUID) -> DatasetVersion | None:
         return await self.session.get(DatasetVersion, dataset_version_id)
+
+    async def model_version(self, model_version_id: uuid.UUID) -> ModelVersion | None:
+        return await self.session.get(ModelVersion, model_version_id)
+
+    async def shadow_vision_model(self, model_version_id: uuid.UUID) -> ModelVersion | None:
+        model = await self.session.get(ModelVersion, model_version_id)
+        if model is None or model.kind != "vision" or model.promoted_at is not None:
+            return None
+        if model.operational_status != "EXPERIMENTAL_SHADOW":
+            return None
+        metrics = model.metrics if isinstance(model.metrics, dict) else {}
+        from app.config import URMIND_DEV_SHADOW_REF
+
+        if (
+            metrics.get("shadow_scope") != "URMIND_DEV_ONLY"
+            or metrics.get("shadow_project_ref") != URMIND_DEV_SHADOW_REF
+        ):
+            return None
+        if model.dataset_version_id is None or not model.checksum:
+            return None
+        if await self.session.get(DatasetVersion, model.dataset_version_id) is None:
+            return None
+        return model
+
+    async def configured_vision_model(
+        self, mode: str, shadow_model_version_id: uuid.UUID | None
+    ) -> ModelVersion | None:
+        if mode == "shadow" and shadow_model_version_id is not None:
+            return await self.shadow_vision_model(shadow_model_version_id)
+        if mode == "production":
+            try:
+                return await self.promoted_vision_model()
+            except RuntimeError as exc:
+                logger.error("production_model_unavailable: %s", exc)
+                return None
+        return None
 
     async def model_version_for_update(self, model_version_id: uuid.UUID) -> ModelVersion | None:
         result = await self.session.execute(
@@ -699,6 +1083,23 @@ class InferenceRepository:
         models = result.scalars().all()
         if len(models) > 1:
             raise RuntimeError("múltiplos modelos vision promovidos")
+        if models and not _promotion_quality_approved(models[0]):
+            raise RuntimeError("modelo vision promovido sem quality gate aprovado")
+        if models and models[0].operational_status != "PRODUCTION_APPROVED":
+            raise RuntimeError("modelo vision promovido está arquivado ou em quarentena")
+        if models:
+            from app.ml.serving import validate_registered_model_evidence
+
+            model = models[0]
+            dataset = (
+                await self.session.get(DatasetVersion, model.dataset_version_id)
+                if model.dataset_version_id is not None
+                else None
+            )
+            try:
+                validate_registered_model_evidence(model, dataset)
+            except (OSError, TypeError, ValueError, KeyError) as exc:
+                raise RuntimeError("modelo vision promovido sem closure íntegro") from exc
         return models[0] if models else None
 
     async def has_detections_from(self, capture_id: uuid.UUID, model_version_id: uuid.UUID) -> bool:
@@ -729,7 +1130,9 @@ class InferenceRepository:
         await self.session.flush()
         return dataset
 
-    async def register_model(self, **fields: Any) -> ModelVersion:
+    async def register_model(
+        self, *, refresh_unpromoted: bool = False, **fields: Any
+    ) -> ModelVersion:
         result = await self.session.execute(
             select(ModelVersion).where(
                 ModelVersion.name == fields["name"], ModelVersion.version == fields["version"]
@@ -737,6 +1140,16 @@ class InferenceRepository:
         )
         existing = result.scalar_one_or_none()
         if existing is not None:
+            if refresh_unpromoted:
+                if (
+                    existing.promoted_at is not None
+                    or existing.checksum != fields["checksum"]
+                    or existing.kind != fields["kind"]
+                    or existing.dataset_version_id != fields["dataset_version_id"]
+                ):
+                    raise ValueError("ModelVersion existente diverge do fechamento validado")
+                existing.metrics = fields["metrics"]
+                await self.session.flush()
             return existing
         model = ModelVersion(**fields)
         self.session.add(model)
@@ -745,6 +1158,17 @@ class InferenceRepository:
 
     async def promote_exclusive(self, model: ModelVersion, *, promoted_at: datetime) -> None:
         """Promove uma versão e despromove qualquer outra da mesma função."""
+        if model.kind == "vision" and not _promotion_quality_approved(model):
+            raise ValueError("ModelVersion sem quality gate aprovado")
+        if model.kind == "vision":
+            from app.ml.serving import validate_registered_model_evidence
+
+            dataset = (
+                await self.session.get(DatasetVersion, model.dataset_version_id)
+                if model.dataset_version_id is not None
+                else None
+            )
+            validate_registered_model_evidence(model, dataset)
         await self.session.execute(
             text("select pg_advisory_xact_lock(hashtext(:lock_key))"),
             {"lock_key": f"urmind:model-promotion:{model.kind}"},
@@ -768,6 +1192,21 @@ class PublicRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    # Publication is a separate reviewer decision, never implied by a detector,
+    # upload, sanitized image or confirmed status alone. Match its Review so
+    # stale publication cannot survive a later correction/rejection.
+    _PUBLISHED = (
+        "e.status = 'confirmed' "
+        "and e.factors->'publication'->>'policy_version' = 'urmind-publication-v1' "
+        "and e.factors->'publication'->>'status' = 'published' "
+        "and exists (select 1 from public.reviews pr where pr.event_id = e.id "
+        "and pr.id::text = e.factors->'publication'->>'review_id' "
+        "and pr.reviewer = e.factors->'publication'->>'reviewer' "
+        "and pr.decision in ('confirm', 'correct') "
+        "and pr.id = (select lr.id from public.reviews lr where lr.event_id = e.id "
+        "order by lr.commit_order desc nulls last, lr.review_sequence desc limit 1))"
+    )
+
     _SUMMARY = (
         "select e.id, e.occurred_at, e.urmind_class, e.status, e.evidence_mode, "
         "e.visual_confidence, e.location_accuracy_m, e.distance_to_road_m, "
@@ -775,7 +1214,10 @@ class PublicRepository:
         "ST_Y(e.snapped_point::geometry) as snapped_latitude, "
         "ST_X(e.snapped_point::geometry) as snapped_longitude, "
         "r.name as road_name, r.highway as road_highway, r.jurisdiction as road_jurisdiction, "
-        "e.road_segment_id, risk.severity, risk.priority_score, risk.factors "
+        "e.road_segment_id, e.model_version_id, e.capture_id, "
+        "e.factors->'publication'->>'review_id' as publication_review_id, "
+        "e.factors->'publication'->'public_image' as publication_image, "
+        "risk.severity, risk.priority_score, risk.factors "
         "from public.events e "
         "left join public.road_segments r on r.id = e.road_segment_id "
         "left join lateral ("
@@ -794,7 +1236,7 @@ class PublicRepository:
         status: str | None = None,
         since: datetime | None = None,
     ) -> list[dict[str, Any]]:
-        clauses = []
+        clauses = [self._PUBLISHED]
         params: dict[str, Any] = {"limit": limit}
         if bbox is not None:
             clauses.append(
@@ -816,9 +1258,21 @@ class PublicRepository:
         )
         return [dict(row) for row in result.mappings()]
 
-    async def event(self, event_id: uuid.UUID) -> dict[str, Any] | None:
+    async def event(
+        self, event_id: uuid.UUID, *, owner_id: str | None = None
+    ) -> dict[str, Any] | None:
+        access = f"({self._PUBLISHED})"
+        params: dict[str, Any] = {"event_id": event_id}
+        if owner_id:
+            access += (
+                " or exists (select 1 from public.captures oc "
+                "where oc.quality->>'uploaded_by' = :owner_id "
+                "and (oc.id = e.capture_id or "
+                "e.factors->'evidence'->'capture_ids' @> jsonb_build_array(oc.id::text)))"
+            )
+            params["owner_id"] = owner_id
         result = await self.session.execute(
-            text(f"{self._SUMMARY} where e.id = :event_id"), {"event_id": event_id}
+            text(f"{self._SUMMARY} where e.id = :event_id and ({access})"), params
         )
         row = result.mappings().first()
         return dict(row) if row else None
@@ -839,9 +1293,11 @@ class PublicRepository:
     async def overview(self) -> dict[str, Any]:
         result = await self.session.execute(
             text(
-                "select (select count(*) from public.events) as events_total, "
+                f"select (select count(*) from public.events e where {self._PUBLISHED}) "
+                "as events_total, "
                 "(select count(*) from public.road_segments) as road_segments_total, "
-                "(select max(occurred_at) from public.events) as last_event_at, "
+                f"(select max(occurred_at) from public.events e where {self._PUBLISHED}) "
+                "as last_event_at, "
                 "(select attributes->'osm_import'->>'label' from public.road_segments limit 1) as pilot_area"
             )
         )

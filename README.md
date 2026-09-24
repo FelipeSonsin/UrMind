@@ -1,14 +1,18 @@
 # URMIND
 
-> **Frontend reconstruído em 07/09/2026:** a pasta [`frontend/`](frontend/README.md)
-> agora contém a base React + TypeScript + Vite/PWA, com rascunhos locais,
-> captura de foto, consulta de ocorrências e MapLibre preparado. Funciona sem as
-> integrações externas para registro local; upload, inferência e previsões não
-> são simulados. Para executar: `cd frontend`, `npm.cmd ci`, `npm.cmd run dev`.
-> Consulte o README do frontend para o escopo e as limitações desta entrega.
+> **Limpeza autorizada (24/09/2026):** pesos/ONNX e runs antigos foram removidos.
+> O modelo DEV está ARCHIVED, sem inferência operacional disponível. Código,
+> datasets e restrições científicas preservados. Consulte PROJECT_STATE para os
+> bloqueios atuais; descrições anteriores de shadow disponível são históricas.
 
-Sistema de percepção e decisão urbana auditável. A cadeia começa numa foto de
-celular ou na câmera/sensores do Scout e termina numa ocorrência
+> **Estado operacional de 24/09/2026:** um backend e um frontend canônicos,
+> exclusivamente Urmind DEV. O fluxo ativo é mobile foto + localização + mapa.
+> Consulte [estado, evidências e blockers](docs/PROJECT_STATE.md) e o
+> [checklist da feira](docs/FAIR_DEMO_CHECKLIST.md). A Fase 7 ainda não possui
+> prova E2E com foto externa aos datasets; testes com fixtures não a substituem.
+
+Sistema de percepção e decisão urbana auditável. A entrega atual começa numa foto de
+celular e termina numa ocorrência
 georreferenciada com classe, confiança, severidade, prioridade, responsável
 sugerido, ação recomendada e histórico — reconstruível por IDs e versões de
 modelo.
@@ -46,7 +50,7 @@ ENV e comandos não destrutivos, está em
 O MASTER_PLAN exclui explicitamente (§3.1) Docker, Compose, Celery, Redis,
 Caddy, RabbitMQ, Kubernetes, Mosquitto como dependência central, Photon
 self-hosted, LLM no runtime e Google Maps como dependência obrigatória.
-A fila assíncrona será o Supabase Queues/pgmq (§7), não Celery/Redis.
+A fila assíncrona utiliza Supabase Queues/pgmq (§7), não Celery/Redis.
 
 ## Stack em uso hoje
 
@@ -65,7 +69,7 @@ A fila assíncrona será o Supabase Queues/pgmq (§7), não Celery/Redis.
 | Lint | ruff |
 
 O backend canônico é `backend/`. O Urmind DEV valida a cadeia Alembic única até
-`0019_context_retention` e as Fases 4–6 (FeatureBuilder, avaliação por regras e
+`0021_history_snapshot_retention` e as Fases 4–6 (FeatureBuilder, avaliação por regras e
 revisão humana). Eventos novos usam `assess_features()`; `assess()` permanece
 somente como motor legado. A Fase 3 segue `BLOCKED_DATA`: o candidato rejeitado
 no Frozen Test não foi promovido e sua evidência científica permanece preservada.

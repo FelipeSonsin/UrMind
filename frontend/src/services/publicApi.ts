@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  issueTaxonomySchema,
   publicEventDetailSchema,
   publicEventSchema,
   publicScoutSchema,
@@ -7,34 +8,29 @@ import {
   transparencySchema,
 } from '../domain/public';
 
-// Painel público: sem token e somente leitura. Mesmo cliente HTTP do restante do
-// app (fetch + zod + AbortSignal); nenhum cliente paralelo.
+import { requestJson } from './api';
+import { auth } from './auth';
+import { captureMarkerSchema } from '../domain/contracts';
+
+// Painel público: sem token e somente leitura, sobre o mesmo cliente HTTP da área logada.
 const base = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '') + '/public';
 
-async function get<T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
-  const timeout = AbortSignal.timeout(8000);
-  try {
-    const response = await fetch(`${base}${path}`, {
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) {
-      const detail = await response
-        .json()
-        .then((body: { detail?: unknown }) => (typeof body.detail === 'string' ? body.detail : ''))
-        .catch(() => '');
-      throw new Error(detail || `A API respondeu com erro ${response.status}.`);
-    }
-    const parsed = schema.safeParse(await response.json());
-    if (!parsed.success) throw new Error('A resposta da API não corresponde ao contrato público.');
-    return parsed.data;
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    if (error instanceof TypeError) throw new Error('Não foi possível conectar ao UrMind.');
-    if (error instanceof DOMException && error.name === 'TimeoutError')
-      throw new Error('O UrMind demorou a responder.');
-    throw error;
-  }
+function get<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  signal?: AbortSignal,
+  token?: string | null,
+): Promise<T> {
+  return requestJson(`${base}${path}`, schema, {
+    signal,
+    token,
+    cache: token ? 'no-store' : undefined,
+    messages: {
+      network: 'Não foi possível conectar ao UrMind.',
+      timeout: 'O UrMind demorou a responder.',
+      contract: 'A resposta da API não corresponde ao contrato público.',
+    },
+  });
 }
 
 export interface EventQuery {
@@ -45,11 +41,15 @@ export interface EventQuery {
 }
 
 export const publicApi = {
+  captureMarkers: (signal?: AbortSignal) =>
+    get('/capture-markers', z.array(captureMarkerSchema), signal),
   status: (signal?: AbortSignal) => get('/status', publicStatusSchema, signal),
   scout: (signal?: AbortSignal) => get('/scout', publicScoutSchema, signal),
   transparency: (signal?: AbortSignal) => get('/transparency', transparencySchema, signal),
-  event: (id: string, signal?: AbortSignal) =>
-    get(`/events/${id}`, publicEventDetailSchema, signal),
+  taxonomy: (signal?: AbortSignal) => get('/taxonomy', issueTaxonomySchema, signal),
+  // Existing owner session only: browsing never creates an anonymous account.
+  event: async (id: string, signal?: AbortSignal) =>
+    get(`/events/${id}`, publicEventDetailSchema, signal, await auth.accessToken()),
   events: (query: EventQuery = {}, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     params.set('limit', String(query.limit ?? 50));

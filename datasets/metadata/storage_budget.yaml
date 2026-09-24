@@ -30,6 +30,15 @@ datasets:
     cap_gb: 0.5
     purpose: road_damage
     note: Fonte inteira cabe folgada; nao ha o que podar.
+  ird_dashcam:
+    cap_gb: 7
+    purpose: road_damage_candidate_audit_and_e2e_demo
+    note: >-
+      Somente Dashcam do IRD-Dataset v1.0.0; aquisicao aprovada pelo usuario
+      em 2026-09-23. Adquirido como CANDIDATE_HOLDOUT, sem autorizacao de TEST
+      ou treinamento. A fonte Dashcam inteira fica excluida de futuro holdout
+      por politica conservadora de grupo apos reservar Dash_0559 para demo E2E;
+      ver reports/ird_dashcam_candidate_audit.json.
   urban_community:
     cap_gb: 1.5
     purpose: urban_damage

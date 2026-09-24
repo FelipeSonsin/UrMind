@@ -24,6 +24,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.repositories.core import PublicRepository
+
 OK = "ok"
 PENDING = "pendente"
 MISSING = "falta"
@@ -106,7 +108,22 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
     steps.append(
         _step(
             "worker",
-            OK if inference.get("status") == "inference_completed" else PENDING,
+            OK
+            if inference.get("status")
+            in {
+                "inference_completed",  # legacy detection-stage record
+                "detection_completed",
+                "building_event",
+                "enriching_context",
+                "building_features",
+                "assessing",
+                "analysis_completed",
+                "no_detection",
+                "no_supported_detection",
+                "no_event",
+                "needs_review",
+            }
+            else PENDING,
             inference.get("status") or "ainda não processada",
             latency_ms=inference.get("latency_ms"),
             model_version=inference.get("model_version"),
@@ -188,7 +205,7 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
     steps.append(
         _step(
             "contexto",
-            OK if disponiveis else PENDING,
+            OK if contexts else PENDING,
             f"{len(disponiveis)} de {len(contexts)} fontes responderam"
             if contexts
             else "contexto ainda não coletado",
@@ -200,7 +217,7 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
         (
             await session.execute(
                 text(
-                    "select severity, priority_score, uncertainty, responsibility_rule_id, "
+                    "select severity, priority_score, uncertainty, factors, responsibility_rule_id, "
                     "action_id from public.risk_assessments where event_id = :id "
                     "order by created_at desc limit 1"
                 ),
@@ -213,11 +230,17 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
     if risk is None:
         steps.append(_step("risco", PENDING, "nenhuma avaliação de risco gravada"))
     else:
+        factors = risk["factors"] or {}
+        snapshot_ready = bool(factors.get("phase4_snapshot") and factors.get("decision_trace"))
         steps.append(
             _step(
                 "risco",
-                OK,
-                f"severidade {risk['severity']}, prioridade {risk['priority_score']}",
+                OK if snapshot_ready else PENDING,
+                (
+                    f"severidade {risk['severity']}, prioridade {risk['priority_score']}"
+                    if snapshot_ready
+                    else "avaliação sem Feature Snapshot ou DecisionTrace"
+                ),
                 incerteza=float(risk["uncertainty"]) if risk["uncertainty"] is not None else None,
             )
         )
@@ -268,7 +291,8 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
     publico = await session.scalar(
         text(
             "select count(*) from public.events e "
-            "join public.risk_assessments r on r.event_id = e.id where e.id = :id"
+            "join public.risk_assessments r on r.event_id = e.id where e.id = :id and "
+            + PublicRepository._PUBLISHED
         ),
         {"id": event["id"]},
     )
@@ -278,7 +302,7 @@ async def inspect(session: AsyncSession, capture_id: uuid.UUID | None) -> dict[s
             OK if publico else PENDING,
             "evento aparece em /api/v1/public/events com risco"
             if publico
-            else "sem risco, o evento ainda não tem diagnóstico público",
+            else "risco ou autorização de publicação pendente; resultado do autor não implica mapa público",
         )
     )
 

@@ -12,6 +12,14 @@ export function SignIn() {
     setBusy(true);
     setError('');
     try {
+      const existing = await auth.session();
+      if (
+        existing?.user.is_anonymous &&
+        !window.confirm(
+          'Entrar com outra conta não transfere suas capturas de visitante. Guarde o link do resultado antes de continuar. Deseja entrar?',
+        )
+      )
+        return;
       await auth.signIn(email.trim(), password);
     } catch (reason) {
       setError((reason as Error).message);
@@ -30,7 +38,8 @@ export function SignIn() {
     <form className="panel sign-in" onSubmit={submit}>
       <h2>Entrar no UrMind</h2>
       <p className="muted">
-        Envio de evidências, ocorrências e revisão exigem uma conta autorizada.
+        A revisão e os dados internos exigem uma conta autorizada. O registro público usa uma sessão
+        de visitante, sem acesso administrativo.
       </p>
       <label>
         E-mail

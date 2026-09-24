@@ -89,7 +89,9 @@ def test_multiple_boxes_share_one_image_sample(tmp_path):
     registry.write_text(
         json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
     )
-    dataset = AuthorizedDetectionDataset(load(manifest, registry), input_size=(20, 20), max_labels=5)
+    dataset = AuthorizedDetectionDataset(
+        load(manifest, registry), input_size=(20, 20), max_labels=5
+    )
     assert len(dataset) == 1
     assert dataset[0][1][:2].tolist() == [[3, 5, 5, 8, 6], [0, 14.5, 5, 9, 8]]
 
@@ -98,9 +100,13 @@ def test_authorized_negative_is_one_sample_with_empty_labels(tmp_path):
     manifest, row, registry = valid(tmp_path)
     row["boxes"] = []
     manifest.write_text(json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
 
-    dataset = AuthorizedDetectionDataset(load(manifest, registry), input_size=(20, 20), max_labels=5)
+    dataset = AuthorizedDetectionDataset(
+        load(manifest, registry), input_size=(20, 20), max_labels=5
+    )
 
     assert len(dataset) == 1
     assert dataset[0][1].shape == (5, 5)
@@ -111,7 +117,9 @@ def test_duplicate_box_is_rejected(tmp_path):
     manifest, row, registry = valid(tmp_path)
     row["boxes"].append(dict(row["boxes"][0]))
     manifest.write_text(json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
     with pytest.raises(DetectionManifestError, match="box duplicada"):
         load(manifest, registry)
 
@@ -128,9 +136,7 @@ def test_dataset_slice_preserves_sequence_contract(tmp_path):
 
 def test_official_preproc_preserves_bgr_without_normalization_and_letterboxes(tmp_path):
     manifest, _, registry = valid(tmp_path)
-    image, _, _, _ = AuthorizedDetectionDataset(
-        load(manifest, registry), input_size=(20, 20)
-    )[0]
+    image, _, _, _ = AuthorizedDetectionDataset(load(manifest, registry), input_size=(20, 20))[0]
 
     assert image.dtype.name == "float32"
     assert image[:, 0, 0].tolist() == [0, 0, 255]
@@ -182,23 +188,34 @@ def test_transform_mode_rejects_cross_split_rows(tmp_path):
 def test_mixed_collate_keeps_zero_one_and_multiple_box_targets(tmp_path):
     manifest, row, registry = valid(tmp_path)
     rows = []
-    box_sets = [[], row["boxes"], row["boxes"] + [{
-        "bbox": [10, 1, 19, 9],
-        "canonical_class": "URMIND_ROAD_D00",
-        "original_class": "D00",
-    }]]
+    box_sets = [
+        [],
+        row["boxes"],
+        row["boxes"]
+        + [
+            {
+                "bbox": [10, 1, 19, 9],
+                "canonical_class": "URMIND_ROAD_D00",
+                "original_class": "D00",
+            }
+        ],
+    ]
     for index, boxes in enumerate(box_sets):
         image = tmp_path / f"image_{index}.png"
         Image.new("RGB", (20, 10), color=(index, 0, 0)).save(image)
         item = {**row, "image_path": str(image), "source_fingerprint": sha(image), "boxes": boxes}
         rows.append(item)
     manifest.write_text("".join(json.dumps(item) + "\n" for item in rows))
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
-    dataset = AuthorizedDetectionDataset(load(manifest, registry), input_size=(32, 32), max_labels=4)
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
+    dataset = AuthorizedDetectionDataset(
+        load(manifest, registry), input_size=(32, 32), max_labels=4
+    )
 
-    images, targets, _, ids = next(iter(build_yolox_dataloader(
-        dataset, batch_size=3, num_workers=0, pin_memory=False
-    )))
+    images, targets, _, ids = next(
+        iter(build_yolox_dataloader(dataset, batch_size=3, num_workers=0, pin_memory=False))
+    )
 
     assert images.shape == (3, 3, 32, 32)
     assert targets.shape == (3, 4, 5)
@@ -212,7 +229,9 @@ def test_max_labels_fails_closed_instead_of_dropping_boxes(tmp_path):
         {"bbox": [10, 1, 19, 9], "canonical_class": "URMIND_ROAD_D00", "original_class": "D00"}
     )
     manifest.write_text(json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
     with pytest.raises(DetectionManifestError, match="truncamento"):
         AuthorizedDetectionDataset(load(manifest, registry), max_labels=1)
 
@@ -221,7 +240,16 @@ def test_max_labels_fails_closed_instead_of_dropping_boxes(tmp_path):
     ("field", "value"),
     [
         ("boxes", [{"bbox": [1, 2, 9, 8], "canonical_class": None, "original_class": "D40"}]),
-        ("boxes", [{"bbox": [1, 2, 21, 8], "canonical_class": "URMIND_ROAD_D40", "original_class": "D40"}]),
+        (
+            "boxes",
+            [
+                {
+                    "bbox": [1, 2, 21, 8],
+                    "canonical_class": "URMIND_ROAD_D40",
+                    "original_class": "D40",
+                }
+            ],
+        ),
         ("blocked_source", True),
         ("duplicate_rejected", True),
         ("human_pending", True),
@@ -255,7 +283,9 @@ def test_protected_split_rejected_from_train(tmp_path, split):
 def test_duplicate_image_record_is_rejected(tmp_path):
     manifest, row, registry = valid(tmp_path)
     manifest.write_text(json.dumps(row) + "\n" + json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
     with pytest.raises(DetectionManifestError, match="duplicada"):
         load(manifest, registry)
 
@@ -265,7 +295,9 @@ def test_legacy_per_box_schema_is_rejected(tmp_path):
     box = row.pop("boxes")[0]
     row.update(box)
     manifest.write_text(json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
     with pytest.raises(DetectionManifestError, match="legado"):
         load(manifest, registry)
 
@@ -274,7 +306,9 @@ def test_blocked_dataset_id_is_rejected(tmp_path):
     manifest, row, registry = valid(tmp_path)
     row["dataset_id"] = "rtk_br"
     manifest.write_text(json.dumps(row) + "\n")
-    registry.write_text(json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]}))
+    registry.write_text(
+        json.dumps({"artifacts": [{"path": "train.jsonl", "sha256": sha(manifest)}]})
+    )
     with pytest.raises(DetectionManifestError, match="fonte"):
         load(manifest, registry)
 
@@ -332,3 +366,35 @@ def test_cloud_only_guard_precedes_open(tmp_path, monkeypatch):
     with pytest.raises(DetectionManifestError, match="CLOUD_ONLY_SAMPLE"):
         AuthorizedDetectionDataset(rows)[0]
     assert not opened
+
+
+def test_zero_worker_dataloader_omits_prefetch_and_rejects_worker_only_options() -> None:
+    """Zero workers must not silently accept subprocess-only settings."""
+    dataset = [0]
+
+    with pytest.raises(ValueError, match="persistent_workers"):
+        build_yolox_dataloader(
+            dataset,
+            num_workers=0,
+            persistent_workers=True,
+            prefetch_factor=None,
+        )
+    with pytest.raises(ValueError, match="prefetch_factor"):
+        build_yolox_dataloader(
+            dataset,
+            num_workers=0,
+            persistent_workers=False,
+            prefetch_factor=1,
+        )
+
+    loader = build_yolox_dataloader(
+        dataset,
+        num_workers=0,
+        persistent_workers=False,
+        prefetch_factor=None,
+        pin_memory=False,
+    )
+    assert loader.num_workers == 0
+    assert loader.persistent_workers is False
+    assert loader.prefetch_factor is None
+    assert loader.pin_memory is False

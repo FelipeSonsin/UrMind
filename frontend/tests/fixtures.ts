@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import taxonomyFixture from './taxonomy.fixture.json' with { type: 'json' };
 
 // Fixtures existem SOMENTE aqui, nos testes. Nenhum dado fictício entra no produto:
 // o app real só mostra o que a API pública devolve. Os formatos abaixo espelham
@@ -221,6 +222,47 @@ export const eventDetail = {
   reviewed: false,
 };
 
+export const urbanAnalysis = {
+  schema_version: 'urmind-urban-analysis-v1',
+  identification: {
+    issue_code: 'URMIND_ROAD_D40',
+    display_name: 'Buraco',
+    family: 'ROAD_SURFACE',
+    model_support_status: 'EXPERIMENTAL_MODEL',
+    visual_confidence: 0.61,
+    reviewed: false,
+  },
+  description: 'Indício visual de buraco na superfície da via.',
+  diagnosis: 'A avaliação persistida indica necessidade de inspeção no local.',
+  potential_consequences: [
+    {
+      domain: 'road_safety',
+      statement: 'Pode comprometer a circulação se confirmado no local.',
+      conditional: true,
+      source: 'persisted_phase5',
+    },
+  ],
+  possible_causes: [],
+  severity: 'high',
+  risk_level: 'medium',
+  priority_lane: null,
+  action: eventDetail.action,
+  responsibility: eventDetail.responsibility,
+  responsibility_domain: 'ROAD_MAINTENANCE',
+  context: [],
+  limitations: ['A fotografia não permite medir a profundidade do dano.'],
+  provenance: {
+    taxonomy_version: 'urmind-issue-taxonomy-v2',
+    model_version: 'baseline_early',
+    model_stage: 'EXPERIMENTAL_SHADOW',
+    dataset_version: null,
+    ruleset_version: 'risk-v1',
+    assessed_at: null,
+    assessment_source: 'persisted_phase5',
+    method: 'deterministic_template',
+  },
+};
+
 export const transparency = {
   model_name: 'urmind-yolox-s',
   model_version: 'baseline_early',
@@ -274,6 +316,12 @@ interface PublicStubs {
 /** Intercepta a API pública. Cada rota devolve exatamente o contrato do backend. */
 export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   const json = (route: Route, body: unknown) => route.fulfill({ json: body as object });
+  // A suíte comum não depende da internet. O runtime continua usando o style
+  // OpenFreeMap real; apenas o navegador de teste recebe um style MapLibre mínimo.
+  await page.route(
+    (url) => url.hostname === 'tiles.openfreemap.org' && url.pathname === '/styles/liberty',
+    (route) => json(route, { version: 8, sources: {}, layers: [] }),
+  );
   await page.route('**/api/v1/health', (route) =>
     json(route, { status: 'ok', database: 'connected' }),
   );
@@ -282,6 +330,10 @@ export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   await page.route('**/api/v1/public/transparency', (route) =>
     json(route, stubs.transparency ?? transparency),
   );
+  // Generated from app.schemas.issue_taxonomy; a backend test keeps it in sync.
+  await page.route('**/api/v1/public/taxonomy', (route) => json(route, taxonomyFixture));
+  await page.route('**/api/v1/public/capture-markers', (route) => json(route, []));
+  await page.route('**/api/v1/captures/markers', (route) => json(route, []));
   // Predicado em vez de glob: a lista e o detalhe diferem só pela barra e pela query.
   await page.route(
     (url) => url.pathname === '/api/v1/public/events',

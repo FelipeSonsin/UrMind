@@ -4,8 +4,12 @@ import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace as Row
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+
+from app.services.core import CoreService
 from app.services.features import SCHEMA_VERSION, FeatureInput, build_features
 from app.services.risk import FeatureRules, assess_features, replay_features
 
@@ -307,3 +311,50 @@ def test_phase5_malformed_confidence_and_missing_point_do_not_pass_gates():
     assert result["priority"]["attention_lane"] == "review_required"
     assert "location.original_location" in result["factors_missing"]
     assert "visual.matching_detection_confidence" in result["factors_missing"]
+
+
+@pytest.mark.asyncio
+async def test_assessment_persists_phase7_trace_with_same_snapshot_and_lineage(monkeypatch):
+    source = fixture(segment=False, context=False, history=False)
+    event = source.event
+    event.model_version_id = source.detections[0].model_version_id
+    features = build_features(source)
+    events = Row(
+        get=AsyncMock(return_value=event),
+        set_status=AsyncMock(),
+    )
+    persisted_rows = []
+
+    async def add_risk(event_id, payload, **refs):
+        persisted_rows.append((event_id, payload, refs))
+        return Row(
+            id=refs["id"],
+            severity=payload["severity"],
+            priority_score=payload["priority_score"],
+            uncertainty=payload["uncertainty"],
+        )
+
+    decisions = Row(
+        latest_risk=AsyncMock(return_value=None),
+        dataset_version_for_model=AsyncMock(return_value=uuid4()),
+        responsibility=AsyncMock(return_value=None),
+        action=AsyncMock(return_value=None),
+        add_risk=add_risk,
+    )
+    service = CoreService(Row(), events, decisions)
+    monkeypatch.setattr(service, "_feature_snapshot", AsyncMock(return_value=(features, [])))
+
+    result = await service.assess_event(event.id)
+
+    stored = persisted_rows[0][1]["factors"]
+    trace = stored["decision_trace"]
+    assert trace["assessment_id"] == str(result["assessment_id"])
+    assert trace["event_id"] == str(event.id)
+    assert trace["feature_schema_version"] == stored["phase4_snapshot"]["feature_schema_version"]
+    assert trace["ruleset_version"] == stored["phase5"]["ruleset_version"]
+    assert trace["model_version_id"] == str(event.model_version_id)
+    assert trace["dataset_version_id"] is not None
+    assert trace["factors_missing"] == stored["phase5"]["factors_missing"]
+    assert trace["evaluated_rules"] == stored["phase5"]["decision_trace"]["evaluated_rules"]
+    assert trace["priority"] != trace["risk"]
+    assert trace["context_snapshot_key"] == "phase4_snapshot.context_records"

@@ -53,3 +53,23 @@ def test_flags_chegam_ao_uvicorn(monkeypatch):
     assert captured["app"] == "app.main:app"
     assert (captured["host"], captured["port"]) == ("0.0.0.0", 8443)
     assert (captured["ssl_certfile"], captured["ssl_keyfile"]) == ("c.pem", "k.pem")
+
+
+def test_ready_is_503_without_database_and_security_headers_are_set() -> None:
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    response = TestClient(app).get("/api/v1/ready")
+    if getattr(app.state, "database", None) is None:
+        assert response.status_code == 503
+        assert response.json() == {"status": "not_ready", "database": "not_configured"}
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert "camera=(self)" in response.headers["Permissions-Policy"]
+    assert "Strict-Transport-Security" not in response.headers  # plain-HTTP test client
+    policy = response.headers["Content-Security-Policy"]
+    assert "script-src 'self';" in policy
+    assert "worker-src 'self' blob:" in policy
+    assert "object-src 'none'" in policy
+    assert "unsafe-eval" not in policy

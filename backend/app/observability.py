@@ -16,6 +16,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.core import ModelVersion
+
 # Amostra mínima para comparar duas distribuições sem que o resultado seja
 # ruído. PROVISÓRIO (§31.16): o número ainda não nasceu de medição no piloto —
 # revisar quando houver histórico revisado.
@@ -142,6 +144,7 @@ async def model_lineage(session: AsyncSession) -> dict[str, Any]:
     if row is None:
         return {"promoted": False, "reason": "nenhum modelo promovido"}
     metrics = row["metrics"] or {}
+    status = ModelVersion(metrics=metrics, promoted_at=row["promoted_at"]).operational_status
     serving = metrics.get("serving") or {}
     training = metrics.get("training") or {}
     detections = await session.scalar(
@@ -159,9 +162,14 @@ async def model_lineage(session: AsyncSession) -> dict[str, Any]:
         "onnx_sha256": row["checksum"],
         "parity_passed": (serving.get("parity") or {}).get("passed"),
         "model_version": row["version"],
-        "stage": metrics.get("stage"),
+        "stage": status,
         "git_commit": (metrics.get("code") or {}).get("git_commit"),
         "detections_attributed": int(detections or 0),
     }
     missing = [name for name, value in chain.items() if value is None]
-    return {"promoted": True, "chain": chain, "missing_links": missing, "complete": not missing}
+    return {
+        "promoted": status == "PRODUCTION_APPROVED",
+        "chain": chain,
+        "missing_links": missing,
+        "complete": not missing,
+    }

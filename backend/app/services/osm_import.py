@@ -21,9 +21,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import httpx
+from app.config import get_settings
+from app.services.external_sources.http import ExternalHttpClient
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 # Vias por onde se circula a pé ou de veículo. Exclui trilhas, escadas e
 # construção, que não são alvo de manutenção de pavimento urbano.
 HIGHWAYS = (
@@ -144,36 +144,49 @@ def parse_ways(payload: dict[str, Any], *, batch: dict[str, Any]) -> list[RoadWa
     return ways
 
 
-async def fetch_ways(bbox: BBox, label: str, *, client: httpx.AsyncClient) -> list[RoadWay]:
-    for attempt in range(3):
-        response = await client.post(OVERPASS_URL, data={"data": overpass_query(bbox)}, timeout=180)
-        # A instância pública responde 429/504 sob carga; espera curta e tenta de novo.
-        if response.status_code not in (429, 502, 503, 504) or attempt == 2:
-            break
-        await asyncio.sleep(5.0 * (attempt + 1))
+async def fetch_ways(
+    bbox: BBox,
+    label: str,
+    *,
+    client: ExternalHttpClient,
+    overpass_url: str | None = None,
+) -> list[RoadWay]:
+    url = overpass_url or get_settings().overpass_api_url
+    response = await client.post(
+        url,
+        data={"data": overpass_query(bbox)},
+        timeout=180,
+        provider="overpass",
+    )
     if response.status_code != 200:
         raise OsmImportError(f"Overpass respondeu HTTP {response.status_code}")
     payload = response.json()
     batch = {
         "label": label,
         "bbox": [bbox.south, bbox.west, bbox.north, bbox.east],
-        "source": OVERPASS_URL,
+        "source": url,
         "osm_base": (payload.get("osm3s") or {}).get("timestamp_osm_base"),
         "fetched_at": datetime.now(UTC).isoformat(),
+        "correlation_id": response.extensions.get("urmind_correlation_id"),
         "license": "ODbL 1.0 — © OpenStreetMap contributors",
     }
     return parse_ways(payload, batch=batch)
 
 
 async def _main(args: argparse.Namespace) -> int:
-    from app.config import get_settings
     from app.db.session import Database
     from app.repositories.core import RoadSegmentRepository
 
     bbox = BBox(*args.bbox)
-    async with httpx.AsyncClient(headers={"User-Agent": "UrMind/0.1 (pilot road import)"}) as client:
-        ways = await fetch_ways(bbox, args.label, client=client)
-    database = Database(get_settings())
+    settings = get_settings()
+    async with ExternalHttpClient.from_settings(settings) as client:
+        ways = await fetch_ways(
+            bbox,
+            args.label,
+            client=client,
+            overpass_url=settings.overpass_api_url,
+        )
+    database = Database(settings)
     try:
         async with database.sessionmaker() as session:
             repository = RoadSegmentRepository(session)
@@ -185,7 +198,12 @@ async def _main(args: argparse.Namespace) -> int:
                 await session.rollback()
     finally:
         await database.close()
-    print(json.dumps({"ways": len(ways), "written": written, "committed": args.commit, **summary}, default=str))
+    print(
+        json.dumps(
+            {"ways": len(ways), "written": written, "committed": args.commit, **summary},
+            default=str,
+        )
+    )
     return 0
 
 
@@ -196,7 +214,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--commit", action="store_true")
     args = parser.parse_args(argv)
     if sys.platform == "win32":
-        return asyncio.run(_main(args), loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector()))
+        return asyncio.run(
+            _main(args), loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())
+        )
     return asyncio.run(_main(args))
 
 

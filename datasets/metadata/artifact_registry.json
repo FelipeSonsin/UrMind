@@ -124,8 +124,8 @@
     },
     {
       "path": "datasets/metadata/artifact_contract.yaml",
-      "sha256": "c4fb7d8703987938f95ac365c6af474faddc0625c4cfbb38b0e3f36674f4d5da",
-      "size_bytes": 19020
+      "sha256": "bcb839dcf97bd7e69899127bec3c0e923f38c9a443eda8d822479c7a291f208b",
+      "size_bytes": 18811
     },
     {
       "path": "datasets/metadata/bdd100k_acquisition_plan.json",
@@ -159,8 +159,8 @@
     },
     {
       "path": "datasets/metadata/storage_budget.yaml",
-      "sha256": "50eec80414ad3a93cc94ecf30a924606fdf37e01f49ac22c74bc5fd8b8fd9966",
-      "size_bytes": 3945
+      "sha256": "11ce73c40a5eaeacbf0cad8be30734d1dd1e767750abb31087a19037e17aa44e",
+      "size_bytes": 4407
     },
     {
       "path": "datasets/metadata/taxonomy.yaml",
@@ -203,6 +203,16 @@
       "size_bytes": 1134
     },
     {
+      "path": "datasets/reports/ird_dashcam_candidate_acquisition.json",
+      "sha256": "ab28f1629cf228bd164913a2ba81ce35db37d7c2c7b7ca54b3f10abcd2834ff6",
+      "size_bytes": 131141
+    },
+    {
+      "path": "datasets/reports/ird_dashcam_candidate_audit.json",
+      "sha256": "0a4a8e54b6e884801c8ec38bf40adf89b99735a9ae1952058eafd4946e2ce790",
+      "size_bytes": 3916
+    },
+    {
       "path": "datasets/reports/norway_profile.jsonl",
       "sha256": "d6e91afa6351b00cec9f42589034dd2acc062abb801b632823096ea383274768",
       "size_bytes": 3726705
@@ -221,6 +231,11 @@
       "path": "datasets/reports/rdd2022_duplicates.json",
       "sha256": "6b81048d290afbd5f12a7d1742f36d24258712e18d4960860c0fc1e02428ae8d",
       "size_bytes": 123051
+    },
+    {
+      "path": "datasets/reports/rdd2022_geometry.json",
+      "sha256": "5f4938c75996b0151c0d1921e8d76a7d3ede8ff46f38bfcc2b184e3d9d541643",
+      "size_bytes": 50356
     },
     {
       "path": "datasets/reports/rdd2022_legacy_artifact_status.json",
@@ -380,9 +395,19 @@
       "size_bytes": 18491
     },
     {
+      "path": "scripts/datasets/acquire_ird_dashcam.py",
+      "sha256": "32c08f56735620b209f895ad72189894b1c629c652293c1bb7eed37308e1b1b9",
+      "size_bytes": 12462
+    },
+    {
       "path": "scripts/datasets/acquire_registered.py",
       "sha256": "ef33261edc2bd9d0c75938aa3d08f766a37d51f0954ad3bd3023b46bc7e0c7b4",
       "size_bytes": 15194
+    },
+    {
+      "path": "scripts/datasets/analyze_rdd2022_geometry.py",
+      "sha256": "b6788f3c4f3dcf2837a336b83ea1d51892c034db31caa260bae5364522b40106",
+      "size_bytes": 8733
     },
     {
       "path": "scripts/datasets/audit_acquired.py",
@@ -393,6 +418,11 @@
       "path": "scripts/datasets/audit_external.py",
       "sha256": "5d8cfd1bf9596239b400a5ab31642ea61b5b67807c5a87c0a96e92c5d19e8a5f",
       "size_bytes": 3215
+    },
+    {
+      "path": "scripts/datasets/audit_ird_dashcam.py",
+      "sha256": "cf7098e11b6ad4d286edf72f7f54b86064ec360e3cee395fd5c7890a74c3c104",
+      "size_bytes": 11698
     },
     {
       "path": "scripts/datasets/audit_rdd2022.py",
@@ -436,8 +466,8 @@
     },
     {
       "path": "scripts/datasets/build_detection_manifests.py",
-      "sha256": "e3713fd155f98f86448fa1026821af13389078f3a37a706c3e9d1a930a500de0",
-      "size_bytes": 13793
+      "sha256": "a5a9fc5cfb5ac1c73e9499298e07234ca0ae5bcfb17f427abafd42a748f04ae9",
+      "size_bytes": 20743
     },
     {
       "path": "scripts/datasets/build_report.py",
@@ -465,6 +495,11 @@
       "size_bytes": 8673
     },
     {
+      "path": "scripts/datasets/make_splits_v2.py",
+      "sha256": "4183b8966d87d79b03c8ade92832786a1ef3ab85ee1027528445976db2fa1263",
+      "size_bytes": 20315
+    },
+    {
       "path": "scripts/datasets/make_univali_splits.py",
       "sha256": "c9cbc9e99e7066585cb5130ec3c45c76ead77c0432af7beba2de292576f380d8",
       "size_bytes": 20858
@@ -476,8 +511,8 @@
     },
     {
       "path": "scripts/datasets/prepare_rdd_split_authorization.py",
-      "sha256": "18a5c30e84d415b83aa6bdc0c77b096103d6cd15ceba43e7574ca4b65cb189c6",
-      "size_bytes": 6309
+      "sha256": "38eb8d7a23c3425edddbb18ee5f91623b2270dbbee04203a7412eef8a091ec99",
+      "size_bytes": 12528
     },
     {
       "path": "scripts/datasets/prepare_univali_human_audit.py",
@@ -585,5 +620,5 @@
       "size_bytes": 7387
     }
   ],
-  "updated": "2026-09-16"
+  "updated": "2026-09-24"
 }

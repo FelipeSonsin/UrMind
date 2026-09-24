@@ -5,7 +5,7 @@ import {
   publicEvents,
   publicStatus,
   scoutOffline,
-  scoutSnapshots,
+  urbanAnalysis,
   stubPublicApi,
 } from './fixtures';
 
@@ -34,41 +34,45 @@ test('a página inicial explica em segundos o que o sistema viu', async ({ page 
   );
 });
 
-test('sem câmera conectada o painel declara o estado em vez de simular vídeo', async ({ page }) => {
+test('o fluxo móvel não consulta Scout nem oferece transmissão ativa', async ({ page }) => {
   await stubPublicApi(page);
-  await page.goto('/#/live');
-  const scout = page.getByLabel('Câmera do Scout');
-  await expect(scout.getByText('Sem câmera conectada').first()).toBeVisible();
-  await expect(scout.getByText('nenhuma câmera conectada a este ambiente')).toBeVisible();
-  await expect(scout.locator('img')).toHaveCount(0);
-  await expect(scout.getByText('não medida')).toBeVisible();
-});
-
-test('com fonte real a câmera conecta e desenha só as caixas da detecção', async ({ page }) => {
-  await stubPublicApi(page, { scout: scoutSnapshots });
-  // Frame real de teste gerado no navegador; nenhum vídeo de demonstração no produto.
-  await page.route('**/api/v1/public/scout/frame*', async (route) => {
-    const pixel =
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    await route.fulfill({ body: Buffer.from(pixel, 'base64'), contentType: 'image/png' });
+  let scoutRequests = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/public/scout')) scoutRequests++;
   });
-  await page.goto('/#/live');
-  const scout = page.getByLabel('Câmera do Scout');
-  await expect(scout.getByText('Ao vivo').first()).toBeVisible();
-  await expect(scout.getByText('IMAGENS AO VIVO')).toBeVisible();
-  await expect(scout.locator('img')).toBeVisible();
-  // Uma detecção com bbox na fixture: uma caixa, nem mais nem menos.
-  await expect(scout.locator('svg.overlay rect')).toHaveCount(1);
-  await expect(scout.getByText('180 ms')).toBeVisible();
+  await page.goto('/#/registrar');
+  await expect(page.getByRole('button', { name: 'Salvar e enviar' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Navegação principal' })
+      .getByRole('link', { name: 'Ao vivo' }),
+  ).toHaveCount(0);
+  expect(scoutRequests).toBe(0);
 });
 
-test('a câmera degradada aparece como degradada, sem inventar continuidade', async ({ page }) => {
-  await stubPublicApi(page, { scout: { ...scoutSnapshots, status: 'degraded' } });
-  await page.route('**/api/v1/public/scout/frame*', (route) => route.abort());
-  await page.goto('/#/live');
-  await expect(
-    page.getByLabel('Câmera do Scout').getByText('Sinal degradado').first(),
-  ).toBeVisible();
+test('análise urbana mostra texto persistido, consequências condicionais e limitações', async ({
+  page,
+}) => {
+  await stubPublicApi(page, { detail: { ...eventDetail, analysis: urbanAnalysis } });
+  await page.goto(`/#/events/${EVENT_ID}`);
+  const analysis = page.getByLabel('Análise urbana');
+  await expect(analysis).toContainText(urbanAnalysis.description);
+  await expect(analysis).toContainText(urbanAnalysis.diagnosis);
+  await expect(analysis).toContainText(urbanAnalysis.potential_consequences[0].statement);
+  await expect(analysis).toContainText('não são uma previsão');
+  await expect(analysis).toContainText(urbanAnalysis.limitations[0]);
+  await expect(analysis).toContainText('risk-v1');
+  await expect(page.getByText('ANÁLISE EXPERIMENTAL', { exact: true })).toBeVisible();
+  await expect(analysis.getByRole('heading', { name: 'Possíveis causas' })).toHaveCount(0);
+});
+
+test('detalhe anterior sem análise mantém diagnóstico sem inventar consequências', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  await page.goto(`/#/events/${EVENT_ID}`);
+  await expect(page.getByRole('heading', { name: 'Buraco', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Análise urbana')).toHaveCount(0);
 });
 
 test('a análise completa mostra explicação, ação, previsão ausente e rastro', async ({ page }) => {
@@ -147,6 +151,12 @@ test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', as
   await page.goto('/#/map');
   await expect(page.getByRole('heading', { name: 'Mapa operacional' })).toBeVisible();
   await expect(page.locator('.map canvas')).toBeVisible();
+  // A canvas alone can hide a missing worker. Verify GeoJSON was processed and
+  // its event marker actually rendered by MapLibre (fixture data, not real E2E).
+  await expect(page.locator('.map').first()).toHaveAttribute(
+    'data-rendered-event-ids',
+    new RegExp(EVENT_ID),
+  );
   const legend = page.getByLabel('Legenda de severidade');
   await expect(legend).toContainText('Crítica');
   await expect(legend).toContainText('Não determinada');
@@ -167,7 +177,11 @@ test('a lista pública filtra por classe e declara quando nada corresponde', asy
     (url) => url.pathname === '/api/v1/public/events',
     (route) => route.fulfill({ json: [] }),
   );
-  await page.getByLabel('Classe').selectOption('URMIND_SIGNAGE');
+  // Only classes a model can emit are filterable; DATA_REQUIRED classes are not offered.
+  const classFilter = page.getByLabel('Classe');
+  await expect(classFilter.locator('option[value="URMIND_FALLEN_TREE"]')).toHaveCount(0);
+  await expect(classFilter.locator('option[value="URMIND_SIGNAGE"]')).toHaveCount(0);
+  await classFilter.selectOption('URMIND_ROAD_D10');
   await expect(page.getByText('Nenhuma ocorrência corresponde a este filtro.')).toBeVisible();
 });
 
@@ -256,4 +270,51 @@ test('sem ocorrência e sem câmera, o painel parece proposital e não quebrado'
   // Nenhum número aparece sem origem: zero é zero, não um traço decorativo.
   await expect(page.locator('body')).not.toContainText('NaN');
   await page.screenshot({ path: testInfo.outputPath('vazio.png'), fullPage: true });
+});
+
+test('demo mostra só exemplos revisados e nunca como resultado da foto enviada', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    (route) =>
+      route.fulfill({
+        json:
+          new URL(route.request().url()).searchParams.get('status') === 'confirmed'
+            ? publicEvents.slice(0, 1)
+            : [],
+      }),
+  );
+  await page.goto('/#/demo');
+  await expect(page.getByRole('heading', { name: 'Exemplos revisados' })).toBeVisible();
+  await expect(page.getByText('Não são o resultado da sua foto')).toBeVisible();
+  await expect(page.getByText('EXEMPLO REVISADO')).toHaveCount(1);
+});
+
+test('transparência lista classes em desenvolvimento sem afirmar reconhecimento', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  await page.goto('/#/transparency');
+  const taxonomy = page.getByLabel('Classes de problemas urbanos');
+  const fallenTree = taxonomy.locator('li', { hasText: 'Árvore caída' });
+  await expect(fallenTree).toContainText('Em desenvolvimento');
+  await expect(taxonomy.locator('li')).toHaveCount(35);
+  await expect(taxonomy.getByText('Em desenvolvimento', { exact: true })).toHaveCount(31);
+  await expect(taxonomy.locator('li', { hasText: 'Buraco' })).toContainText('Análise experimental');
+  await expect(taxonomy).not.toContainText('Reconhecida por modelo aprovado');
+});
+
+test('resultado de modelo shadow leva o selo ANÁLISE EXPERIMENTAL', async ({ page }) => {
+  await stubPublicApi(page, { detail: { ...eventDetail, model_stage: 'EXPERIMENTAL_SHADOW' } });
+  await page.goto(`/#/events/${EVENT_ID}`);
+  await expect(page.getByRole('note').filter({ hasText: 'ANÁLISE EXPERIMENTAL' })).toBeVisible();
+});
+
+test('resultado de modelo não-shadow não recebe o selo experimental', async ({ page }) => {
+  await stubPublicApi(page);
+  await page.goto(`/#/events/${EVENT_ID}`);
+  await expect(page.getByRole('heading', { name: 'Buraco' }).first()).toBeVisible();
+  await expect(page.getByText('ANÁLISE EXPERIMENTAL')).toHaveCount(0);
 });

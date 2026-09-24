@@ -62,6 +62,17 @@ def test_carrega_as_sete_variaveis() -> None:
     assert s.supabase_jwks_url == BASE + JWKS_PATH
 
 
+@pytest.mark.parametrize("mode", ["disabled", "production"])
+def test_runtime_recusa_auth_e_banco_de_projetos_diferentes(mode: str) -> None:
+    with pytest.raises(ValidationError, match="projetos diferentes") as error:
+        _settings(
+            SUPABASE_URL="https://outroprojeto.supabase.co",
+            SUPABASE_JWKS_URL="https://outroprojeto.supabase.co" + JWKS_PATH,
+            VISION_EXECUTION_MODE=mode,
+        )
+    assert PASSWORD not in str(error.value)
+
+
 def test_suite_nao_herda_o_env_de_desenvolvimento() -> None:
     """Com ENVIRONMENT=test, importar app.config não injeta o backend/.env."""
     env = {k: v for k, v in os.environ.items() if not k.startswith(("DATABASE_", "SUPABASE_"))}

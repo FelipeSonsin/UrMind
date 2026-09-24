@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { ExperimentalBadge } from './public/Diagnosis';
 import {
   classes,
   parseCoordinate,
@@ -95,6 +96,7 @@ export function EventDetail({
       )}
       {detail && (
         <>
+          <ExperimentalBadge stage={detail.model_status} />
           {detail.image_url ? (
             <figure className="evidence-figure">
               <div className="evidence-frame">

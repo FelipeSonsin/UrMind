@@ -17,13 +17,76 @@ function statusLabel(status: string): string {
   return statuses[status as keyof typeof statuses] ?? status;
 }
 
+/** Selo obrigatório para resultado de modelo EXPERIMENTAL_SHADOW. */
+export function ExperimentalBadge({ stage }: { stage: string | null | undefined }) {
+  if (stage !== 'EXPERIMENTAL_SHADOW') return null;
+  return (
+    <span className="badge experimental-badge" role="note">
+      ANÁLISE EXPERIMENTAL
+    </span>
+  );
+}
+
 /** Resumo de 5 segundos: o que é, quanto urge, o que fazer e em que estado está. */
+function UrbanAnalysis({ event }: { event: PublicEventDetail }) {
+  return event.analysis ? (
+    <section aria-label="Análise urbana">
+      {event.model_stage !== 'EXPERIMENTAL_SHADOW' && (
+        <ExperimentalBadge stage={event.analysis.provenance.model_stage} />
+      )}
+      <h3>Descrição</h3>
+      <p>{event.analysis.description}</p>
+      <h3>Diagnóstico</h3>
+      <p>{event.analysis.diagnosis}</p>
+      {event.analysis.potential_consequences.length > 0 && (
+        <>
+          <h3>Consequências potenciais</h3>
+          <p className="muted">Possibilidades condicionais; não são uma previsão de ocorrência.</p>
+          <ul>
+            {event.analysis.potential_consequences.map((item, index) => (
+              <li key={`${item.domain}-${index}`}>{item.statement}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {event.analysis.possible_causes.length > 0 && (
+        <>
+          <h3>Possíveis causas</h3>
+          <ul>
+            {event.analysis.possible_causes.map((cause) => (
+              <li key={cause}>{cause}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {event.analysis.limitations.length > 0 && (
+        <>
+          <h3>Limitações da análise</h3>
+          <ul>
+            {event.analysis.limitations.map((limitation) => (
+              <li key={limitation}>{limitation}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="muted">
+        Análise por regras e texto determinístico.{' '}
+        {event.analysis.provenance.assessment_source === 'unavailable'
+          ? 'Avaliação persistida indisponível.'
+          : `Avaliação persistida${event.analysis.provenance.ruleset_version ? ` · ${event.analysis.provenance.ruleset_version}` : ''}.`}
+      </p>
+    </section>
+  ) : null;
+}
+
 export function QuickDiagnosis({ event }: { event: PublicEventDetail }) {
   const severity = severityOf(event.risk?.severity);
   return (
     <div className="quick-diagnosis">
       <p className="eyebrow">PROBLEMA DETECTADO</p>
+      <ExperimentalBadge stage={event.model_stage} />
       <h2>{labelFor(event.urmind_class)}</h2>
+      <UrbanAnalysis event={event} />
       <div className="quick-grid">
         <div>
           <span>Prioridade</span>
@@ -98,11 +161,15 @@ export function RiskExplanation({ event }: { event: PublicEventDetail }) {
   const risk = event.risk;
   if (!risk)
     return (
-      <p className="notice">Ainda não há avaliação de risco publicada para esta ocorrência.</p>
+      <>
+        <UrbanAnalysis event={event} />
+        <p className="notice">Ainda não há avaliação de risco publicada para esta ocorrência.</p>
+      </>
     );
   const { increased, decreased, unavailable } = risk.explanation;
   return (
     <div className="explanation">
+      <UrbanAnalysis event={event} />
       <p className="eyebrow">POR QUE ESTA PRIORIDADE</p>
       <p className="explanation-head">
         Prioridade <strong>{priorityBand(risk.priority_score)}</strong>
@@ -321,7 +388,13 @@ export function EventTraceability({ event }: { event: PublicEventDetail }) {
         <dt>Modelo</dt>
         <dd>
           {event.model_version ?? NA}
-          {event.model_stage && <small> estágio {event.model_stage}</small>}
+          {event.model_stage && (
+            <small>
+              {event.model_stage === 'EXPERIMENTAL_SHADOW'
+                ? ' — Análise experimental (não aprovada para produção)'
+                : ` estágio ${event.model_stage}`}
+            </small>
+          )}
         </dd>
       </div>
       <div>

@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
           icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+          globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
           navigateFallbackDenylist: [/^\/api(?:\/|$)/],
           // Somente o app shell: nunca guardar API, fotos privadas ou tiles no cache HTTP.
         },

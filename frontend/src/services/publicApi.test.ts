@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { publicApi } from './publicApi';
+import { auth } from './auth';
+import { eventDetail } from '../../tests/fixtures';
+import { api } from './api';
 
 const status = {
   api: { name: 'api', status: 'ok', detail: null },
@@ -23,9 +26,58 @@ function respond(body: unknown, init: { ok?: boolean; status?: number } = {}) {
   return fetchMock;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('cliente do painel público', () => {
+  it('envia observação do rascunho sem descartá-la no upload', async () => {
+    vi.spyOn(auth, 'accessToken').mockResolvedValue('owner-test-token');
+    const fetchMock = respond({
+      id: eventDetail.id,
+      capture_key: 'fixture',
+      created: true,
+      requires_manual_location: false,
+    });
+    const note = 'Observação do cidadão, não validada pelo modelo.';
+    await api.uploadPhoto({
+      id: 'local-draft',
+      photo: new Blob(['fixture']),
+      filename: 'foto.jpg',
+      source: 'exif_upload',
+      captured_at: null,
+      created_at: '2026-09-24T00:00:00Z',
+      coordinate: { latitude: -23.5, longitude: -46.6, accuracy_m: null },
+      source_location: 'manual',
+      location_timestamp: null,
+      heading_deg: null,
+      speed_mps: null,
+      note,
+      status: 'local_draft',
+    });
+    expect((fetchMock.mock.calls[0][1]?.body as FormData).get('user_description')).toBe(note);
+  });
+  it('detalhe usa sessão existente do proprietário sem cache ou novo signup', async () => {
+    vi.spyOn(auth, 'accessToken').mockResolvedValue('owner-test-token');
+    const visitor = vi.spyOn(auth, 'ensureVisitorSession');
+    const fetchMock = respond(eventDetail);
+    await publicApi.event(eventDetail.id);
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      Authorization: 'Bearer owner-test-token',
+    });
+    expect(fetchMock.mock.calls[0][1]?.cache).toBe('no-store');
+    expect(visitor).not.toHaveBeenCalled();
+  });
+
+  it('detalhe publicado sem sessão não envia credencial nem cria conta', async () => {
+    vi.spyOn(auth, 'accessToken').mockResolvedValue(null);
+    const visitor = vi.spyOn(auth, 'ensureVisitorSession');
+    const fetchMock = respond(eventDetail);
+    await publicApi.event(eventDetail.id);
+    expect(JSON.stringify(fetchMock.mock.calls[0][1]?.headers)).not.toMatch(/authorization/i);
+    expect(visitor).not.toHaveBeenCalled();
+  });
   it('lê o estado do sistema sem enviar credencial', async () => {
     const fetchMock = respond(status);
     const parsed = await publicApi.status();

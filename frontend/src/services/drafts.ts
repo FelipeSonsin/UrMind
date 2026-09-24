@@ -9,7 +9,7 @@ export interface CaptureDraft {
   captured_at: string | null;
   created_at: string;
   coordinate: Coordinate | null;
-  source_location: 'gps_device' | 'manual' | 'unknown';
+  source_location: 'gps_device' | 'exif' | 'manual' | 'unknown';
   location_timestamp: string | null;
   heading_deg: number | null;
   speed_mps: number | null;
