@@ -157,6 +157,7 @@ class ExternalHttpClient:
         url: str,
         *,
         provider: str | None = None,
+        attempts: int | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         supplied_headers = kwargs.pop("headers", None)
@@ -166,13 +167,16 @@ class ExternalHttpClient:
         timeout = kwargs.pop("timeout", self.timeout_seconds)
         provider_name = self._provider(url, provider)
         started_at = time.perf_counter()
-        for attempt in range(1, self.max_attempts + 1):
+        max_attempts = self.max_attempts if attempts is None else attempts
+        if not 1 <= max_attempts <= self.max_attempts:
+            raise ValueError("attempts must respect the configured retry bound")
+        for attempt in range(1, max_attempts + 1):
             try:
                 response = await self._client.request(
                     method, url, headers=headers, timeout=timeout, **kwargs
                 )
             except httpx.TransportError as exc:
-                if attempt == self.max_attempts:
+                if attempt == max_attempts:
                     log.error(
                         "external_http_request_completed",
                         **self._log_fields(
@@ -203,7 +207,7 @@ class ExternalHttpClient:
                     error=type(exc).__name__,
                 )
             else:
-                if response.status_code not in RETRYABLE_STATUS or attempt == self.max_attempts:
+                if response.status_code not in RETRYABLE_STATUS or attempt == max_attempts:
                     response.extensions[CORRELATION_ID_EXTENSION] = correlation_id
                     outcome = "success" if response.status_code < 400 else "failure"
                     log.info(

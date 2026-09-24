@@ -145,3 +145,14 @@ def test_via_urbana_importada_ja_nasce_com_competencia_municipal() -> None:
     }
     (way,) = parse_ways(payload, batch=BATCH)
     assert way.jurisdiction == "BR-via-urbana-municipal"
+
+
+def test_center_radius_is_explicit_bounded_and_contains_center() -> None:
+    from app.services.osm_import import bbox_from_center
+
+    box = bbox_from_center("-23.5560,-46.6370", 3)
+    assert box.south < -23.5560 < box.north
+    assert box.west < -46.6370 < box.east
+    for center, radius in [("0,0", 0), ("nan,1", 1), ("90,0", 1), ("1,2", 100), ("bad", 1)]:
+        with pytest.raises(OsmImportError):
+            bbox_from_center(center, radius)

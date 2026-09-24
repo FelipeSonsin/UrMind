@@ -434,8 +434,6 @@ async def test_falha_nao_entra_no_cache() -> None:
     responses = iter(
         [
             httpx.Response(500),
-            httpx.Response(500),
-            httpx.Response(500),
             httpx.Response(200, json={"display_name": "X", "address": {}}),
         ]
     )
@@ -443,6 +441,20 @@ async def test_falha_nao_entra_no_cache() -> None:
         provider = NominatimReverse(client)
         assert (await provider.fetch(-23.5, -46.6, WHEN)).status == STATUS_UNAVAILABLE
         assert (await provider.fetch(-23.5, -46.6, WHEN)).status == STATUS_OK
+
+
+def test_pending_address_preserves_history_without_reusing_old_address():
+    previous = {"status": "ok", "road": "Rua anterior", "fetched_at": WHEN.isoformat()}
+    quality = {"address": previous}
+    updated = context_module.pending_address(quality)
+    assert updated["address"]["status"] == "address_pending"
+    assert "road" not in updated["address"]
+    assert updated["address_history"] == [previous]
+    assert quality["address"] == previous
+    assert (
+        context_module.pending_address(updated)["address"]["request_id"]
+        != updated["address"]["request_id"]
+    )
 
 
 def _row(source: str, status: str, data: dict) -> SimpleNamespace:

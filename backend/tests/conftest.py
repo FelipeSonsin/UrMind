@@ -40,6 +40,25 @@ def backend_root() -> Path:
 
 
 @pytest.fixture()
+def reference_inference_unavailable(monkeypatch):
+    """Test images are not the consented calibration corpus; never run installed models."""
+    from app.services import storage
+    from app.services.photo_reference import ReferenceUnavailable
+
+    def unavailable(_image):
+        raise ReferenceUnavailable("test_corpus_not_authorized_for_reference_inference")
+
+    monkeypatch.setattr(storage, "detect_faces", unavailable)
+    monkeypatch.setattr(storage, "scene_similarity", unavailable)
+
+
+@pytest.fixture(autouse=True)
+def isolated_reference_models(reference_inference_unavailable):
+    # Individual unit tests may inject explicit fake models after this fixture.
+    yield
+
+
+@pytest.fixture()
 def client() -> Iterator[TestClient]:
     """Cliente HTTP sobre a aplicação em memória. Não sobe servidor."""
     from app.main import app

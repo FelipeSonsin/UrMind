@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import re
+import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
 
 from app.config import PROJECT_DIR, Settings
+from app.repositories.core import GeocodingRepository
 from app.services.external_sources.http import ExternalHttpClient
 from app.services.external_sources.registry import integration_registry
 from app.services.external_sources.sidra import IbgeSidraProvider, municipal_population_query
@@ -23,6 +26,7 @@ class LiveCheck:
     status: str
     detail: str
     checked_at: str
+    latency_ms: float | None = None
 
 
 async def run_live_checks(
@@ -30,6 +34,7 @@ async def run_live_checks(
     *,
     client: ExternalHttpClient | None = None,
     openfreemap_style_url: str = OPENFREEMAP_STYLE_URL,
+    geocoding: GeocodingRepository | None = None,
 ) -> tuple[LiveCheck, ...]:
     owned = client is None
     http = client or ExternalHttpClient.from_settings(settings)
@@ -38,6 +43,7 @@ async def run_live_checks(
             settings,
             client=http,
             openfreemap_style_url=openfreemap_style_url,
+            geocoding=geocoding,
         )
     finally:
         if owned:
@@ -49,6 +55,7 @@ async def _run_live_checks(
     *,
     client: ExternalHttpClient,
     openfreemap_style_url: str,
+    geocoding: GeocodingRepository | None,
 ) -> tuple[LiveCheck, ...]:
     http = client
     checked_at = datetime.now(UTC).isoformat()
@@ -64,6 +71,76 @@ async def _run_live_checks(
         "FRONTEND_CONFIG_UNKNOWN",
         "frontend configuration is not observable from backend",
     )
+    latencies: dict[str, float] = {}
+    # Availability probes only. The postal code / weather coordinate below are
+    # fixed public smoke-test inputs, never Capture locations or Event evidence.
+    probes = [
+        (
+            "Supabase",
+            f"{settings.supabase_url}/auth/v1/health" if settings.supabase_url else None,
+            {},
+            {"apikey": settings.supabase_publishable_key}
+            if settings.supabase_publishable_key
+            else {},
+        ),
+        ("Nominatim", settings.nominatim_base_url.rstrip("/") + "/status", {"format": "json"}, {}),
+        (
+            "Open-Meteo",
+            settings.open_meteo_forecast_url,
+            {
+                "latitude": -23.55,
+                "longitude": -46.63,
+                "current": "temperature_2m",
+                "forecast_days": 1,
+            },
+            {},
+        ),
+        (
+            "GeoSampa",
+            settings.geosampa_wfs_url,
+            {"service": "WFS", "request": "GetCapabilities"},
+            {},
+        ),
+        ("BrasilAPI", settings.brasil_api_base_url.rstrip("/") + "/cep/v2/01015000", {}, {}),
+        ("ViaCEP", settings.viacep_base_url.rstrip("/") + "/01015000/json/", {}, {}),
+    ]
+    for name, url, params, headers in probes:
+        if not url:
+            statuses[name] = ("UNAVAILABLE", "not configured")
+            continue
+        start = time.perf_counter()
+        token = uuid.uuid4()
+        reserved = False
+        if name == "Nominatim":
+            if geocoding is None or not await geocoding.reserve(token):
+                statuses[name] = ("DEGRADED", "shared lease unavailable; probe not executed")
+                continue
+            reserved = True
+        try:
+            response = await http.get(
+                url, params=params, headers=headers, timeout=5, attempts=1, provider=name
+            )
+            response.raise_for_status()
+            if name == "GeoSampa":
+                if "WFS_Capabilities" not in response.text:
+                    raise ValueError("invalid WFS capabilities")
+            else:
+                body = response.json()
+                if not isinstance(body, dict) or body.get("erro") or body.get("error"):
+                    raise ValueError("invalid health payload")
+                if name == "Nominatim" and body.get("status") != 0:
+                    raise ValueError("Nominatim unhealthy")
+                if name == "Open-Meteo" and "current" not in body:
+                    raise ValueError("weather unavailable")
+                if name in {"BrasilAPI", "ViaCEP"} and not body.get("cep"):
+                    raise ValueError("postal provider unavailable")
+            statuses[name] = ("OK", f"HTTP {response.status_code}")
+        except (httpx.HTTPError, TypeError, ValueError) as exc:
+            statuses[name] = ("UNAVAILABLE", type(exc).__name__)
+        finally:
+            if reserved and geocoding is not None:
+                await geocoding.release(token)
+        latencies[name] = round((time.perf_counter() - start) * 1000, 3)
     try:
         response = await http.post(
             settings.overpass_api_url,
@@ -82,7 +159,7 @@ async def _run_live_checks(
         result = await IbgeSidraProvider(
             http,
             settings.ibge_sidra_base_url,
-        ).fetch(municipal_population_query("3550308"))
+        ).fetch(municipal_population_query("3550308"), use_cache=False)
         if result.status != "ok" or not result.data.get("records"):
             raise ValueError("resposta SIDRA vazia")
         runtime = (
@@ -132,6 +209,12 @@ async def _run_live_checks(
         statuses["Hugging Face"] = ("UNAVAILABLE", type(exc).__name__)
 
     return tuple(
-        LiveCheck(name=name, status=status, detail=detail, checked_at=checked_at)
+        LiveCheck(
+            name=name,
+            status=status,
+            detail=detail,
+            checked_at=checked_at,
+            latency_ms=latencies.get(name),
+        )
         for name, (status, detail) in statuses.items()
     )

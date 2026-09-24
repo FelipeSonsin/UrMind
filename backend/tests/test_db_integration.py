@@ -55,6 +55,121 @@ LAT, LON = -23.5613, -46.6560
 
 
 @pytest.mark.asyncio
+async def test_manual_location_schedules_address_and_stale_result_is_ignored(database):
+    from app.api.v1.core import capture_location
+    from app.auth import AuthenticatedUser
+    from app.repositories.core import DecisionRepository
+    from app.services.context import pending_address
+
+    owner = str(uuid.uuid4())
+    async with database.sessionmaker() as session:
+        capture = await CaptureRepository(session).create(
+            CaptureCreate(
+                capture_key=f"address-fixture-{uuid.uuid4()}",
+                source=CaptureSource.PWA_PHOTO,
+                source_location=LocationSource.UNKNOWN,
+                captured_at=NOW,
+                quality={"uploaded_by": owner},
+            )
+        )
+        identifier = capture.id
+        try:
+            service = CoreService(
+                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
+            )
+            await capture_location(
+                identifier,
+                Coordinate(latitude=LAT, longitude=LON),
+                AuthenticatedUser(owner, None, "authenticated"),
+                service,
+            )
+            await session.refresh(capture)
+            request_id = capture.quality["address"]["request_id"]
+            assert capture.quality["address"]["status"] == "address_pending"
+            repository = CaptureRepository(session)
+            assert await repository.save_address(
+                identifier, request_id, {"status": "ok", "road": "Fixture first address"}
+            )
+            await session.refresh(capture)
+            capture.quality = pending_address(capture.quality)
+            await session.flush()
+            assert capture.quality["address_history"][0]["road"] == "Fixture first address"
+            assert not await repository.save_address(
+                identifier, request_id, {"status": "ok", "road": "Stale"}
+            )
+            assert await repository.save_address(
+                identifier,
+                capture.quality["address"]["request_id"],
+                {"status": "ok", "road": "New"},
+            )
+            await session.rollback()
+        finally:
+            await session.rollback()
+            # The API commits; cleanup is scoped to this exact generated Capture.
+            await session.execute(
+                text("delete from public.audit_log where entity_id=:id"), {"id": identifier}
+            )
+            await session.execute(
+                text("delete from pgmq.q_inference_jobs where message->>'capture_id'=:id"),
+                {"id": str(identifier)},
+            )
+            await session.execute(
+                text("delete from public.captures where id=:id"), {"id": identifier}
+            )
+            await session.commit()
+            assert (
+                await session.scalar(
+                    text("select count(*) from public.captures where id=:id"), {"id": identifier}
+                )
+                == 0
+            )
+
+
+@pytest.mark.asyncio
+async def test_geocoding_global_lease_and_shared_cache(database):
+    import time
+
+    import httpx
+
+    from app.services.context import NominatimReverse, TTLCache
+
+    # Two independent engines/pools represent separate API/Worker instances.
+    second = Database(get_settings())
+    calls = []
+
+    async def respond(request):
+        calls.append(time.monotonic())
+        return httpx.Response(
+            200, json={"display_name": "Synthetic transport", "address": {"road": "Fixture only"}}
+        )
+
+    key_url = f"https://geocoding-{uuid.uuid4().hex}.invalid"
+    try:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+            first = NominatimReverse(client, sessions=database.sessionmaker, base_url=key_url)
+            other = NominatimReverse(client, sessions=second.sessionmaker, base_url=key_url)
+            first.cache = TTLCache(0)
+            other.cache = TTLCache(0)
+            results = await asyncio.gather(
+                first.fetch(LAT, LON, NOW), other.fetch(LAT, LON + 0.01, NOW)
+            )
+            assert sorted(result.status for result in results) == ["context_unavailable", "ok"]
+            await asyncio.sleep(1.1)
+            await other.fetch(LAT, LON + 0.02, NOW)
+            assert len(calls) == 2 and calls[1] - calls[0] >= 1
+            cached = await first.fetch(LAT, LON + 0.02, NOW)
+            assert cached.provenance["cache"] == "shared_hit" and len(calls) == 2
+    finally:
+        # Only this test's cache keys; no real shared cache/lease reset.
+        async with database.session() as session:
+            await session.execute(
+                text("delete from public.geocoding_cache where payload->'provenance'->>'url'=:url"),
+                {"url": key_url + "/reverse"},
+            )
+        await second.close()
+
+
+@pytest.mark.asyncio
 async def test_capture_cursor_walks_1200_tied_records_without_loss(database):
     owner = str(uuid.uuid4())
     async with database.sessionmaker() as session:
@@ -190,6 +305,300 @@ async def test_human_report_real_storage_publication_and_cleanup(database):
                 )
         for path in paths:
             await storage.delete(path)
+
+
+@pytest.mark.asyncio
+async def test_realtime_report_owner_isolation_and_human_publication(database):
+    """Real Auth/Storage/Postgres/Realtime integration; synthetic photo, not photo E2E."""
+    import time
+    from contextlib import AsyncExitStack
+
+    import httpx
+    from fastapi import UploadFile
+    from fastapi.security import HTTPAuthorizationCredentials
+    from PIL import Image
+    from websockets.asyncio.client import connect
+
+    from app.api.v1.core import publish_event, review_capture, upload_photo
+    from app.auth import require_user
+    from app.repositories.core import DecisionRepository, PublicRepository
+    from app.schemas.core import CaptureReviewCreate, PublicationRequest
+    from app.services.core import EventNotFoundError
+
+    settings = get_settings()
+    assert (
+        settings.supabase_url and settings.supabase_publishable_key and settings.supabase_secret_key
+    )
+    headers = {"apikey": settings.supabase_publishable_key}
+    admin_headers = {
+        "apikey": settings.supabase_secret_key,
+        "Authorization": f"Bearer {settings.supabase_secret_key}",
+    }
+    identities, tokens, users, paths = [], [], [], []
+    capture_id = event_id = None
+    storage = StorageClient(settings)
+    async with httpx.AsyncClient(timeout=20) as http:
+        try:
+            for role in (None, None, "reviewer", "admin"):
+                if role is None:
+                    response = await http.post(
+                        settings.supabase_url + "/auth/v1/signup",
+                        headers=headers,
+                        json={"data": {"purpose": "e2e"}},
+                    )
+                    assert response.status_code == 200, (
+                        f"anonymous signup HTTP {response.status_code}"
+                    )
+                    payload = response.json()
+                    identities.append(payload["user"]["id"])
+                else:
+                    email = f"urmind-e2e-{uuid.uuid4().hex}@example.invalid"
+                    password = secrets.token_urlsafe(24)
+                    created = await http.post(
+                        settings.supabase_url + "/auth/v1/admin/users",
+                        headers=admin_headers,
+                        json={
+                            "email": email,
+                            "password": password,
+                            "email_confirm": True,
+                            "app_metadata": {"urmind_role": role, "purpose": "e2e"},
+                            "user_metadata": {"purpose": "e2e"},
+                        },
+                    )
+                    assert created.status_code in (200, 201)
+                    identities.append(created.json()["id"])
+                    response = await http.post(
+                        settings.supabase_url + "/auth/v1/token?grant_type=password",
+                        headers=headers,
+                        json={"email": email, "password": password},
+                    )
+                    assert response.status_code == 200
+                    payload = response.json()
+                tokens.append(payload["access_token"])
+                users.append(
+                    await require_user(
+                        HTTPAuthorizationCredentials(scheme="Bearer", credentials=tokens[-1])
+                    )
+                )
+            assert users[0].is_anonymous and users[1].is_anonymous
+            assert users[2].can_review and users[3].urmind_role == "admin"
+            url = (
+                settings.supabase_url.replace("https://", "wss://")
+                + "/realtime/v1/websocket?vsn=1.0.0&apikey="
+                + settings.supabase_publishable_key
+            )
+            async with AsyncExitStack() as stack:
+                sockets = []
+                for token in tokens[:3]:
+                    socket = await stack.enter_async_context(connect(url, open_timeout=10))
+                    sockets.append(socket)
+                    await socket.send(
+                        json.dumps(
+                            {
+                                "topic": "realtime:report-fixture",
+                                "event": "phx_join",
+                                "ref": "1",
+                                "join_ref": "1",
+                                "payload": {
+                                    "access_token": token,
+                                    "config": {
+                                        "postgres_changes": [
+                                            {
+                                                "event": "INSERT",
+                                                "schema": "public",
+                                                "table": "captures",
+                                            }
+                                        ]
+                                    },
+                                },
+                            }
+                        )
+                    )
+                    deadline = time.monotonic() + 15
+                    while True:
+                        message = json.loads(
+                            await asyncio.wait_for(
+                                socket.recv(), max(0.1, deadline - time.monotonic())
+                            )
+                        )
+                        if (
+                            message.get("event") == "system"
+                            and message.get("payload", {}).get("status") == "ok"
+                        ):
+                            break
+                        assert time.monotonic() < deadline, "subscription not ready"
+                buffer = io.BytesIO()
+                Image.effect_noise((640, 640), 30).convert("RGB").save(buffer, format="JPEG")
+                async with database.sessionmaker() as session:
+                    service = CoreService(
+                        CaptureRepository(session),
+                        EventRepository(session),
+                        DecisionRepository(session),
+                    )
+                    result = await upload_photo(
+                        users[0],
+                        service,
+                        storage,
+                        UploadFile(
+                            filename="synthetic-isolation.jpg", file=io.BytesIO(buffer.getvalue())
+                        ),
+                        latitude=LAT,
+                        longitude=LON,
+                    )
+                    capture_id = result["id"]
+                    committed = time.monotonic()
+                    capture = await service.captures.get(capture_id)
+                    paths.append(capture.storage_path)
+                    assert not await service.events.for_capture(capture_id)
+
+                    async def received(socket, should_receive):
+                        deadline = committed + 5
+                        while time.monotonic() < deadline:
+                            try:
+                                message = json.loads(
+                                    await asyncio.wait_for(
+                                        socket.recv(), deadline - time.monotonic()
+                                    )
+                                )
+                            except TimeoutError:
+                                break
+                            if message.get("event") == "postgres_changes":
+                                record = message["payload"]["data"]["record"]
+                                if record.get("id") == str(capture_id):
+                                    assert should_receive, "cross-user Realtime leak"
+                                    return time.monotonic() - committed
+                        assert not should_receive, "Capture not delivered within 5 seconds"
+                        return None
+
+                    owner_latency, _, reviewer_latency = await asyncio.gather(
+                        received(sockets[0], True),
+                        received(sockets[1], False),
+                        received(sockets[2], True),
+                    )
+                    assert (await service.capture_processing(capture_id, users[0].id, False))[
+                        "capture_id"
+                    ] == capture_id
+                    with pytest.raises(EventNotFoundError):
+                        await service.capture_processing(capture_id, users[1].id, False)
+                    reviewed = await review_capture(
+                        capture_id,
+                        CaptureReviewCreate(
+                            decision="correct", corrected_class="URMIND_FALLEN_TREE"
+                        ),
+                        users[2],
+                        service,
+                    )
+                    event_id = reviewed["event_id"]
+                    # Explicit adjudication; never fabricate consensus between reviewers.
+                    reviewed = await review_capture(
+                        capture_id,
+                        CaptureReviewCreate(
+                            decision="correct",
+                            corrected_class="URMIND_FALLEN_TREE",
+                            adjudicate=True,
+                        ),
+                        users[3],
+                        service,
+                    )
+                    public = PublicRepository(session)
+                    assert await public.event(event_id) is None
+                    # Publication is bound to the latest review AND its author.
+                    reviewed = await review_capture(
+                        capture_id,
+                        CaptureReviewCreate(
+                            decision="correct", corrected_class="URMIND_FALLEN_TREE"
+                        ),
+                        users[2],
+                        service,
+                    )
+                    await publish_event(
+                        event_id,
+                        PublicationRequest(
+                            publish=True,
+                            review_id=reviewed["review_id"],
+                            visible_content_reviewed=True,
+                            reason="Synthetic integration privacy attestation",
+                        ),
+                        users[2],
+                        service,
+                        storage,
+                    )
+                    event = await service.events.get(event_id)
+                    paths.append(event.factors["publication"]["public_image"]["storage_path"])
+                    assert event.factors["origin"] == "human_review"
+                    assert await public.event(event_id) is not None
+                    print(
+                        f"REALTIME_REPORT_LATENCY: owner={owner_latency:.3f}s reviewer={reviewer_latency:.3f}s; visitor_B=not_delivered_5s"
+                    )
+        finally:
+            async with database.session() as session:
+                for identifier in (capture_id, event_id):
+                    if identifier:
+                        await session.execute(
+                            text("delete from public.audit_log where entity_id=:id"),
+                            {"id": identifier},
+                        )
+                if capture_id:
+                    await session.execute(
+                        text("delete from pgmq.q_inference_jobs where message->>'capture_id'=:id"),
+                        {"id": str(capture_id)},
+                    )
+                    await session.execute(
+                        text("delete from public.reviews where capture_id=:id"), {"id": capture_id}
+                    )
+                if event_id:
+                    await session.execute(
+                        text("delete from public.events where id=:id"), {"id": event_id}
+                    )
+                if capture_id:
+                    await session.execute(
+                        text("delete from public.captures where id=:id"), {"id": capture_id}
+                    )
+            for path in paths:
+                await storage.delete(path)
+            cleanup_errors = []
+            for token in tokens:
+                try:
+                    await http.post(
+                        settings.supabase_url + "/auth/v1/logout?scope=global",
+                        headers={**headers, "Authorization": f"Bearer {token}"},
+                    )
+                except httpx.HTTPError:
+                    cleanup_errors.append("logout transport failed")
+            for identifier in identities:
+                response = await http.delete(
+                    settings.supabase_url + "/auth/v1/admin/users/" + identifier,
+                    headers=admin_headers,
+                )
+                assert response.status_code in (200, 204)
+            async with database.session() as session:
+                for table, column in (("auth.users", "id"), ("auth.sessions", "user_id")):
+                    assert (
+                        await session.scalar(
+                            text(
+                                f"select count(*) from {table} where {column}=any(cast(:ids as uuid[]))"
+                            ),
+                            {"ids": identities},
+                        )
+                        == 0
+                    )
+                assert (
+                    await session.scalar(
+                        text("select count(*) from public.captures where id=:id"),
+                        {"id": capture_id},
+                    )
+                    == 0
+                )
+                assert (
+                    await session.scalar(
+                        text("select count(*) from public.events where id=:id"), {"id": event_id}
+                    )
+                    == 0
+                )
+            assert not cleanup_errors
+            print(
+                "REPORT_REALTIME_CLEANUP: users=0 sessions=0 captures=0 events=0; Storage objects deleted (fixture IDs only)"
+            )
 
 
 @pytest.mark.asyncio
@@ -413,6 +822,11 @@ async def test_operational_policy_persistence_and_rls(database):
         totals = await repo.report_totals()
         assert totals["day_timezone"] == "UTC"
         assert totals["published"] >= 0
+        assert totals["gate_metrics"]["days"] == 30
+        assert totals["gate_metrics"]["accepted"] >= 0
+        assert "actor" not in json.dumps(totals["gate_metrics"])
+        with pytest.raises(ValueError):
+            await repo.report_totals(0)
         models = await repo.operational_models()
         assert all("metrics" not in row and "checksum" not in row for row in models)
         rows = await repo.audit_page(operation=None, after=None, limit=3)
@@ -1334,7 +1748,7 @@ async def test_commit_order_serializes_concurrent_event_inserts(database):
 
 
 @pytest.mark.asyncio
-async def test_supabase_auth_real_roles_login_and_jwks():
+async def test_supabase_auth_real_roles_login_and_jwks(database):
     import httpx
 
     from app.auth import decode_token
@@ -1348,10 +1762,11 @@ async def test_supabase_auth_real_roles_login_and_jwks():
     }
     public_headers = {"apikey": settings.supabase_publishable_key}
     created_ids = []
+    tokens = []
     async with httpx.AsyncClient(timeout=20) as client:
         try:
             for role in ("viewer", "reviewer", "admin"):
-                email = f"urmind-integration-{uuid.uuid4().hex}@example.invalid"
+                email = f"urmind-e2e-{uuid.uuid4().hex}@example.invalid"
                 password = secrets.token_urlsafe(24)
                 response = await client.post(
                     f"{settings.supabase_url}/auth/v1/admin/users",
@@ -1360,7 +1775,8 @@ async def test_supabase_auth_real_roles_login_and_jwks():
                         "email": email,
                         "password": password,
                         "email_confirm": True,
-                        "app_metadata": {"urmind_role": role},
+                        "app_metadata": {"urmind_role": role, "purpose": "e2e"},
+                        "user_metadata": {"purpose": "e2e"},
                     },
                 )
                 assert response.status_code in (200, 201), (
@@ -1374,18 +1790,43 @@ async def test_supabase_auth_real_roles_login_and_jwks():
                     json={"email": email, "password": password},
                 )
                 assert login.status_code == 200, f"login HTTP {login.status_code}"
-                claims = decode_token(login.json()["access_token"], settings)
+                tokens.append(login.json()["access_token"])
+                claims = decode_token(tokens[-1], settings)
                 assert claims["sub"] == user_id
                 assert claims["app_metadata"]["urmind_role"] == role
         finally:
+            failures = []
+            for token in tokens:
+                response = await client.post(
+                    f"{settings.supabase_url}/auth/v1/logout?scope=global",
+                    headers={**public_headers, "Authorization": f"Bearer {token}"},
+                )
+                if response.status_code not in (200, 204):
+                    failures.append(f"logout HTTP {response.status_code}")
             for user_id in created_ids:
                 response = await client.delete(
                     f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
                     headers=admin_headers,
                 )
-                assert response.status_code in (200, 204), (
-                    f"admin delete HTTP {response.status_code}"
+                if response.status_code not in (200, 204):
+                    failures.append(f"admin delete HTTP {response.status_code}")
+                check = await client.get(
+                    f"{settings.supabase_url}/auth/v1/admin/users/{user_id}", headers=admin_headers
                 )
+                if check.status_code != 404:
+                    failures.append(f"deleted user lookup HTTP {check.status_code}")
+            async with database.session() as session:
+                for table in ("auth.users", "auth.sessions"):
+                    column = "id" if table == "auth.users" else "user_id"
+                    count = await session.scalar(
+                        text(
+                            f"select count(*) from {table} where {column}=any(cast(:ids as uuid[]))"
+                        ),
+                        {"ids": created_ids},
+                    )
+                    assert count == 0
+            assert failures == []
+            print("E2E_AUTH_CLEANUP: users=0 sessions=0 (created IDs only)")
 
 
 @pytest.mark.asyncio
@@ -1823,9 +2264,10 @@ async def test_realtime_delivers_event_change_to_reviewer(database):
         "apikey": settings.supabase_secret_key,
         "Authorization": f"Bearer {settings.supabase_secret_key}",
     }
-    email = f"urmind-integration-realtime-{uuid.uuid4().hex}@example.invalid"
+    email = f"urmind-e2e-realtime-{uuid.uuid4().hex}@example.invalid"
     password = secrets.token_urlsafe(24)
     user_id = None
+    token = None
     event_key = f"integration-realtime-{uuid.uuid4().hex}"
     async with httpx.AsyncClient(timeout=20) as client:
         try:
@@ -1836,7 +2278,8 @@ async def test_realtime_delivers_event_change_to_reviewer(database):
                     "email": email,
                     "password": password,
                     "email_confirm": True,
-                    "app_metadata": {"urmind_role": "reviewer"},
+                    "app_metadata": {"urmind_role": "reviewer", "purpose": "e2e"},
+                    "user_metadata": {"purpose": "e2e"},
                 },
             )
             assert created.status_code in (200, 201)
@@ -1931,8 +2374,47 @@ async def test_realtime_delivers_event_change_to_reviewer(database):
                     text("delete from public.events where event_key=:key"), {"key": event_key}
                 )
             if user_id:
+                if token:
+                    logout = await client.post(
+                        f"{settings.supabase_url}/auth/v1/logout?scope=global",
+                        headers={
+                            "apikey": settings.supabase_publishable_key,
+                            "Authorization": f"Bearer {token}",
+                        },
+                    )
                 deleted = await client.delete(
                     f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
                     headers=admin_headers,
                 )
                 assert deleted.status_code in (200, 204)
+                if token:
+                    assert logout.status_code in (200, 204)
+                check = await client.get(
+                    f"{settings.supabase_url}/auth/v1/admin/users/{user_id}", headers=admin_headers
+                )
+                assert check.status_code == 404
+                async with database.session() as session:
+                    assert (
+                        await session.scalar(
+                            text("select count(*) from auth.users where id=cast(:id as uuid)"),
+                            {"id": user_id},
+                        )
+                        == 0
+                    )
+                    assert (
+                        await session.scalar(
+                            text(
+                                "select count(*) from auth.sessions where user_id=cast(:id as uuid)"
+                            ),
+                            {"id": user_id},
+                        )
+                        == 0
+                    )
+                    assert (
+                        await session.scalar(
+                            text("select count(*) from public.events where event_key=:key"),
+                            {"key": event_key},
+                        )
+                        == 0
+                    )
+                print("E2E_REALTIME_CLEANUP: users=0 sessions=0 events=0 (fixture IDs only)")

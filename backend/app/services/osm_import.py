@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import selectors
 import sys
 from dataclasses import dataclass
@@ -50,6 +51,25 @@ class BBox:
             raise OsmImportError("bbox inválida: use S W N E com S<N e W<E")
         if (self.north - self.south) * (self.east - self.west) > MAX_AREA_DEG2:
             raise OsmImportError("bbox grande demais para área piloto")
+
+
+def bbox_from_center(center: str, radius_km: float) -> BBox:
+    try:
+        latitude, longitude = map(float, center.split(","))
+    except ValueError as exc:
+        raise OsmImportError("center exige LAT,LON") from exc
+    if not (
+        math.isfinite(radius_km)
+        and 0 < radius_km <= 5
+        and -85 < latitude < 85
+        and -180 <= longitude <= 180
+    ):
+        raise OsmImportError("centro/raio inválido para recorte piloto")
+    delta_lat = math.degrees(radius_km / 6371.0088)
+    delta_lon = delta_lat / math.cos(math.radians(latitude))
+    return BBox(
+        latitude - delta_lat, longitude - delta_lon, latitude + delta_lat, longitude + delta_lon
+    )
 
 
 @dataclass(frozen=True)
@@ -177,7 +197,7 @@ async def _main(args: argparse.Namespace) -> int:
     from app.db.session import Database
     from app.repositories.core import RoadSegmentRepository
 
-    bbox = BBox(*args.bbox)
+    bbox = bbox_from_center(args.center, args.radius_km) if args.center else BBox(*args.bbox)
     settings = get_settings()
     async with ExternalHttpClient.from_settings(settings) as client:
         ways = await fetch_ways(
@@ -186,6 +206,25 @@ async def _main(args: argparse.Namespace) -> int:
             client=client,
             overpass_url=settings.overpass_api_url,
         )
+    if not args.commit:
+        print(
+            json.dumps(
+                {
+                    "ways": len(ways),
+                    "written": 0,
+                    "committed": False,
+                    "bbox": [bbox.south, bbox.west, bbox.north, bbox.east],
+                }
+            )
+        )
+        return 0
+    from urllib.parse import urlparse
+
+    project = "impmeitwtusjtwjouggy"
+    if urlparse(
+        settings.supabase_url or ""
+    ).hostname != project + ".supabase.co" or project not in (settings.database_pooler_url or ""):
+        raise OsmImportError("importação permitida somente no Urmind DEV")
     database = Database(settings)
     try:
         async with database.sessionmaker() as session:
@@ -209,10 +248,15 @@ async def _main(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bbox", nargs=4, type=float, required=True, metavar=("S", "W", "N", "E"))
+    area = parser.add_mutually_exclusive_group(required=True)
+    area.add_argument("--bbox", nargs=4, type=float, metavar=("S", "W", "N", "E"))
+    area.add_argument("--center", help="LAT,LON, sem centro padrão")
+    parser.add_argument("--radius-km", type=float)
     parser.add_argument("--label", required=True)
     parser.add_argument("--commit", action="store_true")
     args = parser.parse_args(argv)
+    if bool(args.center) != (args.radius_km is not None):
+        parser.error("--center e --radius-km devem ser usados juntos")
     if sys.platform == "win32":
         return asyncio.run(
             _main(args), loop_factory=lambda: asyncio.SelectorEventLoop(selectors.SelectSelector())

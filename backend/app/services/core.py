@@ -32,7 +32,7 @@ from app.schemas.core import (
     ReviewDecision,
     UrmindClass,
 )
-from app.services.context import POI_RADIUS_M, STATUS_OK, ContextResult
+from app.services.context import POI_RADIUS_M, STATUS_OK, ContextResult, pending_address
 from app.services.features import FeatureInput, build_features
 from app.services.report import (
     ActionSuggestion,
@@ -957,6 +957,8 @@ class CoreService:
             else before.get("corrected_location"),
         }
         capture.quality = {**(capture.quality or {}), "human_review": human_review}
+        if payload.corrected_location:
+            capture.quality = pending_address(capture.quality)
         await self.decisions.add_audit(
             operation="capture_review_state",
             entity_type="capture",

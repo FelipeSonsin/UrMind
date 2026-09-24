@@ -23,7 +23,12 @@ from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 from app.config import Settings
 from app.schemas.core import PhotoGatePolicy
 from app.services.exif import read_exif_location
-from app.services.photo_reference import ReferenceUnavailable, detect_faces, scene_similarity
+from app.services.photo_reference import (
+    ReferenceUnavailable,
+    calibrated_policy,
+    detect_faces,
+    scene_similarity,
+)
 
 BUCKET = "captures"
 MAX_BYTES = 10 * 1024 * 1024
@@ -226,6 +231,11 @@ def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None)
         if old:
             result["warnings"].append("old_exif_date_unverified")
     with Image.open(io.BytesIO(data)) as source:
+        calibration = calibrated_policy(policy)
+        if calibration is None:
+            result["face_status"] = "UNCALIBRATED"
+            result["scene_status"] = "UNCALIBRATED"
+            return replace(image, photo_quality=result, phash=phash)
         try:
             faces = detect_faces(source)
         except ReferenceUnavailable as exc:
@@ -249,8 +259,8 @@ def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None)
             result["scene_unavailable_reason"] = str(exc)
         else:
             result["scene"] = scene
-            result["scene_status"] = "CHECKED" if scene["calibrated"] else "UNCALIBRATED"
-            if scene["calibrated"]:
+            result["scene_status"] = "CALIBRATED"
+            if calibration:
                 if scene["margin"] < policy.scene_reject_margin:
                     result["status"] = "REJECTED"
                     result["reasons"].append("non_urban_scene")
@@ -263,10 +273,11 @@ def validate_report_photo(data: bytes, *, policy: PhotoGatePolicy | None = None)
                     and "privacy_review_required" not in result["warnings"]
                 ):
                     result["status"] = "ACCEPTED"
+            result["calibration_audit_id"] = calibration["activation_audit_id"]
     return replace(image, photo_quality=result, phash=phash)
 
 
-def sanitize_public_image(data: bytes) -> ValidatedImage:
+def sanitize_public_image(data: bytes, *, policy: PhotoGatePolicy | None = None) -> ValidatedImage:
     """Create a metadata-free derivative; never mutate original evidence.
 
     Preserve raster coordinates so existing normalized boxes remain valid.
@@ -279,21 +290,14 @@ def sanitize_public_image(data: bytes) -> ValidatedImage:
         converted = source.convert("RGBA")
         clean.paste(converted, mask=converted.getchannel("A"))
         try:
+            if calibrated_policy(policy or PhotoGatePolicy()) is None:
+                raise ReferenceUnavailable("UNCALIBRATED")
             faces = detect_faces(clean)
         except ReferenceUnavailable as exc:
             # Original publication gate always requires human privacy review.
             # Never claim automatic redaction when its artifact is unavailable.
             faces = {"status": "NOT_VERIFIED", "reason": str(exc), "boxes": []}
-        for left, top, right, bottom in faces["boxes"]:
-            margin_x, margin_y = (right - left) * 0.2, (bottom - top) * 0.2
-            box = (
-                int(max(0, left - margin_x) * clean.width),
-                int(max(0, top - margin_y) * clean.height),
-                int(min(1, right + margin_x) * clean.width),
-                int(min(1, bottom + margin_y) * clean.height),
-            )
-            region = clean.crop(box)
-            clean.paste(region.filter(ImageFilter.GaussianBlur(max(12, min(region.size) / 5))), box)
+        blur_faces(clean, faces["boxes"])
         output = io.BytesIO()
         clean.save(output, format="JPEG", quality=90)
     return replace(
@@ -305,6 +309,20 @@ def sanitize_public_image(data: bytes) -> ValidatedImage:
             "human_attestation_required": True,
         },
     )
+
+
+def blur_faces(clean: Image.Image, boxes: list[list[float]]) -> None:
+    """Shared redaction primitive for publication and external calibration inspection."""
+    for left, top, right, bottom in boxes:
+        margin_x, margin_y = (right - left) * 0.2, (bottom - top) * 0.2
+        box = (
+            int(max(0, left - margin_x) * clean.width),
+            int(max(0, top - margin_y) * clean.height),
+            int(min(1, right + margin_x) * clean.width),
+            int(min(1, bottom + margin_y) * clean.height),
+        )
+        region = clean.crop(box)
+        clean.paste(region.filter(ImageFilter.GaussianBlur(max(12, min(region.size) / 5))), box)
 
 
 def object_path(

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import hashlib
+import io
+import json
 import uuid
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -11,7 +14,7 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache, partial
 from threading import BoundedSemaphore
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import structlog
 from fastapi import (
@@ -25,6 +28,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from fastapi.responses import StreamingResponse
 
 from app.auth import CurrentUser, require_user
 from app.config import get_settings
@@ -50,7 +54,8 @@ from app.schemas.core import (
     UrmindClass,
     decode_page_cursor,
 )
-from app.services.context import NominatimReverse
+from app.schemas.issue_taxonomy import get_issue
+from app.services.context import NominatimReverse, pending_address
 from app.services.core import CoreService, DuplicateKeyError, EventNotFoundError
 from app.services.external_sources.http import ExternalHttpClient
 from app.services.photo_ingest import ingest_photo
@@ -147,11 +152,14 @@ async def get_photo_gate_policy(service: Core) -> PhotoGatePolicy:
     return await service.decisions.photo_gate_policy()
 
 
-async def get_address_provider() -> AsyncIterator[NominatimReverse]:
+async def get_address_provider(request: Request) -> AsyncIterator[NominatimReverse]:
+    database = getattr(request.app.state, "database", None)
+    if database is None:
+        raise HTTPException(status_code=503, detail="Banco do runtime não configurado")
     async with ExternalHttpClient(
         user_agent=get_settings().external_http_user_agent, timeout_seconds=3, max_attempts=1
     ) as client:
-        yield NominatimReverse(client)
+        yield NominatimReverse(client, sessions=database.sessionmaker)
 
 
 @router.get("/ops/photo-gate", response_model=PhotoGatePolicy)
@@ -203,6 +211,18 @@ async def ops_metrics(user: CurrentUser, inference: Inference) -> dict[str, Any]
     return await inference.stats()
 
 
+@router.get("/ops/integrations")
+async def integration_health(
+    user: CurrentUser, service: Core, response: Response
+) -> list[dict[str, Any]]:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Saúde das integrações exige papel interno")
+    if service.decisions is None:
+        raise HTTPException(status_code=503, detail="Observações indisponíveis")
+    response.headers["Cache-Control"] = "private, no-store"
+    return await service.decisions.observed_integrations()
+
+
 @router.get("/ops/models")
 async def operational_models(
     user: CurrentUser, service: Core, response: Response
@@ -217,14 +237,17 @@ async def operational_models(
 
 @router.get("/ops/reports")
 async def operational_reports(
-    user: CurrentUser, service: Core, response: Response
+    user: CurrentUser,
+    service: Core,
+    response: Response,
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
 ) -> dict[str, Any]:
     if not user.can_review:
         raise HTTPException(status_code=403, detail="Indicadores exigem papel interno")
     if service.decisions is None:
         raise HTTPException(status_code=503, detail="Indicadores indisponíveis")
     response.headers["Cache-Control"] = "private, no-store"
-    return await service.decisions.report_totals()
+    return await service.decisions.report_totals(days)
 
 
 @router.get("/ops/ground-truth")
@@ -336,13 +359,99 @@ async def capture_markers(
     )
 
 
+@router.get("/captures/export")
+async def export_capture_markers(
+    user: CurrentUser,
+    service: Core,
+    format: Literal["csv", "geojson"] = "csv",
+    status: str = "",
+    family: str = "",
+    issue: str = "",
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> StreamingResponse:
+    if not user.can_review:
+        raise HTTPException(status_code=403, detail="Exportação exige papel interno")
+    if any(value is not None and value.tzinfo is None for value in (start, end)):
+        raise HTTPException(status_code=422, detail="Período exige fuso horário")
+    if start and end and start > end:
+        raise HTTPException(status_code=422, detail="Período inválido")
+    cutoff = min(end, datetime.now(UTC)) if end else datetime.now(UTC)
+
+    async def chunks():
+        cursor = None
+        first = True
+        yield (
+            "latitude,longitude,issue_code,status,date\r\n"
+            if format == "csv"
+            else '{"type":"FeatureCollection","features":['
+        )
+        while True:
+            batch = await service.capture_markers(user.id, True, limit=100, after=cursor)
+            if not batch:
+                break
+            for row in batch:
+                at = row["created_at"]
+                if isinstance(at, str):
+                    at = datetime.fromisoformat(at)
+                definition = get_issue(row.get("urmind_class") or "")
+                if (
+                    at > cutoff
+                    or (start and at < start)
+                    or (status and row["report_status"] != status)
+                    or (issue and row.get("urmind_class") != issue)
+                    or (family and (definition is None or definition.family.value != family))
+                    or row.get("latitude") is None
+                    or row.get("longitude") is None
+                ):
+                    continue
+                values = {
+                    "latitude": row["latitude"],
+                    "longitude": row["longitude"],
+                    "issue_code": row.get("urmind_class") or "",
+                    "status": row["report_status"],
+                    "date": at.isoformat(),
+                }
+                if format == "csv":
+                    buffer = io.StringIO()
+                    csv.writer(buffer).writerow(values.values())
+                    yield buffer.getvalue()
+                else:
+                    yield ("" if first else ",") + json.dumps(
+                        {
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [values.pop("longitude"), values.pop("latitude")],
+                            },
+                            "properties": values,
+                        }
+                    )
+                    first = False
+            last = batch[-1]
+            cursor = (last["created_at"], last["id"])
+            if len(batch) < 100:
+                break
+        if format == "geojson":
+            yield "]}"
+
+    return StreamingResponse(
+        chunks(),
+        media_type="text/csv" if format == "csv" else "application/geo+json",
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": f'attachment; filename="urmind-relatos.{format}"',
+        },
+    )
+
+
 @router.patch("/captures/{capture_id}/location")
 async def capture_location(
     capture_id: uuid.UUID, payload: Coordinate, user: CurrentUser, service: Core
 ) -> dict[str, Any]:
     if payload.latitude == 0 and payload.longitude == 0:
         raise HTTPException(status_code=422, detail="confirme uma localização válida")
-    capture = await service.captures.get(capture_id)
+    capture = await service.captures.get_for_review(capture_id)
     if capture is None or (capture.quality or {}).get("uploaded_by") != user.id:
         raise HTTPException(status_code=404, detail="Captura não encontrada")
     if not await service.captures.fill_missing_location(capture_id, user.id, payload):
@@ -358,6 +467,7 @@ async def capture_location(
         after={"source": "manual"},
         event_hash=f"location-{uuid.uuid4()}",
     )
+    capture.quality = pending_address(capture.quality or {})
     await service.captures.session.commit()
     return {"capture_id": capture_id, "location_source": "manual"}
 
@@ -644,6 +754,8 @@ async def upload_photo(
             "city": address.data.get("city"),
             "attribution": address.data.get("attribution"),
         }
+        if address.status != "ok":
+            ingest.capture.quality = pending_address(ingest.capture.quality)
     try:
         uploaded = await storage.upload(path, image)
     except StorageError as exc:
@@ -973,6 +1085,7 @@ async def publish_event(
     user: CurrentUser,
     service: Core,
     storage: Storage,
+    policy: Annotated[PhotoGatePolicy | None, Depends(get_photo_gate_policy)] = None,
 ) -> dict[str, Any]:
     """Explicit reviewed publication; originals and inference remain unchanged."""
     if not user.can_review:
@@ -1024,7 +1137,7 @@ async def publish_event(
             source_hash = hashlib.sha256(raw).hexdigest()
             if source_hash != expected_quality.get("sha256"):
                 raise HTTPException(status_code=409, detail="Checksum da evidência não confere")
-            image = await _decode_upload(raw, sanitize_public_image)
+            image = await _decode_upload(raw, partial(sanitize_public_image, policy=policy))
             path = f"public-derived/{event_id}/{uuid.uuid4().hex}.jpg"
             uploaded = await storage.upload(path, image)
             if not uploaded:

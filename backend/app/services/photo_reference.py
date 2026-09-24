@@ -18,6 +18,7 @@ from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[3]
 PLAN = ROOT / "datasets/metadata/acquisition_plan.json"
+CALIBRATION = ROOT / "datasets/metadata/photo_gate_calibration.json"
 SCENE_PROMPTS = {
     "positive": [
         "a photo of a public street",
@@ -43,6 +44,66 @@ SCENE_PROMPTS = {
 
 class ReferenceUnavailable(RuntimeError):
     pass
+
+
+def calibrated_policy(policy: Any) -> dict[str, Any] | None:
+    """Absent, stale, malformed or below-target evidence never activates references."""
+    try:
+        document = json.loads(CALIBRATION.read_text(encoding="utf-8"))
+        if not isinstance(document, dict):
+            return None
+        _, face = reference_artifact("yunet_face_privacy")
+        _, scene = reference_artifact("openclip_scene_reference")
+        manifest_path = ROOT / scene["derived_manifest"]
+        info = manifest_path.stat()
+        _verify_hash(
+            str(manifest_path), info.st_mtime_ns, info.st_size, scene["derived_manifest_sha256"]
+        )
+        export = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if (
+            document.get("scene_revision") != scene["revision"]
+            or document.get("face_revision") != face["revision"]
+        ):
+            return None
+        if not calibration_matches(
+            document, scene_sha=export["onnx_sha256"], face_sha=face["sha256"], policy=policy
+        ):
+            return None
+        return document
+    except (OSError, ValueError, TypeError, KeyError, ReferenceUnavailable):
+        return None
+
+
+def calibration_matches(
+    document: dict[str, Any], *, scene_sha: str, face_sha: str, policy: Any
+) -> bool:
+    import uuid
+
+    try:
+        if not isinstance(document.get("activation_audit_id"), str):
+            return False
+        uuid.UUID(document["activation_audit_id"])
+        metrics, counts = document["metrics"], document["counts"]
+        return bool(
+            document["schema"] == "urmind-photo-gate-calibration-v1"
+            and document["scene_sha256"] == scene_sha
+            and document["face_sha256"] == face_sha
+            and document["blur_reviewed"] is True
+            and counts["street_positive"] >= 20
+            and counts["scene_negative"] >= 20
+            and counts["face_large"] >= 5
+            and counts["face_small"] >= 5
+            and 0 <= metrics["false_rejection"] <= 0.05
+            and 0 <= metrics["false_acceptance"] <= 0.15
+            and metrics["face_large_recall"] == 1
+            and metrics["face_small_recall"] == 1
+            and 0 <= metrics["face_false_positive"] <= 0.05
+            and document["scene_reject_margin"] == policy.scene_reject_margin
+            and document["scene_accept_margin"] == policy.scene_accept_margin
+            and document["dominant_face_ratio"] == policy.dominant_face_ratio
+        )
+    except (ValueError, TypeError, KeyError):
+        return False
 
 
 def reference_artifact(identifier: str) -> tuple[Path, dict[str, Any]]:
@@ -192,7 +253,7 @@ def scene_similarity(image: Image.Image) -> dict[str, Any]:
         "positive_similarity": positive,
         "negative_similarity": negative,
         "margin": positive - negative,
-        "calibrated": manifest["calibrated"],
+        "calibrated": False,  # Export parity is not operational calibration.
         "sha256": manifest["onnx_sha256"],
         "revision": entry["revision"],
     }

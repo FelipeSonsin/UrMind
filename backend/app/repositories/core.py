@@ -153,6 +153,56 @@ class PublicImageQuota:
             raise QuotaExceededError("public image quota exhausted")
 
 
+class GeocodingRepository:
+    """Shared cache and one provider-wide lease, independent of Capture transactions."""
+
+    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+        self.sessions = sessions
+
+    async def cached(self, key: str) -> dict[str, Any] | None:
+        async with self.sessions() as session:
+            return await session.scalar(
+                text(
+                    "select payload from public.geocoding_cache where cache_key=:key and expires_at>clock_timestamp()"
+                ),
+                {"key": key},
+            )
+
+    async def reserve(self, token: uuid.UUID) -> bool:
+        async with self.sessions() as session:
+            reserved = await session.scalar(
+                text("""insert into public.geocoding_leases(provider,token,expires_at)
+                values ('nominatim',:token,clock_timestamp()+interval '30 seconds')
+                on conflict(provider) do update set token=excluded.token,expires_at=excluded.expires_at
+                where geocoding_leases.expires_at<=clock_timestamp() returning token"""),
+                {"token": token},
+            )
+            await session.commit()
+            return reserved == token
+
+    async def cache(self, key: str, payload: dict[str, Any]) -> None:
+        async with self.sessions() as session:
+            await session.execute(
+                text("delete from public.geocoding_cache where expires_at<=clock_timestamp()")
+            )
+            await session.execute(
+                text("""insert into public.geocoding_cache(cache_key,payload,expires_at)
+                values (:key,cast(:payload as jsonb),clock_timestamp()+interval '7 days')
+                on conflict(cache_key) do update set payload=excluded.payload,expires_at=excluded.expires_at"""),
+                {"key": key, "payload": json.dumps(payload)},
+            )
+            await session.commit()
+
+    async def release(self, token: uuid.UUID) -> None:
+        async with self.sessions() as session:
+            await session.execute(
+                text("""update public.geocoding_leases set expires_at=clock_timestamp()+interval '1 second'
+                where provider='nominatim' and token=:token"""),
+                {"token": token},
+            )
+            await session.commit()
+
+
 class CaptureRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -321,6 +371,40 @@ class CaptureRepository:
                 point=_point(coordinate), source_location="manual", accuracy_m=coordinate.accuracy_m
             )
             .returning(Capture.id)
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def reserve_pending_address(self) -> dict[str, Any] | None:
+        row = (
+            (
+                await self.session.execute(
+                    text("""with candidate as (
+            select id from public.captures where source in ('pwa_photo','exif_upload')
+            and (point is not null or jsonb_typeof(quality->'human_review'->'corrected_location')='object')
+            and quality->'address'->>'status'='address_pending'
+            and coalesce((quality->'address'->>'retry_at')::timestamptz,'-infinity')<=clock_timestamp()
+            order by created_at,id for update skip locked limit 1
+        ) update public.captures c set quality=jsonb_set(c.quality,'{address,retry_at}',
+            to_jsonb(clock_timestamp()+interval '30 seconds'),true)
+          from candidate where c.id=candidate.id returning c.id,c.quality->'address'->>'request_id' request_id,
+            coalesce((c.quality->'human_review'->'corrected_location'->>'latitude')::float,ST_Y(c.point::geometry)) latitude,
+            coalesce((c.quality->'human_review'->'corrected_location'->>'longitude')::float,ST_X(c.point::geometry)) longitude,
+            c.captured_at""")
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    async def save_address(
+        self, identifier: uuid.UUID, request_id: str, address: dict[str, Any]
+    ) -> bool:
+        # A reviewer may change the point while HTTP is pending. Do not publish the stale address.
+        result = await self.session.execute(
+            text("""update public.captures set quality=jsonb_set(quality,'{address}',cast(:address as jsonb))
+            where id=:id and quality->'address'->>'request_id'=:request_id returning id"""),
+            {"id": identifier, "request_id": request_id, "address": json.dumps(address)},
         )
         return result.scalar_one_or_none() is not None
 
@@ -944,7 +1028,9 @@ class DecisionRepository:
             for model in result.scalars()
         ]
 
-    async def report_totals(self) -> dict[str, Any]:
+    async def report_totals(self, days: int = 30) -> dict[str, Any]:
+        if not 1 <= days <= 365:
+            raise ValueError("period must be 1..365 days")
         result = await self.session.execute(
             text(f"""select
             count(*) filter(where created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') as today,
@@ -960,11 +1046,59 @@ class DecisionRepository:
             text("""select reason, count(*) as total
             from public.audit_log a cross join lateral
                 jsonb_array_elements_text(a.after_data->'reasons') as reason
-            where operation='photo_gate_rejected' group by reason order by reason""")
+            where operation='photo_gate_rejected'
+              and created_at >= now()-make_interval(days=>:days)
+            group by reason order by reason"""),
+            {"days": days},
         )
         totals["rejected_by_reason"] = {row.reason: row.total for row in rejected}
         totals["day_timezone"] = "UTC"
+        counts = await self.session.execute(
+            text("""with rejected as (
+            select actor,created_at from public.audit_log
+            where operation='photo_gate_rejected' and created_at>=now()-make_interval(days=>:days)
+        ) select
+          (select count(*) from rejected) rejected,
+          (select count(*) from public.captures where source in ('pwa_photo','exif_upload')
+             and created_at>=now()-make_interval(days=>:days)) accepted,
+          (select count(*) from rejected r where exists(select 1 from public.captures c
+            where c.quality->>'uploaded_by'=r.actor and c.created_at>r.created_at
+              and c.created_at<=r.created_at+interval '24 hours'
+              and c.quality->'human_review'->>'status'='confirmed')) retry_confirmed
+        """),
+            {"days": days},
+        )
+        sample = dict(counts.mappings().one())
+        denominator = sample["rejected"] + sample["accepted"]
+        totals["gate_metrics"] = {
+            "days": days,
+            **sample,
+            "rates_by_reason": {
+                key: value / denominator if denominator else None
+                for key, value in totals["rejected_by_reason"].items()
+            },
+            "false_rejection_estimate": sample["retry_confirmed"] / sample["rejected"]
+            if sample["rejected"]
+            else None,
+            "estimate_method": "same_owner_accepted_within_24h_then_human_confirmed; not_same_photo_proof",
+        }
         return totals
+
+    async def observed_integrations(self) -> list[dict[str, Any]]:
+        rows = await self.session.execute(
+            text("""with observations as (
+            select after_data->>'name' name, after_data,created_at,id,
+            max(created_at) filter(where after_data->>'status' in ('OK','OK_PROVIDER','OK_PUBLIC','AVAILABLE'))
+                over(partition by after_data->>'name') last_success,
+            max(created_at) filter(where after_data->>'status'='UNAVAILABLE')
+                over(partition by after_data->>'name') last_failure
+            from public.audit_log where operation='integration_health_check'
+        ) select distinct on(name) name,after_data->>'status' status,
+            after_data->>'detail' detail,after_data->'latency_ms' latency_ms,
+            after_data->>'checked_at' checked_at,last_success,last_failure
+            from observations order by name,created_at desc,id desc""")
+        )
+        return [dict(row) for row in rows.mappings()]
 
     async def audit_page(
         self, *, operation: str | None, limit: int, after: tuple[datetime, uuid.UUID] | None = None

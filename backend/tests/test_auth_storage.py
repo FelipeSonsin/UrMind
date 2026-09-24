@@ -234,6 +234,7 @@ def test_photo_gate_uses_configured_resolution_and_reports_effective_threshold()
         "operational_audit",
         "read_photo_gate",
         "operational_reports",
+        "integration_health",
         "operational_ground_truth",
     ],
 )
@@ -250,6 +251,47 @@ async def test_operational_reads_deny_customer_before_repository_access(endpoint
             response=Response(),
         )
     assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_capture_export_streams_1200_keyset_rows_without_private_fields():
+    from datetime import UTC, datetime, timedelta
+    from uuid import UUID
+
+    from app.api.v1.core import export_capture_markers
+    from app.auth import AuthenticatedUser
+
+    now = datetime.now(UTC) - timedelta(minutes=1)
+    records = [
+        {
+            "id": UUID(int=1200 - index),
+            "created_at": now - timedelta(seconds=index),
+            "latitude": -23.5,
+            "longitude": -46.6,
+            "report_status": "received",
+            "urmind_class": None,
+            "user_description": "PRIVATE",
+            "uploaded_by": "PRIVATE",
+            "storage_path": "PRIVATE",
+        }
+        for index in range(1200)
+    ]
+
+    async def page(actor, reviewer, limit, after):
+        eligible = [
+            row for row in records if after is None or (row["created_at"], row["id"]) < after
+        ]
+        assert limit == 100 and reviewer
+        return eligible[:limit]
+
+    response = await export_capture_markers(
+        AuthenticatedUser("reviewer", None, "authenticated", "reviewer"),
+        SimpleNamespace(capture_markers=page),
+    )
+    chunks = [chunk async for chunk in response.body_iterator]
+    assert len(chunks) == 1201
+    assert len(set(chunks[1:])) == 1200
+    assert "PRIVATE" not in "".join(chunks)
 
 
 def _token(key=KEY, **overrides) -> str:
@@ -672,7 +714,7 @@ async def test_capture_manual_location_is_owner_only_and_never_overwrites():
     from app.schemas.core import Coordinate
 
     repository = SimpleNamespace(
-        get=AsyncMock(return_value=SimpleNamespace(quality={"uploaded_by": "A"})),
+        get_for_review=AsyncMock(return_value=SimpleNamespace(quality={"uploaded_by": "A"})),
         fill_missing_location=AsyncMock(return_value=False),
     )
     service = SimpleNamespace(captures=repository)
@@ -1448,8 +1490,8 @@ def test_report_photo_gate_accepts_texture_but_never_claims_urban_scene_or_probl
     image = validate_report_photo(buffer.getvalue())
     assert image.photo_quality["status"] == "NEEDS_REVIEW"
     assert image.photo_quality["technical_status"] == "ACCEPTED"
-    assert image.photo_quality["scene_status"] == "NOT_VERIFIED"
-    assert image.photo_quality["face_status"] == "NOT_VERIFIED"
+    assert image.photo_quality["scene_status"] == "UNCALIBRATED"
+    assert image.photo_quality["face_status"] == "UNCALIBRATED"
 
 
 def test_report_phash_identifies_reencoding_but_not_unrelated_image():
@@ -1525,6 +1567,10 @@ async def test_perceptual_duplicate_rejected_before_storage_with_private_audit()
 def test_face_privacy_gate_and_public_blur(monkeypatch, area, rejected):
     from app.services import storage
 
+    monkeypatch.setattr(
+        storage, "calibrated_policy", lambda _policy: {"activation_audit_id": "fake-unit-audit"}
+    )
+
     # Controlled detector boundary verifies decision/redaction, not face recall.
     monkeypatch.setattr(
         storage,
@@ -1566,6 +1612,12 @@ def test_face_privacy_gate_and_public_blur(monkeypatch, area, rejected):
 )
 def test_scene_margin_contract_never_claims_calibration(monkeypatch, margin, calibrated, status):
     from app.services import storage
+
+    monkeypatch.setattr(
+        storage,
+        "calibrated_policy",
+        lambda _policy: {"activation_audit_id": "fake-unit-audit"} if calibrated else None,
+    )
 
     monkeypatch.setattr(
         storage,

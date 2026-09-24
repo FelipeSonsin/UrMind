@@ -30,6 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+fair = ["qrcode[pil]==8.2"]
 photo-reference-export = [
   # Export only of explicitly registered reference models; no training.
   "open_clip_torch==3.3.0",

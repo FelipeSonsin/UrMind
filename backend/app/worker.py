@@ -33,8 +33,9 @@ from app.repositories.core import (
 )
 from app.schemas.core import BoundingBox, CaptureProcessingStatus, UrmindClass
 from app.schemas.issue_taxonomy import model_may_emit
-from app.services.context import gather_context
+from app.services.context import NominatimReverse, gather_context
 from app.services.core import CoreService
+from app.services.external_sources.http import ExternalHttpClient
 from app.services.external_sources.sidra import municipal_population_query
 from app.services.storage import StorageClient, StorageError
 
@@ -64,6 +65,35 @@ class Worker:
         self._detector: OnnxDetector | None = None
         self._detector_version: uuid.UUID | None = None
         self._score_threshold: float | None = None
+
+    async def process_pending_address(self) -> bool:
+        """Retry explicit mobile address requests, independently of detector availability."""
+        async with self.database.sessionmaker() as session:
+            job = await CaptureRepository(session).reserve_pending_address()
+            await session.commit()
+        if job is None:
+            return False
+        async with ExternalHttpClient(
+            user_agent=get_settings().external_http_user_agent, timeout_seconds=3, max_attempts=1
+        ) as client:
+            result = await NominatimReverse(client, sessions=self.database.sessionmaker).fetch(
+                job["latitude"], job["longitude"], job["captured_at"]
+            )
+        if result.status == "ok":
+            address = {
+                "status": result.status,
+                "source": result.source,
+                "fetched_at": result.fetched_at,
+                "provenance": result.provenance,
+                **{
+                    name: result.data.get(name)
+                    for name in ("road", "suburb", "city", "attribution")
+                },
+            }
+            async with self.database.sessionmaker() as session:
+                await CaptureRepository(session).save_address(job["id"], job["request_id"], address)
+                await session.commit()
+        return True
 
     def _detector_for(self, model) -> OnnxDetector:
         if self._detector is None or self._detector_version != model.id:
@@ -379,6 +409,7 @@ class Worker:
                         include_sidra=True,
                         sidra_query=sidra_query,
                         include_administrative=True,
+                        sessions=self.database.sessionmaker,
                     )
             except Exception as exc:  # noqa: BLE001 — falha externa não apaga o Event
                 bound.warning(
@@ -443,6 +474,7 @@ async def run(once: bool) -> int:
     try:
         while True:
             try:
+                await worker.process_pending_address()
                 processed = await worker.process_one()
             except Exception as exc:
                 log.error("worker_iteration_failed", error=type(exc).__name__)

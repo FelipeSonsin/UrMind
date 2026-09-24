@@ -13,9 +13,11 @@ do evento nunca é substituída por ele.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import math
 import re
 import time
+import uuid
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -24,8 +26,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
 import structlog
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import get_settings
+from app.repositories.core import GeocodingRepository
 from app.services.external_sources.http import ExternalHttpClient
 
 if TYPE_CHECKING:
@@ -83,6 +88,23 @@ class TTLCache:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def pending_address(quality: dict[str, Any]) -> dict[str, Any]:
+    """Keep the previous address as history, never display it at a new point."""
+    history = list(quality.get("address_history") or [])
+    previous = quality.get("address")
+    if previous and previous.get("status") == STATUS_OK:
+        history.append(previous)
+    return {
+        **quality,
+        "address_history": history,
+        "address": {
+            "status": "address_pending",
+            "requested_at": _now(),
+            "request_id": str(uuid.uuid4()),
+        },
+    }
 
 
 def _distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -191,10 +213,56 @@ class NominatimReverse(ContextProvider):
         client: httpx.AsyncClient | ExternalHttpClient,
         *,
         base_url: str | None = None,
+        sessions: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         super().__init__(client)
         base = (base_url or get_settings().nominatim_base_url).rstrip("/")
         self.url = base if base.endswith("/reverse") else f"{base}/reverse"
+        self.sessions = sessions
+
+    async def fetch(
+        self, latitude: float, longitude: float, occurred_at: datetime
+    ) -> ContextResult:
+        if self.sessions is None:
+            return await super().fetch(latitude, longitude, occurred_at)
+        key = hashlib.sha256(
+            repr(self.cache_key(latitude, longitude, occurred_at)).encode()
+        ).hexdigest()
+        token = uuid.uuid4()
+        repository = GeocodingRepository(self.sessions)
+        try:
+            payload = await repository.cached(key)
+            if payload:
+                return ContextResult(
+                    **{**payload, "provenance": {**payload["provenance"], "cache": "shared_hit"}}
+                )
+            if not await repository.reserve(token):
+                return ContextResult(
+                    self.source,
+                    STATUS_UNAVAILABLE,
+                    _now(),
+                    {"provider": self.source},
+                    error="address_pending",
+                )
+            try:
+                # No retries inside the lease: each network attempt needs its own slot.
+                async with asyncio.timeout(10):
+                    result = await super().fetch(latitude, longitude, occurred_at)
+                if result.status == STATUS_OK:
+                    payload = {"source": result.source, **result.as_payload()}
+                    await repository.cache(key, payload)
+                return result
+            finally:
+                await repository.release(token)
+        except (SQLAlchemyError, TimeoutError):
+            # Coordination unavailable must never fall back to unthrottled network access.
+            return ContextResult(
+                self.source,
+                STATUS_UNAVAILABLE,
+                _now(),
+                {"provider": self.source},
+                error="address_pending",
+            )
 
     @classmethod
     def _lock(cls) -> asyncio.Lock:
@@ -220,6 +288,7 @@ class NominatimReverse(ContextProvider):
                     "addressdetails": 1,
                 },
                 headers={"Accept-Language": "pt-BR"},
+                attempts=1,
             )
         if "error" in body:
             raise ValueError("nominatim sem resultado")
@@ -593,6 +662,7 @@ async def gather_context(
     include_sidra: bool = False,
     sidra_query: SidraQuery | None = None,
     include_administrative: bool = False,
+    sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> list[ContextResult]:
     """Consulta todos os providers; cada um falha isoladamente."""
     owned = client is None
@@ -609,7 +679,12 @@ async def gather_context(
         )
     try:
         calls: list[Awaitable[ContextResult]] = [
-            factory(http).fetch(latitude, longitude, occurred_at) for factory in providers
+            (
+                NominatimReverse(http, sessions=sessions)
+                if factory is NominatimReverse
+                else factory(http)
+            ).fetch(latitude, longitude, occurred_at)
+            for factory in providers
         ]
         if include_sidra:
             from app.services.external_sources.sidra import IbgeSidraProvider

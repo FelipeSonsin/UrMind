@@ -57,7 +57,7 @@ class IbgeSidraProvider:
         self.client = client
         self.base_url = base_url.rstrip("/")
 
-    async def fetch(self, query: SidraQuery | None) -> ContextResult:
+    async def fetch(self, query: SidraQuery | None, *, use_cache: bool = True) -> ContextResult:
         fetched_at = datetime.now(UTC).isoformat()
         if query is None:
             return ContextResult(
@@ -72,7 +72,7 @@ class IbgeSidraProvider:
                 error="territory_required",
             )
         cache_key = (self.base_url, query)
-        cached = self.cache.get(cache_key)
+        cached = self.cache.get(cache_key) if use_cache else None
         if cached is not None:
             return ContextResult(
                 source=cached.source,
@@ -137,5 +137,6 @@ class IbgeSidraProvider:
             provenance=provenance,
             data={"columns": columns, "records": records},
         )
-        self.cache.put(cache_key, result)
+        if use_cache:
+            self.cache.put(cache_key, result)
         return result

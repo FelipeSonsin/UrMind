@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 
@@ -62,16 +64,17 @@ async def test_live_checks_use_only_small_requests_and_skip_optional_auth() -> N
         "ViaCEP",
     }
     assert all(
-        by_name[name].status == "UNKNOWN"
+        by_name[name].status == "UNAVAILABLE"
         for name in (
             "Supabase",
-            "Nominatim",
             "Open-Meteo",
             "GeoSampa",
             "BrasilAPI",
             "ViaCEP",
         )
     )
+    assert by_name["Nominatim"].status == "DEGRADED"
+    assert not any(request.url.host == "nominatim.openstreetmap.org" for request in requests)
     assert all(request.method in {"GET", "POST"} for request in requests)
     sidra_request = next(request for request in requests if request.url.host == "sidra.example")
     assert "/n6/3550308/" in str(sidra_request.url)
@@ -111,3 +114,36 @@ async def test_carto_live_check_does_not_claim_to_know_frontend_configuration() 
     assert carto.status == "FRONTEND_CONFIG_UNKNOWN"
     assert carto.detail == "frontend configuration is not observable from backend"
     assert seen_carto == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["502", "timeout"])
+async def test_runtime_health_degrades_without_inventing_success(failure):
+    def handler(request):
+        if failure == "timeout":
+            raise httpx.ReadTimeout("isolated timeout", request=request)
+        return httpx.Response(502)
+
+    lease = AsyncMock()
+    lease.reserve.return_value = True
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as raw:
+        results = await run_live_checks(
+            Settings(SUPABASE_URL="https://fixture.supabase.co"),
+            client=ExternalHttpClient(client=raw, max_attempts=1, backoff_seconds=0),
+            geocoding=lease,
+        )
+    by_name = {row.name: row for row in results}
+    for name in (
+        "Supabase",
+        "Nominatim",
+        "Open-Meteo",
+        "GeoSampa",
+        "BrasilAPI",
+        "ViaCEP",
+        "Overpass",
+        "IBGE SIDRA",
+        "OpenFreeMap",
+    ):
+        assert by_name[name].status == "UNAVAILABLE"
+    lease.release.assert_awaited_once()
+    assert len(by_name) == 20
