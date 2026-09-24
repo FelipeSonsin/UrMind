@@ -9,7 +9,7 @@ import {
   severityOf,
   type MapFilters,
 } from '../domain/public';
-import { resolveMapProvider } from '../mapConfig';
+import { BRAZIL_MAP_BOUNDS, isInBrazilMapViewport, resolveMapProvider } from '../mapConfig';
 import { reportLabels, type CaptureMarker } from '../domain/contracts';
 import { api } from '../services/api';
 
@@ -196,12 +196,26 @@ export default function UrbanMap({
     let map: maplibregl.Map | undefined;
     try {
       delete container.current.dataset.renderedEventIds;
-      const located = events.filter((e) => e.latitude != null && e.longitude != null);
+      const located = events.filter(
+        (e) =>
+          e.latitude != null &&
+          e.longitude != null &&
+          isInBrazilMapViewport(e.latitude, e.longitude),
+      );
+      const shownCenter =
+        initialCenter && isInBrazilMapViewport(initialCenter.latitude, initialCenter.longitude)
+          ? initialCenter
+          : null;
       map = new maplibregl.Map({
         container: container.current,
         style,
-        center: initialCenter ? [initialCenter.longitude, initialCenter.latitude] : [0, 0],
-        zoom: initialCenter ? 15 : 1,
+        center: shownCenter ? [shownCenter.longitude, shownCenter.latitude] : [-51, -14],
+        zoom: shownCenter ? 15 : 3.5,
+        maxBounds: [
+          [BRAZIL_MAP_BOUNDS[0], BRAZIL_MAP_BOUNDS[1]],
+          [BRAZIL_MAP_BOUNDS[2], BRAZIL_MAP_BOUNDS[3]],
+        ],
+        renderWorldCopies: false,
       });
       mapRef.current = map;
       setActiveProviderName(primaryProvider.name);
@@ -396,7 +410,12 @@ export default function UrbanMap({
     ]);
   }, [selectedId]);
 
-  const located = events.filter((event) => event.latitude != null && event.longitude != null);
+  const located = events.filter(
+    (event) =>
+      event.latitude != null &&
+      event.longitude != null &&
+      isInBrazilMapViewport(event.latitude, event.longitude),
+  );
   return (
     <section className="panel map-panel">
       {!onPickLocation && (

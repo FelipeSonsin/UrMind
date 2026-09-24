@@ -1,5 +1,30 @@
 # Estado operacional do UrMind
 
+## Mobile Brasil/GPS — 24/09/2026, recorte em implementação
+
+O mapa operacional agora inicia no enquadramento brasileiro, restringe a navegação
+e não mostra pontos fora **desse viewport**. Isso ainda não é uma validação
+territorial por polígono: um ponto de país vizinho dentro do retângulo pode
+continuar entrando. A malha oficial do IBGE deve ser instalada e a admissão de
+novas Captures deve ser testada no backend antes de afirmar `BRAZIL_ONLY=YES`.
+Nenhum dado histórico ou científico de fora do Brasil foi descartado.
+
+A câmera continua solicitando GPS automaticamente. Foto da galeria conserva a
+leitura EXIF; a posição atual do telefone só é usada depois de confirmação
+explícita do usuário. Correção manual confirmada pode superar EXIF sem apagar
+a coordenada EXIF original da provenance. A navegação pública principal tem
+Início, Registrar, Meus relatos e Mapa; rotas técnicas anteriores permanecem
+acessíveis por URL, e a área interna preserva seus controles de papel.
+
+Verificação desta mudança: backend `1304 passed / 34 skipped`; Vitest `49 passed`;
+Playwright `132 passed / 2 skipped`; Ruff, mypy, TypeScript/build, Prettier e
+`git diff --check` passaram. O E2E físico continua entre os dois skips.
+`live-check` observou HTTP 200 de Supabase Auth health, Overpass, Open-Meteo,
+GeoSampa, BrasilAPI, ViaCEP, OpenFreeMap e SIDRA; Nominatim não foi sondado
+porque o lease global estava ocupado. Isso não prova falha de chave ou do provedor.
+Não foi executado treinamento nem alterado `.env`/Frozen Test. Pré-treino segue
+bloqueado por revisão/holdout científico e Ground Truth insuficiente.
+
 ## Continuação vigente — 24/09/2026, fechamento em verificação
 
 IMPLEMENTATION_STATUS=PARTIAL. Head DEV único `0029_geocoding_coordination`, com

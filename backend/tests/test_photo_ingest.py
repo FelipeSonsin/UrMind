@@ -89,6 +89,27 @@ def test_exif_tem_prioridade_sobre_fallback_manual():
     assert anterior["longitude"] == pytest.approx(PAULISTA_LON, abs=1e-6)
 
 
+def test_correcao_manual_explicita_supera_exif_sem_apagar_provenance():
+    marcado = Coordinate(latitude=-23.5000, longitude=-46.6000, accuracy_m=None)
+
+    result = ingest(
+        build_jpeg(gps=gps_block()),
+        manual_coordinate=marcado,
+        manual_location_source=LocationSource.MANUAL,
+        manual_overrides_exif=True,
+    )
+
+    assert result.capture.coordinate == marcado
+    assert result.capture.source_location is LocationSource.MANUAL
+    assert result.capture.quality["exif_coordinate"]["latitude"] == pytest.approx(PAULISTA_LAT)
+    assert result.capture.quality["manual_overrides_exif"] is True
+
+
+def test_correcao_exif_sem_ponto_manual_confirmado_falha_fechado():
+    with pytest.raises(ValueError, match="ponto manual confirmado"):
+        ingest(build_jpeg(gps=gps_block()), manual_overrides_exif=True)
+
+
 def test_arquivo_ilegivel_nao_impede_a_captura_mas_exige_marcacao():
     result = ingest(b"nao e imagem")
 

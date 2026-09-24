@@ -34,6 +34,26 @@ test.beforeEach(async ({ page }) => {
   await stubPublicApi(page, { events: [], detail: null });
 });
 
+test('gallery uses current GPS only after confirmation', async ({ page }) => {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: -23.55, longitude: -46.63, accuracy: 12 });
+  await page.goto('/#/registrar');
+  await page.getByLabel('Escolher foto').setInputFiles({
+    name: 'report.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
+  });
+  const useCurrent = page.getByRole('button', { name: 'Usar GPS atual para esta foto' });
+  await expect(useCurrent).toBeVisible();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await useCurrent.click();
+  await expect(page.getByText(/Origem:.*GPS do dispositivo/)).toHaveCount(0);
+  page.once('dialog', (dialog) => dialog.accept());
+  await useCurrent.click();
+  await expect(page.getByText(/GPS do dispositivo/)).toBeVisible();
+  await expect(page.getByText(/12\.0 m/)).toBeVisible();
+});
+
 test('captura respeita tema do dispositivo e alvos de toque em 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -597,10 +617,13 @@ test('separa o centro público da operação e navega entre os dois', async ({ p
     page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
-  await page.getByRole('link', { name: 'Revisão', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Navegação principal' })).not.toContainText(
+    'Revisão',
+  );
+  await page.goto('/#/review');
   // Sem sessão, a revisão pede login em vez de mostrar números.
   await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
-  await page.getByRole('link', { name: 'Transparência' }).click();
+  await page.goto('/#/transparency');
   await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

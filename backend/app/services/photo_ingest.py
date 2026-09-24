@@ -67,6 +67,7 @@ def ingest_photo(
     received_at: datetime,
     manual_coordinate: Coordinate | None = None,
     manual_location_source: LocationSource = LocationSource.MANUAL,
+    manual_overrides_exif: bool = False,
     client_captured_at: datetime | None = None,
     storage_path: str | None = None,
     source: CaptureSource = CaptureSource.EXIF_UPLOAD,
@@ -76,8 +77,9 @@ def ingest_photo(
     """Monta o `CaptureCreate` de uma foto já existente.
 
     `manual_coordinate` é o ponto que o usuário marcou no mapa. Quando ele vem
-    junto de um EXIF válido, o EXIF vence. GPS do dispositivo tem prioridade
-    sobre ambos. Todos são claims, não precisão metrológica comprovada.
+    junto de um EXIF válido, o EXIF vence, salvo correção manual explícita.
+    GPS do dispositivo tem prioridade sobre ambos. Todos são claims, não
+    precisão metrológica comprovada.
 
     EXIF sem offset não prova um instante: o fuso atual do telefone que envia
     uma foto importada não é evidência do fuso no momento da captura.
@@ -94,7 +96,13 @@ def ingest_photo(
 
     if manual_location_source not in (LocationSource.MANUAL, LocationSource.GPS_DEVICE):
         raise ValueError("coordenada informada só pode ser manual ou GPS do dispositivo")
-    coordinate, location_source = _resolve_location(exif, manual_coordinate, manual_location_source)
+    if manual_overrides_exif and (
+        manual_coordinate is None or manual_location_source is not LocationSource.MANUAL
+    ):
+        raise ValueError("correcao EXIF exige ponto manual confirmado")
+    coordinate, location_source = _resolve_location(
+        exif, manual_coordinate, manual_location_source, manual_overrides_exif
+    )
 
     quality: dict[str, object] = {
         "exif_status": exif.status.value,
@@ -134,6 +142,8 @@ def ingest_photo(
     if manual_coordinate is not None:
         quality["submitted_coordinate"] = manual_coordinate.model_dump()
         quality["submitted_location_source"] = manual_location_source.value
+    if manual_overrides_exif:
+        quality["manual_overrides_exif"] = True
 
     capture = CaptureCreate(
         capture_key=capture_key,
@@ -156,9 +166,12 @@ def _resolve_location(
     exif: ExifLocation,
     manual_coordinate: Coordinate | None,
     manual_location_source: LocationSource = LocationSource.MANUAL,
+    manual_overrides_exif: bool = False,
 ) -> tuple[Coordinate | None, LocationSource]:
     if manual_coordinate is not None and manual_location_source is LocationSource.GPS_DEVICE:
         return manual_coordinate, manual_location_source
+    if manual_overrides_exif and manual_coordinate is not None:
+        return manual_coordinate, LocationSource.MANUAL
     if exif.usable and exif.coordinate is not None:
         return exif.coordinate, LocationSource.EXIF
     if manual_coordinate is not None:

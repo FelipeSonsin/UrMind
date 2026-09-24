@@ -9,6 +9,15 @@ export interface MapProvider {
   attribution: string;
 }
 
+// Presentation viewport only. Admission of a new report must use the
+// authoritative country geometry in the backend, not this rectangle.
+export const BRAZIL_MAP_BOUNDS = [-75, -35, -28, 6] as const;
+
+export function isInBrazilMapViewport(latitude: number, longitude: number): boolean {
+  const [west, south, east, north] = BRAZIL_MAP_BOUNDS;
+  return latitude >= south && latitude <= north && longitude >= west && longitude <= east;
+}
+
 const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 const OPENFREE_ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap';

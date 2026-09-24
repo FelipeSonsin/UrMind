@@ -57,6 +57,9 @@ describe('cliente do painel público', () => {
       status: 'local_draft',
     });
     expect((fetchMock.mock.calls[0][1]?.body as FormData).get('user_description')).toBe(note);
+    expect((fetchMock.mock.calls[0][1]?.body as FormData).get('manual_overrides_exif')).toBe(
+      'true',
+    );
   });
   it('detalhe usa sessão existente do proprietário sem cache ou novo signup', async () => {
     vi.spyOn(auth, 'accessToken').mockResolvedValue('owner-test-token');

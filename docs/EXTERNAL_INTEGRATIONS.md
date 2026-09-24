@@ -1,5 +1,16 @@
 # UrMind — integrações externas aprovadas
 
+## Observação vigente — 24/09/2026
+
+`python -m app.services.external_sources live-check --json` sondou com sucesso
+Supabase Auth health, Overpass, Open-Meteo, GeoSampa, BrasilAPI, ViaCEP,
+OpenFreeMap e IBGE SIDRA (HTTP 200). Nominatim ficou `DEGRADED` porque o lease
+global impediu a sondagem; não foi demonstrada falha do provedor. CARTO ficou
+`FRONTEND_CONFIG_UNKNOWN`, pois a configuração do browser não é visível ao
+diagnóstico backend. O resultado é uma amostra temporal, não garantia de uptime.
+Nenhuma API key adicional foi comprovadamente necessária. O texto abaixo
+descreve decisões e observações históricas e não substitui este live-check.
+
 Atualização DEV 24/09/2026: head `0021_history_snapshot_retention`, arquivo de histórico
 forward-only protegido em AuditLog (sem acesso público), quota pública
 compartilhada no PostgreSQL; 18 integrações passaram na execução final. Uma

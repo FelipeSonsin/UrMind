@@ -9,6 +9,35 @@ import {
   stubPublicApi,
 } from './fixtures';
 
+test('public primary navigation has four citizen actions and keeps legacy routes', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  await page.goto('/');
+  const links = page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link');
+  await expect(links).toHaveCount(4);
+  await expect(links.nth(0)).toHaveText(/Início/);
+  await expect(links.nth(1)).toHaveText(/Registrar/);
+  await expect(links.nth(2)).toHaveText(/Meus relatos/);
+  await expect(links.nth(3)).toHaveText(/Mapa/);
+  await expect(page.getByRole('link', { name: 'Sobre e privacidade' })).toBeVisible();
+  await page.goto('/#/transparency');
+  await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
+});
+
+test('operational map excludes historical points outside the Brazil viewport', async ({ page }) => {
+  const outsideId = 'e7ec6a81-52c6-4d7a-89a7-9bca42f232a1';
+  await stubPublicApi(page, {
+    events: [
+      publicEvents[0],
+      { ...publicEvents[0], id: outsideId, latitude: 38.72, longitude: -9.14 },
+    ],
+  });
+  await page.goto('/#/mapa');
+  await expect(page.getByText('1 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.locator(`[data-event-id="${outsideId}"]`)).toHaveCount(0);
+});
+
 test('a página inicial explica em segundos o que o sistema viu', async ({ page }, testInfo) => {
   await stubPublicApi(page);
   await page.goto('/');

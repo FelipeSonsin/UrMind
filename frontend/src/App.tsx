@@ -94,7 +94,7 @@ const navigation = [
     href: '#/sobre',
     section: 'público',
   },
-  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard, href: '#/', section: 'público' },
+  { id: 'overview', label: 'Início', icon: LayoutDashboard, href: '#/', section: 'público' },
   { id: 'live', label: 'Ao vivo', icon: Radio, href: '#/live', section: 'público' },
   { id: 'map', label: 'Mapa operacional', icon: Map, href: '#/map', section: 'público' },
   { id: 'events', label: 'Ocorrências', icon: ClipboardList, href: '#/events', section: 'público' },
@@ -750,7 +750,7 @@ export default function App() {
         Pular para o conteúdo
       </a>
       <aside className="sidebar">
-        <a className="brand" href="#overview">
+        <a className="brand" href="#/">
           <img src="/icon.svg" alt="" />
           <span>
             ur<span className="brand-light">mind</span>
@@ -761,8 +761,9 @@ export default function App() {
           ESPAÇO DE TRABALHO <span>V1</span>
         </div>
         <nav aria-label="Navegação principal">
-          {navigation
-            .filter((item) => item.id !== 'live')
+          {(['overview', 'capture', 'my-reports', 'map'] as const)
+            .map((id) => navigation.find((item) => item.id === id))
+            .filter((item): item is NonNullable<typeof item> => item != null)
             .map((item) => (
               <a
                 key={item.id}
@@ -782,12 +783,6 @@ export default function App() {
             ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="scout">
-            <Radio size={21} />
-            <strong>Scout</strong>
-            <span>Fase futura</span>
-            <p>O mesmo núcleo. Novas formas de observar.</p>
-          </div>
           <p>
             FECART <span>Projeto UrMind</span>
           </p>
@@ -1529,6 +1524,7 @@ export default function App() {
             )}
           </Suspense>
           <footer>
+            <a href="#/sobre">Sobre e privacidade</a>
             UrMind <span>Percepção e decisão urbana auditável.</span>
             <span className="footer-right">FECART · Desenvolvimento</span>
           </footer>

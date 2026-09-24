@@ -626,6 +626,7 @@ async def upload_photo(
     longitude: Annotated[float | None, Form(ge=-180, le=180)] = None,
     accuracy_m: Annotated[float | None, Form(ge=0)] = None,
     location_source: Annotated[LocationSource, Form()] = LocationSource.GPS_DEVICE,
+    manual_overrides_exif: Annotated[bool, Form()] = False,
     tz_offset_minutes: Annotated[int | None, Form(ge=-840, le=840)] = None,
     captured_at: Annotated[datetime | None, Form()] = None,
     location_timestamp: Annotated[datetime | None, Form()] = None,
@@ -654,6 +655,10 @@ async def upload_photo(
         LocationSource.MANUAL,
     ):
         raise HTTPException(status_code=422, detail="location_source deve ser gps_device ou manual")
+    if manual_overrides_exif and (
+        location_source is not LocationSource.MANUAL or latitude is None or longitude is None
+    ):
+        raise HTTPException(status_code=422, detail="correcao EXIF exige ponto manual confirmado")
     if (captured_at is not None and captured_at.tzinfo is None) or (
         location_timestamp is not None and location_timestamp.tzinfo is None
     ):
@@ -722,6 +727,7 @@ async def upload_photo(
         received_at=received_at,
         manual_coordinate=coordinate,
         manual_location_source=location_source,
+        manual_overrides_exif=manual_overrides_exif,
         client_captured_at=captured_at,
         storage_path=path,
         source=source,

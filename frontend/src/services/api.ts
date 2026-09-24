@@ -443,6 +443,7 @@ export const api = {
           'location_source',
           draft.source_location === 'manual' ? 'manual' : 'gps_device',
         );
+        if (draft.source_location === 'manual') form.append('manual_overrides_exif', 'true');
         if (draft.source_location === 'gps_device') {
           if (draft.location_timestamp) form.append('location_timestamp', draft.location_timestamp);
           if (draft.heading_deg != null) form.append('heading_deg', String(draft.heading_deg));

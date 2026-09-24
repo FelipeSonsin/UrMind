@@ -158,6 +158,7 @@ export function CapturePage({
           heading_deg: position.coords.heading,
           speed_mps: position.coords.speed,
         }));
+        setShowMap(false);
         setLocating(false);
       },
       () => {
@@ -165,6 +166,7 @@ export function CapturePage({
         setError(
           'Não foi possível obter a localização. Verifique a permissão ou informe as coordenadas.',
         );
+        setShowMap(true);
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -383,6 +385,29 @@ export function CapturePage({
               </p>
             </>
           )}
+          {draft.source === 'exif_upload' && draft.photo.size > 0 && (
+            <>
+              <button
+                type="button"
+                className="secondary"
+                disabled={locating || busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'A posição atual do celular corresponde ao local onde esta foto foi tirada? Ela será registrada como declaração sua.',
+                    )
+                  )
+                    locate();
+                }}
+              >
+                <LocateFixed size={16} /> Usar GPS atual para esta foto
+              </button>
+              <p className="muted">
+                Use apenas se estiver no local da foto. O GPS atual não comprova onde uma foto
+                antiga foi tirada.
+              </p>
+            </>
+          )}
           <p className="muted">
             Origem:{' '}
             {draft.source_location === 'gps_device'
@@ -444,7 +469,8 @@ export function CapturePage({
       </form>
       <p className="footnote">
         O rascunho fica neste navegador até o envio. Após o envio, a foto original permanece no
-        Storage privado e a análise experimental ocorre no backend.
+        Storage privado. A análise visual só ocorre quando houver um modelo autorizado; caso
+        contrário, o relato permanece identificado sem classificação automática.
       </p>
     </>
   );

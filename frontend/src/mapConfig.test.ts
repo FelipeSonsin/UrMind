@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { resolveMapProvider } from './mapConfig';
+import { BRAZIL_MAP_BOUNDS, isInBrazilMapViewport, resolveMapProvider } from './mapConfig';
+
+describe('Brazil operational map viewport', () => {
+  it('frames Brazil instead of the whole world', () => {
+    expect(BRAZIL_MAP_BOUNDS).toEqual([-75, -35, -28, 6]);
+    expect(isInBrazilMapViewport(-23.55, -46.63)).toBe(true);
+    expect(isInBrazilMapViewport(38.72, -9.14)).toBe(false);
+  });
+});
 
 describe('resolveMapProvider', () => {
   it('uses OpenFreeMap as the primary provider', () => {
