@@ -856,6 +856,18 @@ export default function App() {
                       ownReports.some((report) => report.id === selectedReport) && (
                         <>
                           <h2>Relato do cidadão</h2>
+                          <p>
+                            {(() => {
+                              const address = ownReports.find(
+                                (report) => report.id === selectedReport,
+                              )?.address;
+                              return address?.status === 'ok'
+                                ? [address.road, address.suburb, address.city]
+                                    .filter(Boolean)
+                                    .join(', ')
+                                : 'Endereço aproximado indisponível';
+                            })()}
+                          </p>
                           {canReview && privatePage && (
                             <CaptureReviewPanel
                               key={selectedReport}

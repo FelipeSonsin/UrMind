@@ -175,6 +175,7 @@ class CaptureRepository:
                    c.source_location as location_source, c.accuracy_m, c.user_description,
                    c.quality->'location_conflict' as location_conflict,
                    c.quality->'photo_gate' as photo_gate,
+                   c.quality->'address' as address,
                    c.quality->'human_review' as human_review,
                    c.quality->'inference'->>'status' as processing_status,
                    c.quality->'inference'->>'model_status' as model_status,
@@ -1404,12 +1405,14 @@ class PublicRepository:
         "ST_X(coalesce(hr.corrected_point,e.point)::geometry) as longitude, "
         "ST_Y(e.snapped_point::geometry) as snapped_latitude, "
         "ST_X(e.snapped_point::geometry) as snapped_longitude, "
-        "r.name as road_name, r.highway as road_highway, r.jurisdiction as road_jurisdiction, "
+        "case when hr.corrected_point is null then coalesce(r.name,c.quality->'address'->>'road') end as road_name, "
+        "r.highway as road_highway, r.jurisdiction as road_jurisdiction, "
         "e.road_segment_id, e.model_version_id, e.capture_id, "
         "e.factors->'publication'->>'review_id' as publication_review_id, "
         "e.factors->'publication'->'public_image' as publication_image, "
         "risk.severity, risk.priority_score, risk.factors "
         "from public.events e "
+        "left join public.captures c on c.id=e.capture_id "
         "left join lateral (select corrected_class, corrected_point from public.reviews "
         "where event_id=e.id order by commit_order desc nulls last, review_sequence desc limit 1) "
         "hr on e.status='confirmed' "

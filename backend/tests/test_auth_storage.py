@@ -41,14 +41,16 @@ OTHER_KEY = ec.generate_private_key(ec.SECP256R1())
 
 @pytest.fixture(autouse=True)
 def isolated_upload_attempt_budget():
-    from app.api.v1.core import get_photo_gate_policy, upload_admission
+    from app.api.v1.core import get_address_provider, get_photo_gate_policy, upload_admission
     from app.main import app
     from app.schemas.core import PhotoGatePolicy
 
     upload_admission.cache_clear()
     app.dependency_overrides[get_photo_gate_policy] = lambda: PhotoGatePolicy()
+    app.dependency_overrides[get_address_provider] = lambda: None
     yield
     app.dependency_overrides.pop(get_photo_gate_policy, None)
+    app.dependency_overrides.pop(get_address_provider, None)
     upload_admission.cache_clear()
 
 
@@ -729,6 +731,17 @@ async def test_usuario_publico_dev_pode_criar_captura_com_quota_atomica(
         register_capture=AsyncMock(return_value={"id": capture_id, "created": True}),
     )
     storage = SimpleNamespace(upload=AsyncMock(return_value=True), delete=AsyncMock())
+    provider = SimpleNamespace(
+        fetch=AsyncMock(
+            return_value=SimpleNamespace(
+                status="ok",
+                source="nominatim_reverse",
+                fetched_at="2026-09-24T12:00:00Z",
+                provenance={"cache": "hit"},
+                data={"road": "Rua de teste", "city": "Cidade de teste"},
+            )
+        )
+    )
     result = await core.upload_photo(
         user=AuthenticatedUser(
             id="visitor-1", email=None, role="authenticated", is_anonymous=anonymous
@@ -739,9 +752,12 @@ async def test_usuario_publico_dev_pode_criar_captura_com_quota_atomica(
         latitude=-23.55,
         longitude=-46.63,
         location_source=LocationSource.MANUAL,
+        address_provider=provider,
     )
     assert result["id"] == capture_id
     assert service.register_capture.await_args.args[0].quality["public_upload"] is True
+    assert service.register_capture.await_args.args[0].quality["address"]["road"] == "Rua de teste"
+    assert provider.fetch.await_args.args[:2] == (-23.55, -46.63)
     assert captures.recent_owner_uploads.await_count == 2
     assert captures.recent_public_uploads.await_count == 2
     captures.lock_public_uploads.assert_awaited_once()

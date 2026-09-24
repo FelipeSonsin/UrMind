@@ -310,13 +310,51 @@ export type IssueTaxonomy = z.infer<typeof issueTaxonomySchema>;
 export type IssueDefinition = IssueTaxonomy['issues'][number];
 
 const taxonomyLabels = new Map<string, string>();
+const taxonomyFamilies = new Map<string, string>();
 let emittableCodes: string[] = [];
 
 /** Registra os rótulos canônicos; o mapa estático fica só como fallback offline. */
 export function registerTaxonomy(taxonomy: IssueTaxonomy): void {
   taxonomyLabels.clear();
-  for (const issue of taxonomy.issues) taxonomyLabels.set(issue.issue_code, issue.display_name_pt);
+  taxonomyFamilies.clear();
+  for (const issue of taxonomy.issues) {
+    taxonomyLabels.set(issue.issue_code, issue.display_name_pt);
+    taxonomyFamilies.set(issue.issue_code, issue.family);
+  }
   emittableCodes = taxonomy.issues.filter((i) => i.model_may_emit).map((i) => i.issue_code);
+}
+
+export function familyFor(code?: string | null): string {
+  return code ? (taxonomyFamilies.get(code) ?? '') : '';
+}
+
+export type MapFilters = {
+  status: string;
+  family: string;
+  issue: string;
+  from: string;
+  to: string;
+};
+export function filterMapRecords<
+  T extends {
+    urmind_class?: string | null;
+    report_status?: string;
+    status?: string;
+    created_at?: string | null;
+    occurred_at?: string | null;
+  },
+>(records: T[], filters: MapFilters): T[] {
+  return records.filter((row) => {
+    const stamp = row.created_at ?? row.occurred_at;
+    const timestamp = stamp ? Date.parse(stamp) : NaN;
+    return (
+      (!filters.status || (row.report_status ?? row.status) === filters.status) &&
+      (!filters.family || familyFor(row.urmind_class) === filters.family) &&
+      (!filters.issue || row.urmind_class === filters.issue) &&
+      (!filters.from || timestamp >= Date.parse(`${filters.from}T00:00:00Z`)) &&
+      (!filters.to || timestamp < Date.parse(`${filters.to}T00:00:00Z`) + 86400000)
+    );
+  });
 }
 
 /** Classes que podem aparecer como detecção de modelo (filtros de ocorrência). */

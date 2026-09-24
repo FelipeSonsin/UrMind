@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { eventDetail, urbanAnalysis } from '../../tests/fixtures';
 import {
   filterableClasses,
+  filterMapRecords,
   issueTaxonomySchema,
   labelFor,
   modelSupportLabel,
@@ -13,6 +14,20 @@ import {
   publicScoutSchema,
   severityOf,
 } from './public';
+
+it('filtros do mapa não inventam período para relato sem data', () => {
+  const rows = [
+    { status: 'confirmed', urmind_class: 'A', created_at: '2026-09-24T12:00:00Z' },
+    { report_status: 'received', urmind_class: null, created_at: null },
+  ];
+  const filters = { status: '', family: '', issue: '', from: '', to: '' };
+  expect(filterMapRecords(rows, filters)).toHaveLength(2);
+  expect(filterMapRecords(rows, { ...filters, from: '2026-09-24', to: '2026-09-24' })).toEqual([
+    rows[0],
+  ]);
+  expect(filterMapRecords(rows, { ...filters, status: 'received' })).toEqual([rows[1]]);
+  expect(filterMapRecords(rows, { ...filters, issue: 'missing' })).toEqual([]);
+});
 
 const event = {
   id: '3f8b9d3a-2f0c-4f1e-9b1a-4f6a0d5e7c11',

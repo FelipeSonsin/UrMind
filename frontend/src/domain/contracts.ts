@@ -106,6 +106,15 @@ export const captureMarkerSchema = z.object({
   latitude: z.number().finite().min(-90).max(90).nullable(),
   longitude: z.number().finite().min(-180).max(180).nullable(),
   created_at: z.string().nullable().optional(),
+  address: z
+    .object({
+      status: z.string(),
+      road: z.string().nullable(),
+      suburb: z.string().nullable(),
+      city: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
   photo_gate: z
     .object({
       status: z.string(),

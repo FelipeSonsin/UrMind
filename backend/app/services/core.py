@@ -175,6 +175,7 @@ class CoreService:
                         "event_public_id",
                         "created_at",
                         "photo_gate",
+                        "address",
                         "protocol_code",
                         "public_id",
                     )

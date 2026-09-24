@@ -1,5 +1,22 @@
 # Áreas, mapa e porteiro — diagnóstico e execução
 
+## Bloco 4 — mapa e endereço (24/09/2026)
+
+UrbanMap canônico estendido com filtros de status/família/classe/período UTC,
+estado na URL, contador, legenda e ícones por família. Deep link preserva os filtros.
+Geolocalização local e direções reutilizam os controles existentes.
+Upload consulta Nominatim pelo cliente existente (cache, User-Agent, limite 1 req/s
+por processo, timeout 3 s, uma tentativa); guarda endereço e provenance na Capture.
+Falha externa não impede relato. Correção humana de ponto não reutiliza endereço antigo.
+Público recebe somente rua de relato publicado, nunca metadados privados da Capture.
+
+Evidências: backend focado auth/public 134 passed; integração DEV Storage/publicação/
+marcador 2 passed / 21 deselected; Vitest 46 passed; Playwright público 40 passed;
+mypy, Ruff, TypeScript, build, Prettier e diff check passaram.
+Reuso: EXTENDED_EXISTING_COMPONENT para mapa, repositórios, upload e provider.
+Limites OPEN: rate limit Nominatim distribuído entre processos; endereço após marcação
+manual posterior ao envio; prova completa em celular físico. Blocos 5–6 ainda pendentes.
+
 ## Bloco 3 — operação interna persistida (continuação 24/09/2026)
 
 - `0025_operational_configuration`: upgrade/downgrade/upgrade no DEV comprovados. Sem alteração de .env/Auth. Defaults apenas para linha ausente; erro/contrato inválido não libera upload. Escrita admin, leitura interna reviewer/admin, AuditLog atômico, RLS e grants sem acesso direto anon/authenticated. Camada pública genérica permanece desligada por default; configuração passa a ser canônica no banco, não na antiga flag de ambiente.

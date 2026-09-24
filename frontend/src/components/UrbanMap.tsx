@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { labelFor, severityOf } from '../domain/public';
+import {
+  familyFor,
+  filterMapRecords,
+  labelFor,
+  severityOf,
+  type MapFilters,
+} from '../domain/public';
 import { resolveMapProvider } from '../mapConfig';
 import { reportLabels, type CaptureMarker } from '../domain/contracts';
 
@@ -20,7 +26,19 @@ export interface MapMarker {
   severity?: string | null;
   road_name?: string | null;
   status?: string;
+  created_at?: string | null;
+  occurred_at?: string | null;
 }
+
+const STATUS_COLORS: Record<string, string> = {
+  received: '#64748b',
+  model_not_available: '#a16207',
+  experimental: '#7c3aed',
+  human_confirmed: '#047857',
+  confirmed: '#047857',
+  rejected: '#991b1b',
+  duplicate: '#475569',
+};
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: '#7f1d1d',
@@ -36,8 +54,63 @@ function markerLabel(event: MapMarker) {
     : labelFor(event.urmind_class ?? '');
 }
 
+function familyIcon(family: string): ImageData | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 32;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.strokeStyle = '#fff';
+  context.fillStyle = '#fff';
+  context.lineWidth = 3;
+  context.beginPath();
+  if (family.includes('VEGETATION')) {
+    context.moveTo(16, 4);
+    context.lineTo(6, 22);
+    context.lineTo(26, 22);
+    context.closePath();
+    context.moveTo(16, 22);
+    context.lineTo(16, 29);
+  } else if (family === 'ROAD_SURFACE') {
+    context.moveTo(9, 4);
+    context.lineTo(9, 28);
+    context.moveTo(23, 4);
+    context.lineTo(23, 28);
+    context.moveTo(16, 6);
+    context.lineTo(16, 13);
+    context.moveTo(16, 20);
+    context.lineTo(16, 27);
+  } else if (family === 'DRAINAGE') {
+    for (const y of [9, 16, 23]) {
+      context.moveTo(4, y);
+      context.bezierCurveTo(10, y - 7, 22, y + 7, 28, y);
+    }
+  } else if (family === 'TRAFFIC_INFRASTRUCTURE') {
+    context.moveTo(16, 4);
+    context.lineTo(4, 27);
+    context.lineTo(28, 27);
+    context.closePath();
+  } else if (family === 'PEDESTRIAN_INFRASTRUCTURE') {
+    context.arc(16, 6, 3, 0, Math.PI * 2);
+    context.moveTo(16, 11);
+    context.lineTo(16, 21);
+    context.moveTo(7, 15);
+    context.lineTo(25, 15);
+    context.moveTo(8, 29);
+    context.lineTo(16, 21);
+    context.lineTo(24, 29);
+  } else if (family === 'WASTE_OBSTRUCTION') {
+    context.rect(8, 10, 16, 18);
+    context.moveTo(5, 7);
+    context.lineTo(27, 7);
+  } else {
+    context.rect(7, 7, 18, 18);
+  }
+  context.stroke();
+  return context.getImageData(0, 0, 32, 32);
+}
+
 export default function UrbanMap({
-  events,
+  events: allEvents,
   selectedId,
   onSelect,
   onPickLocation,
@@ -53,6 +126,49 @@ export default function UrbanMap({
   detail?: ReactNode;
   onCloseDetail?: () => void;
 }) {
+  const [filters, setFilters] = useState<MapFilters>(() => {
+    const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
+    return {
+      status: query.get('map_status') ?? '',
+      family: query.get('map_family') ?? '',
+      issue: query.get('map_class') ?? '',
+      from: query.get('map_from') ?? '',
+      to: query.get('map_to') ?? '',
+    };
+  });
+  const events = useMemo(
+    () => (onPickLocation ? allEvents : filterMapRecords(allEvents, filters)),
+    [allEvents, filters, onPickLocation],
+  );
+  const options = {
+    statuses: [...new Set(allEvents.map((row) => row.report_status ?? row.status).filter(Boolean))],
+    families: [...new Set(allEvents.map((row) => familyFor(row.urmind_class)).filter(Boolean))],
+    issues: [
+      ...new Set(
+        allEvents.map((row) => row.urmind_class).filter((value): value is string => Boolean(value)),
+      ),
+    ],
+  };
+  function changeFilters(next: MapFilters) {
+    setFilters(next);
+    onCloseDetail?.();
+    const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
+    for (const [key, value] of Object.entries({
+      map_status: next.status,
+      map_family: next.family,
+      map_class: next.issue,
+      map_from: next.from,
+      map_to: next.to,
+    })) {
+      if (value) query.set(key, value);
+      else query.delete(key);
+    }
+    history.replaceState(
+      null,
+      '',
+      `${location.hash.split('?')[0]}${query.size ? `?${query}` : ''}`,
+    );
+  }
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map>(null);
   const pickCallback = useRef(onPickLocation);
@@ -121,6 +237,11 @@ export default function UrbanMap({
       map.on('style.load', () => {
         if (!map) return;
         if (map.getSource('events')) return;
+        for (const family of new Set(located.map((event) => familyFor(event.urmind_class)))) {
+          const image = familyIcon(family);
+          if (image && !map.hasImage(`family:${family}`))
+            map.addImage(`family:${family}`, image, { pixelRatio: 2 });
+        }
         map.addSource('events', {
           type: 'geojson',
           cluster: !pickCallback.current,
@@ -139,8 +260,11 @@ export default function UrbanMap({
                 label: markerLabel(event),
                 report: Boolean(event.report_status),
                 severity: severityOf(event.severity).label,
-                color: SEVERITY_COLOR[severityOf(event.severity).level],
+                color:
+                  STATUS_COLORS[event.report_status ?? event.status ?? ''] ??
+                  SEVERITY_COLOR[severityOf(event.severity).level],
                 road: event.road_name ?? '',
+                family_icon: `family:${familyFor(event.urmind_class)}`,
               },
             })),
           },
@@ -166,11 +290,18 @@ export default function UrbanMap({
           source: 'events',
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-radius': ['case', ['==', ['get', 'id'], selectedId ?? ''], 11, 7],
+            'circle-radius': ['case', ['==', ['get', 'id'], selectedId ?? ''], 15, 12],
             'circle-color': ['get', 'color'],
             'circle-stroke-color': '#f5f6f2',
             'circle-stroke-width': 3,
           },
+        });
+        map.addLayer({
+          id: 'family-icons',
+          type: 'symbol',
+          source: 'events',
+          filter: ['!', ['has', 'point_count']],
+          layout: { 'icon-image': ['get', 'family_icon'], 'icon-allow-overlap': true },
         });
         // Diagnóstico do que a camada realmente desenhou (não apenas da lista recebida).
         map.on('idle', () => {
@@ -253,14 +384,75 @@ export default function UrbanMap({
     map.setPaintProperty('events', 'circle-radius', [
       'case',
       ['==', ['get', 'id'], selectedId ?? ''],
-      11,
-      7,
+      15,
+      12,
     ]);
   }, [selectedId]);
 
   const located = events.filter((event) => event.latitude != null && event.longitude != null);
   return (
     <section className="panel map-panel">
+      {!onPickLocation && (
+        <div className="filters" aria-label="Filtros do mapa">
+          <label>
+            Status do ponto
+            <select
+              value={filters.status}
+              onChange={(event) => changeFilters({ ...filters, status: event.target.value })}
+            >
+              <option value="">Todos</option>
+              {options.statuses.map((status) => (
+                <option key={status} value={status}>
+                  {reportLabels[status as CaptureMarker['report_status']] ?? status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Família do ponto
+            <select
+              value={filters.family}
+              onChange={(event) => changeFilters({ ...filters, family: event.target.value })}
+            >
+              <option value="">Todas</option>
+              {options.families.map((family) => (
+                <option key={family}>{family}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Classe do ponto
+            <select
+              value={filters.issue}
+              onChange={(event) => changeFilters({ ...filters, issue: event.target.value })}
+            >
+              <option value="">Todas</option>
+              {options.issues.map((issue) => (
+                <option key={issue} value={issue}>
+                  {labelFor(issue)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Desde (UTC)
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(event) => changeFilters({ ...filters, from: event.target.value })}
+            />
+          </label>
+          <label>
+            Até (UTC)
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(event) => changeFilters({ ...filters, to: event.target.value })}
+            />
+          </label>
+          <p role="status">{located.length} pontos visíveis</p>
+        </div>
+      )}
       <div className="map-wrap">
         <div
           className="map"
@@ -302,7 +494,10 @@ export default function UrbanMap({
       {events.some((event) => event.report_status) && (
         <ul className="map-legend" aria-label="Legenda de relatos">
           {Object.entries(reportLabels).map(([status, label]) => (
-            <li key={status}>{label}</li>
+            <li key={status}>
+              <i aria-hidden="true" style={{ background: STATUS_COLORS[status] ?? '#64748b' }} />
+              {label}
+            </li>
           ))}
         </ul>
       )}

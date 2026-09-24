@@ -48,7 +48,9 @@ from app.schemas.core import (
     ReviewCreate,
     UrmindClass,
 )
+from app.services.context import NominatimReverse
 from app.services.core import CoreService, DuplicateKeyError, EventNotFoundError
+from app.services.external_sources.http import ExternalHttpClient
 from app.services.photo_ingest import ingest_photo
 from app.services.storage import (
     MAX_BYTES,
@@ -129,6 +131,13 @@ async def get_photo_gate_policy(service: Core) -> PhotoGatePolicy:
     if service.decisions is None:
         raise HTTPException(status_code=503, detail="Configuração do porteiro indisponível")
     return await service.decisions.photo_gate_policy()
+
+
+async def get_address_provider() -> AsyncIterator[NominatimReverse]:
+    async with ExternalHttpClient(
+        user_agent=get_settings().external_http_user_agent, timeout_seconds=3, max_attempts=1
+    ) as client:
+        yield NominatimReverse(client)
 
 
 @router.get("/ops/photo-gate", response_model=PhotoGatePolicy)
@@ -324,6 +333,7 @@ async def upload_photo(
     storage: Storage,
     file: Annotated[UploadFile, File()],
     gate_policy: Annotated[PhotoGatePolicy | None, Depends(get_photo_gate_policy)] = None,
+    address_provider: Annotated[NominatimReverse | None, Depends(get_address_provider)] = None,
     source: Annotated[CaptureSource, Form()] = CaptureSource.PWA_PHOTO,
     latitude: Annotated[float | None, Form(ge=-90, le=90)] = None,
     longitude: Annotated[float | None, Form(ge=-180, le=180)] = None,
@@ -464,6 +474,20 @@ async def upload_photo(
             raise HTTPException(status_code=429, detail="Limite de capturas por hora atingido")
         # Do not hold an idle transaction during the external Storage upload.
         await service.captures.session.rollback()
+    if ingest.capture.coordinate is not None and address_provider is not None:
+        address = await address_provider.fetch(
+            ingest.capture.coordinate.latitude, ingest.capture.coordinate.longitude, received_at
+        )
+        ingest.capture.quality["address"] = {
+            "status": address.status,
+            "source": address.source,
+            "fetched_at": address.fetched_at,
+            "provenance": address.provenance,
+            "road": address.data.get("road"),
+            "suburb": address.data.get("suburb"),
+            "city": address.data.get("city"),
+            "attribution": address.data.get("attribution"),
+        }
     try:
         uploaded = await storage.upload(path, image)
     except StorageError as exc:

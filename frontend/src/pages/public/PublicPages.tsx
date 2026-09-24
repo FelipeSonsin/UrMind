@@ -332,7 +332,9 @@ export function PublicMapPage({
           onSelect={(id) => {
             setSelected(id);
             if (events.some((event) => event.id === id)) {
-              history.replaceState(null, '', `#/mapa?ponto=${encodeURIComponent(id)}`);
+              const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
+              query.set('ponto', id);
+              history.replaceState(null, '', `#/mapa?${query}`);
             }
           }}
           onCloseDetail={() => setSelected(null)}

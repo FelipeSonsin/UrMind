@@ -146,6 +146,20 @@ test('ocorrência sem avaliação não recebe severidade nem prioridade plausív
   await expect(page.getByLabel('Evidência visual')).toContainText('Sem detecções publicadas.');
 });
 
+test('filtros do mapa persistem na URL e removem pontos fora do período', async ({ page }) => {
+  await stubPublicApi(page);
+  await page.goto('/#/mapa');
+  await page.getByLabel('Desde (UTC)').fill('2099-01-01');
+  await expect(page).toHaveURL(/map_from=2099-01-01/);
+  await expect(page.getByText('0 pontos visíveis', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Desde (UTC)')).toHaveValue('2099-01-01');
+  await page.getByLabel('Desde (UTC)').fill('');
+  await page.getByLabel('Classe do ponto').selectOption('URMIND_ROAD_D40');
+  await expect(page).toHaveURL(/map_class=URMIND_ROAD_D40/);
+  await expect(page.getByText('1 pontos visíveis', { exact: true })).toBeVisible();
+});
+
 test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/map');

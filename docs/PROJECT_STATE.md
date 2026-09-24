@@ -1,5 +1,12 @@
 # Estado operacional do UrMind
 
+## Mapa filtrável e endereço (24/09/2026)
+
+UrbanMap existente: filtros sincronizados com URL, contador e ícones/legenda.
+Endereço aproximado do upload persistido via Nominatim existente; falha não bloqueia.
+Backend focado 134 passed; DEV 2 passed; Vitest 46; Playwright público 40.
+Sem migration nova neste bloco; head 0025. Porteiro de cena/rostos e bloco 6 OPEN.
+
 ## Área interna persistida (24/09/2026)
 
 DEV head `0025_operational_configuration` (up/down/up verificados). Administração com
