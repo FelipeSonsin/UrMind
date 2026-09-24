@@ -4,7 +4,6 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   familyFor,
-  exportMapRecords,
   filterMapRecords,
   labelFor,
   severityOf,
@@ -12,6 +11,7 @@ import {
 } from '../domain/public';
 import { resolveMapProvider } from '../mapConfig';
 import { reportLabels, type CaptureMarker } from '../domain/contracts';
+import { api } from '../services/api';
 
 // Vite must emit the actual worker; MapLibre's sibling default URL does not
 // survive bundling the library into a hashed application chunk.
@@ -129,6 +129,10 @@ export default function UrbanMap({
   onCloseDetail?: () => void;
   allowExport?: boolean;
 }) {
+  const exportController = useRef<AbortController | null>(null);
+  const [exportError, setExportError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  useEffect(() => () => exportController.current?.abort(), []);
   const [filters, setFilters] = useState<MapFilters>(() => {
     const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
     return {
@@ -403,26 +407,40 @@ export default function UrbanMap({
                 <button
                   key={format}
                   type="button"
-                  onClick={() => {
-                    const data = exportMapRecords(events);
-                    const url = URL.createObjectURL(
-                      new Blob([format === 'csv' ? data.csv : JSON.stringify(data.geojson)], {
-                        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'application/geo+json',
-                      }),
-                    );
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `urmind-pontos-filtrados.${format}`;
-                    link.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  disabled={exporting}
+                  onClick={async () => {
+                    exportController.current?.abort();
+                    const controller = new AbortController();
+                    exportController.current = controller;
+                    setExporting(true);
+                    setExportError('');
+                    try {
+                      const blob = await api.exportReports(format, filters, controller.signal);
+                      if (controller.signal.aborted) return;
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `urmind-pontos-filtrados.${format}`;
+                      link.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    } catch (error) {
+                      if (!controller.signal.aborted)
+                        setExportError(
+                          error instanceof Error ? error.message : 'Exportação indisponível',
+                        );
+                    } finally {
+                      if (!controller.signal.aborted) setExporting(false);
+                    }
                   }}
                 >
                   Exportar {format.toUpperCase()}
                 </button>
               ))}
               <small>
-                Somente os pontos carregados que correspondem aos filtros; sem fotos ou identidades.
+                Todos os relatos que correspondem aos filtros, em lotes no servidor; sem fotos ou
+                identidades. O navegador reúne o arquivo para baixar.
               </small>
+              {exportError && <p role="alert">{exportError}</p>}
             </div>
           )}
           <label>

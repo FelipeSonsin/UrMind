@@ -665,7 +665,7 @@ test('a revisão exibe dados da API, filtra e mantém zero de confiança', async
       },
     }),
   );
-  await page.route('**/api/v1/events?limit=500', (route) =>
+  await page.route('**/api/v1/events?limit=100', (route) =>
     route.fulfill({
       json: [
         {

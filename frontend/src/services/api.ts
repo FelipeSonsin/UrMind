@@ -109,6 +109,31 @@ export const photoGatePolicySchema = z.object({
 });
 
 export const api = {
+  exportReports: async (
+    format: 'csv' | 'geojson',
+    filters: { status: string; family: string; issue: string; from: string; to: string },
+    signal: AbortSignal,
+  ) => {
+    const token = await auth.accessToken();
+    if (!token) throw new UnauthorizedError();
+    const params = new URLSearchParams({
+      format,
+      status: filters.status,
+      family: filters.family,
+      issue: filters.issue,
+    });
+    if (filters.from) params.set('start', `${filters.from}T00:00:00Z`);
+    if (filters.to) params.set('end', `${filters.to}T23:59:59.999999Z`);
+    const response = await fetch(`${base}/captures/export?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      signal,
+    });
+    if (!response.ok) throw new Error(`Exportação indisponível (${response.status})`);
+    const blob = await response.blob();
+    if (signal.aborted || (await auth.accessToken()) !== token) throw new UnauthorizedError();
+    return blob;
+  },
   groundTruth: (signal?: AbortSignal, cursor: string | null = null) =>
     request(
       `/ops/ground-truth${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
@@ -130,9 +155,9 @@ export const api = {
       }),
       { signal },
     ),
-  reportTotals: (signal?: AbortSignal) =>
+  reportTotals: (signal?: AbortSignal, days = 30) =>
     request(
-      '/ops/reports',
+      `/ops/reports?days=${days}`,
       z.object({
         today: z.number(),
         week: z.number(),
@@ -142,7 +167,34 @@ export const api = {
         published: z.number(),
         day_timezone: z.literal('UTC'),
         rejected_by_reason: z.record(z.string(), z.number()),
+        gate_metrics: z
+          .object({
+            days: z.number(),
+            rejected: z.number(),
+            accepted: z.number(),
+            retry_confirmed: z.number(),
+            rates_by_reason: z.record(z.string(), z.number().nullable()),
+            false_rejection_estimate: z.number().nullable(),
+            estimate_method: z.string(),
+          })
+          .optional(),
       }),
+      { signal },
+    ),
+  integrationHealth: (signal?: AbortSignal) =>
+    request(
+      '/ops/integrations',
+      z.array(
+        z.object({
+          name: z.string(),
+          status: z.string(),
+          detail: z.string(),
+          checked_at: z.string(),
+          latency_ms: z.number().nullable(),
+          last_success: z.string().nullable(),
+          last_failure: z.string().nullable(),
+        }),
+      ),
       { signal },
     ),
   operationalModels: (signal?: AbortSignal) =>

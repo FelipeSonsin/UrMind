@@ -70,7 +70,22 @@ async function session(page: Page, anonymous = false) {
 
 test.beforeEach(async ({ page }) => {
   await stubPublicApi(page);
-  await page.route('**/api/v1/ops/reports', (route) =>
+  await page.route('**/api/v1/ops/integrations', (route) =>
+    route.fulfill({
+      json: [
+        {
+          name: 'Nominatim',
+          status: 'UNAVAILABLE',
+          detail: 'ReadTimeout',
+          checked_at: '2026-09-24T19:00:00Z',
+          latency_ms: 5000,
+          last_success: null,
+          last_failure: '2026-09-24T19:00:00Z',
+        },
+      ],
+    }),
+  );
+  await page.route('**/api/v1/ops/reports?*', (route) =>
     route.fulfill({
       json: {
         today: 3,
@@ -104,6 +119,20 @@ test.beforeEach(async ({ page }) => {
       },
     }),
   );
+});
+
+test('painel apresenta saúde observada sem transformar configuração em sucesso', async ({
+  page,
+}) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  await page.goto('/#/app/dashboard');
+  const panel = page.getByRole('region', { name: 'Integrações' });
+  await expect(panel.getByText('Nominatim: UNAVAILABLE')).toBeVisible();
+  await expect(panel.getByText(/Último sucesso: não observado/)).toBeVisible();
 });
 
 test('relato sem modelo recebe revisão humana e publicação sanitizada', async ({ page }) => {
@@ -186,6 +215,14 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
     });
     published = true;
     return route.fulfill({ json: { event_id: EVENT_ID, publication_status: 'published' } });
+  });
+  await page.route('**/api/v1/captures/export?*', (route) => {
+    expect(route.request().headers().authorization).toBe('Bearer private-test-token');
+    expect(new URL(route.request().url()).searchParams.get('format')).toBe('csv');
+    return route.fulfill({
+      contentType: 'text/csv',
+      body: 'latitude,longitude,issue_code,status,date\r\n-23.55,-46.63,,model_not_available,2026-09-24T12:00:00Z\r\n',
+    });
   });
   await page.goto('/#/app/mapa');
   const csvDownload = page.waitForEvent('download');

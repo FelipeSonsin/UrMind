@@ -92,12 +92,13 @@ export function GroundTruthPage() {
 }
 
 export function ReportIndicators() {
+  const [days, setDays] = useState(30);
   const [totals, setTotals] = useState<Awaited<ReturnType<typeof api.reportTotals>> | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
     void api
-      .reportTotals(controller.signal)
+      .reportTotals(controller.signal, days)
       .then((data) => {
         if (!controller.signal.aborted) setTotals(data);
       })
@@ -105,10 +106,18 @@ export function ReportIndicators() {
         if (!controller.signal.aborted) setError(failure.message);
       });
     return () => controller.abort();
-  }, []);
+  }, [days]);
   return (
     <section className="panel">
       <h2>Relatos recebidos</h2>
+      <label>
+        Período do porteiro
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          <option value={7}>7 dias</option>
+          <option value={30}>30 dias</option>
+          <option value={90}>90 dias</option>
+        </select>
+      </label>
       {error && <p role="alert">Indicadores indisponíveis: {error}</p>}
       {!totals && !error && <p role="status">Consultando relatos…</p>}
       {totals && (
@@ -129,6 +138,31 @@ export function ReportIndicators() {
             <dd>{totals.published}</dd>
           </dl>
           <h3>Rejeições do porteiro por motivo</h3>
+          {totals.gate_metrics && (
+            <>
+              <p>
+                {totals.gate_metrics.accepted} envios aceitos e {totals.gate_metrics.rejected}{' '}
+                rejeitados nos últimos {totals.gate_metrics.days} dias.
+              </p>
+              <p>
+                Estimativa de falsa rejeição:{' '}
+                {totals.gate_metrics.false_rejection_estimate === null
+                  ? 'amostra indisponível'
+                  : `${(totals.gate_metrics.false_rejection_estimate * 100).toFixed(1)}%`}
+                . Reenvio do mesmo titular em até 24 h, posteriormente confirmado por revisão. Não
+                comprova que seja a mesma foto ou uma rejeição incorreta; decisões posteriores
+                alteram esta estimativa retrospectiva.
+              </p>
+              <ul>
+                {Object.entries(totals.gate_metrics.rates_by_reason).map(([reason, rate]) => (
+                  <li key={reason}>
+                    {reason}: {rate === null ? 'indisponível' : `${(rate * 100).toFixed(1)}%`} das
+                    tentativas
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {Object.entries(totals.rejected_by_reason).length === 0 ? (
             <p>Nenhuma rejeição registrada.</p>
           ) : (
@@ -142,6 +176,55 @@ export function ReportIndicators() {
           )}
         </>
       )}
+      <IntegrationHealth />
+    </section>
+  );
+}
+
+function IntegrationHealth() {
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof api.integrationHealth>> | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    void api
+      .integrationHealth(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setRows(data);
+      })
+      .catch((failure: Error) => {
+        if (!controller.signal.aborted) setError(failure.message);
+      });
+    return () => controller.abort();
+  }, []);
+  return (
+    <section aria-label="Integrações">
+      <h2>Integrações</h2>
+      <p>
+        Saúde observada, somente leitura. Configuração não comprova disponibilidade. Falhas de
+        contexto são degradáveis; armazenamento e autenticação são essenciais.
+      </p>
+      {error && <p role="alert">Saúde indisponível: {error}</p>}
+      {!rows && !error && <p role="status">Consultando verificações…</p>}
+      {rows?.length === 0 && (
+        <p>Nenhuma verificação registrada. Execute live-check --persist no DEV.</p>
+      )}
+      <ul>
+        {rows?.map((row) => (
+          <li key={row.name}>
+            <strong>
+              {row.name}: {row.status}
+            </strong>
+            <p>{row.detail}</p>
+            <p>
+              Verificado: {row.checked_at}; latência: {row.latency_ms ?? 'não medida'} ms
+            </p>
+            <p>
+              Último sucesso: {row.last_success ?? 'não observado'}. Última falha:{' '}
+              {row.last_failure ?? 'não observada'}.
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

@@ -1186,8 +1186,8 @@ export default function App() {
                     Próxima
                   </button>
                   <span>
-                    Página {reportCursors.length}; filtros e exportação aplicados aos pontos desta
-                    página.
+                    Página {reportCursors.length}; filtros visuais aplicados a esta página. A
+                    exportação consulta todos os relatos correspondentes.
                   </span>
                 </div>
                 {page === 'map' &&
