@@ -218,6 +218,7 @@ const log = new BroadcastChannel('fixture-worker-log');
 self.onmessage = (event) => {
   const m = event.data;
   if (m.type === 'load') {
+    new BroadcastChannel('fixture-worker-load').postMessage(true);
     self.postMessage({ type: 'ready', provider: 'wasm', fallbackReason: null });
     return;
   }
@@ -287,6 +288,35 @@ const overlayPixels = (page: Page) =>
   });
 
 const cvState = (page: Page) => page.getByRole('status', { name: 'Estado da visão computacional' });
+
+test('o modelo carrega enquanto o celular pareia; com o vídeo, a análise começa na hora', async ({
+  page,
+  context,
+}) => {
+  await fixtureDetector(context, page);
+  await page.addInitScript(() => {
+    const scope = window as unknown as { __workerLoads: number };
+    scope.__workerLoads = 0;
+    new BroadcastChannel('fixture-worker-load').onmessage = () => (scope.__workerLoads += 1);
+  });
+  const loads = () =>
+    page.evaluate(() => (window as unknown as { __workerLoads: number }).__workerLoads);
+  await page.goto('/#/camera-robo');
+  // Só abrir a página não baixa o modelo à toa.
+  await page.waitForTimeout(800);
+  expect(await loads()).toBe(0);
+  // Pareando, ainda sem celular: o modelo já está sendo carregado.
+  const link = await startPairing(page);
+  await expect.poll(loads).toBe(1);
+  const phone = await context.newPage();
+  await fakeCamera(phone);
+  await phone.goto(link);
+  await phone.getByRole('button', { name: 'Ativar câmera' }).click();
+  // Com o vídeo chegando, a análise começa sem outro carregamento do modelo.
+  await expect(cvState(page)).toHaveText('Analisando vídeo em tempo real', { timeout: 30_000 });
+  await expect.poll(async () => (await workerFrames(page)).length).toBeGreaterThan(0);
+  expect(await loads()).toBe(1);
+});
 
 test('vídeo remoto vai ao worker de detecção e as caixas aparecem alinhadas sobre ele', async ({
   page,

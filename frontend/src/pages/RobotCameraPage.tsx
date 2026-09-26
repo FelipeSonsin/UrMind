@@ -183,6 +183,12 @@ export function RobotCameraPage({
     detection.startDetection();
   }
 
+  /** Início automático (celular conectou ou voltou): não repete um modelo que já falhou. */
+  function autoStartDetection() {
+    setPaused(false);
+    detection.startDetection({ retryFailed: false });
+  }
+
   function pauseDetection() {
     stopDetection();
     setPaused(true);
@@ -235,6 +241,14 @@ export function RobotCameraPage({
   function lost(message = 'Câmera desconectada') {
     teardown({ kind: 'disconnected', message }, false);
   }
+
+  // Enquanto o celular pareia (QR, permissão da câmera), o modelo já baixa e inicia em
+  // segundo plano: quando o vídeo chega, a detecção começa na hora, sem vídeo sem caixas.
+  const pairingPhone = phase.kind === 'waiting' || phase.kind === 'connecting';
+  useEffect(() => {
+    if (pairingPhone && detection.model.status === 'available') detection.prepareModel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairingPhone, detection.model.status]);
 
   function connectPhone() {
     teardown({ kind: 'idle' }, true);
@@ -390,7 +404,7 @@ export function RobotCameraPage({
         if (resumeDetection.current || autoStart.current) {
           resumeDetection.current = false;
           autoStart.current = false;
-          startDetection();
+          autoStartDetection();
         }
       } else if (state === 'disconnected' || state === 'failed') {
         // Queda de rede: segura a sessão por pouco tempo enquanto o celular tenta voltar.

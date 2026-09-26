@@ -432,11 +432,25 @@ export function useVideoDetection({
     created.postMessage({ type: 'load', manifest } satisfies WorkerRequest);
   }
 
-  /** Começa a analisar o vídeo do palco; sem vídeo ao vivo ou sem modelo, não faz nada. */
-  function startDetection() {
+  /**
+   * Baixa, confere e inicia o modelo no worker sem começar a analisar. Quem sabe que o
+   * vídeo vai chegar (celular pareando) chama antes; a análise começa sem esperar o modelo.
+   */
+  function prepareModel() {
+    const current = modelRef.current;
+    if (current.status === 'available') ensureWorker(current.manifest);
+  }
+
+  /**
+   * Começa a analisar o vídeo do palco; sem vídeo ao vivo ou sem modelo, não faz nada.
+   * `retryFailed: false` (início automático) deixa um modelo recusado como está: nova
+   * tentativa, com outro download, só por pedido explícito da pessoa.
+   */
+  function startDetection({ retryFailed = true }: { retryFailed?: boolean } = {}) {
     const current = modelRef.current;
     if (!sourceRef.current().live || !('manifest' in current)) return;
     if (current.status === 'failed') {
+      if (!retryFailed) return;
       // Nova tentativa explícita: outro worker, outra verificação de checksum.
       updateModel({ status: 'available', manifest: current.manifest });
     }
@@ -510,6 +524,7 @@ export function useVideoDetection({
     metrics,
     inferenceError,
     setInferenceError,
+    prepareModel,
     startDetection,
     stopDetection,
     analyzeStill,
