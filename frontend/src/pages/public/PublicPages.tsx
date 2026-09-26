@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Camera, ScanEye } from 'lucide-react';
 import {
   ContextPanel,
   DecisionTrace,
@@ -11,7 +12,6 @@ import {
   RiskExplanation,
 } from '../../components/public/Diagnosis';
 import { EventFeed } from '../../components/public/EventFeed';
-import { ScoutLivePanel, adapterFor } from '../../components/public/ScoutLivePanel';
 import { SystemStatusBar } from '../../components/public/SystemStatusBar';
 import {
   filterableClasses,
@@ -22,11 +22,11 @@ import {
   type IssueTaxonomy,
   type PublicEvent,
   type PublicEventDetail,
-  type PublicScout,
   type PublicStatus,
   type Transparency,
 } from '../../domain/public';
-import { statuses, type CaptureMarker } from '../../domain/contracts';
+import { reportLabels, statuses, type CaptureMarker } from '../../domain/contracts';
+import { api } from '../../services/api';
 import { publicApi } from '../../services/publicApi';
 
 const UrbanMap = lazy(() => import('../../components/UrbanMap'));
@@ -70,8 +70,11 @@ function Skeleton({ lines = 3 }: { lines?: number }) {
   );
 }
 
-export function useSystemStatus(revision: number) {
-  return usePublicData<PublicStatus>((signal) => publicApi.status(signal), [revision]);
+export function useSystemStatus(revision: number, enabled = true) {
+  return usePublicData<PublicStatus | null>(
+    (signal) => (enabled ? publicApi.status(signal) : Promise.resolve(null)),
+    [revision, enabled],
+  );
 }
 
 export function usePublicEvents(
@@ -84,10 +87,6 @@ export function usePublicEvents(
   );
 }
 
-export function useScout(revision: number) {
-  return usePublicData<PublicScout>((signal) => publicApi.scout(signal), [revision]);
-}
-
 function useEventDetail(id: string | null, revision: number) {
   return usePublicData<PublicEventDetail | null>(
     (signal) => (id ? publicApi.event(id, signal) : Promise.resolve(null)),
@@ -95,57 +94,194 @@ function useEventDetail(id: string | null, revision: number) {
   );
 }
 
-const SCOUT_STATE: Record<string, string> = {
-  live: 'transmitindo',
-  degraded: 'transmissão degradada',
-  offline: 'fora do ar',
-  no_device: 'nenhum dispositivo registrado',
-};
-
 function openEvent(id: string) {
   location.hash = `#/events/${id}`;
+}
+
+const LOCATION_SOURCES: Record<string, string> = {
+  gps_device: 'GPS do aparelho',
+  exif: 'localização gravada na foto',
+  manual: 'ponto marcado no mapa',
+};
+
+function reportPlace(report: CaptureMarker): string | null {
+  const address = report.address;
+  if (address?.status !== 'ok') return null;
+  return [address.road, address.suburb, address.city].filter(Boolean).join(', ') || null;
+}
+
+/**
+ * Relato do próprio autor no mapa: situação, ponto informado com a precisão real e,
+ * depois da análise, o trecho de via associado, sempre separado do ponto informado.
+ */
+export function OwnReportDetail({
+  report,
+  photoUrl,
+  children,
+}: {
+  report: CaptureMarker;
+  photoUrl?: string | null;
+  children?: ReactNode;
+}) {
+  const source = report.location_source ? LOCATION_SOURCES[report.location_source] : undefined;
+  return (
+    <>
+      <h2>{report.urmind_class ? labelFor(report.urmind_class) : 'Seu relato'}</h2>
+      <p>
+        <span className={`report-chip report-${report.report_status}`}>
+          {reportLabels[report.report_status]}
+        </span>
+      </p>
+      {report.created_at && (
+        <p className="muted">
+          Enviado em{' '}
+          <time dateTime={report.created_at}>
+            {new Date(report.created_at).toLocaleString('pt-BR')}
+          </time>
+        </p>
+      )}
+      <p>{reportPlace(report) ?? 'Endereço aproximado indisponível'}</p>
+      <dl className="data-list">
+        <div>
+          <dt>Ponto informado</dt>
+          <dd>
+            {source ?? 'origem não registrada'}
+            {report.accuracy_m != null && (
+              <small>Precisão aproximada: {Math.round(report.accuracy_m)} m</small>
+            )}
+          </dd>
+        </div>
+        {report.snapped_latitude != null && report.snapped_longitude != null && (
+          <div>
+            <dt>Trecho de via associado</dt>
+            <dd>
+              {report.road_name ?? 'via sem nome no mapa'}
+              {report.distance_to_road_m != null && (
+                <small>a {Math.round(report.distance_to_road_m)} m do ponto informado</small>
+              )}
+            </dd>
+          </div>
+        )}
+      </dl>
+      {(report.reporters_count ?? 1) > 1 && (
+        <p>{report.reporters_count} pessoas relataram este ponto</p>
+      )}
+      {report.photo_gate?.status === 'NEEDS_REVIEW' && (
+        <p className="notice">
+          Verificação pendente: nem todas as condições de cena e privacidade foram confirmadas. Isso
+          não é uma detecção de problema.
+        </p>
+      )}
+      {report.user_description && <p className="report-note">{report.user_description}</p>}
+      {photoUrl && (
+        <>
+          <img src={photoUrl} alt="Foto privada do relato selecionado" />
+          <a href={photoUrl} target="_blank" rel="noopener noreferrer">
+            Ver original
+          </a>
+        </>
+      )}
+      {children}
+    </>
+  );
 }
 
 // ------------------------------------------------------------------ home
 
 export function PublicHome({
   revision,
-  status,
   events,
-  scout,
+  reports,
+  hasSession,
   loading,
   error,
 }: {
   revision: number;
-  status: PublicStatus | null;
   events: PublicEvent[];
-  scout: PublicScout | null;
+  reports: CaptureMarker[];
+  hasSession: boolean;
   loading: boolean;
   error: string;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const current = selected ?? events[0]?.id ?? null;
   const { data: detail } = useEventDetail(current, revision);
-  // Without a camera the Scout frame is an empty box; the map answers "where"
-  // and leads the page instead, and Scout shrinks to one line of status.
-  const cameraConnected = Boolean(adapterFor(scout));
-  const scoutReason = scout?.camera.reason ?? 'Nenhuma fonte de vídeo conectada a este ambiente.';
   return (
     <>
-      <div className="page-heading public">
+      <section className="home-hero" aria-labelledby="home-title">
         <div>
-          <h1>O que o UrMind está vendo na cidade</h1>
+          <h1 id="home-title">Viu um problema na rua? Registre com uma foto.</h1>
           <p>
-            Cada ocorrência abaixo foi detectada por visão computacional, situada na malha viária e
-            avaliada por regras auditáveis. Nada aqui é estimado por inteligência artificial
-            generativa.
+            O UrMind guarda onde a foto foi tirada, analisa a imagem e acompanha o relato até a
+            revisão da equipe.
           </p>
         </div>
+        <div className="actions">
+          <a className="button" href="#/registrar">
+            <Camera size={17} /> Registrar evidência
+          </a>
+          <a className="button secondary" href="#/deteccao-ao-vivo">
+            <ScanEye size={17} /> Detecção ao vivo
+          </a>
+        </div>
+      </section>
+      <section className="panel home-reports" aria-label="Seus relatos">
+        <div className="section-heading">
+          <h2>Seus relatos</h2>
+          {reports.length > 0 && (
+            <a className="text-button" href="#/meus-relatos">
+              Ver todos
+            </a>
+          )}
+        </div>
+        {reports.length === 0 ? (
+          <p className="muted">
+            {hasSession
+              ? 'Você ainda não enviou relatos por este aparelho.'
+              : 'Os relatos que você enviar por este aparelho aparecem aqui, com a situação de cada um.'}
+          </p>
+        ) : (
+          <ul className="report-list">
+            {reports.slice(0, 3).map((report) => (
+              <li key={report.id}>
+                <span className={`report-chip report-${report.report_status}`}>
+                  {reportLabels[report.report_status]}
+                </span>
+                <span className="report-place">
+                  {reportPlace(report) ?? report.user_description ?? 'Relato enviado'}
+                </span>
+                {report.created_at && (
+                  <time dateTime={report.created_at}>
+                    {new Date(report.created_at).toLocaleDateString('pt-BR')}
+                  </time>
+                )}
+                <a href={`#/processando/${report.id}`}>Acompanhar</a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <div className="section-heading home-section">
+        <h2>Ocorrências publicadas</h2>
+        <a className="text-button" href="#/map">
+          Abrir mapa
+        </a>
       </div>
-      <SystemStatusBar status={status} error={error} />
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       <div className="home-lead">
         <Suspense fallback={<p role="status">Carregando mapa…</p>}>
-          <UrbanMap events={events} selectedId={current} onSelect={setSelected} />
+          <UrbanMap
+            events={events}
+            // Só uma escolha explícita leva o mapa até o ponto; de início ele enquadra todos.
+            selectedId={selected}
+            onSelect={setSelected}
+            showFilters={false}
+            emptyMessage="Nenhuma ocorrência publicada ainda."
+          />
         </Suspense>
         <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
           {loading && !detail ? (
@@ -162,81 +298,13 @@ export function PublicHome({
             <div className="empty">
               <h3>Nenhuma ocorrência publicada ainda</h3>
               <p>
-                Quando uma evidência for processada, o diagnóstico aparece aqui com confiança,
-                severidade, prioridade e ação sugerida.
+                Depois da revisão da equipe, cada ocorrência aparece aqui com severidade, prioridade
+                e ação sugerida.
               </p>
-              <a className="text-button" href="#/transparency">
-                Ver como o UrMind analisa
+              <a className="text-button" href="#/registrar">
+                Registrar a primeira evidência
               </a>
             </div>
-          )}
-        </section>
-      </div>
-      {cameraConnected && <ScoutLivePanel scout={scout} latest={detail} />}
-      <div className="command-bottom">
-        <EventFeed
-          events={events}
-          selectedId={current}
-          onSelect={(event) => setSelected(event.id)}
-        />
-        <section className="panel" aria-label="Contexto da ocorrência">
-          <div className="section-heading">
-            <h2>Contexto urbano</h2>
-          </div>
-          {detail ? (
-            <ContextPanel event={detail} />
-          ) : (
-            <p className="muted">Sem ocorrência selecionada.</p>
-          )}
-        </section>
-      </div>
-      {!cameraConnected && (
-        <section className="panel scout-offline" aria-label="Câmera do Scout">
-          <strong>Câmera do Scout indisponível</strong>
-          <span>{scoutReason} As ocorrências acima continuam sendo publicadas.</span>
-          <a href="#/live">Ver estado do Scout</a>
-        </section>
-      )}
-    </>
-  );
-}
-
-// ------------------------------------------------------------------ live
-
-export function PublicLive({
-  revision,
-  scout,
-  events,
-}: {
-  revision: number;
-  scout: PublicScout | null;
-  events: PublicEvent[];
-}) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const current = selected ?? events[0]?.id ?? null;
-  const { data: detail } = useEventDetail(current, revision);
-  return (
-    <>
-      <div className="page-heading public">
-        <div>
-          <p className="eyebrow">OPERAÇÃO AO VIVO</p>
-          <h1>Scout e diagnóstico</h1>
-          <p>
-            A câmera só aparece quando há fonte real conectada; caso contrário, o estado é
-            declarado.
-          </p>
-        </div>
-      </div>
-      <div className="command-grid">
-        <ScoutLivePanel scout={scout} latest={detail} />
-        <section className="panel diagnosis" aria-label="Diagnóstico ao vivo">
-          {detail ? (
-            <>
-              <QuickDiagnosis event={detail} />
-              <LocationPanel event={detail} />
-            </>
-          ) : (
-            <p className="muted">Nenhuma ocorrência para diagnosticar.</p>
           )}
         </section>
       </div>
@@ -286,6 +354,13 @@ function Filters({
   );
 }
 
+type MapKind = 'all' | 'mine' | 'published';
+const MAP_KINDS: [MapKind, string][] = [
+  ['all', 'Tudo'],
+  ['mine', 'Meus relatos'],
+  ['published', 'Ocorrências publicadas'],
+];
+
 export function PublicMapPage({
   events,
   reports = [],
@@ -293,18 +368,26 @@ export function PublicMapPage({
   events: PublicEvent[];
   reports?: CaptureMarker[];
 }) {
-  const [selected, setSelected] = useState<string | null>(() =>
-    new URLSearchParams(location.hash.split('?')[1] ?? '').get('ponto'),
-  );
+  const query = () => new URLSearchParams(location.hash.split('?')[1] ?? '');
+  const [selected, setSelected] = useState<string | null>(() => query().get('ponto'));
+  const [kind, setKind] = useState<MapKind>(() => {
+    const requested = query().get('mostrar');
+    return MAP_KINDS.some(([value]) => value === requested) ? (requested as MapKind) : 'all';
+  });
   const [pointDetail, setPointDetail] = useState<PublicEventDetail | null>(null);
   const [pointError, setPointError] = useState('');
+  const [photo, setPhoto] = useState<{ id: string; url: string } | null>(null);
+  const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
+  const own = reports.find((report) => report.id === selected) ?? null;
+  const isGeneric = Boolean(selected && generic?.some((marker) => marker.id === selected));
   useEffect(() => {
     const controller = new AbortController();
     setPointDetail(null);
     setPointError('');
     // A deep link may refer to a publication newer than the cached map page,
     // or outside its bounded listing. The publication endpoint is the authority.
-    if (selected) {
+    // Own reports and other people's generic markers are not publications.
+    if (selected && !own && !isGeneric) {
       publicApi
         .publishedEvent(selected, controller.signal)
         .then((value) => {
@@ -315,9 +398,24 @@ export function PublicMapPage({
         });
     }
     return () => controller.abort();
-  }, [selected]);
-  const { data: generic } = usePublicData((signal) => publicApi.captureMarkers(signal), []);
+  }, [selected, own, isGeneric]);
+  // The author's own original photo: private, served only to the owner's session.
+  const ownId = own?.id;
+  useEffect(() => {
+    const controller = new AbortController();
+    setPhoto(null);
+    if (ownId)
+      api
+        .captureImage(ownId, controller.signal)
+        .then(({ image_url }) => {
+          if (!controller.signal.aborted) setPhoto({ id: ownId, url: image_url });
+        })
+        .catch(() => undefined);
+    return () => controller.abort();
+  }, [ownId]);
   const markers = useMemo(() => {
+    if (kind === 'mine') return reports;
+    if (kind === 'published') return events;
     const reportIds = new Set(reports.map((report) => report.public_id));
     const eventIds = new Set(reports.map((report) => report.event_public_id));
     return [
@@ -325,31 +423,70 @@ export function PublicMapPage({
       ...(generic ?? []).filter((report) => !reportIds.has(report.id)),
       ...reports,
     ];
-  }, [events, reports, generic]);
+  }, [events, reports, generic, kind]);
+  function changeKind(next: MapKind) {
+    setKind(next);
+    setSelected(null);
+    const params = query();
+    params.delete('ponto');
+    if (next === 'all') params.delete('mostrar');
+    else params.set('mostrar', next);
+    history.replaceState(null, '', `#/mapa${params.size ? `?${params}` : ''}`);
+  }
   return (
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">TERRITÓRIO</p>
           <h1>Mapa operacional</h1>
-          <p>Coordenada informada e ponto ajustado à via permanecem separados.</p>
+          <p>
+            Ocorrências publicadas e, se você enviou, os seus relatos com a situação de cada um.
+          </p>
         </div>
       </div>
+      {reports.length > 0 && (
+        <div className="segmented" role="radiogroup" aria-label="Mostrar no mapa">
+          {MAP_KINDS.map(([value, label]) => (
+            <label key={value} className={kind === value ? 'active' : undefined}>
+              <input
+                type="radio"
+                name="map-kind"
+                value={value}
+                checked={kind === value}
+                onChange={() => changeKind(value)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      )}
       <Suspense fallback={<p role="status">Carregando mapa…</p>}>
         <UrbanMap
+          key={kind}
           events={markers}
           selectedId={selected}
+          emptyMessage={
+            kind === 'mine'
+              ? 'Seus relatos com localização aparecem aqui.'
+              : 'Nenhuma ocorrência publicada ainda.'
+          }
           onSelect={(id) => {
             setSelected(id);
             if (events.some((event) => event.id === id)) {
-              const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
-              query.set('ponto', id);
-              history.replaceState(null, '', `#/mapa?${query}`);
+              const params = query();
+              params.set('ponto', id);
+              history.replaceState(null, '', `#/mapa?${params}`);
             }
           }}
           onCloseDetail={() => setSelected(null)}
           detail={
-            selected && (
+            selected &&
+            (own ? (
+              <OwnReportDetail report={own} photoUrl={photo?.id === own.id ? photo.url : null}>
+                <a href={`#/processando/${own.id}`}>Acompanhar relato</a>
+              </OwnReportDetail>
+            ) : isGeneric ? (
+              <p>Relato de outra pessoa. Foto e descrição não são públicas.</p>
+            ) : (
               <>
                 {pointError && <p role="alert">{pointError}</p>}
                 {pointDetail && pointDetail.id === selected ? (
@@ -364,30 +501,33 @@ export function PublicMapPage({
                     )}
                     <p>{pointDetail.road_name ?? 'Endereço aproximado indisponível'}</p>
                     {pointDetail.latitude != null && pointDetail.longitude != null && (
-                      <>
-                        <p>
-                          {pointDetail.latitude.toFixed(4)}, {pointDetail.longitude.toFixed(4)}
-                        </p>
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${pointDetail.latitude.toFixed(4)},${pointDetail.longitude.toFixed(4)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Como chegar
-                        </a>
-                      </>
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${pointDetail.latitude.toFixed(4)},${pointDetail.longitude.toFixed(4)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Como chegar
+                      </a>
                     )}
                     <a href={`#/resultado/${pointDetail.id}`}>Abrir resultado</a>
                   </>
                 ) : (
-                  <p>Relato do cidadão. Foto e descrição não publicadas.</p>
+                  !pointError && <p role="status">Carregando detalhe…</p>
                 )}
               </>
-            )
+            ))
           }
         />
       </Suspense>
-      <EventFeed events={events} selectedId={selected} onSelect={(event) => openEvent(event.id)} />
+      {kind !== 'mine' && (
+        <EventFeed
+          events={events}
+          selectedId={selected}
+          onSelect={(event) => openEvent(event.id)}
+          title="Ocorrências publicadas"
+          emptyHint="Nenhuma ocorrência publicada ainda. Relatos aparecem aqui depois da revisão."
+        />
+      )}
     </>
   );
 }
@@ -588,7 +728,7 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
         <ol className="pipeline">
           <li>
             <strong>Imagem</strong>
-            <span>captura enviada ou registrada pelo Scout</span>
+            <span>foto enviada pelo celular ou capturada na detecção ao vivo</span>
           </li>
           <li>
             <strong>YOLOX</strong>
@@ -751,23 +891,20 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
 
 // ------------------------------------------------------------------ sistema
 
+/** Diagnóstico técnico, fora da navegação do cidadão: API, banco, detector e cobertura. */
 export function PublicSystemPage({
   status,
-  scout,
   error,
   onReload,
 }: {
   status: PublicStatus | null;
-  scout: PublicScout | null;
   error: string;
   onReload: () => void;
 }) {
-  const telemetry = Object.entries(scout?.telemetry ?? {});
   return (
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">SISTEMA</p>
           <h1>Estado público</h1>
           <p>Cada componente com seu estado real, sem reduzir tudo a online ou offline.</p>
         </div>
@@ -777,55 +914,6 @@ export function PublicSystemPage({
       </div>
       <SystemStatusBar status={status} error={error} />
       <div className="detail-grid">
-        <section className="panel" aria-label="Scout">
-          <div className="section-heading">
-            <h2>Scout</h2>
-          </div>
-          <dl className="data-list">
-            <div>
-              <dt>Estado</dt>
-              <dd>
-                {SCOUT_STATE[scout?.status ?? ''] ?? 'não disponível'}
-                {status?.scout.detail && <small>{status.scout.detail}</small>}
-              </dd>
-            </div>
-            <div>
-              <dt>Câmera</dt>
-              <dd>
-                {scout?.camera.mode === 'unavailable'
-                  ? 'indisponível'
-                  : scout?.camera.mode === 'live_video'
-                    ? 'vídeo ao vivo'
-                    : scout?.camera.mode === 'live_snapshots'
-                      ? 'imagens ao vivo'
-                      : 'não disponível'}
-                {scout?.camera.reason && <small>{scout.camera.reason}</small>}
-              </dd>
-            </div>
-            <div>
-              <dt>Última captura</dt>
-              <dd>
-                {scout?.last_seen
-                  ? new Date(scout.last_seen).toLocaleString('pt-BR')
-                  : 'não disponível'}
-              </dd>
-            </div>
-          </dl>
-          {telemetry.length ? (
-            <dl className="data-list">
-              {telemetry.map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="muted">
-              Sem telemetria publicada: nenhum sensor é exibido enquanto não houver leitura real.
-            </p>
-          )}
-        </section>
         <section className="panel" aria-label="Cobertura">
           <div className="section-heading">
             <h2>Cobertura</h2>

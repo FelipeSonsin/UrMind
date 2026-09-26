@@ -32,10 +32,14 @@ mostra "Modelo de detecção indisponível": não apresentar isso como detecçã
 | Caixas alinhadas ao objeto em retrato e paisagem | [ ] | [ ] | [ ] |
 | Provider (WebGPU/WASM), latência p50/p95 e análises/s anotados | [ ] | [ ] | [ ] |
 | "Analisar imagem" sem GPS não cria ocorrência | [ ] | [ ] | [ ] |
-| Foto tirada agora usa GPS atual com precisão e horário exibidos | [ ] | [ ] | [ ] |
-| Foto da galeria usa EXIF; GPS atual só após confirmação explícita | [ ] | [ ] | [ ] |
-| GPS negado → seleção manual; nenhum ponto inventado | [ ] | [ ] | [ ] |
-| Capturar e registrar → frame sem overlay → fluxo oficial | [ ] | [ ] | [ ] |
+| Vídeo fluido durante a detecção (câmera fps ≫ análises/s em "Detalhes técnicos") | [ ] | [ ] | [ ] |
+| Foto tirada agora: "Localização obtida" com precisão; nenhum campo de coordenada | [ ] | [ ] | [ ] |
+| Foto da galeria usa o GPS do EXIF ou o mapa; nunca o GPS atual | [ ] | [ ] | [ ] |
+| GPS negado ou sem sinal → mapa; nenhum ponto inventado | [ ] | [ ] | [ ] |
+| "Marcar o centro do mapa" funciona só com teclado/leitor de tela | [ ] | [ ] | [ ] |
+| Capturar e registrar → frame sem overlay → GPS do instante → fluxo oficial | [ ] | [ ] | [ ] |
+| Relato enviado aparece no mapa do autor na hora e continua após recarregar | [ ] | [ ] | [ ] |
+| Nomes de cidades no mapa em português, sem nome duplicado ou fora do lugar | [ ] | [ ] | [ ] |
 
 ## Continuação atual (24/09/2026)
 

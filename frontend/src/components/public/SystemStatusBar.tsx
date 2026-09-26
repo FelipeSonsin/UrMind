@@ -21,8 +21,8 @@ export function SystemStatusBar({
 }) {
   if (error) return <p className="status-bar error">{error}</p>;
   if (!status) return <p className="status-bar muted">Consultando o estado do sistema…</p>;
+  // O Scout (hardware) está fora do escopo mobile/foto; seu estado não aparece mais.
   const items = [
-    { key: 'scout', label: 'Scout', component: status.scout },
     { key: 'detector', label: 'IA', component: status.detector },
     { key: 'api', label: 'API', component: status.api },
     { key: 'database', label: 'Banco', component: status.database },

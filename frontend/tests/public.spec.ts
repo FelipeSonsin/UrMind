@@ -4,7 +4,6 @@ import {
   eventDetail,
   publicEvents,
   publicStatus,
-  scoutOffline,
   urbanAnalysis,
   stubPublicApi,
 } from './fixtures';
@@ -35,23 +34,30 @@ test('operational map excludes historical points outside the Brazil viewport', a
     ],
   });
   await page.goto('/#/mapa');
-  await expect(page.getByText('1 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 ponto visível', { exact: true })).toBeVisible();
   await expect(page.locator(`[data-event-id="${outsideId}"]`)).toHaveCount(0);
 });
 
-test('a página inicial explica em segundos o que o sistema viu', async ({ page }, testInfo) => {
+test('a página inicial leva a registrar, acompanhar relatos e ver o mapa', async ({
+  page,
+}, testInfo) => {
+  let statusRequests = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/public/status')) statusRequests++;
+  });
   await stubPublicApi(page);
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
+    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
-  // Estado por componente, nunca um único "online".
-  const statusBar = page.getByRole('status').first();
-  await expect(statusBar).toContainText('Scout');
-  await expect(statusBar).toContainText('indisponível');
-  await expect(statusBar).toContainText('parcial');
-  await expect(statusBar).toContainText('832 trechos');
-  // Diagnóstico rápido da ocorrência mais recente.
+  await expect(page.getByRole('link', { name: 'Registrar evidência' }).first()).toBeVisible();
+  await expect(page.getByLabel('Seus relatos')).toContainText('aparecem aqui');
+  // Diagnóstico técnico (API, banco, detector, trechos, Scout) não aparece para o cidadão.
+  const main = page.locator('main');
+  for (const technical of ['Scout', 'Banco', 'API operacional', 'trechos', 'Área piloto'])
+    await expect(main).not.toContainText(technical);
+  expect(statusRequests).toBe(0);
+  // Diagnóstico rápido da ocorrência publicada mais recente.
   const diagnosis = page.getByLabel('Diagnóstico da ocorrência selecionada');
   await expect(diagnosis.getByRole('heading', { name: 'Buraco', exact: true })).toBeVisible();
   await expect(diagnosis).toContainText('MÉDIA');
@@ -71,7 +77,7 @@ test('o fluxo móvel não consulta Scout nem oferece transmissão ativa', async 
     if (request.url().includes('/public/scout')) scoutRequests++;
   });
   await page.goto('/#/registrar');
-  await expect(page.getByRole('button', { name: 'Salvar e enviar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enviar relato' })).toBeVisible();
   await expect(
     page
       .getByRole('navigation', { name: 'Navegação principal' })
@@ -180,15 +186,43 @@ test('ocorrência sem avaliação não recebe severidade nem prioridade plausív
 test('filtros do mapa persistem na URL e removem pontos fora do período', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/mapa');
-  await page.getByLabel('Desde (UTC)').fill('2099-01-01');
+  // Data em pt-BR, digitada como dd/mm/aaaa (nunca mm/dd/yyyy).
+  const since = page.getByLabel('Desde');
+  await expect(since).toHaveAttribute('placeholder', 'dd/mm/aaaa');
+  await since.fill('01012099');
+  await expect(since).toHaveValue('01/01/2099');
   await expect(page).toHaveURL(/map_from=2099-01-01/);
   await expect(page.getByText('0 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nenhum ponto corresponde a estes filtros.')).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Desde (UTC)')).toHaveValue('2099-01-01');
-  await page.getByLabel('Desde (UTC)').fill('');
+  await expect(page.getByLabel('Desde')).toHaveValue('01/01/2099');
+  await page.getByRole('button', { name: 'Limpar filtros' }).click();
+  await expect(page.getByLabel('Desde')).toHaveValue('');
+  // Data impossível não filtra e é apontada.
+  await page.getByLabel('Até').fill('31/02/2026');
+  await expect(page.getByText('Data inexistente')).toBeVisible();
+  await expect(page).not.toHaveURL(/map_to=/);
+  await page.getByLabel('Até').fill('');
   await page.getByLabel('Classe do ponto').selectOption('URMIND_ROAD_D40');
   await expect(page).toHaveURL(/map_class=URMIND_ROAD_D40/);
-  await expect(page.getByText('1 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 ponto visível', { exact: true })).toBeVisible();
+});
+
+test('filtros do mapa oferecem status, família e classe reais, com a classe presa à família', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  await page.goto('/#/mapa');
+  const classes = page.getByLabel('Classe do ponto').locator('option');
+  // As quatro classes que o modelo experimental emite, com nome em português.
+  await expect(classes).toHaveText([
+    'Todas',
+    'Buraco',
+    'Trinca em malha (couro de jacaré)',
+    'Trinca longitudinal',
+    'Trinca transversal',
+  ]);
+  await expect(page.getByLabel('Família do ponto')).toHaveCount(0);
 });
 
 test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', async ({ page }) => {
@@ -285,37 +319,42 @@ test('estado do sistema é auditável na rota pública dedicada', async ({ page 
   await stubPublicApi(page, { status: { ...publicStatus, events_total: 2 } });
   await page.goto('/#/system');
   await expect(page.getByRole('heading', { name: 'Estado público' })).toBeVisible();
-  await expect(page.getByLabel('Scout')).toContainText('nenhum dispositivo registrado');
-  await expect(page.getByLabel('Scout')).not.toContainText('no_device');
+  // O diagnóstico técnico continua disponível aqui, fora da navegação; sem Scout.
+  await expect(page.getByRole('status').first()).toContainText('API');
+  await expect(page.locator('main')).not.toContainText('Scout');
   await expect(page.getByLabel('Cobertura')).toContainText('832');
 });
 
-test('sem ocorrência e sem câmera, o painel parece proposital e não quebrado', async ({
+test('sem ocorrência publicada, a página inicial convida a registrar e não parece quebrada', async ({
   page,
 }, testInfo) => {
-  // Estado real de hoje: nenhuma captura publicada e nenhum Scout registrado.
+  // Estado real de hoje: nenhuma captura publicada.
   await stubPublicApi(page, {
     events: [],
-    scout: scoutOffline,
     status: { ...publicStatus, events_total: 0, last_event_at: null },
   });
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
+    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
 
   const diagnosis = page.getByLabel('Diagnóstico da ocorrência selecionada');
   await expect(
     diagnosis.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
   ).toBeVisible();
-  await expect(diagnosis).toContainText('Quando uma evidência for processada');
-
-  await expect(page.getByLabel('Câmera do Scout')).toContainText('Câmera do Scout indisponível');
+  await expect(
+    diagnosis.getByRole('link', { name: 'Registrar a primeira evidência' }),
+  ).toBeVisible();
+  await expect(page.getByText('Nenhuma ocorrência publicada ainda.')).toBeVisible();
   await expect(page.getByLabel('Ocorrências recentes')).toContainText('0 registros');
-  await expect(page.getByRole('status').first()).toContainText('nenhuma ainda');
+  await expect(page.locator('main')).not.toContainText('Scout');
   // Nenhum número aparece sem origem: zero é zero, não um traço decorativo.
   await expect(page.locator('body')).not.toContainText('NaN');
   await page.screenshot({ path: testInfo.outputPath('vazio.png'), fullPage: true });
+  // No Mapa operacional, sem pontos não há filtros vazios: só o estado vazio explicado.
+  await page.goto('/#/mapa');
+  await expect(page.getByText('Nenhuma ocorrência publicada ainda.').first()).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Filtros do mapa' })).toHaveCount(0);
 });
 
 test('demo mostra só exemplos revisados e nunca como resultado da foto enviada', async ({

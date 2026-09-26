@@ -4,9 +4,13 @@ import {
   filterableClasses,
   exportMapRecords,
   filterMapRecords,
+  formatBrDate,
   issueTaxonomySchema,
   labelFor,
+  mapFilterOptions,
+  maskBrDate,
   modelSupportLabel,
+  parseBrDate,
   registerTaxonomy,
   type IssueDefinition,
   priorityBand,
@@ -47,6 +51,32 @@ it('filtros do mapa não inventam período para relato sem data', () => {
   ]);
   expect(filterMapRecords(rows, { ...filters, status: 'received' })).toEqual([rows[1]]);
   expect(filterMapRecords(rows, { ...filters, issue: 'missing' })).toEqual([]);
+});
+
+it('período do mapa usa o dia de quem consulta, de meia-noite a meia-noite', () => {
+  const lateNight = new Date(2026, 8, 25, 23, 30).toISOString();
+  const earlyMorning = new Date(2026, 8, 26, 0, 10).toISOString();
+  const rows = [
+    { status: 'confirmed', created_at: lateNight },
+    { status: 'confirmed', created_at: earlyMorning },
+  ];
+  const filters = { status: '', family: '', issue: '', from: '', to: '' };
+  expect(filterMapRecords(rows, { ...filters, from: '2026-09-26' })).toEqual([rows[1]]);
+  expect(filterMapRecords(rows, { ...filters, to: '2026-09-25' })).toEqual([rows[0]]);
+});
+
+it('datas digitadas em pt-BR viram ISO e datas impossíveis são recusadas', () => {
+  expect(parseBrDate('26/09/2026')).toBe('2026-09-26');
+  expect(parseBrDate(' 01/01/2027 ')).toBe('2027-01-01');
+  expect(parseBrDate('31/02/2026')).toBeNull();
+  expect(parseBrDate('2026-09-26')).toBeNull();
+  expect(parseBrDate('9/9/2026')).toBeNull();
+  expect(formatBrDate('2026-09-26')).toBe('26/09/2026');
+  expect(formatBrDate('')).toBe('');
+  expect(maskBrDate('26092026')).toBe('26/09/2026');
+  expect(maskBrDate('2609')).toBe('26/09');
+  expect(maskBrDate('26/09/20261')).toBe('26/09/2026');
+  expect(maskBrDate('')).toBe('');
 });
 
 const event = {
@@ -259,6 +289,54 @@ describe('taxonomia canônica', () => {
     );
     expect(labelFor('URMIND_FALLEN_TREE')).toBe('rótulo URMIND_FALLEN_TREE');
     expect(filterableClasses().map(([code]) => code)).toEqual(['URMIND_ROAD_D40']);
+  });
+
+  it('filtros do mapa têm opções reais e a classe segue a família escolhida', () => {
+    registerTaxonomy(
+      issueTaxonomySchema.parse({
+        taxonomy_version: 'urmind-issue-taxonomy-v2',
+        issues: [
+          issue('URMIND_ROAD_D40', 'EXPERIMENTAL_MODEL', true),
+          issue('URMIND_ROAD_D00', 'EXPERIMENTAL_MODEL', true),
+          {
+            ...issue('URMIND_FALLEN_TREE', 'DATA_REQUIRED', false),
+            family: 'VEGETATION_OBSTRUCTION',
+          },
+          { ...issue('URMIND_CLOGGED_DRAIN', 'DATA_REQUIRED', false), family: 'DRAINAGE' },
+        ],
+      }),
+    );
+    const vocabulary = {
+      reports: { received: 'Recebido', published: 'Publicado' },
+      events: { confirmed: 'Confirmada', review: 'Em revisão' },
+    };
+    // Sem nenhum ponto, ainda há o que filtrar: as classes que o modelo pode emitir.
+    const empty = mapFilterOptions([], '', vocabulary);
+    expect(empty.statuses).toEqual([]);
+    expect(empty.families).toEqual([['ROAD_SURFACE', 'Pavimento']]);
+    expect(empty.issues.map(([code]) => code).sort()).toEqual([
+      'URMIND_ROAD_D00',
+      'URMIND_ROAD_D40',
+    ]);
+    // Um relato revisado com classe fora do modelo acrescenta a família dele.
+    const rows = [
+      { report_status: 'received', urmind_class: null },
+      { report_status: 'published', urmind_class: 'URMIND_FALLEN_TREE' },
+      { status: 'confirmed', urmind_class: 'URMIND_ROAD_D40' },
+    ];
+    const options = mapFilterOptions(rows, '', vocabulary);
+    expect(options.statuses).toEqual([
+      ['received', 'Recebido'],
+      ['published', 'Publicado'],
+      ['confirmed', 'Confirmada'],
+    ]);
+    expect(options.families.map(([code]) => code)).toEqual([
+      'ROAD_SURFACE',
+      'VEGETATION_OBSTRUCTION',
+    ]);
+    expect(options.families).not.toContainEqual(['DRAINAGE', 'Drenagem']);
+    const roadOnly = mapFilterOptions(rows, 'VEGETATION_OBSTRUCTION', vocabulary);
+    expect(roadOnly.issues).toEqual([['URMIND_FALLEN_TREE', 'rótulo URMIND_FALLEN_TREE']]);
   });
 
   it('classe sem dados nunca aparece como reconhecida pela IA', () => {

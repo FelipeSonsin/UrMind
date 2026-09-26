@@ -129,9 +129,11 @@ export const captureMarkerSchema = z.object({
     .optional(),
   report_status: z.enum([
     'received',
+    'processing',
     'model_not_available',
     'experimental',
     'human_confirmed',
+    'published',
     'rejected',
     'duplicate',
     'no_supported_detection',
@@ -143,20 +145,28 @@ export const captureMarkerSchema = z.object({
   location_source: z.string().optional(),
   location_conflict: z.boolean().nullable().optional(),
   accuracy_m: optionalNumber,
+  /** Ponto ajustado à via pela análise; o ponto informado continua em latitude/longitude. */
+  snapped_latitude: optionalNumber,
+  snapped_longitude: optionalNumber,
+  distance_to_road_m: optionalNumber,
+  road_name: z.string().nullable().optional(),
   urmind_class: z.string().nullable().optional(),
   severity: z.string().nullable().optional(),
   priority_score: optionalNumber,
 });
 export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
+/** Estado do relato em palavras do cidadão; a ordem é a do caminho do relato. */
 export const reportLabels: Record<CaptureMarker['report_status'], string> = {
-  location_required: 'Localização necessária — sem ponto no mapa',
-  received: 'Relato recebido — aguardando análise',
-  model_not_available: 'Análise indisponível — sem modelo autorizado',
-  experimental: 'Análise experimental',
-  human_confirmed: 'Confirmado por revisão humana',
-  rejected: 'Rejeitado por revisão humana',
-  duplicate: 'Relato duplicado',
-  no_supported_detection: 'Relato recebido — nenhum problema das classes suportadas identificado',
+  location_required: 'Necessita localização',
+  received: 'Recebido',
+  processing: 'Processando',
+  model_not_available: 'Análise indisponível',
+  experimental: 'Analisado (experimental)',
+  no_supported_detection: 'Analisado — nenhum problema reconhecido',
+  human_confirmed: 'Confirmado na revisão',
+  published: 'Publicado',
+  rejected: 'Rejeitado na revisão',
+  duplicate: 'Duplicado',
 };
 
 const detectionSchema = z.object({

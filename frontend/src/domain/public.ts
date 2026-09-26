@@ -328,6 +328,20 @@ export function familyFor(code?: string | null): string {
   return code ? (taxonomyFamilies.get(code) ?? '') : '';
 }
 
+/** Nome público das famílias da taxonomia; código desconhecido aparece como está. */
+export const familyLabels: Record<string, string> = {
+  ROAD_SURFACE: 'Pavimento',
+  DRAINAGE: 'Drenagem',
+  VEGETATION_OBSTRUCTION: 'Vegetação',
+  PEDESTRIAN_INFRASTRUCTURE: 'Calçadas e pedestres',
+  TRAFFIC_INFRASTRUCTURE: 'Sinalização e trânsito',
+  URBAN_INFRASTRUCTURE: 'Infraestrutura urbana',
+  WASTE_OBSTRUCTION: 'Resíduos e entulho',
+};
+export function familyLabel(family: string): string {
+  return familyLabels[family] ?? family;
+}
+
 export type MapFilters = {
   status: string;
   family: string;
@@ -335,6 +349,36 @@ export type MapFilters = {
   from: string;
   to: string;
 };
+
+/** Início do dia `yyyy-mm-dd` no fuso de quem usa o mapa (o dia que a pessoa escolheu). */
+export function localDayStart(isoDate: string): number {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(year, month - 1, day).getTime();
+}
+
+/** `dd/mm/aaaa` → `aaaa-mm-dd`; data inexistente ou incompleta → null. */
+export function parseBrDate(text: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+  if (!match) return null;
+  const [, day, month, year] = match.map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)
+    return null;
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+/** Enquanto a pessoa digita: só dígitos, com as barras de `dd/mm/aaaa` no lugar. */
+export function maskBrDate(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+}
+
+/** `aaaa-mm-dd` → `dd/mm/aaaa`. */
+export function formatBrDate(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+
 export function filterMapRecords<
   T extends {
     urmind_class?: string | null;
@@ -351,10 +395,44 @@ export function filterMapRecords<
       (!filters.status || (row.report_status ?? row.status) === filters.status) &&
       (!filters.family || familyFor(row.urmind_class) === filters.family) &&
       (!filters.issue || row.urmind_class === filters.issue) &&
-      (!filters.from || timestamp >= Date.parse(`${filters.from}T00:00:00Z`)) &&
-      (!filters.to || timestamp < Date.parse(`${filters.to}T00:00:00Z`) + 86400000)
+      (!filters.from || timestamp >= localDayStart(filters.from)) &&
+      (!filters.to || timestamp < localDayStart(filters.to) + 86_400_000)
     );
   });
+}
+
+/**
+ * Opções reais dos filtros do mapa: o vocabulário completo do tipo de ponto exibido
+ * (relato ou ocorrência) e as famílias/classes que existem nos pontos ou que o modelo
+ * pode emitir. Com uma família escolhida, só as classes dela.
+ */
+export function mapFilterOptions(
+  records: Array<{ urmind_class?: string | null; report_status?: string; status?: string }>,
+  family: string,
+  vocabulary: { reports: Record<string, string>; events: Record<string, string> },
+): {
+  statuses: [string, string][];
+  families: [string, string][];
+  issues: [string, string][];
+} {
+  const hasReports = records.some((row) => row.report_status);
+  const eventStatuses = new Set(
+    records.filter((row) => !row.report_status && row.status).map((row) => row.status!),
+  );
+  const statuses: [string, string][] = [
+    ...(hasReports ? Object.entries(vocabulary.reports) : []),
+    ...Object.entries(vocabulary.events).filter(([code]) => eventStatuses.has(code)),
+  ];
+  const codes = new Set(emittableCodes);
+  for (const row of records) if (row.urmind_class) codes.add(row.urmind_class);
+  const families = [...new Set([...codes].map((code) => familyFor(code)).filter(Boolean))]
+    .sort()
+    .map((code): [string, string] => [code, familyLabel(code)]);
+  const issues = [...codes]
+    .filter((code) => !family || familyFor(code) === family)
+    .map((code): [string, string] => [code, labelFor(code)])
+    .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  return { statuses, families, issues };
 }
 
 /** Classes que podem aparecer como detecção de modelo (filtros de ocorrência). */

@@ -6,11 +6,34 @@ import {
   BRAZIL_OUTLINE_BOUNDS,
   isInBrazilMapViewport,
   isInsidePolygons,
+  LOCAL_LABEL_FIELD,
+  localizedLabelField,
   outlinePolygons,
   outsideMask,
   resolveMapProvider,
   type Polygon,
 } from './mapConfig';
+import { BRAZIL_CAPITALS } from './mapDesign';
+
+describe('basemap labels', () => {
+  // Campo de texto real das camadas de rótulo do estilo "liberty" do OpenFreeMap.
+  const liberty = [
+    'case',
+    ['has', 'name:nonlatin'],
+    ['concat', ['get', 'name:latin'], '\n', ['get', 'name:nonlatin']],
+    ['coalesce', ['get', 'name_en'], ['get', 'name']],
+  ];
+
+  it('shows the local OpenStreetMap name instead of the English one', () => {
+    expect(localizedLabelField(liberty)).toEqual(['coalesce', ['get', 'name'], ['get', 'name_en']]);
+    expect(LOCAL_LABEL_FIELD[1]).toEqual(['get', 'name']);
+  });
+
+  it('leaves labels that do not use names untouched (road shields)', () => {
+    expect(localizedLabelField(['to-string', ['get', 'ref']])).toBeNull();
+    expect(localizedLabelField(undefined)).toBeNull();
+  });
+});
 
 describe('Brazil operational map viewport', () => {
   it('frames Brazil instead of the whole world', () => {
@@ -103,6 +126,30 @@ describe('Brazil outline geometry', () => {
         expect(lat).toBeGreaterThanOrEqual(south);
         expect(lat).toBeLessThanOrEqual(north);
       }
+  });
+
+  it('places every capital label inside its own state on the IBGE state grid', () => {
+    const states = JSON.parse(
+      readFileSync(resolve(__dirname, '../public/geo/brasil-uf.geojson'), 'utf-8'),
+    ) as { features: { properties: { codarea: string }; geometry: { type: string } }[] };
+    const byCode = new Map(
+      states.features.map((feature) => [
+        feature.properties.codarea,
+        outlinePolygons({ features: [feature as never] }),
+      ]),
+    );
+    expect(BRAZIL_CAPITALS).toHaveLength(27);
+    expect(new Set(BRAZIL_CAPITALS.map((capital) => capital.uf)).size).toBe(27);
+    for (const capital of BRAZIL_CAPITALS) {
+      const state = byCode.get(capital.uf);
+      expect(state, capital.name).toBeDefined();
+      expect(isInsidePolygons(state!, capital.lat, capital.lng), capital.name).toBe(true);
+      const elsewhere = [...byCode].filter(
+        ([code, polygons]) =>
+          code !== capital.uf && isInsidePolygons(polygons, capital.lat, capital.lng),
+      );
+      expect(elsewhere, capital.name).toEqual([]);
+    }
   });
 
   it('honours holes and builds a mask that cuts every shell out of the world', () => {

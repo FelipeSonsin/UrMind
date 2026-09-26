@@ -7,7 +7,6 @@ import {
   FileImage,
   LayoutDashboard,
   Map,
-  Radio,
   ScanEye,
   ScanLine,
   Settings2,
@@ -19,8 +18,8 @@ import { auth, subscribeToEventChanges, type RealtimeStatus } from './services/a
 import {
   PublicEventDetailPage,
   PublicEventsPage,
+  OwnReportDetail,
   PublicHome,
-  PublicLive,
   PublicMapPage,
   PublicSystemPage,
   PublicTransparencyPage,
@@ -83,6 +82,25 @@ const GroundTruthPage = lazy(() =>
  * para não pesar na API. */
 const PUBLIC_REFRESH_MS = 30_000;
 
+/** Etapa do processamento em palavras de quem enviou; o código fica em `data-stage`. */
+const processingLabels: Record<CaptureProcessing['status'], string> = {
+  received: 'Recebido',
+  queued: 'Recebido, na fila de análise',
+  processing_detection: 'Processando: procurando o problema na foto',
+  detection_completed: 'Processando: detecção concluída',
+  building_event: 'Processando: consolidando a ocorrência',
+  enriching_context: 'Processando: consultando o contexto do local',
+  building_features: 'Processando: preparando a avaliação',
+  assessing: 'Processando: avaliando a prioridade',
+  completed: 'Analisado',
+  no_supported_detection: 'Analisado: nenhum problema reconhecido',
+  no_event: 'Analisado: sem ocorrência consolidada',
+  needs_review: 'Aguardando revisão humana',
+  failed: 'Falha no processamento',
+  model_not_available: 'Recebido, sem análise automática disponível',
+  location_required: 'Necessita localização',
+};
+
 const navigation = [
   {
     id: 'my-reports',
@@ -99,7 +117,6 @@ const navigation = [
     section: 'público',
   },
   { id: 'overview', label: 'Início', icon: LayoutDashboard, href: '#/', section: 'público' },
-  { id: 'live', label: 'Ao vivo', icon: Radio, href: '#/live', section: 'público' },
   { id: 'map', label: 'Mapa operacional', icon: Map, href: '#/map', section: 'público' },
   { id: 'events', label: 'Ocorrências', icon: ClipboardList, href: '#/events', section: 'público' },
   {
@@ -176,6 +193,8 @@ function parseRoute(): Route {
   if (first === 'processando' && second) return { page: 'processing', captureId: second };
   if (first === 'relato' && second) return { page: 'processing', protocol: second };
   if (first === 'registrar') return { page: 'capture' };
+  // A antiga página do Scout (hardware fora do escopo) leva à detecção no próprio aparelho.
+  if (first === 'live') return { page: 'live-detection' };
   if (first === 'mapa') return { page: 'map' };
   if (first === 'transparency') return { page: 'analysis' };
   if (first === 'system') return { page: 'settings' };
@@ -284,16 +303,22 @@ export default function App() {
     null,
   );
   const locationOperation = useRef<AbortController | null>(null);
+  // Páginas do cidadão mostram só os relatos da própria sessão (propriedade conferida
+  // no servidor); a equipe vê os de todos apenas na área interna.
+  const onlyMine = ['my-reports', 'map', 'overview', 'processing'].includes(page);
   const ownReports =
-    session && reports?.owner === session.user.id && reports.onlyMine === (page === 'my-reports')
+    session && reports?.owner === session.user.id && reports.onlyMine === onlyMine
       ? reports.data
       : [];
   const showReports =
     page === 'processing' ||
     page === 'private-map' ||
     page === 'map' ||
+    page === 'overview' ||
     page === 'my-reports' ||
     (canReview && (page === 'review' || page === 'dashboard'));
+  // Início e Mapa mostram os relatos dentro das próprias páginas.
+  const reportSection = showReports && page !== 'map' && page !== 'overview';
   const listedReports =
     page === 'review'
       ? filterMapRecords(ownReports, queueFilters)
@@ -310,6 +335,8 @@ export default function App() {
       : ownReports;
   useEffect(() => {
     if (page === 'review' && canReview && route.captureId) setSelectedReport(route.captureId);
+    // O relato que acabou de ser enviado (ou reaberto pelo link) fica em foco no mapa.
+    if (page === 'processing' && route.captureId) setSelectedReport(route.captureId);
   }, [page, canReview, route.captureId]);
   useEffect(() => {
     locationOperation.current?.abort();
@@ -329,10 +356,10 @@ export default function App() {
     if (!session || !showReports) return () => controller.abort();
     const owner = session.user.id;
     api
-      .captureMarkers(controller.signal, page === 'my-reports', reportCursors.at(-1) ?? null)
+      .captureMarkers(controller.signal, onlyMine, reportCursors.at(-1) ?? null)
       .then((data) => {
         if (!controller.signal.aborted) {
-          setReports({ owner, onlyMine: page === 'my-reports', data });
+          setReports({ owner, onlyMine, data });
           setReportError('');
         }
       })
@@ -340,7 +367,7 @@ export default function App() {
         if (!controller.signal.aborted) setReportError('Não foi possível consultar os relatos.');
       });
     return () => controller.abort();
-  }, [session?.user.id, showReports, page, revision, processingRetry, reportCursors]);
+  }, [session?.user.id, showReports, onlyMine, page, revision, processingRetry, reportCursors]);
   useEffect(() => {
     const controller = new AbortController();
     setReportPhoto(null);
@@ -390,8 +417,11 @@ export default function App() {
       .catch(() => undefined);
     return () => controller.abort();
   }, []);
-  const { data: publicStatus, error: statusError } = useSystemStatus(publicRevision);
-  const scout = null;
+  // Diagnóstico técnico (API, banco, detector) só na página Sistema, fora do fluxo do cidadão.
+  const { data: publicStatus, error: statusError } = useSystemStatus(
+    publicRevision,
+    page === 'settings',
+  );
   const {
     data: publicEvents,
     loading: publicLoading,
@@ -716,7 +746,7 @@ export default function App() {
           : result.requires_manual_location
             ? 'Foto enviada. Sem localização: marque o ponto antes que ela vire ocorrência.'
             : result.created
-              ? 'Foto enviada e registrada. A detecção roda no processamento do backend.'
+              ? 'Foto enviada e registrada. O ponto já aparece no seu mapa; a análise segue abaixo.'
               : 'Esta foto já estava registrada; nada foi duplicado.',
       );
       setRevision((value) => value + 1);
@@ -813,7 +843,7 @@ export default function App() {
             <i className={online ? 'online' : ''} />
             {online ? 'Rede disponível' : 'Sem rede'}
           </span>
-          {session && (
+          {session && privatePage && canReview && (
             <span className="network" title="Supabase Realtime (Postgres Changes)">
               <i className={realtime === 'connected' ? 'online' : ''} />
               {realtime === 'connected'
@@ -850,17 +880,20 @@ export default function App() {
             {page === 'overview' && (
               <PublicHome
                 revision={publicRevision}
-                status={publicStatus}
                 events={publicEvents ?? []}
-                scout={scout}
+                reports={ownReports}
+                hasSession={Boolean(session)}
                 loading={publicLoading}
-                error={publicError || statusError}
+                error={publicError}
               />
             )}
-            {page === 'live' && (
-              <PublicLive revision={publicRevision} scout={scout} events={publicEvents ?? []} />
+            {page === 'map' && (
+              <PublicMapPage
+                key={session?.user.id ?? 'no-session'}
+                events={publicEvents ?? []}
+                reports={ownReports}
+              />
             )}
-            {page === 'map' && <PublicMapPage events={publicEvents ?? []} reports={ownReports} />}
             {page === 'events' && (
               <PublicEventsPage
                 events={publicEvents ?? []}
@@ -879,9 +912,13 @@ export default function App() {
             )}
             {page === 'processing' && (
               <section className="panel" aria-live="polite">
-                <h1>Processamento da foto</h1>
+                <h1>Seu relato</h1>
                 {!session ? <p>Recuperando sessão segura desta captura…</p> : null}
-                {captureStatus && <p role="status">Etapa: {captureStatus.status}</p>}
+                {captureStatus && (
+                  <p role="status" className="stage" data-stage={captureStatus.status}>
+                    Situação: <strong>{processingLabels[captureStatus.status]}</strong>
+                  </p>
+                )}
                 {captureStatus?.protocol_code && (
                   <p>
                     Protocolo: <strong>{captureStatus.protocol_code}</strong>{' '}
@@ -899,7 +936,9 @@ export default function App() {
                   </p>
                 )}
                 {captureStatus?.model_status === 'EXPERIMENTAL_SHADOW' && (
-                  <p className="notice">Análise experimental — modelo rejeitado para produção.</p>
+                  <p className="notice">
+                    Análise experimental: o modelo ainda não foi aprovado para uso oficial.
+                  </p>
                 )}
                 {captureStatus &&
                   ['completed', 'needs_review'].includes(captureStatus.status) &&
@@ -925,94 +964,53 @@ export default function App() {
                 </button>
               </section>
             )}
-            {showReports && session && (page !== 'private-map' || canReview) && (
+            {reportSection && session && (page !== 'private-map' || canReview) && (
               <section className="panel">
                 {page === 'private-map' ? (
                   <h1>Gêmeo digital 2D</h1>
                 ) : (
                   <h2>
-                    {canReview && page !== 'my-reports' ? 'Relatos recebidos' : 'Meus relatos'}
+                    {canReview && page !== 'my-reports' && page !== 'processing'
+                      ? 'Relatos recebidos'
+                      : 'Meus relatos'}
                   </h2>
                 )}
-                <p>
-                  Relatos sem análise não são problemas confirmados pela IA. Localização declarada,
-                  não exata.
+                <p className="muted">
+                  Um relato recebido ainda não é um problema confirmado. O ponto é a posição
+                  informada, com a precisão do aparelho.
                 </p>
-                {page !== 'map' && page !== 'review' && (
+                {page !== 'review' && (
                   <UrbanMap
                     events={ownReports}
                     allowExport={canReview}
                     selectedId={selectedReport}
                     onSelect={setSelectedReport}
                     onCloseDetail={() => setSelectedReport(null)}
-                    detail={
-                      selectedReport &&
-                      ownReports.some((report) => report.id === selectedReport) && (
-                        <>
-                          <h2>Relato do cidadão</h2>
-                          <p>
-                            {ownReports.find((report) => report.id === selectedReport)
-                              ?.reporters_count ?? 1}{' '}
-                            pessoa(s) relataram
-                          </p>
-                          <p>
-                            {(() => {
-                              const address = ownReports.find(
-                                (report) => report.id === selectedReport,
-                              )?.address;
-                              return address?.status === 'ok'
-                                ? [address.road, address.suburb, address.city]
-                                    .filter(Boolean)
-                                    .join(', ')
-                                : 'Endereço aproximado indisponível';
-                            })()}
-                          </p>
+                    detail={(() => {
+                      const report = ownReports.find((row) => row.id === selectedReport);
+                      if (!report) return null;
+                      return (
+                        <OwnReportDetail
+                          report={report}
+                          photoUrl={
+                            reportPhoto?.owner === session.user.id && reportPhoto.id === report.id
+                              ? reportPhoto.url
+                              : null
+                          }
+                        >
                           {canReview && privatePage && (
                             <CaptureReviewPanel
-                              key={selectedReport}
-                              id={selectedReport}
+                              key={report.id}
+                              id={report.id}
                               onChanged={() => setRevision((value) => value + 1)}
                             />
                           )}
-                          {ownReports.find((report) => report.id === selectedReport)?.photo_gate
-                            ?.status === 'NEEDS_REVIEW' && (
-                            <p>
-                              Verificação pendente: o porteiro não confirmou todas as condições de
-                              cena e privacidade. Isso não é uma detecção de problema.
-                            </p>
+                          {!canReview && page !== 'processing' && (
+                            <a href={`#/processando/${report.id}`}>Acompanhar relato</a>
                           )}
-                          <p>
-                            {
-                              ownReports.find((report) => report.id === selectedReport)
-                                ?.user_description
-                            }
-                          </p>
-                          <p>
-                            {
-                              reportLabels[
-                                ownReports.find((report) => report.id === selectedReport)
-                                  ?.report_status ?? 'received'
-                              ]
-                            }
-                          </p>
-                          {reportPhoto?.owner === session.user.id &&
-                            reportPhoto.id === selectedReport && (
-                              <>
-                                <img
-                                  src={reportPhoto.url}
-                                  alt="Foto privada do relato selecionado"
-                                />
-                                <a href={reportPhoto.url} target="_blank" rel="noopener noreferrer">
-                                  Ver original
-                                </a>
-                              </>
-                            )}
-                          {!canReview && (
-                            <a href={`#/processando/${selectedReport}`}>Abrir relato</a>
-                          )}
-                        </>
-                      )
-                    }
+                        </OwnReportDetail>
+                      );
+                    })()}
                     onPickLocation={
                       captureStatus?.status === 'location_required'
                         ? (latitude, longitude) => setManualPoint({ latitude, longitude })
@@ -1196,15 +1194,6 @@ export default function App() {
                     exportação consulta todos os relatos correspondentes.
                   </span>
                 </div>
-                {page === 'map' &&
-                  reportPhoto?.owner === session.user.id &&
-                  reportPhoto.id === selectedReport && (
-                    <img
-                      src={reportPhoto.url}
-                      alt="Foto privada do relato selecionado"
-                      style={{ maxWidth: '100%' }}
-                    />
-                  )}
               </section>
             )}
             {page === 'analysis' && <PublicTransparencyPage revision={publicRevision} />}
@@ -1240,7 +1229,6 @@ export default function App() {
             {page === 'settings' && (
               <PublicSystemPage
                 status={publicStatus}
-                scout={scout}
                 error={statusError}
                 onReload={() => setPublicRevision((value) => value + 1)}
               />
@@ -1308,9 +1296,7 @@ export default function App() {
                           <h2>{draft.filename}</h2>
                           <p>{new Date(draft.created_at).toLocaleString('pt-BR')}</p>
                           <p>
-                            {draft.coordinate
-                              ? `${draft.coordinate.latitude.toFixed(5)}, ${draft.coordinate.longitude.toFixed(5)}`
-                              : 'Localização pendente'}
+                            {draft.coordinate ? 'Localização definida' : 'Localização pendente'}
                           </p>
                           <div className="actions">
                             <button

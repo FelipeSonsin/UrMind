@@ -1,8 +1,17 @@
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Camera as CameraIcon, Upload, LocateFixed, Save } from 'lucide-react';
+import {
+  Camera as CameraIcon,
+  CircleAlert,
+  CircleCheck,
+  ImageUp,
+  LoaderCircle,
+  LocateFixed,
+  MapPin,
+  Send,
+} from 'lucide-react';
 import { Camera } from '../components/Camera';
 import { Photo } from '../components/Photo';
-import { parseCoordinate, coordinateSchema } from '../domain/contracts';
+import { coordinateSchema } from '../domain/contracts';
 import {
   defaultPhotoPolicy,
   drafts,
@@ -10,7 +19,13 @@ import {
   validatePhoto,
   type CaptureDraft,
 } from '../services/drafts';
-import { currentFix, stopWarmUp, warmUp, warmUpIfAllowed } from '../services/deviceLocation';
+import {
+  currentFix,
+  fixMatchesPhoto,
+  stopWarmUp,
+  warmUp,
+  warmUpIfAllowed,
+} from '../services/deviceLocation';
 import { publicApi } from '../services/publicApi';
 import { gps } from 'exifr';
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
@@ -45,6 +60,12 @@ function newDraft(): CaptureDraft {
     status: 'local_draft',
   };
 }
+
+/** A photo taken now (camera or live capture) can still get the device position. */
+function takenNow(draft: CaptureDraft, now = Date.now()) {
+  return draft.source === 'pwa_photo' && fixMatchesPhoto(now, draft.captured_at);
+}
+
 export function CapturePage({
   initial,
   onSaved,
@@ -53,8 +74,6 @@ export function CapturePage({
   onSaved: (draft: CaptureDraft) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState<CaptureDraft>(() => initial || newDraft());
-  const [latitude, setLatitude] = useState(initial?.coordinate?.latitude.toString() || '');
-  const [longitude, setLongitude] = useState(initial?.coordinate?.longitude.toString() || '');
   const [camera, setCamera] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,7 +84,10 @@ export function CapturePage({
     longitude: number;
   } | null>(null);
   const [showMap, setShowMap] = useState(false);
+  // Each photo (and each manual point) starts a new selection: a GPS answer that
+  // arrives for an earlier one is discarded instead of landing on the current photo.
   const selectionVersion = useRef(0);
+  const capturedAt = useRef<string | null>(initial?.captured_at ?? null);
   const [photoPolicy, setPhotoPolicy] = useState(defaultPhotoPolicy);
   const [privacy, setPrivacy] = useState<{ version: string; text: string } | null>(null);
   const [acceptedVersion, setAcceptedVersion] = useState<string | null>(null);
@@ -95,11 +117,15 @@ export function CapturePage({
     void warmUpIfAllowed();
     return stopWarmUp;
   }, []);
-  const candidateCenter = coordinateSchema.safeParse({
-    latitude: Number(latitude),
-    longitude: Number(longitude),
-    accuracy_m: null,
-  });
+  // A frame captured in live detection a moment ago gets the device position
+  // right away; an older draft is located on the map instead.
+  useEffect(() => {
+    if (initial && !initial.coordinate && takenNow(initial)) void locate();
+    else if (initial?.photo.size && !initial.coordinate) setShowMap(true);
+    // Runs once for the draft this page was opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function select(picked: File, fromCamera = false) {
     const version = ++selectionVersion.current;
     setBusy(true);
@@ -117,6 +143,7 @@ export function CapturePage({
           const candidate = coordinateSchema.safeParse({
             latitude: position?.latitude,
             longitude: position?.longitude,
+            // EXIF has no accuracy of its own; none is invented here.
             accuracy_m: null,
           });
           if (
@@ -125,28 +152,30 @@ export function CapturePage({
           )
             exifCoordinate = candidate.data;
         } catch {
-          // No readable EXIF: require a point explicitly confirmed on the map.
+          // No readable EXIF: the place is marked on the map.
         }
       }
       if (version !== selectionVersion.current) return;
+      const taken = fromCamera ? new Date().toISOString() : null;
+      capturedAt.current = taken;
       setDraft((value) => ({
         ...value,
         photo: file,
         filename: file.name,
         source: fromCamera ? 'pwa_photo' : 'exif_upload',
-        captured_at: fromCamera ? new Date().toISOString() : null,
+        captured_at: taken,
         coordinate: exifCoordinate,
         source_location: exifCoordinate ? 'exif' : 'unknown',
         location_timestamp: null,
         heading_deg: null,
         speed_mps: null,
       }));
-      setLatitude(exifCoordinate ? String(exifCoordinate.latitude) : '');
-      setLongitude(exifCoordinate ? String(exifCoordinate.longitude) : '');
       setPickedLocation(null);
+      // Gallery photo: its own GPS or the map. Never the device's current position.
       setShowMap(!fromCamera && !exifCoordinate);
       setCamera(false);
       setLocationError('');
+      setLocating(false);
       // A photo taken now is located by the phone itself, no map or typing.
       if (fromCamera) void locate();
     } catch (reason) {
@@ -155,6 +184,7 @@ export function CapturePage({
       setBusy(false);
     }
   }
+
   async function locate() {
     const version = selectionVersion.current;
     setLocating(true);
@@ -162,6 +192,13 @@ export function CapturePage({
     try {
       const position = await currentFix();
       if (version !== selectionVersion.current) return;
+      if (!fixMatchesPhoto(position.timestamp, capturedAt.current)) {
+        setLocationError(
+          'A foto foi tirada há mais de 2 minutos e você pode ter se deslocado. Marque no mapa onde ela foi tirada.',
+        );
+        setShowMap(true);
+        return;
+      }
       const result = coordinateSchema.safeParse({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -172,8 +209,6 @@ export function CapturePage({
         setShowMap(true);
         return;
       }
-      setLatitude(String(result.data.latitude));
-      setLongitude(String(result.data.longitude));
       setDraft((value) => ({
         ...value,
         coordinate: result.data,
@@ -193,25 +228,18 @@ export function CapturePage({
       if (version === selectionVersion.current) setLocating(false);
     }
   }
-  function manual() {
-    // A confirmed/edited manual point wins over a pending Geolocation callback.
-    selectionVersion.current += 1;
-    setLocating(false);
-    setDraft((value) => ({
-      ...value,
-      source_location: 'manual',
-      coordinate: null,
-      location_timestamp: null,
-      heading_deg: null,
-      speed_mps: null,
-    }));
+
+  function openMap() {
+    setPickedLocation(null);
+    setShowMap(true);
   }
+
   function confirmMapLocation() {
     if (!pickedLocation) return;
+    // A confirmed point wins over a GPS answer still on its way.
     selectionVersion.current += 1;
     setLocating(false);
-    setLatitude(String(pickedLocation.latitude));
-    setLongitude(String(pickedLocation.longitude));
+    setLocationError('');
     setDraft((value) => ({
       ...value,
       coordinate: { ...pickedLocation, accuracy_m: null },
@@ -222,34 +250,23 @@ export function CapturePage({
     }));
     setShowMap(false);
   }
+
   async function save(event: FormEvent) {
     event.preventDefault();
     setError('');
     setBusy(true);
     try {
-      if (!draft.photo.size) throw new Error('Selecione ou tire uma foto antes de salvar.');
+      if (!draft.photo.size) throw new Error('Tire ou escolha uma foto antes de enviar.');
       if (!privacy || acceptedVersion !== privacy.version) {
         await drafts.save(draft);
         throw new Error(
           'Leia e aceite o aviso de privacidade antes de enviar. Rascunho preservado.',
         );
       }
-      const coordinate =
-        latitude.trim() || longitude.trim() ? parseCoordinate(latitude, longitude) : null;
-      if (
-        coordinate &&
-        draft.source_location !== 'gps_device' &&
-        (!draft.coordinate ||
-          draft.coordinate.latitude !== coordinate.latitude ||
-          draft.coordinate.longitude !== coordinate.longitude)
-      )
-        throw new Error('Selecione e confirme a localização no mapa antes do envio.');
       const saved: CaptureDraft = {
         ...draft,
         privacy_version: privacy.version,
-        coordinate:
-          coordinate && draft.source_location === 'gps_device' ? draft.coordinate : coordinate,
-        source_location: coordinate ? draft.source_location : 'unknown',
+        source_location: draft.coordinate ? draft.source_location : 'unknown',
       };
       await drafts.save(saved);
       await onSaved(saved);
@@ -263,30 +280,33 @@ export function CapturePage({
       setBusy(false);
     }
   }
+
+  const hasPhoto = draft.photo.size > 0;
+  const located = draft.coordinate != null && draft.source_location !== 'unknown';
+  const canRetryGps = !locating && takenNow(draft);
+
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">EVIDÊNCIAS / NOVO REGISTRO</p>
-          <h1>{initial ? 'Editar rascunho' : 'Registrar uma evidência'}</h1>
-          <p>Comece pela foto. Cada informação mantém sua origem.</p>
+          <h1>{initial ? 'Continuar relato' : 'Registrar evidência'}</h1>
+          <p>Envie uma foto do problema. A localização vem do aparelho ou da própria foto.</p>
         </div>
-        <span className="badge">Armazenamento local</span>
       </div>
       <form onSubmit={save} className="capture-grid">
-        <section className="panel">
-          <h2>
-            <span className="step">01</span> Fotografia
+        <section className="panel" aria-labelledby="capture-photo">
+          <h2 id="capture-photo">
+            <span className="step">1</span> Foto
           </h2>
           <div className="upload-area">
-            {draft.photo.size ? (
+            {hasPhoto ? (
               <Photo blob={draft.photo} alt="Evidência selecionada" />
             ) : (
               <>
-                <Upload size={36} strokeWidth={1.4} />
-                <h3>O primeiro olhar sobre a cidade</h3>
-                <p>Importe uma foto ou utilize a câmera.</p>
-                <small>JPEG, PNG ou WebP · até 10 MB</small>
+                <ImageUp size={36} strokeWidth={1.4} />
+                <h3>Mostre o problema de perto</h3>
+                <p>Tire na hora ou escolha da galeria.</p>
+                <small>JPEG, PNG ou WebP, até 10 MB</small>
               </>
             )}
           </div>
@@ -301,7 +321,7 @@ export function CapturePage({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 capture="environment"
-                disabled={busy || locating}
+                disabled={busy}
                 onClick={() => warmUp()}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -317,7 +337,7 @@ export function CapturePage({
                 className="file-input"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                disabled={busy || locating}
+                disabled={busy}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void select(file);
@@ -328,7 +348,7 @@ export function CapturePage({
             <button
               type="button"
               className="secondary desktop-camera"
-              disabled={busy || locating}
+              disabled={busy}
               onClick={() => {
                 warmUp();
                 setCamera(true);
@@ -337,7 +357,6 @@ export function CapturePage({
               <CameraIcon size={17} /> Abrir câmera
             </button>
           </div>
-          {draft.filename && <p className="muted filename">{draft.filename}</p>}
           {camera && (
             <Camera
               onCapture={(file) => void select(file, true)}
@@ -345,156 +364,126 @@ export function CapturePage({
             />
           )}
         </section>
-        <section className="panel">
+        <section className="panel capture-details">
           <h2>
-            <span className="step">02</span> Localização e contexto
+            <span className="step">2</span> Localização
           </h2>
-          <p>
-            Foto tirada agora recebe o local do GPS do aparelho automaticamente. Foto da galeria usa
-            o GPS gravado nela ou o ponto que você marcar no mapa.
-          </p>
-          {draft.source === 'exif_upload' && (
-            <p className="notice">
-              {draft.source_location === 'exif'
-                ? 'GPS EXIF encontrado. O servidor confirmará os metadados da foto original.'
-                : 'Sem GPS EXIF válido. Selecione e confirme no mapa onde a foto foi tirada.'}
-            </p>
-          )}
-          <div className="field-row">
-            <label>
-              Latitude
-              <input
-                inputMode="decimal"
-                placeholder="−90 a 90"
-                value={latitude}
-                disabled={locating}
-                onChange={(event) => {
-                  setLatitude(event.target.value);
-                  manual();
-                }}
-              />
-            </label>
-            <label>
-              Longitude
-              <input
-                inputMode="decimal"
-                placeholder="−180 a 180"
-                value={longitude}
-                disabled={locating}
-                onChange={(event) => {
-                  setLongitude(event.target.value);
-                  manual();
-                }}
-              />
-            </label>
+          <div
+            className={`location-status${located ? ' is-located' : ''}${locationError ? ' is-error' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            {!hasPhoto ? (
+              <p className="muted">
+                Foto tirada agora usa o GPS do aparelho. Foto da galeria usa a localização gravada
+                nela; se não houver, você marca no mapa.
+              </p>
+            ) : locating ? (
+              <p>
+                <LoaderCircle size={18} className="spin" aria-hidden="true" />{' '}
+                <strong>Obtendo localização…</strong>
+                <small>O envio espera a localização ou o ponto marcado no mapa.</small>
+              </p>
+            ) : located && draft.source_location === 'gps_device' ? (
+              <p>
+                <CircleCheck size={18} aria-hidden="true" /> <strong>Localização obtida</strong>
+                <small>
+                  {draft.coordinate?.accuracy_m != null
+                    ? `Precisão aproximada: ${Math.round(draft.coordinate.accuracy_m)} m`
+                    : 'Precisão não informada pelo aparelho'}
+                </small>
+              </p>
+            ) : located && draft.source_location === 'exif' ? (
+              <p>
+                <CircleCheck size={18} aria-hidden="true" />{' '}
+                <strong>Localização encontrada na foto</strong>
+                <small>A posição gravada na foto é conferida no envio.</small>
+              </p>
+            ) : located ? (
+              <p>
+                <CircleCheck size={18} aria-hidden="true" /> <strong>Local marcado no mapa</strong>
+                <small>Você pode corrigir o ponto antes de enviar.</small>
+              </p>
+            ) : locationError ? (
+              <p>
+                <CircleAlert size={18} aria-hidden="true" />{' '}
+                <strong>Localização indisponível</strong>
+                <small>{locationError}</small>
+              </p>
+            ) : (
+              <p>
+                <MapPin size={18} aria-hidden="true" />{' '}
+                <strong>Precisamos que você confirme onde a foto foi tirada</strong>
+                <small>Se a foto não tiver localização, marque onde ela foi tirada.</small>
+              </p>
+            )}
+            {hasPhoto && !showMap && (
+              <div className="actions">
+                {!located && canRetryGps && (
+                  <button type="button" className="secondary" onClick={() => void locate()}>
+                    <LocateFixed size={16} /> Tentar de novo
+                  </button>
+                )}
+                {!locating && (
+                  <button type="button" className="secondary" onClick={openMap}>
+                    <MapPin size={16} /> {located ? 'Corrigir no mapa' : 'Marcar no mapa'}
+                  </button>
+                )}
+              </div>
+            )}
+            {locationError && canRetryGps && showMap && (
+              <button type="button" className="secondary" onClick={() => void locate()}>
+                <LocateFixed size={16} /> Tentar de novo
+              </button>
+            )}
           </div>
-          <button type="button" className="secondary" onClick={() => setShowMap((value) => !value)}>
-            {showMap ? 'Fechar mapa' : 'Selecionar localização no mapa'}
-          </button>
-          {showMap && (
-            <div>
-              <p>Toque no local onde a foto foi tirada e confirme o marcador.</p>
-              <Suspense fallback={<p>Carregando mapa…</p>}>
+          {hasPhoto && showMap && (
+            <div className="location-picker">
+              <h3>Selecione no mapa onde esta foto foi tirada</h3>
+              <Suspense fallback={<p role="status">Carregando mapa…</p>}>
                 <UrbanMap
                   events={NO_EVENTS}
-                  initialCenter={
-                    latitude.trim() && longitude.trim() && candidateCenter.success
-                      ? candidateCenter.data
-                      : null
-                  }
-                  onPickLocation={(lat, lon) =>
-                    setPickedLocation({ latitude: lat, longitude: lon })
+                  initialCenter={draft.coordinate}
+                  onPickLocation={(latitude, longitude) =>
+                    setPickedLocation({ latitude, longitude })
                   }
                 />
               </Suspense>
-              <button type="button" disabled={!pickedLocation} onClick={confirmMapLocation}>
-                Confirmar localização no mapa
-              </button>
+              <div className="actions">
+                <button type="button" disabled={!pickedLocation} onClick={confirmMapLocation}>
+                  <MapPin size={16} /> Confirmar localização
+                </button>
+                {located && (
+                  <button type="button" className="secondary" onClick={() => setShowMap(false)}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
             </div>
           )}
-          {draft.source === 'pwa_photo' && (
-            <>
-              <p role="status" className={locationError ? 'error' : 'notice'}>
-                {locating
-                  ? 'Localizando pelo GPS do aparelho…'
-                  : locationError ||
-                    (draft.source_location === 'gps_device'
-                      ? 'Local registrado automaticamente pelo GPS do aparelho.'
-                      : 'A foto ainda não tem local.')}
-              </p>
-              {(locationError || draft.source_location !== 'gps_device') && (
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={locating || busy}
-                  onClick={() => void locate()}
-                >
-                  <LocateFixed size={16} />
-                  {locating ? 'Obtendo posição…' : 'Tentar localizar de novo'}
-                </button>
-              )}
-            </>
-          )}
-          {draft.source === 'exif_upload' && draft.photo.size > 0 && (
-            <>
-              <button
-                type="button"
-                className="secondary"
-                disabled={locating || busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'A posição atual do celular corresponde ao local onde esta foto foi tirada? Ela será registrada como declaração sua.',
-                    )
-                  )
-                    void locate();
-                }}
-              >
-                <LocateFixed size={16} /> Usar GPS atual para esta foto
-              </button>
-              <p className="muted">
-                Use apenas se estiver no local da foto. O GPS atual não comprova onde uma foto
-                antiga foi tirada.
-              </p>
-              {locationError && (
-                <p className="error" role="alert">
-                  {locationError}
-                </p>
-              )}
-            </>
-          )}
-          <p className="muted">
-            Origem:{' '}
-            {draft.source_location === 'gps_device'
-              ? 'GPS do dispositivo'
-              : draft.source_location === 'exif'
-                ? 'GPS EXIF da foto (pendente de validação pelo servidor)'
-                : latitude || longitude
-                  ? 'informada manualmente'
-                  : 'não disponível'}{' '}
-            · Precisão:{' '}
-            {draft.source_location === 'gps_device' && draft.coordinate?.accuracy_m != null
-              ? `${draft.coordinate.accuracy_m.toFixed(1)} m`
-              : 'não disponível'}
-          </p>
+          <h2>
+            <span className="step">3</span> Descrição
+          </h2>
           <label>
-            Descreva o problema (opcional)
+            Descreva o que você observou (opcional)
             <textarea
-              rows={4}
+              rows={3}
               maxLength={500}
               value={draft.note}
-              placeholder="Registre o contexto que você observou…"
+              placeholder="Ex.: buraco grande perto da faixa de pedestres"
               onChange={(event) => setDraft((value) => ({ ...value, note: event.target.value }))}
             />
           </label>
-          <p aria-live="polite">{draft.note.length}/500 caracteres</p>
-          <p className="muted">Observações do usuário não são classificações do modelo.</p>
-          <section aria-label="Privacidade do relato">
-            <h3>Antes de enviar</h3>
+          <p className="muted char-count" aria-live="polite">
+            {draft.note.length}/500 caracteres
+          </p>
+          <h2>
+            <span className="step">4</span> Enviar
+          </h2>
+          <section aria-label="Privacidade do relato" className="consent">
             {privacy ? (
               <>
-                <p>{privacy.text}</p>
-                <label>
+                <label className="checkbox">
                   <input
                     type="checkbox"
                     checked={acceptedVersion === privacy.version}
@@ -502,13 +491,17 @@ export function CapturePage({
                       setAcceptedVersion(event.target.checked ? privacy.version : null)
                     }
                   />
-                  Li e aceito o armazenamento da foto e localização conforme este aviso
+                  Li e aceito o armazenamento da foto e da localização
                 </label>
+                <details>
+                  <summary>Saiba mais sobre privacidade</summary>
+                  <p>{privacy.text}</p>
+                </details>
               </>
             ) : (
-              <p role="status">
-                Aviso de privacidade indisponível. O envio aguarda conexão; o rascunho pode ser
-                preservado.
+              <p role="status" className="muted">
+                Aviso de privacidade indisponível sem conexão. O relato fica guardado neste aparelho
+                até você enviar.
               </p>
             )}
           </section>
@@ -518,15 +511,13 @@ export function CapturePage({
             </p>
           )}
           <button type="submit" disabled={busy || locating}>
-            <Save size={17} /> {busy ? 'Enviando…' : 'Salvar e enviar'}
+            <Send size={17} /> {busy ? 'Enviando…' : 'Enviar relato'}
           </button>
+          {hasPhoto && !located && !locating && (
+            <p className="muted">Sem localização, você poderá marcar o ponto depois do envio.</p>
+          )}
         </section>
       </form>
-      <p className="footnote">
-        O rascunho fica neste navegador até o envio. Após o envio, a foto original permanece no
-        Storage privado. A análise visual só ocorre quando houver um modelo autorizado; caso
-        contrário, o relato permanece identificado sem classificação automática.
-      </p>
     </>
   );
 }

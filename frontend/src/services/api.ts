@@ -7,6 +7,7 @@ import {
   uploadResultSchema,
   type ReviewPayload,
 } from '../domain/contracts';
+import { localDayStart } from '../domain/public';
 import { auth } from './auth';
 import type { CaptureDraft } from './drafts';
 
@@ -135,8 +136,10 @@ export const api = {
       family: filters.family,
       issue: filters.issue,
     });
-    if (filters.from) params.set('start', `${filters.from}T00:00:00Z`);
-    if (filters.to) params.set('end', `${filters.to}T23:59:59.999999Z`);
+    // Mesmo dia civil que o mapa filtrou: meia-noite no fuso de quem exporta.
+    if (filters.from) params.set('start', new Date(localDayStart(filters.from)).toISOString());
+    if (filters.to)
+      params.set('end', new Date(localDayStart(filters.to) + 86_400_000 - 1).toISOString());
     return authenticatedDownload(`/captures/export?${params}`, signal);
   },
   exportGroundTruth: (signal: AbortSignal) =>

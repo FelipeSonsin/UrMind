@@ -57,6 +57,83 @@ export async function syntheticReportPhoto(page: Page): Promise<string> {
   });
 }
 
+/**
+ * A mesma foto sintética em JPEG, com um bloco EXIF que só contém GPS (sem precisão,
+ * como numa foto de galeria). Exclusivo de teste: prova o caminho EXIF, não um local real.
+ */
+export async function syntheticJpegWithGps(
+  page: Page,
+  latitude: number,
+  longitude: number,
+): Promise<Buffer> {
+  const jpeg = Buffer.from(
+    await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 640;
+      const context = canvas.getContext('2d')!;
+      const image = context.createImageData(640, 640);
+      for (let y = 0; y < 640; y++)
+        for (let x = 0; x < 640; x++) {
+          const i = (y * 640 + x) * 4;
+          image.data[i] = image.data[i + 1] = image.data[i + 2] = (x * 73 + y * 151) % 256;
+          image.data[i + 3] = 255;
+        }
+      context.putImageData(image, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+    }),
+    'base64',
+  );
+  // TIFF little-endian: IFD0 → GPS IFD com latitude/longitude em graus, minutos, segundos.
+  const tiff = Buffer.alloc(128);
+  tiff.write('II', 0, 'ascii');
+  tiff.writeUInt16LE(42, 2);
+  tiff.writeUInt32LE(8, 4);
+  tiff.writeUInt16LE(1, 8);
+  tiff.writeUInt16LE(0x8825, 10);
+  tiff.writeUInt16LE(4, 12);
+  tiff.writeUInt32LE(1, 14);
+  tiff.writeUInt32LE(26, 18);
+  tiff.writeUInt32LE(0, 22);
+  const entries: [number, number, number, number | string][] = [
+    [0x0001, 2, 2, latitude < 0 ? 'S' : 'N'],
+    [0x0002, 5, 3, 80],
+    [0x0003, 2, 2, longitude < 0 ? 'W' : 'E'],
+    [0x0004, 5, 3, 104],
+  ];
+  tiff.writeUInt16LE(entries.length, 26);
+  entries.forEach(([tag, type, count, value], index) => {
+    const at = 28 + index * 12;
+    tiff.writeUInt16LE(tag, at);
+    tiff.writeUInt16LE(type, at + 2);
+    tiff.writeUInt32LE(count, at + 4);
+    if (typeof value === 'string') tiff.write(value, at + 8, 'ascii');
+    else tiff.writeUInt32LE(value, at + 8);
+  });
+  tiff.writeUInt32LE(0, 28 + entries.length * 12);
+  for (const [offset, decimal] of [
+    [80, Math.abs(latitude)],
+    [104, Math.abs(longitude)],
+  ]) {
+    const degrees = Math.floor(decimal);
+    const minutes = Math.floor((decimal - degrees) * 60);
+    const seconds = Math.round(((decimal - degrees) * 60 - minutes) * 60 * 10_000);
+    [
+      [degrees, 1],
+      [minutes, 1],
+      [seconds, 10_000],
+    ].forEach(([numerator, denominator], index) => {
+      tiff.writeUInt32LE(numerator, offset + index * 8);
+      tiff.writeUInt32LE(denominator, offset + index * 8 + 4);
+    });
+  }
+  const payload = Buffer.concat([Buffer.from('Exif\0\0', 'binary'), tiff]);
+  const header = Buffer.alloc(4);
+  header.writeUInt16BE(0xffe1, 0);
+  header.writeUInt16BE(payload.length + 2, 2);
+  return Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+}
+
 // Fixtures existem SOMENTE aqui, nos testes. Nenhum dado fictício entra no produto:
 // o app real só mostra o que a API pública devolve. Os formatos abaixo espelham
 // backend/app/schemas/public.py.

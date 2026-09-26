@@ -96,6 +96,21 @@ _PASSTHROUGH_STAGES = frozenset(
 )
 
 
+# Worker stages during which an owner's point shows as "processing" on the map;
+# `queued` stays "received" (nothing is running on it yet).
+_MARKER_PROCESSING_STAGES = frozenset(
+    status.value
+    for status in (
+        CaptureProcessingStatus.PROCESSING_DETECTION,
+        CaptureProcessingStatus.DETECTION_COMPLETED,
+        CaptureProcessingStatus.BUILDING_EVENT,
+        CaptureProcessingStatus.ENRICHING_CONTEXT,
+        CaptureProcessingStatus.BUILDING_FEATURES,
+        CaptureProcessingStatus.ASSESSING,
+    )
+)
+
+
 class DuplicateKeyError(RuntimeError):
     """Chave idempotente já usada; reenvio não deve duplicar (§7.2)."""
 
@@ -188,6 +203,8 @@ class CoreService:
                 marker["report_status"] = "model_not_available"
             elif status in {"no_supported_detection", "no_detection"}:
                 marker["report_status"] = "no_supported_detection"
+            elif status in _MARKER_PROCESSING_STAGES:
+                marker["report_status"] = "processing"
             marker.update(
                 {
                     key: row.get(key)
@@ -216,6 +233,12 @@ class CoreService:
                         "urmind_class",
                         "severity",
                         "priority_score",
+                        # Point snapped to the road by the analysis; the reported point
+                        # stays in latitude/longitude and is never replaced by it.
+                        "snapped_latitude",
+                        "snapped_longitude",
+                        "distance_to_road_m",
+                        "road_name",
                     )
                 }
             )
@@ -229,6 +252,11 @@ class CoreService:
                     marker["original_longitude"] = marker["longitude"]
                     marker["latitude"] = correction["latitude"]
                     marker["longitude"] = correction["longitude"]
+                    # The snap belonged to the point the reviewer corrected away from.
+                    for key in ("snapped_latitude", "snapped_longitude", "distance_to_road_m"):
+                        marker[key] = None
+                if row.get("event_published"):
+                    marker["report_status"] = "published"
             elif human.get("status") == "rejected":
                 marker["report_status"] = "duplicate" if human.get("duplicate_of") else "rejected"
             if row.get("additional_evidence"):

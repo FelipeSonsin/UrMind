@@ -401,6 +401,67 @@ async def test_capture_marker_without_model_has_no_invented_analysis():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("row", "expected"),
+    [
+        ({"processing_status": "queued"}, "received"),
+        ({"processing_status": "processing_detection"}, "processing"),
+        ({"processing_status": "assessing"}, "processing"),
+        ({"processing_status": "failed"}, "received"),
+        (
+            {"has_review": True, "event_status": "confirmed", "event_published": False},
+            "human_confirmed",
+        ),
+        (
+            {"has_review": True, "event_status": "confirmed", "event_published": True},
+            "published",
+        ),
+    ],
+)
+async def test_owner_marker_distinguishes_processing_and_publication(row, expected):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    base = {"id": "capture", "latitude": -23.556, "longitude": -46.637}
+    service = CoreService(
+        SimpleNamespace(report_markers=AsyncMock(return_value=[{**base, **row}])), None
+    )
+    marker = (await service.capture_markers("owner"))[0]
+    assert marker["report_status"] == expected
+    # Status never moves the reported point.
+    assert (marker["latitude"], marker["longitude"]) == (-23.556, -46.637)
+
+
+@pytest.mark.asyncio
+async def test_owner_marker_keeps_reported_point_and_road_snap_apart():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    analyzed = {
+        "id": "capture",
+        "latitude": -23.5561,
+        "longitude": -46.6372,
+        "event_id": uuid4(),
+        "model_status": "EXPERIMENTAL_SHADOW",
+        "snapped_latitude": -23.5562,
+        "snapped_longitude": -46.6371,
+        "distance_to_road_m": 4.2,
+        "road_name": "Rua Galvão Bueno",
+    }
+    pending = {**analyzed, "event_id": None, "model_status": None, "id": "other"}
+    service = CoreService(
+        SimpleNamespace(report_markers=AsyncMock(return_value=[analyzed, pending])), None
+    )
+    done, waiting = await service.capture_markers("owner")
+    assert done["report_status"] == "experimental"
+    assert (done["latitude"], done["longitude"]) == (-23.5561, -46.6372)
+    assert (done["snapped_latitude"], done["snapped_longitude"]) == (-23.5562, -46.6371)
+    assert done["road_name"] == "Rua Galvão Bueno"
+    # Without an analysis there is no snap to show, and none is invented.
+    assert waiting["snapped_latitude"] is None and waiting["road_name"] is None
+
+
+@pytest.mark.asyncio
 async def test_human_corrected_marker_preserves_absent_original_location():
     from types import SimpleNamespace
     from unittest.mock import AsyncMock

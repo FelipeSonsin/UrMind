@@ -1,49 +1,125 @@
-import { expect, test } from '@playwright/test';
-import { signedIn, stubPublicApi, supabaseStorageKey, syntheticReportPhoto } from './fixtures';
+import { expect, test, type Page } from '@playwright/test';
+import {
+  signedIn,
+  stubPublicApi,
+  supabaseStorageKey,
+  syntheticJpegWithGps,
+  syntheticReportPhoto,
+} from './fixtures';
 
 test.beforeEach(async ({ page }) => {
   // Fixtures exclusivamente de teste. Nenhuma ocorrência fictícia entra no produto.
   await stubPublicApi(page, { events: [], detail: null });
 });
 
-test('gallery uses current GPS only after confirmation', async ({ page }) => {
-  await page.context().grantPermissions(['geolocation']);
-  await page.context().setGeolocation({ latitude: -23.55, longitude: -46.63, accuracy: 12 });
-  await page.goto('/#/registrar');
-  await page.getByLabel('Escolher foto').setInputFiles({
-    name: 'report.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
+/** Conta as leituras do GPS atual (getCurrentPosition) feitas pela página. */
+async function countGpsReads(page: Page) {
+  await page.addInitScript(() => {
+    const geolocation = navigator.geolocation;
+    const original = geolocation.getCurrentPosition.bind(geolocation);
+    const state = window as unknown as { __gpsReads: number };
+    state.__gpsReads = 0;
+    geolocation.getCurrentPosition = (...args: Parameters<Geolocation['getCurrentPosition']>) => {
+      state.__gpsReads += 1;
+      return original(...args);
+    };
   });
-  const useCurrent = page.getByRole('button', { name: 'Usar GPS atual para esta foto' });
-  await expect(useCurrent).toBeVisible();
-  page.once('dialog', (dialog) => dialog.dismiss());
-  await useCurrent.click();
-  await expect(page.getByText(/Origem:.*GPS do dispositivo/)).toHaveCount(0);
-  page.once('dialog', (dialog) => dialog.accept());
-  await useCurrent.click();
-  await expect(page.getByText(/GPS do dispositivo/)).toBeVisible();
-  await expect(page.getByText(/12\.0 m/)).toBeVisible();
+  return () => page.evaluate(() => (window as unknown as { __gpsReads: number }).__gpsReads);
+}
+
+const GALLERY_PNG = async (page: Page) => ({
+  name: 'report.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
 });
 
-test('foto tirada agora recebe o local do GPS do aparelho sem mapa', async ({ page }) => {
+test('A. foto tirada agora envia GPS, precisão e horário, e o ponto aparece no mapa do autor', async ({
+  page,
+}) => {
+  await signedIn(page);
   await page.context().grantPermissions(['geolocation']);
-  await page.context().setGeolocation({ latitude: -23.55, longitude: -46.63, accuracy: 12 });
+  await page.context().setGeolocation({ latitude: -23.556, longitude: -46.637, accuracy: 12 });
+  const id = '6f1c2b3a-4d5e-4f60-8a71-92b3c4d5e6f7';
+  let body = '';
+  await page.route('**/api/v1/public/auth-origin', (route) =>
+    route.fulfill({
+      json: {
+        auth_origin: `https://${supabaseStorageKey().split('-')[1]}.supabase.co`,
+        visitor_upload_enabled: true,
+      },
+    }),
+  );
+  await page.route('**/api/v1/captures/nearby-reports?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/captures/photo', (route) => {
+    body = route.request().postData() ?? '';
+    return route.fulfill({
+      json: { id, capture_key: 'photo-gps', created: true, requires_manual_location: false },
+    });
+  });
+  await page.route(`**/api/v1/captures/${id}/processing`, (route) =>
+    route.fulfill({
+      json: {
+        capture_id: id,
+        status: 'queued',
+        requires_manual_location: false,
+        event_ids: [],
+        model_version_id: null,
+        model_status: null,
+        updated_at: null,
+      },
+    }),
+  );
+  await page.route(`**/api/v1/captures/${id}/image`, (route) =>
+    route.fulfill({ status: 404, json: { detail: 'sem foto no teste' } }),
+  );
+  await page.route('**/api/v1/captures/markers*', (route) =>
+    route.fulfill({
+      json: body
+        ? [
+            {
+              id,
+              latitude: -23.556,
+              longitude: -46.637,
+              report_status: 'received',
+              location_source: 'gps_device',
+              accuracy_m: 12,
+              created_at: new Date().toISOString(),
+            },
+          ]
+        : [],
+    }),
+  );
   await page.goto('/#/registrar');
   await page.getByLabel('Tirar foto').setInputFiles({
+    ...(await GALLERY_PNG(page)),
     name: 'camera.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
   });
-  await expect(
-    page.getByText('Local registrado automaticamente pelo GPS do aparelho.'),
-  ).toBeVisible();
-  await expect(page.getByText(/Origem:.*GPS do dispositivo/)).toBeVisible();
-  await expect(page.getByText(/12\.0 m/)).toBeVisible();
+  await expect(page.getByText('Localização obtida')).toBeVisible();
+  await expect(page.getByText('Precisão aproximada: 12 m')).toBeVisible();
+  await expect(page.getByLabel(/Latitude|Longitude/)).toHaveCount(0);
   await expect(page.locator('.map canvas')).toHaveCount(0);
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
+  await expect.poll(() => body).toContain('name="latitude"');
+  expect(body).toMatch(/name="latitude"\r\n\r\n-23\.556/);
+  expect(body).toMatch(/name="longitude"\r\n\r\n-46\.637/);
+  expect(body).toMatch(/name="accuracy_m"\r\n\r\n12/);
+  expect(body).toMatch(/name="location_source"\r\n\r\ngps_device/);
+  expect(body).toMatch(/name="location_timestamp"\r\n\r\n20\d\d-/);
+  expect(body).toMatch(/name="captured_at"\r\n\r\n20\d\d-/);
+  // O relato aparece na hora no mapa do próprio autor, com a situação dele.
+  await expect(page).toHaveURL(new RegExp(`processando/${id}`));
+  // O mapa é carregado sob demanda; sob carga da máquina pode levar mais que 5 s.
+  await expect(page.locator(`[data-event-id="${id}"]`)).toHaveCount(1, { timeout: 20_000 });
+  const detail = page.getByRole('complementary', { name: 'Detalhe do ponto' });
+  await expect(detail).toContainText('Recebido');
+  await expect(detail).toContainText('Precisão aproximada: 12 m');
+  // Depois de recarregar a página, o ponto continua lá.
+  await page.reload();
+  await expect(page.locator(`[data-event-id="${id}"]`)).toHaveCount(1);
 });
 
-test('sem permissão de localização, a foto tirada agora explica e oferece o mapa', async ({
+test('B. sem permissão de localização, a foto tirada agora explica e abre o mapa', async ({
   page,
 }) => {
   await page.context().clearPermissions();
@@ -54,16 +130,130 @@ test('sem permissão de localização, a foto tirada agora explica e oferece o m
       value: { getCurrentPosition: denied, watchPosition: () => 1, clearWatch: () => undefined },
     });
   });
-  await page.getByLabel('Tirar foto').setInputFiles({
-    name: 'camera.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
-  });
+  await page.getByLabel('Tirar foto').setInputFiles(await GALLERY_PNG(page));
+  await expect(page.getByText('Localização indisponível')).toBeVisible();
   await expect(page.getByText(/Localização bloqueada para este site/).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Tentar localizar de novo' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tentar de novo' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Selecione no mapa onde esta foto foi tirada' }),
+  ).toBeVisible();
   await expect(page.locator('.map canvas')).toBeVisible();
 });
 
+test('C. GPS sem sinal leva ao mapa sem inventar posição', async ({ page }) => {
+  await page.goto('/#/registrar');
+  await page.evaluate(() => {
+    const unavailable = (_ok: unknown, fail: (error: { code: number }) => void) =>
+      fail({ code: 2 });
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: unavailable,
+        watchPosition: () => 1,
+        clearWatch: () => undefined,
+      },
+    });
+  });
+  await page.getByLabel('Tirar foto').setInputFiles(await GALLERY_PNG(page));
+  await expect(page.getByText(/não conseguiu a posição agora/)).toBeVisible();
+  await expect(page.getByText('Localização obtida')).toHaveCount(0);
+  await expect(page.locator('.map canvas')).toBeVisible();
+});
+
+test('D. foto da galeria com GPS no EXIF usa a posição da foto, não o GPS atual', async ({
+  page,
+}) => {
+  await page.context().grantPermissions(['geolocation']);
+  // O aparelho está em outro lugar: esta posição não pode ir para a foto antiga.
+  await page.context().setGeolocation({ latitude: -22.9, longitude: -43.2, accuracy: 5 });
+  const gpsReads = await countGpsReads(page);
+  await page.goto('/#/registrar');
+  await page.getByLabel('Escolher foto').setInputFiles({
+    name: 'rua-com-exif.jpg',
+    mimeType: 'image/jpeg',
+    buffer: await syntheticJpegWithGps(page, -23.556, -46.637),
+  });
+  await expect(page.getByText('Localização encontrada na foto')).toBeVisible();
+  await expect(page.getByText('Localização obtida')).toHaveCount(0);
+  // Sem precisão no EXIF, nenhuma é inventada.
+  await expect(page.getByText(/Precisão aproximada/)).toHaveCount(0);
+  await expect(page.locator('.map canvas')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Corrigir no mapa' })).toBeVisible();
+  expect(await gpsReads()).toBe(0);
+});
+
+test('E. foto da galeria sem EXIF exige o ponto no mapa e nunca lê o GPS atual', async ({
+  page,
+}) => {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: -22.9, longitude: -43.2, accuracy: 5 });
+  const gpsReads = await countGpsReads(page);
+  await page.goto('/#/registrar');
+  await page.getByLabel('Escolher foto').setInputFiles(await GALLERY_PNG(page));
+  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Selecione no mapa onde esta foto foi tirada' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tentar de novo' })).toHaveCount(0);
+  await page.locator('.map canvas').click();
+  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
+  await expect(page.getByText('Local marcado no mapa')).toBeVisible();
+  await expect(page.getByLabel(/Latitude|Longitude/)).toHaveCount(0);
+  expect(await gpsReads()).toBe(0);
+});
+
+test('E2. sem mouse, o ponto é marcado pelo centro do mapa usando só o teclado', async ({
+  page,
+}) => {
+  await page.goto('/#/registrar');
+  await page.getByLabel('Escolher foto').setInputFiles(await GALLERY_PNG(page));
+  const center = page.getByRole('button', { name: 'Marcar o centro do mapa' });
+  await center.focus();
+  await page.keyboard.press('Enter');
+  const confirm = page.getByRole('button', { name: 'Confirmar localização', exact: true });
+  await expect(confirm).toBeEnabled();
+  await confirm.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Local marcado no mapa')).toBeVisible();
+});
+
+test('F. resposta atrasada do GPS de uma foto anterior não vai para a foto atual', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const state = window as unknown as { __pendingFixes: Array<(p: unknown) => void> };
+    state.__pendingFixes = [];
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (ok: (p: unknown) => void) => state.__pendingFixes.push(ok),
+        watchPosition: () => 1,
+        clearWatch: () => undefined,
+      },
+    });
+  });
+  await page.goto('/#/registrar');
+  await page.getByLabel('Tirar foto').setInputFiles({
+    ...(await GALLERY_PNG(page)),
+    name: 'primeira.png',
+  });
+  await expect(page.getByText('Obtendo localização…')).toBeVisible();
+  // Antes do GPS responder, a pessoa troca por uma foto da galeria.
+  await page.getByLabel('Escolher foto').setInputFiles({
+    ...(await GALLERY_PNG(page)),
+    name: 'segunda.png',
+  });
+  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+  await page.evaluate(() => {
+    const state = window as unknown as { __pendingFixes: Array<(p: unknown) => void> };
+    for (const resolve of state.__pendingFixes)
+      resolve({
+        coords: { latitude: -23.55, longitude: -46.63, accuracy: 5, heading: null, speed: null },
+        timestamp: Date.now(),
+      });
+  });
+  await expect(page.getByText('Localização obtida')).toHaveCount(0);
+  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+});
 test('captura respeita tema do dispositivo e alvos de toque em 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -143,7 +333,7 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
     }),
   );
   await page.goto('/#/registrar');
-  await page.getByLabel('Descreva o problema (opcional)').fill(description);
+  await page.getByLabel('Descreva o que você observou (opcional)').fill(description);
   await expect(page.getByText(`${description.length}/500 caracteres`)).toBeVisible();
   const png = await syntheticReportPhoto(page);
   await page.getByLabel('Escolher foto').setInputFiles({
@@ -151,20 +341,23 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
     mimeType: 'image/png',
     buffer: Buffer.from(png, 'base64'),
   });
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect(page.getByRole('alert')).toContainText('Leia e aceite o aviso de privacidade');
   expect(uploaded).toBe(false);
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect.poll(() => uploaded).toBe(true);
   await expect(page).toHaveURL(new RegExp(`processando/${id}`));
-  await expect(page.getByText('Etapa: location_required')).toBeVisible();
+  await expect(page.getByText('Situação: Necessita localização', { exact: true })).toBeVisible();
   // O mapa enquadra o Brasil inteiro; o centro do quadro fica em território
   // brasileiro, enquanto os cantos caem na máscara e são recusados.
   await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização do relato' }).click();
-  await expect(page.getByText('Etapa: model_not_available')).toBeVisible();
-  await expect(page.getByText(description, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Situação: Recebido, sem análise automática disponível', { exact: true }),
+  ).toBeVisible();
+  // A descrição aparece na lista e no detalhe do ponto recém-enviado, sempre como texto.
+  await expect(page.getByText(description, { exact: true }).first()).toBeVisible();
   await expect(page.locator(`[data-event-id="${id}"]`)).toHaveCount(1);
   await expect(page.getByRole('list', { name: 'Legenda de relatos' })).toContainText(
     'Análise indisponível',
@@ -228,9 +421,9 @@ test('confirma relato próximo e envia evidência adicional com aceite', async (
     buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
   });
   await page.locator('.map canvas').click();
-  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect.poll(() => linked).toBe(true);
   await expect(page.getByText(/Foto anexada como evidência adicional/)).toBeVisible();
 });
@@ -259,11 +452,15 @@ test('recupera a captura pela URL após refresh sem antecipar análise', async (
     });
   });
   await page.goto(`/#/processando/${captureId}`);
-  await expect(page.getByText('Etapa: detection_completed')).toBeVisible();
+  await expect(
+    page.getByText('Situação: Processando: detecção concluída', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText(/Análise experimental/)).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByText('Etapa: detection_completed')).toBeVisible();
+  await expect(
+    page.getByText('Situação: Processando: detecção concluída', { exact: true }),
+  ).toBeVisible();
   expect(reads).toBeGreaterThanOrEqual(2);
   stage = 'completed';
   await page.reload();
@@ -307,7 +504,9 @@ test('protocolo recupera apenas o relato da sessão e sobrevive ao refresh', asy
   await page.goto('/#/relato/URM-7K3Q9XYZ');
   await expect(page.getByRole('button', { name: 'Copiar protocolo' })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('Etapa: model_not_available')).toBeVisible();
+  await expect(
+    page.getByText('Situação: Recebido, sem análise automática disponível', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('URM-7K3Q9XYZ', { exact: true })).toBeVisible();
 });
 
@@ -341,7 +540,7 @@ test('logout em outra aba remove o resultado e interrompe consultas da captura',
     channel.close();
   }, supabaseStorageKey());
   await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
-  await expect(page.getByText('Etapa: completed')).toHaveCount(0);
+  await expect(page.getByText('Situação: Analisado', { exact: true })).toHaveCount(0);
   await expect(page.getByText(/modelo rejeitado para produção/)).toHaveCount(0);
   await expect(page).not.toHaveURL(new RegExp(captureId));
   const stoppedAt = reads;
@@ -369,9 +568,9 @@ test('bloqueia signup público se frontend e backend apontam para projetos difer
     buffer: Buffer.from(png, 'base64'),
   });
   await page.locator('.map canvas').click();
-  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect(page.getByRole('alert')).toContainText('projetos diferentes');
   expect(authCalls).toBe(0);
 });
@@ -417,9 +616,9 @@ test('logout durante upload cancela resposta tardia sem navegar para captura ant
     buffer: Buffer.from(png, 'base64'),
   });
   await page.locator('.map canvas').click();
-  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect.poll(() => started).toBe(true);
   await page.evaluate((key) => {
     localStorage.removeItem(key);
@@ -464,7 +663,9 @@ test('logout na fila aborta polling pendente e ignora resposta tardia', async ({
   });
   await page.clock.install();
   await page.goto(`/#/processando/${captureId}`);
-  await expect(page.getByText('Etapa: queued')).toBeVisible();
+  await expect(
+    page.getByText('Situação: Recebido, na fila de análise', { exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(5_100);
   await expect.poll(() => reads).toBe(2);
   await page.evaluate((key) => {
@@ -477,7 +678,7 @@ test('logout na fila aborta polling pendente e ignora resposta tardia', async ({
   release();
   await page.clock.fastForward(15_000);
   expect(reads).toBe(2);
-  await expect(page.getByText('Etapa: completed')).toHaveCount(0);
+  await expect(page.getByText('Situação: Analisado', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
 });
 
@@ -544,9 +745,9 @@ for (const boundary of ['origin', 'signup'] as const) {
         buffer: Buffer.from(png, 'base64'),
       });
       await page.locator('.map canvas').click();
-      await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+      await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
       await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-      await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+      await page.getByRole('button', { name: 'Enviar relato' }).click();
       await expect.poll(() => started).toBe(true);
       const completed = Promise.race([
         page.waitForEvent('requestfinished', (r) =>
@@ -571,8 +772,9 @@ for (const boundary of ['origin', 'signup'] as const) {
           },
           { key, session: nextSession, action },
         );
+      // A nova sessão chegou ao app: o convite para entrar some da página de rascunhos.
       if (action === 'switch')
-        await expect(page.locator('[title="Supabase Realtime (Postgres Changes)"]')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toHaveCount(0);
       if (action === 'logout')
         await expect(page.getByRole('button', { name: 'Enviar', exact: true })).toBeEnabled();
       release();
@@ -616,7 +818,9 @@ test('foto sem detecção termina sem anunciar revisão de Event inexistente', a
     }),
   );
   await page.goto(`/#/processando/${captureId}`);
-  await expect(page.getByText('Etapa: no_supported_detection')).toBeVisible();
+  await expect(
+    page.getByText('Situação: Analisado: nenhum problema reconhecido', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText(/Nenhuma ocorrência das classes suportadas foi detectada/),
   ).toBeVisible();
@@ -626,7 +830,7 @@ test('foto sem detecção termina sem anunciar revisão de Event inexistente', a
 test('separa o centro público da operação e navega entre os dois', async ({ page }, testInfo) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
+    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
   await expect(page.getByRole('navigation', { name: 'Navegação principal' })).not.toContainText(
@@ -655,21 +859,23 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
   });
   await expect(page.getByAltText('Evidência selecionada')).toBeVisible();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect(page.getByText('Localização pendente', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'evidencia.png' })).toBeVisible();
   await page.getByRole('button', { name: 'Continuar edição' }).click();
-  await page.getByLabel('Latitude', { exact: true }).fill('0');
-  await page.getByLabel('Longitude', { exact: true }).fill('0');
-  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
-  await expect(page.getByRole('alert')).toContainText('Selecione e confirme a localização no mapa');
-  await page.getByRole('button', { name: 'Selecionar localização no mapa' }).click();
+  // Rascunho da galeria sem local: o mapa abre sozinho; nenhum campo de coordenada.
+  await expect(page.getByLabel(/Latitude|Longitude/)).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Selecione no mapa onde esta foto foi tirada' }),
+  ).toBeVisible();
+  const confirm = page.getByRole('button', { name: 'Confirmar localização', exact: true });
+  await expect(confirm).toBeDisabled();
   await page.locator('.map canvas').click();
-  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await confirm.click();
+  await expect(page.getByText('Local marcado no mapa')).toBeVisible();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect(page.getByRole('heading', { name: 'evidencia.png' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'evidencia.png' })).toHaveCount(1);
   page.once('dialog', (dialog) => dialog.accept());
@@ -792,10 +998,13 @@ test('reabre o aplicativo sem rede após instalar o service worker', async ({ pa
   ).toBe(true);
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: 'O que o UrMind está vendo na cidade' }),
+    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'Registrar evidência' }).click();
-  await expect(page.getByRole('button', { name: 'Salvar e enviar' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Navegação principal' })
+    .getByRole('link', { name: 'Registrar evidência' })
+    .click();
+  await expect(page.getByRole('button', { name: 'Enviar relato' })).toBeVisible();
 });
 test('meus relatos inclui captura sem localização e preserva descrição como texto', async ({
   page,
@@ -825,7 +1034,7 @@ test('meus relatos inclui captura sem localização e preserva descrição como 
 });
 test('porteiro local recusa foto escura sem perder a descrição', async ({ page }) => {
   await page.goto('/#/registrar');
-  await page.getByLabel('Descreva o problema (opcional)').fill('Minha observação');
+  await page.getByLabel('Descreva o que você observou (opcional)').fill('Minha observação');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
@@ -837,5 +1046,7 @@ test('porteiro local recusa foto escura sem perder a descrição', async ({ page
     .getByLabel('Escolher foto')
     .setInputFiles({ name: 'dark.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await expect(page.getByRole('alert')).toContainText('escura');
-  await expect(page.getByLabel('Descreva o problema (opcional)')).toHaveValue('Minha observação');
+  await expect(page.getByLabel('Descreva o que você observou (opcional)')).toHaveValue(
+    'Minha observação',
+  );
 });

@@ -100,21 +100,42 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
     buffer: image,
   });
   await expect(page.getByAltText('Evidência selecionada')).toBeVisible();
-  await page.getByLabel('Latitude', { exact: true }).fill(latitude!);
-  await page.getByLabel('Longitude', { exact: true }).fill(longitude!);
-  await page.getByRole('button', { name: 'Selecionar localização no mapa' }).click();
+  // Sem campos de coordenada: o ponto revisado é marcado no mapa, como faria a pessoa.
+  // Com GPS no EXIF o mapa só abre por "Corrigir no mapa"; sem, ele já está aberto.
+  const correct = page.getByRole('button', { name: 'Corrigir no mapa' });
+  if (await correct.isVisible()) await correct.click();
+  await page.context().grantPermissions(['geolocation']);
+  await page
+    .context()
+    .setGeolocation({ latitude: Number(latitude), longitude: Number(longitude), accuracy: 5 });
+  // O botão "minha localização" do próprio mapa centra no ponto revisado fornecido ao teste.
+  await page.locator('.maplibregl-ctrl-geolocate').click();
   const map = page.locator('.map canvas');
+  const dot = page.locator('.maplibregl-user-location-dot');
+  await expect(dot).toBeVisible({ timeout: 20_000 });
+  // Espera o fim da animação: o ponto revisado fica no centro do mapa.
+  await expect
+    .poll(async () => {
+      const [d, m] = [await dot.boundingBox(), await map.boundingBox()];
+      return d && m
+        ? Math.hypot(
+            d.x + d.width / 2 - (m.x + m.width / 2),
+            d.y + d.height / 2 - (m.y + m.height / 2),
+          )
+        : Infinity;
+    })
+    .toBeLessThan(3);
   const bounds = await map.boundingBox();
   if (!bounds) throw new Error('Mapa não carregou para confirmar a localização informada');
-  // O mapa foi centrado nas coordenadas revisadas fornecidas ao teste.
   await map.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
-  await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
+  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
+  await expect(page.getByText('Local marcado no mapa')).toBeVisible();
   const uploadResponse = page.waitForResponse(
     (response) =>
       response.url().includes('/api/v1/captures/photo') && response.request().method() === 'POST',
   );
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
-  await page.getByRole('button', { name: 'Salvar e enviar' }).click();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
   const uploaded = await uploadResponse;
   const upload = await uploaded.json();
   if (!uploaded.ok() || upload.created !== true)
@@ -125,7 +146,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
 
   await expect(page).toHaveURL(new RegExp(`#\/processando\/${upload.id}$`));
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Processamento da foto' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Seu relato' })).toBeVisible();
   const ownerSession = await page.evaluate((ref) => {
     const value = localStorage.getItem(`sb-${ref}-auth-token`);
     return value ? JSON.parse(value) : null;
@@ -155,7 +176,9 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
     .toBe(true);
   if (processing!.status === 'no_supported_detection') {
     expect(processing!.event_ids).toEqual([]);
-    await expect(page.getByText('Etapa: no_supported_detection')).toBeVisible();
+    await expect(
+      page.getByText('Situação: Analisado: nenhum problema reconhecido', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
     testInfo.annotations.push({
       type: 'real_outcome',

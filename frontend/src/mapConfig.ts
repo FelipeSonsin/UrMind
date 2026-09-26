@@ -93,6 +93,20 @@ export function outsideMask(polygons: Polygon[]) {
   };
 }
 
+/**
+ * O estilo do OpenFreeMap rotula com `name_en` antes de `name`: aparecia "New Fribourg"
+ * em vez de Nova Friburgo e "Federal District" em vez de Distrito Federal. No Brasil o
+ * `name` do OpenStreetMap já é o nome local em português; o `name:pt` dos blocos não
+ * serve, pois traz rótulos da Wikidata ("Liberdade (bairro de São Paulo)", "Estação
+ * Santana"). O rótulo usa `name` e só recorre a `name_en` quando falta o nome local.
+ */
+export const LOCAL_LABEL_FIELD = ['coalesce', ['get', 'name'], ['get', 'name_en']];
+
+/** Campo de texto a aplicar numa camada do mapa base, ou null se ela não usa `name_en`. */
+export function localizedLabelField(textField: unknown): unknown[] | null {
+  return JSON.stringify(textField ?? null).includes('"name_en"') ? LOCAL_LABEL_FIELD : null;
+}
+
 const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 const OPENFREE_ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap';

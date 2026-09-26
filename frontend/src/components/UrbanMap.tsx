@@ -6,7 +6,11 @@ import { convertFilter, expression } from '@maplibre/maplibre-gl-style-spec';
 import {
   familyFor,
   filterMapRecords,
+  formatBrDate,
   labelFor,
+  mapFilterOptions,
+  maskBrDate,
+  parseBrDate,
   severityOf,
   type MapFilters,
 } from '../domain/public';
@@ -16,12 +20,13 @@ import {
   BRAZIL_STATES_URL,
   isInBrazilMapViewport,
   isInsidePolygons,
+  localizedLabelField,
   outlinePolygons,
   outsideMask,
   resolveMapProvider,
   type Polygon,
 } from '../mapConfig';
-import { reportLabels, type CaptureMarker } from '../domain/contracts';
+import { reportLabels, statuses, type CaptureMarker } from '../domain/contracts';
 import { BRAZIL_CAPITALS, MAP_DESIGN, byZoom, type MapColors } from '../mapDesign';
 import {
   SHAPE_PATHS,
@@ -188,8 +193,16 @@ function addBrazilMask(map: maplibregl.Map) {
   // Country names are drawn over the mask and leak fragments of neighbours
   // across the border; the map only ever shows Brazil, so hide them all.
   for (const layer of map.getStyle().layers ?? []) {
-    if (layer.type === 'symbol' && /country/i.test(layer.id))
-      map.setLayoutProperty(layer.id, 'visibility', 'none');
+    if (layer.type !== 'symbol') continue;
+    if (/country/i.test(layer.id)) map.setLayoutProperty(layer.id, 'visibility', 'none');
+    // Nome local do OpenStreetMap (português no Brasil), nunca o inglês (ver mapConfig).
+    const localized = localizedLabelField(map.getLayoutProperty(layer.id, 'text-field'));
+    if (localized)
+      map.setLayoutProperty(
+        layer.id,
+        'text-field',
+        localized as maplibregl.DataDrivenPropertyValueSpecification<string>,
+      );
   }
   const theme = outlineTheme();
   const { lines } = MAP_DESIGN;
@@ -273,8 +286,17 @@ function addBrazilMask(map: maplibregl.Map) {
     });
 }
 
-/** Replaces the plotted points; reframes only when the set of points changes. */
-function showEvents(map: maplibregl.Map, located: MapMarker[], fittedKey: { current: string }) {
+/**
+ * Replaces the plotted points; reframes only when the set of points changes. With a
+ * selected point (a report just sent, a report opened) the frame is that point; otherwise
+ * the points themselves, or the whole country when they are spread across it.
+ */
+function showEvents(
+  map: maplibregl.Map,
+  located: MapMarker[],
+  fittedKey: { current: string },
+  focusId?: string | null,
+) {
   const source = map.getSource('events') as maplibregl.GeoJSONSource | undefined;
   if (!source) return;
   const markerIds = new Map<string, string>();
@@ -308,6 +330,11 @@ function showEvents(map: maplibregl.Map, located: MapMarker[], fittedKey: { curr
     .join(',');
   if (!located.length || key === fittedKey.current) return;
   fittedKey.current = key;
+  const focus = located.find((event) => event.id === focusId);
+  if (focus) {
+    map.jumpTo({ center: [focus.longitude!, focus.latitude!], zoom: MAP_DESIGN.framing.pointZoom });
+    return;
+  }
   const bounds = new maplibregl.LngLatBounds();
   located.forEach((event) => bounds.extend([event.longitude!, event.latitude!]));
   const { framing } = MAP_DESIGN;
@@ -352,6 +379,8 @@ export default function UrbanMap({
   detail,
   onCloseDetail,
   allowExport = false,
+  emptyMessage = 'Ainda não há pontos para mostrar neste mapa.',
+  showFilters = true,
 }: {
   events: MapMarker[];
   selectedId?: string | null;
@@ -361,6 +390,9 @@ export default function UrbanMap({
   detail?: ReactNode;
   onCloseDetail?: () => void;
   allowExport?: boolean;
+  emptyMessage?: string;
+  /** Mapas de apoio (início) mostram os pontos sem a barra de filtros. */
+  showFilters?: boolean;
 }) {
   const exportController = useRef<AbortController | null>(null);
   const [exportError, setExportError] = useState('');
@@ -380,16 +412,17 @@ export default function UrbanMap({
     () => (onPickLocation ? allEvents : filterMapRecords(allEvents, filters)),
     [allEvents, filters, onPickLocation],
   );
-  const options = {
-    statuses: [...new Set(allEvents.map((row) => row.report_status ?? row.status).filter(Boolean))],
-    families: [...new Set(allEvents.map((row) => familyFor(row.urmind_class)).filter(Boolean))],
-    issues: [
-      ...new Set(
-        allEvents.map((row) => row.urmind_class).filter((value): value is string => Boolean(value)),
-      ),
-    ],
-  };
-  function changeFilters(next: MapFilters) {
+  const options = mapFilterOptions(allEvents, filters.family, {
+    reports: reportLabels,
+    events: statuses,
+  });
+  const filtering = Object.values(filters).some(Boolean);
+  function changeFilters(requested: MapFilters) {
+    // A classe escolhida precisa pertencer à família escolhida.
+    const next =
+      requested.issue && requested.family && familyFor(requested.issue) !== requested.family
+        ? { ...requested, issue: '' }
+        : requested;
     setFilters(next);
     onCloseDetail?.();
     const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
@@ -448,6 +481,19 @@ export default function UrbanMap({
   selectCallback.current = onSelect;
   const fittedKey = useRef('');
   const pickMode = Boolean(onPickLocation);
+  const pickedMarker = useRef<maplibregl.Marker | null>(null);
+
+  /** Um toque no mapa ou "Marcar o centro do mapa": o mesmo ponto confirmado pela pessoa. */
+  function pickPoint(map: maplibregl.Map, point: maplibregl.LngLat) {
+    if (!isInsideBrazil(point.lat, point.lng)) {
+      setError('Escolha um ponto dentro do território brasileiro.');
+      return;
+    }
+    setError('');
+    pickedMarker.current?.remove();
+    pickedMarker.current = new maplibregl.Marker({ color: '#123f36' }).setLngLat(point).addTo(map);
+    pickCallback.current?.(point.lat, point.lng);
+  }
 
   useEffect(() => {
     if (!container.current) return;
@@ -503,22 +549,7 @@ export default function UrbanMap({
         }),
         'top-right',
       );
-      if (pickMode) {
-        let pickedMarker: maplibregl.Marker | undefined;
-        map.on('click', (event) => {
-          const { lat, lng } = event.lngLat;
-          if (!isInsideBrazil(lat, lng)) {
-            setError('Escolha um ponto dentro do território brasileiro.');
-            return;
-          }
-          setError('');
-          pickedMarker?.remove();
-          pickedMarker = new maplibregl.Marker({ color: '#123f36' })
-            .setLngLat(event.lngLat)
-            .addTo(map!);
-          pickCallback.current?.(lat, lng);
-        });
-      }
+      if (pickMode) map.on('click', (event) => pickPoint(map!, event.lngLat));
       let fallbackUsed = false;
       let styleLoaded = false;
       map.on('error', () => {
@@ -596,7 +627,7 @@ export default function UrbanMap({
         });
         // A style swap (CARTO fallback) empties the map: refit the current data.
         fittedKey.current = '';
-        showEvents(map, locatedRef.current, fittedKey);
+        showEvents(map, locatedRef.current, fittedKey, selectedRef.current);
       });
       // Diagnóstico do que a camada realmente desenhou (não apenas da lista recebida).
       map.on('idle', () => {
@@ -663,7 +694,7 @@ export default function UrbanMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (map?.getSource('events')) showEvents(map, located, fittedKey);
+    if (map?.getSource('events')) showEvents(map, located, fittedKey, selectedRef.current);
   }, [located]);
 
   const centerLatitude = initialCenter?.latitude;
@@ -686,71 +717,90 @@ export default function UrbanMap({
     ]);
   }, [selectedId]);
 
-  const showReportLegend = events.some((event) => event.report_status);
-  const showSeverityLegend = events.some((event) => !event.report_status || event.severity != null);
+  // Abrir um relato leva o mapa até ele; o ponto vem dos dados, nunca de um centro padrão.
+  const selectedPoint = located.find((event) => event.id === selectedId);
+  const selectedLatitude = selectedPoint?.latitude;
+  const selectedLongitude = selectedPoint?.longitude;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || selectedLatitude == null || selectedLongitude == null) return;
+    map.easeTo({
+      center: [selectedLongitude, selectedLatitude],
+      zoom: Math.max(map.getZoom(), MAP_DESIGN.framing.pointZoom),
+      duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600,
+    });
+  }, [selectedId, selectedLatitude, selectedLongitude]);
+
+  const shownStatuses = new Set(located.map((event) => event.report_status).filter(Boolean));
+  const showReportLegend = shownStatuses.size > 0;
+  const showSeverityLegend = located.some(
+    (event) => !event.report_status || event.severity != null,
+  );
   const reportColors: Record<string, string> = MAP_DESIGN.markers.reportStatus;
   return (
     <section className="panel map-panel">
-      {!onPickLocation && (
+      {!onPickLocation && showFilters && allEvents.length > 0 && (
         <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
-          <label>
-            Status do ponto
-            <select
-              value={filters.status}
-              onChange={(event) => changeFilters({ ...filters, status: event.target.value })}
-            >
-              <option value="">Todos</option>
-              {options.statuses.map((status) => (
-                <option key={status} value={status}>
-                  {reportLabels[status as CaptureMarker['report_status']] ?? status}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Família do ponto
-            <select
-              value={filters.family}
-              onChange={(event) => changeFilters({ ...filters, family: event.target.value })}
-            >
-              <option value="">Todas</option>
-              {options.families.map((family) => (
-                <option key={family}>{family}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Classe do ponto
-            <select
-              value={filters.issue}
-              onChange={(event) => changeFilters({ ...filters, issue: event.target.value })}
-            >
-              <option value="">Todas</option>
-              {options.issues.map((issue) => (
-                <option key={issue} value={issue}>
-                  {labelFor(issue)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Desde (UTC)
-            <input
-              type="date"
-              value={filters.from}
-              onChange={(event) => changeFilters({ ...filters, from: event.target.value })}
-            />
-          </label>
-          <label>
-            Até (UTC)
-            <input
-              type="date"
-              value={filters.to}
-              onChange={(event) => changeFilters({ ...filters, to: event.target.value })}
-            />
-          </label>
+          {options.statuses.length > 1 && (
+            <label>
+              Status do ponto
+              <select
+                value={filters.status}
+                onChange={(event) => changeFilters({ ...filters, status: event.target.value })}
+              >
+                <option value="">Todos</option>
+                {options.statuses.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {options.families.length > 1 && (
+            <label>
+              Família do ponto
+              <select
+                value={filters.family}
+                onChange={(event) => changeFilters({ ...filters, family: event.target.value })}
+              >
+                <option value="">Todas</option>
+                {options.families.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {options.issues.length > 1 && (
+            <label>
+              Classe do ponto
+              <select
+                value={filters.issue}
+                onChange={(event) => changeFilters({ ...filters, issue: event.target.value })}
+              >
+                <option value="">Todas</option>
+                {options.issues.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <DateField
+            label="Desde"
+            value={filters.from}
+            onChange={(from) => changeFilters({ ...filters, from })}
+          />
+          <DateField
+            label="Até"
+            value={filters.to}
+            onChange={(to) => changeFilters({ ...filters, to })}
+          />
           <p role="status" className="map-count">
-            {located.length} pontos visíveis
+            {located.length === 1 ? '1 ponto visível' : `${located.length} pontos visíveis`}
           </p>
         </div>
       )}
@@ -760,10 +810,27 @@ export default function UrbanMap({
           style={{ height: MAP_DESIGN.slot.height }}
           ref={container}
           role="img"
-          aria-label={`Mapa com ${located.length} de ${events.length} ocorrências localizadas`}
+          aria-label={`Mapa com ${located.length} de ${events.length} pontos localizados`}
         />
         {!located.length && !onPickLocation && (
-          <p className="map-empty">Nenhum registro com localização disponível neste recorte.</p>
+          <div className="map-empty" role="status">
+            {filtering && allEvents.length > 0 ? (
+              <>
+                <span>Nenhum ponto corresponde a estes filtros.</span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    changeFilters({ status: '', family: '', issue: '', from: '', to: '' })
+                  }
+                >
+                  Limpar filtros
+                </button>
+              </>
+            ) : (
+              <span>{emptyMessage}</span>
+            )}
+          </div>
         )}
         {(showReportLegend || showSeverityLegend) && (
           <div className="map-legends">
@@ -782,18 +849,20 @@ export default function UrbanMap({
             )}
             {showReportLegend && (
               <ul className="map-legend" aria-label="Legenda de relatos">
-                {Object.entries(reportLabels).map(([status, label]) => (
-                  <li key={status}>
-                    <SignSwatch
-                      style={{
-                        shape: 'circle',
-                        fill: reportColors[status] ?? '#64748b',
-                        glyph: '#ffffff',
-                      }}
-                    />
-                    {label}
-                  </li>
-                ))}
+                {Object.entries(reportLabels)
+                  .filter(([status]) => shownStatuses.has(status as CaptureMarker['report_status']))
+                  .map(([status, label]) => (
+                    <li key={status}>
+                      <SignSwatch
+                        style={{
+                          shape: 'circle',
+                          fill: reportColors[status] ?? '#64748b',
+                          glyph: '#ffffff',
+                        }}
+                      />
+                      {label}
+                    </li>
+                  ))}
               </ul>
             )}
           </div>
@@ -807,7 +876,23 @@ export default function UrbanMap({
           {detail}
         </aside>
       )}
-      <div className="map-footer">
+      {pickMode && (
+        <div className="map-footer map-pick-center">
+          {/* Alternativa ao toque: teclado (setas, + e -) move o mapa até o local. */}
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => mapRef.current && pickPoint(mapRef.current, mapRef.current.getCenter())}
+          >
+            Marcar o centro do mapa
+          </button>
+          <small>
+            Toque no local da foto ou mova o mapa (arrastando ou com as setas do teclado) e marque o
+            centro.
+          </small>
+        </div>
+      )}
+      <div className="map-footer" hidden={pickMode}>
         {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
         <details className="map-point-list">
           <summary>Lista acessível de pontos ({located.length})</summary>
@@ -822,7 +907,8 @@ export default function UrbanMap({
                   {markerLabel(event)}
                 </button>{' '}
                 {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`} ·{' '}
-                {event.road_name ?? 'via não associada'} · {event.latitude}, {event.longitude}
+                {event.road_name ?? 'via não associada'} · {event.latitude!.toFixed(5)},{' '}
+                {event.longitude!.toFixed(5)}
               </li>
             ))}
           </ul>
@@ -873,10 +959,8 @@ export default function UrbanMap({
           </div>
         )}
         <p className="map-caption">
-          {located.length} de {events.length} registros têm localização disponível neste mapa.{' '}
-          {style
-            ? `${activeProviderName}: ${activeAttribution}. Coordenadas originais; o ponto ajustado à via permanece separado.`
-            : 'Somente coordenadas reais são exibidas; nenhuma rua é simulada.'}
+          Pontos na posição informada; o trecho de via associado aparece no detalhe.{' '}
+          {activeProviderName}: {activeAttribution}.
         </p>
       </div>
       {error && (
@@ -885,6 +969,51 @@ export default function UrbanMap({
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * Data digitada como dd/mm/aaaa: o campo nativo de data segue o idioma do navegador e
+ * mostraria mm/dd/yyyy numa interface em português. Guarda aaaa-mm-dd internamente.
+ */
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (isoDate: string) => void;
+}) {
+  const [text, setText] = useState(() => formatBrDate(value));
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setText(formatBrDate(value));
+  }
+  const invalid = text.length === 10 && parseBrDate(text) === null;
+  return (
+    <label>
+      {label}
+      <input
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="dd/mm/aaaa"
+        maxLength={10}
+        value={text}
+        aria-invalid={invalid || undefined}
+        onChange={(event) => {
+          const next = maskBrDate(event.target.value);
+          setText(next);
+          if (!next) onChange('');
+          else {
+            const iso = parseBrDate(next);
+            if (iso) onChange(iso);
+          }
+        }}
+      />
+      {invalid && <small className="field-error">Data inexistente</small>}
+    </label>
   );
 }
 

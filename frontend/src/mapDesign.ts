@@ -111,10 +111,14 @@ export const MAP_DESIGN = {
     },
     /** Relatos de cidadãos (sem severidade): círculo na cor do estado. */
     reportStatus: {
+      location_required: '#be123c',
       received: '#64748b',
+      processing: '#0e7490',
       model_not_available: '#a16207',
       experimental: '#7c3aed',
+      no_supported_detection: '#57534e',
       human_confirmed: '#047857',
+      published: '#123f36',
       confirmed: '#047857',
       rejected: '#991b1b',
       duplicate: '#475569',
@@ -128,35 +132,48 @@ export type MarkerShape = 'warning' | 'triangle' | 'square' | 'circle' | 'ring';
 
 export type MapColors = Record<keyof (typeof MAP_DESIGN.colors)['light'], string>;
 
-/** Capitais das 27 UFs; `rank` menor aparece primeiro quando falta espaço. */
-export const BRAZIL_CAPITALS: { name: string; lng: number; lat: number; rank: number }[] = [
-  { name: 'Brasília', lng: -47.88, lat: -15.79, rank: 0 },
-  { name: 'São Paulo', lng: -46.63, lat: -23.55, rank: 1 },
-  { name: 'Rio de Janeiro', lng: -43.17, lat: -22.91, rank: 1 },
-  { name: 'Manaus', lng: -60.02, lat: -3.12, rank: 1 },
-  { name: 'Salvador', lng: -38.5, lat: -12.97, rank: 1 },
-  { name: 'Belém', lng: -48.5, lat: -1.46, rank: 2 },
-  { name: 'Fortaleza', lng: -38.54, lat: -3.73, rank: 2 },
-  { name: 'Recife', lng: -34.88, lat: -8.05, rank: 2 },
-  { name: 'Porto Alegre', lng: -51.23, lat: -30.03, rank: 2 },
-  { name: 'Belo Horizonte', lng: -43.94, lat: -19.92, rank: 2 },
-  { name: 'Curitiba', lng: -49.27, lat: -25.43, rank: 2 },
-  { name: 'Cuiabá', lng: -56.1, lat: -15.6, rank: 2 },
-  { name: 'Porto Velho', lng: -63.9, lat: -8.76, rank: 3 },
-  { name: 'Rio Branco', lng: -67.81, lat: -9.97, rank: 3 },
-  { name: 'Boa Vista', lng: -60.67, lat: 2.82, rank: 3 },
-  { name: 'Macapá', lng: -51.07, lat: 0.03, rank: 3 },
-  { name: 'Palmas', lng: -48.33, lat: -10.18, rank: 3 },
-  { name: 'Goiânia', lng: -49.25, lat: -16.68, rank: 3 },
-  { name: 'Campo Grande', lng: -54.62, lat: -20.47, rank: 3 },
-  { name: 'São Luís', lng: -44.3, lat: -2.53, rank: 3 },
-  { name: 'Teresina', lng: -42.8, lat: -5.09, rank: 3 },
-  { name: 'Natal', lng: -35.21, lat: -5.79, rank: 4 },
-  { name: 'João Pessoa', lng: -34.86, lat: -7.12, rank: 4 },
-  { name: 'Maceió', lng: -35.73, lat: -9.67, rank: 4 },
-  { name: 'Aracaju', lng: -37.07, lat: -10.91, rank: 4 },
-  { name: 'Vitória', lng: -40.31, lat: -20.32, rank: 4 },
-  { name: 'Florianópolis', lng: -48.55, lat: -27.59, rank: 4 },
+/**
+ * Capitais das 27 UFs, só para a visão do país inteiro (abaixo do zoom em que o mapa
+ * base passa a trazer as cidades). `uf` é o código IBGE da unidade da federação: um
+ * teste confere que cada ponto cai dentro da própria UF na malha oficial do IBGE
+ * (`public/geo/brasil-uf.geojson`). Coordenadas com duas casas (~1 km), suficientes
+ * para um rótulo nacional. `rank` menor aparece primeiro quando falta espaço.
+ */
+export const BRAZIL_CAPITALS: {
+  name: string;
+  uf: string;
+  lng: number;
+  lat: number;
+  rank: number;
+}[] = [
+  { name: 'Brasília', uf: '53', lng: -47.88, lat: -15.79, rank: 0 },
+  { name: 'São Paulo', uf: '35', lng: -46.63, lat: -23.55, rank: 1 },
+  // -43.17 (Praça XV) cai na água da baía na malha simplificada do IBGE; -43.20 é o Centro.
+  { name: 'Rio de Janeiro', uf: '33', lng: -43.2, lat: -22.91, rank: 1 },
+  { name: 'Manaus', uf: '13', lng: -60.02, lat: -3.12, rank: 1 },
+  { name: 'Salvador', uf: '29', lng: -38.5, lat: -12.97, rank: 1 },
+  { name: 'Belém', uf: '15', lng: -48.5, lat: -1.46, rank: 2 },
+  { name: 'Fortaleza', uf: '23', lng: -38.54, lat: -3.73, rank: 2 },
+  { name: 'Recife', uf: '26', lng: -34.88, lat: -8.05, rank: 2 },
+  { name: 'Porto Alegre', uf: '43', lng: -51.23, lat: -30.03, rank: 2 },
+  { name: 'Belo Horizonte', uf: '31', lng: -43.94, lat: -19.92, rank: 2 },
+  { name: 'Curitiba', uf: '41', lng: -49.27, lat: -25.43, rank: 2 },
+  { name: 'Cuiabá', uf: '51', lng: -56.1, lat: -15.6, rank: 2 },
+  { name: 'Porto Velho', uf: '11', lng: -63.9, lat: -8.76, rank: 3 },
+  { name: 'Rio Branco', uf: '12', lng: -67.81, lat: -9.97, rank: 3 },
+  { name: 'Boa Vista', uf: '14', lng: -60.67, lat: 2.82, rank: 3 },
+  { name: 'Macapá', uf: '16', lng: -51.07, lat: 0.03, rank: 3 },
+  { name: 'Palmas', uf: '17', lng: -48.33, lat: -10.18, rank: 3 },
+  { name: 'Goiânia', uf: '52', lng: -49.25, lat: -16.68, rank: 3 },
+  { name: 'Campo Grande', uf: '50', lng: -54.62, lat: -20.47, rank: 3 },
+  { name: 'São Luís', uf: '21', lng: -44.3, lat: -2.53, rank: 3 },
+  { name: 'Teresina', uf: '22', lng: -42.8, lat: -5.09, rank: 3 },
+  { name: 'Natal', uf: '24', lng: -35.21, lat: -5.79, rank: 4 },
+  { name: 'João Pessoa', uf: '25', lng: -34.86, lat: -7.12, rank: 4 },
+  { name: 'Maceió', uf: '27', lng: -35.73, lat: -9.67, rank: 4 },
+  { name: 'Aracaju', uf: '28', lng: -37.07, lat: -10.91, rank: 4 },
+  { name: 'Vitória', uf: '32', lng: -40.31, lat: -20.32, rank: 4 },
+  { name: 'Florianópolis', uf: '42', lng: -48.55, lat: -27.59, rank: 4 },
 ];
 
 /** Converte pares [zoom, valor] numa expressão de interpolação do MapLibre. */

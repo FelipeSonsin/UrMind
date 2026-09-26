@@ -311,10 +311,17 @@ class CaptureRepository:
                    e.id as event_id, e.public_id as event_public_id,
                    e.urmind_class, e.status as event_status,
                    exists(select 1 from public.reviews rv where rv.event_id=e.id) as has_review,
+                   ST_Y(e.snapped_point::geometry) as snapped_latitude,
+                   ST_X(e.snapped_point::geometry) as snapped_longitude,
+                   e.distance_to_road_m, road.name as road_name,
+                   (e.id is not null and """
+                + PublicRepository._PUBLISHED
+                + """) as event_published,
                    risk.severity, risk.priority_score
             from public.captures c
             left join lateral (
-                select id, public_id, urmind_class, status, factors from public.events
+                select id, public_id, urmind_class, status, factors, snapped_point,
+                       distance_to_road_m, road_segment_id from public.events
                 where capture_id = c.id or (
                     c.quality->'inference'->'event_ids' @> to_jsonb(events.id::text)
                     and exists(select 1 from public.captures owner_capture
@@ -323,6 +330,7 @@ class CaptureRepository:
                 )
                 order by commit_order desc nulls last, created_at desc, id limit 1
             ) e on true
+            left join public.road_segments road on road.id = e.road_segment_id
             left join lateral (
                 select severity, priority_score from public.risk_assessments
                 where event_id = e.id
