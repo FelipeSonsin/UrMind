@@ -50,6 +50,18 @@ test('a página inicial leva a registrar, acompanhar relatos e ver o mapa', asyn
   await expect(
     page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
+  // A marca abre a página: o logo oficial (o mesmo arquivo da barra lateral) e a frase.
+  const hero = page.getByRole('region', { name: 'Viu um problema na rua? Registre com uma foto.' });
+  const heroLogo = hero.getByRole('img', { name: 'UrMind', exact: true });
+  await expect(heroLogo).toBeVisible();
+  await expect
+    .poll(() => heroLogo.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBe(1200);
+  await expect(hero).toContainText('Inteligência urbana que transforma ocorrências em ação.');
+  // Um logo por região: no celular a barra do topo fica sem o seu no Início.
+  const topLogo = page.getByRole('link', { name: 'UrMind', exact: true });
+  if ((page.viewportSize()?.width ?? 0) <= 800) await expect(topLogo).toBeHidden();
+  else await expect(topLogo).toBeVisible();
   await expect(page.getByRole('link', { name: 'Registrar evidência' }).first()).toBeVisible();
   await expect(page.getByLabel('Seus relatos')).toContainText('aparecem aqui');
   // Diagnóstico técnico (API, banco, detector, trechos, Scout) não aparece para o cidadão.

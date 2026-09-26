@@ -817,7 +817,11 @@ export default function App() {
     }
   }
   return (
-    <div className={`app-shell${privatePage && canReview ? ' internal-shell' : ''}`}>
+    <div
+      className={`app-shell${page === 'overview' ? ' is-home' : ''}${
+        privatePage && canReview ? ' internal-shell' : ''
+      }`}
+    >
       <a
         className="skip-link"
         href="#main"
@@ -834,8 +838,8 @@ export default function App() {
             className="brand-logo"
             src="/brand/urmind-logo.png"
             alt="UrMind"
-            width={600}
-            height={168}
+            width={1200}
+            height={322}
           />
         </a>
         <nav aria-label="Navegação principal">

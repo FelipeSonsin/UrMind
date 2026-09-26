@@ -340,20 +340,19 @@ textarea {
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 36px;
+  align-self: flex-start;
+  min-height: 40px;
+  margin-bottom: 14px;
   padding: 0 8px;
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  border-radius: var(--radius-s);
   text-decoration: none;
 }
-/* Logo oficial (public/brand/urmind-logo.png): altura fixa, largura pela proporção. */
+/* Logo oficial (public/brand/urmind-logo.png, recorte justo e fundo transparente):
+   altura fixa, largura pela proporção; a borda esquerda alinha com os ícones do menu. */
 .brand-logo {
   display: block;
   width: auto;
-  height: 38px;
+  height: 32px;
   max-width: 100%;
 }
 .sidebar-section {
@@ -851,23 +850,68 @@ tbody tr:hover {
 }
 
 /* ================================ Início =================================== */
+/* Marca à esquerda (logo oficial + frase), convite a registrar à direita. Só espaço
+   e tipografia: sem cartão, borda, gradiente ou brilho. */
 .home-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px 32px;
-  padding: 8px 0 4px;
-  margin-bottom: 32px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 28px 64px;
+  padding: 12px 0 4px;
+  margin-bottom: 40px;
 }
-.home-hero h1 {
+.home-brand {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  max-width: 340px;
+}
+/* Proporção do arquivo (width/height no <img>); só a largura muda por tela. */
+.home-brand-logo {
+  display: block;
+  width: 340px;
+  max-width: 100%;
+  height: auto;
+}
+.home-brand-tagline {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 19px;
+  font-weight: 450;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.home-intro h1 {
   max-width: 20ch;
   margin-bottom: 8px;
   font-size: clamp(24px, 2.6vw, 30px);
 }
-.home-hero p {
+.home-intro > p {
   max-width: 56ch;
   margin: 0;
+}
+.home-intro .actions {
+  margin-top: 20px;
+}
+/* Um único movimento de entrada: logo, frase e convite, nessa ordem. Com "reduzir
+   movimento" a regra global desliga a animação e tudo aparece de uma vez. */
+.home-brand-logo,
+.home-brand-tagline,
+.home-intro {
+  animation: home-enter 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.home-brand-tagline {
+  animation-delay: 90ms;
+}
+.home-intro {
+  animation-delay: 180ms;
+}
+@keyframes home-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 .home-capabilities {
   display: flex;
@@ -2311,6 +2355,26 @@ tbody tr:hover {
 }
 
 /* ================================= Responsivo ============================== */
+/* Sem largura para duas colunas: marca em cima (logo ao lado da frase), convite embaixo. */
+@media (max-width: 1199px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 28px;
+  }
+  .home-brand {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 16px 28px;
+    max-width: 640px;
+  }
+  .home-brand-logo {
+    width: 264px;
+  }
+  .home-brand-tagline {
+    font-size: 18px;
+  }
+}
 @media (max-width: 1150px) {
   :root {
     --sidebar: 208px;
@@ -2371,8 +2435,38 @@ tbody tr:hover {
   .sidebar-bottom {
     display: none;
   }
+  .brand {
+    min-height: 36px;
+    margin-bottom: 0;
+    padding: 0 4px;
+  }
   .brand-logo {
-    height: 30px;
+    height: 28px;
+  }
+  /* No Início a marca já abre a página: a do topo sai para não repetir o logo. */
+  .is-home .sidebar {
+    padding: 0;
+  }
+  .is-home .brand {
+    display: none;
+  }
+  .is-home .workspace {
+    border-top: 0;
+  }
+  .home-hero {
+    gap: 24px;
+    padding-top: 4px;
+    margin-bottom: 32px;
+  }
+  .home-brand {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .home-brand-logo {
+    width: 232px;
+  }
+  .home-brand-tagline {
+    font-size: 17px;
   }
   .sidebar nav {
     position: fixed;

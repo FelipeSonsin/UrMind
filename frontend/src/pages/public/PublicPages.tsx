@@ -244,7 +244,20 @@ export function PublicHome({
   return (
     <>
       <section className="home-hero" aria-labelledby="home-title">
-        <div>
+        {/* Apresentação da marca: o mesmo arquivo da barra lateral, em tamanho maior. */}
+        <div className="home-brand">
+          <img
+            className="home-brand-logo"
+            src="/brand/urmind-logo.png"
+            alt="UrMind"
+            width={1200}
+            height={322}
+          />
+          <p className="home-brand-tagline">
+            Inteligência urbana que transforma ocorrências em ação.
+          </p>
+        </div>
+        <div className="home-intro">
           <h1 id="home-title">Viu um problema na rua? Registre com uma foto.</h1>
           <p>
             A localização vem do aparelho ou da própria foto. A equipe revisa cada relato antes de
@@ -262,21 +275,21 @@ export function PublicHome({
               </ul>
             </div>
           )}
-        </div>
-        <div className="actions">
-          <a className="button" href="#/registrar">
-            <Camera size={16} aria-hidden="true" /> Registrar evidência
-          </a>
-          {activeCapabilities.liveDetection && (
-            <a className="button secondary" href="#/deteccao-ao-vivo">
-              <ScanEye size={16} aria-hidden="true" /> Detecção ao vivo
+          <div className="actions">
+            <a className="button" href="#/registrar">
+              <Camera size={16} aria-hidden="true" /> Registrar evidência
             </a>
-          )}
-          {activeCapabilities.robotCamera && (
-            <a className="button secondary" href="#/camera-robo">
-              <Webcam size={16} aria-hidden="true" /> Câmera do robô
-            </a>
-          )}
+            {activeCapabilities.liveDetection && (
+              <a className="button secondary" href="#/deteccao-ao-vivo">
+                <ScanEye size={16} aria-hidden="true" /> Detecção ao vivo
+              </a>
+            )}
+            {activeCapabilities.robotCamera && (
+              <a className="button secondary" href="#/camera-robo">
+                <Webcam size={16} aria-hidden="true" /> Câmera do robô
+              </a>
+            )}
+          </div>
         </div>
       </section>
       <section className="panel home-reports" aria-label="Seus relatos">
