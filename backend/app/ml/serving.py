@@ -22,6 +22,13 @@ from typing import Any, NoReturn
 
 import numpy as np
 
+from app.ml.sliced_inference import (
+    SlicingConfig,
+    finalize_detections,
+    merge_view_detections,
+    offset_detections,
+    plan_views,
+)
 from app.ml.yolox_model import MODEL_METADATA_PATH, load_model_config
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -643,6 +650,58 @@ def _preprocess(
     return tensor[None, :, :, :], 1.0
 
 
+def decode_raw_output(output: np.ndarray, ratio: float) -> tuple[np.ndarray, np.ndarray]:
+    """Saída ``[1, N, 5+C]`` decodificada → caixas xyxy na imagem e ``objectness × classe``."""
+    predictions = output[0]
+    boxes = predictions[:, :4].copy()
+    xyxy = np.empty_like(boxes)
+    xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
+    xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2
+    xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2
+    xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2
+    xyxy /= ratio
+    return xyxy, predictions[:, 4:5] * predictions[:, 5:]
+
+
+def select_detections(
+    xyxy: np.ndarray,
+    scores: np.ndarray,
+    image_shape: tuple[int, ...],
+    *,
+    class_score_thresholds: Sequence[float] | None,
+    nms_threshold: float,
+    score_threshold: float,
+) -> np.ndarray:
+    """Limiar + NMS do perfil e recorte à imagem: ``[x0, y0, x1, y1, score, classe]``.
+
+    Única implementação usada pelo ``OnnxDetector`` e pela avaliação offline da saída
+    bruta em cache (``app.ml.camera_dev``), para que as duas não divirjam.
+    """
+    from yolox.utils.demo_utils import multiclass_nms  # type: ignore[import-not-found]
+
+    height, width = image_shape[:2]
+    if class_score_thresholds is not None:
+        # Limiar estrito por classe antes do NMS por classe; o limiar global
+        # recebido não se aplica a este perfil.
+        limits = np.asarray(class_score_thresholds, dtype=scores.dtype)
+        scores = np.where(scores > limits[None, :], scores, 0).astype(scores.dtype)
+        kept = multiclass_nms(
+            xyxy, scores, nms_thr=nms_threshold, score_thr=0.0, class_agnostic=False
+        )
+    else:
+        kept = multiclass_nms(xyxy, scores, nms_thr=nms_threshold, score_thr=score_threshold)
+    rows: list[list[float]] = []
+    if kept is None:
+        return np.empty((0, 6), dtype=np.float64)
+    for x0, y0, x1, y1, score, class_index in kept:
+        x0, x1 = max(0.0, float(x0)), min(float(width), float(x1))
+        y0, y1 = max(0.0, float(y0)), min(float(height), float(y1))
+        if x1 <= x0 or y1 <= y0:
+            continue
+        rows.append([x0, y0, x1, y1, float(score), float(class_index)])
+    return np.asarray(rows, dtype=np.float64).reshape(-1, 6)
+
+
 class OnnxDetector:
     """Inferência CPU/GPU via ONNX Runtime, com o ONNX conferido por hash."""
 
@@ -743,54 +802,81 @@ class OnnxDetector:
         *,
         score_threshold: float,
     ) -> list[ServedDetection]:
-        from yolox.utils.demo_utils import multiclass_nms  # type: ignore[import-not-found]
-
         height, width = image_shape[:2]
-        predictions = output[0]
-        boxes = predictions[:, :4].copy()
-        xyxy = np.empty_like(boxes)
-        xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
-        xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2
-        xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2
-        xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2
-        xyxy /= ratio
-        scores = predictions[:, 4:5] * predictions[:, 5:]
-        if self.class_score_thresholds is not None:
-            # Limiar estrito por classe antes do NMS por classe; o limiar global
-            # recebido não se aplica a este perfil.
-            limits = np.asarray(self.class_score_thresholds, dtype=scores.dtype)
-            scores = np.where(scores > limits[None, :], scores, 0).astype(scores.dtype)
-            kept = multiclass_nms(
-                xyxy, scores, nms_thr=self.nms_threshold, score_thr=0.0, class_agnostic=False
+        return self._served(
+            self.postprocess_pixels(output, ratio, image_shape, score_threshold=score_threshold),
+            width,
+            height,
+        )
+
+    def _served(self, detections: np.ndarray, width: int, height: int) -> list[ServedDetection]:
+        return [
+            ServedDetection(
+                urmind_class=self.class_names[int(class_index)],
+                confidence=round(float(score), 6),
+                bbox={
+                    "x": x0 / width,
+                    "y": y0 / height,
+                    "width": (x1 - x0) / width,
+                    "height": (y1 - y0) / height,
+                },
             )
-        else:
-            kept = multiclass_nms(
-                xyxy,
-                scores,
-                nms_thr=self.nms_threshold,
-                score_thr=score_threshold,
+            for x0, y0, x1, y1, score, class_index in detections.tolist()
+        ]
+
+    def postprocess_pixels(
+        self,
+        output: np.ndarray,
+        ratio: float,
+        image_shape: tuple[int, ...],
+        *,
+        score_threshold: float,
+    ) -> np.ndarray:
+        """``[x0, y0, x1, y1, score, classe]`` em pixels da imagem, recortadas a ela."""
+        xyxy, scores = decode_raw_output(output, ratio)
+        return select_detections(
+            xyxy,
+            scores,
+            image_shape,
+            class_score_thresholds=self.class_score_thresholds,
+            nms_threshold=self.nms_threshold,
+            score_threshold=score_threshold,
+        )
+
+    def detect_frame(
+        self,
+        image_bgr: np.ndarray,
+        *,
+        score_threshold: float = SERVING_SCORE_THRESHOLD,
+        slicing: SlicingConfig | None = None,
+        max_detections: int | None = None,
+    ) -> np.ndarray:
+        """Detecções no quadro com fatiamento (``app.ml.sliced_inference``) — só avaliação.
+
+        Usado para medir TILED/HYBRID contra o cache de desenvolvimento; o fatiamento foi
+        rejeitado na sprint visual de 26/09/2026 e o Worker usa ``detect`` (uma vista, sem
+        passar por aqui). Sem ``slicing`` (ou ``mode="full"``) o resultado é o do caminho
+        histórico. Cada vista usa o mesmo pré e pós-processamento do perfil e, com
+        ``max_detections``, o mesmo teto antes da fusão e depois dela.
+        """
+        config = slicing or SlicingConfig()
+        per_view = []
+        for view in plan_views(image_bgr.shape[1], image_bgr.shape[0], config):
+            x0, y0, x1, y1 = view
+            crop = image_bgr[y0:y1, x0:x1]
+            tensor, ratio = self.preprocess(crop)
+            pixels = self.postprocess_pixels(
+                self.infer(tensor), ratio, crop.shape, score_threshold=score_threshold
             )
-        detections: list[ServedDetection] = []
-        if kept is None:
-            return detections
-        for x0, y0, x1, y1, score, class_index in kept:
-            x0, x1 = max(0.0, float(x0)), min(float(width), float(x1))
-            y0, y1 = max(0.0, float(y0)), min(float(height), float(y1))
-            if x1 <= x0 or y1 <= y0:
-                continue
-            detections.append(
-                ServedDetection(
-                    urmind_class=self.class_names[int(class_index)],
-                    confidence=round(float(score), 6),
-                    bbox={
-                        "x": x0 / width,
-                        "y": y0 / height,
-                        "width": (x1 - x0) / width,
-                        "height": (y1 - y0) / height,
-                    },
-                )
-            )
-        return detections
+            if max_detections is not None:
+                pixels = finalize_detections(pixels, max_detections=max_detections)
+            per_view.append(offset_detections(pixels, view))
+        merged = merge_view_detections(
+            per_view, method=config.merge, threshold=config.merge_threshold
+        )
+        if max_detections is not None:
+            merged = finalize_detections(merged, max_detections=max_detections)
+        return merged
 
     def detect(
         self, image_bytes: bytes, *, score_threshold: float = SERVING_SCORE_THRESHOLD

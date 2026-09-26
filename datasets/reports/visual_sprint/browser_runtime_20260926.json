@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "SOURCE": "MANUAL_BENCH_TRANSCRIPTION",
+  "source_detail": "Valores copiados à mão da saída de frontend/bench/runtime.html (window.benchResult) lida pela automação do navegador; o arquivo não foi gerado pela bancada. Desde 26/09/2026 a bancada oferece 'Baixar resultado (JSON)' para registros futuros sem transcrição.",
+  "producer": "frontend/bench/runtime.html (transcrição manual)",
+  "measured_at": "2026-09-26T06:30:00+00:00",
+  "measured_at_precision": "aproximado (horário da sessão, não carimbo da bancada)",
+  "development_only": true,
+  "production_evidence": false,
+  "baseline_id": "VS-BASELINE-60f9c748979feddb83d2a65ac49eeccc4fb1f63a61cc8848e03ea18ee80032be",
+  "onnx_sha256": "d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9",
+  "environment": {
+    "browser": "Microsoft Edge 153 (Chromium 153), Windows 11, esta máquina de desenvolvimento",
+    "hardware_concurrency": 20,
+    "webgpu_adapter": {"vendor": "intel", "architecture": "gen-12lp"},
+    "power_preference_high_performance_honored": false,
+    "note_adapter": "Mesmo com ort.env.webgpu.powerPreference = 'high-performance' e requestAdapter({powerPreference}), o navegador entregou a GPU integrada Intel; a RTX 4050 não é usada pelo navegador. No Windows a GPU por aplicativo é escolhida nas configurações de gráficos do sistema.",
+    "onnxruntime_web": "1.30.0",
+    "frame": "1920x1080 sintético (latência de session.run não depende do conteúdo)",
+    "worker": "módulo Web Worker dedicado, mesmo pré/pós-processamento do produto"
+  },
+  "runs": {
+    "webgpu": {
+      "session_create_ms": 1395,
+      "full_frame_ms": {
+        "preprocess": {"p50": 15.2, "p95": 22.0},
+        "session_run": {"p50": 291.9, "p95": 297.8},
+        "decode_nms": {"p50": 0.2, "p95": 2.1},
+        "total": {"p50": 309.4, "p95": 320.0},
+        "n": 15
+      },
+      "hybrid_pass_9_views_ms": {"p50": 2819.3, "p95": 2866.4, "n": 3}
+    },
+    "webgpu_io_binding": {
+      "description": "entrada em GPUBuffer (writeBuffer) e saída preferida na GPU, lida por staging buffer",
+      "session_create_ms": 179.3,
+      "full_frame_ms": {
+        "preprocess": {"p50": 14.0, "p95": 16.6},
+        "session_run_dispatch": {"p50": 6.6, "p95": 8.6},
+        "gpu_wait_and_download": {"p50": 280.1, "p95": 283.2},
+        "total": {"p50": 301.3, "p95": 307.3},
+        "n": 15
+      },
+      "hybrid_pass_9_views_ms": {"p50": 2714.4, "p95": 2731.1, "n": 3}
+    },
+    "webgpu_graph_capture": {
+      "description": "enableGraphCapture + IO na GPU com buffers fixos; captura concluída sem erro (kernels compatíveis)",
+      "session_create_ms": 179.9,
+      "full_frame_ms": {
+        "session_run_dispatch": {"p50": 6.6, "p95": 8.0},
+        "gpu_wait_and_download": {"p50": 282.7, "p95": 291.8},
+        "total": {"p50": 305.3, "p95": 312.7},
+        "n": 15
+      },
+      "hybrid_pass_9_views_ms": {"p50": 2726.7, "p95": 2729.1, "n": 3}
+    },
+    "wasm_1_thread": {
+      "session_create_ms": 911.4,
+      "full_frame_ms": {
+        "preprocess": {"p50": 14.2, "p95": 14.3},
+        "session_run": {"p50": 1206.7, "p95": 1211.0},
+        "decode_nms": {"p50": 1.7, "p95": 1.8},
+        "total": {"p50": 1220.7, "p95": 1227.1},
+        "n": 5
+      }
+    },
+    "webgpu_kernel_profiling": {
+      "result": "sem dados: o adaptador/navegador não expôs timestamp-query; perfil por etapa acima mostra que session.run é ~95 % do tempo"
+    },
+    "discarded": "Primeira medição WebGPU (session.run p50 695 ms) feita com a CPU saturada pelo cache do IRD; descartada e repetida com a CPU livre."
+  },
+  "conclusions": {
+    "bottleneck": "GPU (session.run); pré-processamento ~15 ms e decode/NMS < 2 ms",
+    "io_binding": "ganho ~2,6 % (309 → 301 ms), dentro do ruído; não adotado",
+    "graph_capture": "funciona, ganho ~1,3 % (309 → 305 ms); não adotado",
+    "wasm": "~4× mais lento que WebGPU nesta máquina (~0,8 análise/s)",
+    "hybrid_live": "uma passada HYBRID 1080p custa ~2,7–2,8 s no iGPU; mesmo que fosse aceita em qualidade, só caberia como detalhe esporádico"
+  }
+}
