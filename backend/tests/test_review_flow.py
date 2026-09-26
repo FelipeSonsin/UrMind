@@ -53,6 +53,40 @@ async def test_tabular_internal_export_does_not_invent_ground_truth_or_features(
     assert "private-user" not in str(result)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("notes", "reason"),
+    [
+        (None, "rejeição sem motivo visual não é rótulo negativo"),
+        ("[motivo:duplicidade] mesmo buraco", "rejeição sem motivo visual não é rótulo negativo"),
+        ("[motivo:localizacao]", "rejeição sem motivo visual não é rótulo negativo"),
+        ("[motivo:imagem_inconclusiva]", "rejeição sem motivo visual não é rótulo negativo"),
+        # A visual rejection passes this gate and then needs the snapshot like any label.
+        ("[motivo:erro_visual] sombra", "snapshot anterior ao início da revisão indisponível"),
+    ],
+)
+async def test_only_visual_rejection_can_become_a_negative_label(notes, reason):
+    vote = {
+        "event_id": str(uuid4()),
+        "review_id": uuid4(),
+        "decision": "reject",
+        "notes": notes,
+        "reviewer": "private-user",
+        "reviewer_role": "admin",
+        "adjudicated": True,
+        "reviewed_at": datetime(2026, 9, 24, tzinfo=UTC),
+        "inferred_class": "URMIND_ROAD_D40",
+    }
+    decisions = SimpleNamespace(
+        dataset_candidates=AsyncMock(return_value=[vote]),
+        snapshot_before_review=AsyncMock(return_value=None),
+        persisted_review=AsyncMock(return_value=None),
+    )
+    result = await CoreService(SimpleNamespace(), SimpleNamespace(), decisions).tabular_ground_truth()
+    assert result["rows"] == []
+    assert result["entries"][0]["reason"] == reason
+
+
 ROW = {
     "review_id": "r1",
     "decision": "correct",

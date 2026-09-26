@@ -297,18 +297,53 @@ async def ground_truth_summary(
         raise HTTPException(status_code=403, detail="Ground Truth exige papel interno")
     if service.decisions is None:
         raise HTTPException(status_code=503, detail="Ground Truth indisponível")
+    from collections import Counter
+    from types import SimpleNamespace
+
+    from app.ml.tabular import leakage_groups
+
     counts: dict[str, int] = {}
     reviewed = eligible = 0
+    by_decision: Counter[str] = Counter()
+    by_resolution: Counter[str] = Counter()
+    ineligible: Counter[str] = Counter()
+    eligible_rows: list[SimpleNamespace] = []
     async for batch in ground_truth_batches(service):
         reviewed += len(batch["entries"])
         eligible += len(batch["rows"])
         for issue, count in batch["counts_by_class"].items():
             counts[issue] = counts.get(issue, 0) + count
+        for entry in batch["entries"]:
+            by_resolution[entry["status"]] += 1
+            if entry.get("decision"):
+                by_decision[entry["decision"]] += 1
+            if not entry["eligible"]:
+                ineligible[entry["reason"]] += 1
+        eligible_rows.extend(
+            SimpleNamespace(
+                event_id=row["event_id"],
+                road_segment_id=row.get("road_segment_id"),
+                capture_ids=tuple(row.get("capture_ids") or ()),
+                scene_group_id=row.get("scene_group_id"),
+                duplicate_group_id=row.get("duplicate_group_id"),
+                sequence_group_id=row.get("sequence_group_id"),
+            )
+            for row in batch["rows"]
+        )
     response.headers["Cache-Control"] = "private, no-store"
     return {
         "reviewed_events": reviewed,
         "eligible_events": eligible,
         "counts_by_class": counts,
+        # Selected label per resolved Event; "inconclusive" is not a Review decision yet.
+        "confirmed": by_decision.get("confirm", 0),
+        "rejected": by_decision.get("reject", 0),
+        "corrected": by_decision.get("correct", 0),
+        "conflicts": by_resolution.get("conflicted", 0),
+        "by_resolution_status": dict(by_resolution),
+        "ineligible_reasons": dict(ineligible),
+        # Connected components over segment, Capture and verified scene groups.
+        "independent_groups": len(set(leakage_groups(eligible_rows).values())),
         "training_authorized": False,
     }
 

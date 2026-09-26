@@ -691,3 +691,78 @@ async def test_citizen_cannot_use_capture_human_review_service():
         await service.review_capture(
             uuid4(), CaptureReviewCreate(decision="reject"), reviewer="citizen", reviewer_role=None
         )
+
+
+@pytest.mark.asyncio
+async def test_dossier_report_provenance_resolves_actual_capture_and_segment(monkeypatch):
+    from app.services import core
+    from app.services.risk import ContextInput, RiskInput, assess
+
+    event_id, capture_id, segment_id = uuid4(), uuid4(), uuid4()
+    capture = SimpleNamespace(
+        id=capture_id,
+        captured_at=NOW,
+        source_location="gps_device",
+        detections=[],
+        quality={},
+        capture_key="fixture",
+        source="photo",
+        storage_path=None,
+    )
+    segment = SimpleNamespace(id=segment_id, name="Recorded road", created_at=NOW)
+    event = SimpleNamespace(
+        id=event_id,
+        capture_id=capture_id,
+        road_segment_id=segment_id,
+        factors={},
+        occurred_at=NOW,
+        event_key="TEST_EVENT",
+        urmind_class="URMIND_ROAD_D40",
+        visual_confidence=None,
+        model_version_id=None,
+        location_accuracy_m=6,
+        distance_to_road_m=3,
+    )
+    row = SimpleNamespace(
+        id=uuid4(),
+        created_at=NOW,
+        action_id=None,
+        responsibility_rule_id=None,
+        severity="unknown",
+        priority_score=None,
+        uncertainty=1,
+        factors={},
+    )
+    events = SimpleNamespace(
+        get=AsyncMock(return_value=event),
+        coordinates=AsyncMock(return_value={"latitude": -23, "longitude": -46}),
+        segment=AsyncMock(return_value=segment),
+        contexts=AsyncMock(return_value=[]),
+    )
+    decisions = SimpleNamespace(
+        latest_risk=AsyncMock(return_value=row),
+        get_rule=AsyncMock(return_value=None),
+        get_action=AsyncMock(return_value=None),
+        reviews=AsyncMock(return_value=[]),
+    )
+    service = CoreService(
+        SimpleNamespace(get=AsyncMock(return_value=capture)), events, decisions=decisions
+    )
+    monkeypatch.setattr(service, "detail", AsyncMock(return_value={}))
+    monkeypatch.setattr(
+        core,
+        "_risk_from_row",
+        AsyncMock(
+            return_value=assess(
+                RiskInput(
+                    urmind_class=UrmindClass.ROAD_D40,
+                    evidence_mode=EvidenceMode.PHOTO,
+                    context=ContextInput(),
+                )
+            )
+        ),
+    )
+    report = (await service.event_dossier(event_id))["report"]
+    assert f"Capture:{capture_id}/source_location" in report
+    assert f"RoadSegment:{segment_id}/name" in report
+    assert f"Event:{event_id}/location_source" not in report

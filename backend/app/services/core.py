@@ -16,7 +16,15 @@ from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.ml.tabular import TabularExportError, build_example, build_tabular_dataset_version
+from app.ml.tabular import (
+    NEGATIVE_REJECTION_REASON,
+    TabularExportError,
+    build_example,
+    build_tabular_dataset_version,
+    configured_tabular_runtime,
+    predict_review_confirmed,
+    rejection_reason,
+)
 from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
 from app.schemas.core import (
     CaptureCreate,
@@ -36,6 +44,7 @@ from app.services.context import POI_RADIUS_M, STATUS_OK, ContextResult, pending
 from app.services.features import FeatureInput, build_features
 from app.services.report import (
     ActionSuggestion,
+    EvidenceReference,
     ReportInput,
     ResponsibilitySuggestion,
     render_event_report,
@@ -636,7 +645,7 @@ class CoreService:
         # assessment row. Keep references to those exact values, not to the
         # mutable EventContext or to the current model registry entry.
         persisted["factors"]["decision_trace"] = {
-            "trace_schema_version": "urmind-decision-trace-v1",
+            "trace_schema_version": "urmind-decision-trace-v2",
             "assessment_id": str(assessment_id),
             "event_id": str(event_id),
             "feature_schema_version": features["feature_schema_version"],
@@ -649,14 +658,22 @@ class CoreService:
             "provisional_parameters": result["decision_trace"]["provisional_parameters"],
             "impact": result["impact"],
             "severity": result["severity"],
+            "severity_source": "rules",
             "risk": result["risk"],
+            "risk_source": "rules",
             "priority": result["priority"],
+            "priority_source": "rules",
             "responsibility": persisted["factors"]["responsibility"],
             "action": persisted["factors"]["action"],
             "model_version_id": str(event.model_version_id) if event.model_version_id else None,
             "dataset_version_id": str(dataset_version_id) if dataset_version_id else None,
             "assessed_at": persisted["factors"]["phase4_snapshot"]["collected_at"],
             "provenance": features["provenance"],
+            # Advisory estimate over the same frozen snapshot. It is recorded, never
+            # applied: severity, risk, priority, Review and publication stay rule/human.
+            "review_confirmed_advisory": predict_review_confirmed(
+                configured_tabular_runtime(), features
+            ),
         }
         assessment = await self.decisions.add_risk(
             event.id,
@@ -709,6 +726,63 @@ class CoreService:
         )
         report = None
         if row is not None:
+            provenance = {
+                name: EvidenceReference(
+                    field=name,
+                    source=f"Event:{event.id}/{'point' if name in {'latitude', 'longitude'} else name}",
+                    observed_at=event.occurred_at,
+                    kind="reported",
+                    limitation="Valor registrado; não constitui medição física ou diagnóstico causal.",
+                )
+                for name in (
+                    "event_key",
+                    "urmind_class",
+                    "visual_confidence",
+                    "model_version",
+                    "latitude",
+                    "longitude",
+                    "location_accuracy_m",
+                    "location_source",
+                    "road_segment_name",
+                    "distance_to_road_m",
+                )
+            }
+            if capture:
+                provenance["location_source"] = EvidenceReference(
+                    "location_source",
+                    f"Capture:{capture.id}/source_location",
+                    capture.captured_at,
+                    "reported",
+                    "Recorded coordinate source.",
+                )
+            if segment:
+                provenance["road_segment_name"] = EvidenceReference(
+                    "road_segment_name",
+                    f"RoadSegment:{segment.id}/name",
+                    segment.created_at,
+                    "reported",
+                    "Map record timestamp, not field observation.",
+                )
+            for name in ("urmind_class", "visual_confidence", "model_version"):
+                provenance[name] = EvidenceReference(
+                    name,
+                    f"Event:{event.id}/{'model_version_id' if name == 'model_version' else name}",
+                    event.occurred_at,
+                    "inferred" if event.model_version_id else "reported",
+                    "Recorded inference; not physical measurement.",
+                )
+            for name, source in (
+                ("risk", f"RiskAssessment:{row.id}"),
+                ("action", f"actions_catalog:{row.action_id}"),
+                ("responsibility", f"responsibility_rules:{row.responsibility_rule_id}"),
+            ):
+                provenance[name] = EvidenceReference(
+                    field=name,
+                    source=source,
+                    observed_at=row.created_at,
+                    kind="rule",
+                    limitation="Regra/catalogação persistida; requer revisão técnica, não é probabilidade.",
+                )
             report = render_event_report(
                 ReportInput(
                     event_key=event.event_key,
@@ -722,7 +796,18 @@ class CoreService:
                     location_source=capture.source_location if capture else None,
                     road_segment_name=segment.name if segment else None,
                     distance_to_road_m=event.distance_to_road_m,
-                    evidence=[f"captura {capture.capture_key}"] if capture else [],
+                    evidence=[
+                        EvidenceReference(
+                            field="capture_id",
+                            source=f"Capture:{capture.id}",
+                            observed_at=capture.captured_at,
+                            kind="reported",
+                            limitation="Registro de captura não comprova causa ou gravidade.",
+                        )
+                    ]
+                    if capture
+                    else [],
+                    provenance=provenance,
                     responsibility=(
                         ResponsibilitySuggestion(rule.responsible, rule.source, rule.version)
                         if rule
@@ -814,6 +899,7 @@ class CoreService:
             entry = {
                 "event_id": event_id,
                 "status": resolution["status"],
+                "decision": selected["decision"] if selected is not None else None,
                 "issue_code": None,
                 "eligible": False,
                 "reason": "consenso pendente",
@@ -833,10 +919,17 @@ class CoreService:
                 snapshot = (assessment.factors or {}).get("phase4_snapshot") if assessment else None
                 if selected["decision"] not in {"confirm", "reject"}:
                     entry["reason"] = "correção de classe não é rótulo binário do pipeline tabular"
-                elif not snapshot or review is None:
+                elif (
+                    selected["decision"] == "reject"
+                    and rejection_reason(selected.get("notes")) != NEGATIVE_REJECTION_REASON
+                ):
+                    entry["reason"] = "rejeição sem motivo visual não é rótulo negativo"
+                elif assessment is None or not snapshot or review is None:
                     entry["reason"] = "snapshot anterior ao início da revisão indisponível"
                 else:
                     try:
+                        if snapshot.get("assessment_id") != str(assessment.id):
+                            raise TabularExportError("snapshot não pertence à avaliação persistida")
                         collected_at = datetime.fromisoformat(snapshot["collected_at"])
                         if collected_at >= cutoff:
                             raise TabularExportError("snapshot posterior ao início da revisão")
@@ -847,6 +940,10 @@ class CoreService:
                             review_confirmed=review.decision == "confirm",
                             capture_ids=(selected.get("evidence") or {}).get("capture_ids") or (),
                             review=review,
+                            snapshot_id=str(snapshot["assessment_id"]),
+                            knowledge_cutoff=collected_at,
+                            review_status=resolution["status"],
+                            detector_origin="persisted_detection",
                         )
                         examples.append(example)
                         entry.update(eligible=True, reason=None)
@@ -1087,17 +1184,58 @@ class CoreService:
         coords = await self.events.coordinates(event_id)
         contexts = await self.events.contexts(event_id)
         history, history_status = await self.events.previous_event_times(event)
+        detections = await self.events.evidence_detections(event)
+        vision_lineage = None
+        model_reader = getattr(self.decisions, "model_version", None)
+        if (
+            event.model_version_id
+            and detections
+            and all(d.model_version_id == event.model_version_id for d in detections)
+            and callable(model_reader)
+        ):
+            model = await model_reader(event.model_version_id)
+            serving = (model.metrics or {}).get("serving") if model else None
+            candidate_detection_times = [getattr(d, "created_at", None) for d in detections]
+            detection_times = [
+                stamp
+                for stamp in candidate_detection_times
+                if isinstance(stamp, datetime)
+                and stamp.tzinfo is not None
+                and stamp.utcoffset() is not None
+            ]
+            if (
+                isinstance(serving, dict)
+                and detection_times
+                and len(detection_times) == len(candidate_detection_times)
+            ):
+                contract_hash = serving.get("model_contract_sha256")
+                contract_version = (
+                    f"model-contract-sha256:{contract_hash}" if contract_hash else None
+                )
+                vision_lineage = {
+                    "source": "model_versions.metrics.serving@assessment",
+                    "available_at": datetime.now(UTC).isoformat(),
+                    "latest_detection_at": max(detection_times).isoformat(),
+                    "model_version_id": str(event.model_version_id),
+                    "checkpoint_sha256": serving.get("checkpoint_sha256"),
+                    "class_order": serving.get("class_names"),
+                    "model_contract_sha256": contract_hash,
+                    "preprocessing_version": contract_version,
+                    "postprocessing_version": contract_version,
+                    "model_status": model.operational_status,
+                }
         features = build_features(
             FeatureInput(
                 event=event,
                 capture=capture,
-                detections=await self.events.evidence_detections(event),
+                detections=detections,
                 road_segment=segment,
                 contexts=contexts,
                 previous_event_times=history,
                 history_status=history_status,
                 has_original_location=coords["latitude"] is not None,
                 has_snapped_point=coords["snapped_latitude"] is not None,
+                vision_lineage=vision_lineage,
             )
         )
         records = [

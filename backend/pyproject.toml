@@ -60,6 +60,13 @@ mlops = [
   "dvc==3.67.1",
   "mlflow-skinny==3.16.0",
 ]
+tabular-ml = [
+  # Local/offline XGBoost preparation only. Never install with the web service.
+  "xgboost==3.4.1",
+  "psutil==7.1.0",
+  "scikit-learn==1.9.1",
+  "shap==0.52.0",
+]
 data-platforms = [
   "huggingface-hub>=0.27,<2",
 ]
