@@ -132,3 +132,14 @@ def test_audit_storage_e_o_unico_writer_do_relatorio_de_armazenamento():
             writers.append(path.name)
 
     assert writers == ["audit_storage.py"]
+
+
+def test_scoped_refresh_never_opens_unselected_protected_artifact(tmp_path, monkeypatch):
+    path = tmp_path / "datasets/reports/safe.json"
+    path.parent.mkdir(parents=True)
+    path.write_text("{}")
+    old = {"artifacts": [{"path": "datasets/manifests/test.jsonl", "sha256": "preserved"}]}
+    result = registry.scoped_artifacts(
+        old, tmp_path, {"datasets/reports/safe.json"}, {"datasets/reports/safe.json"}
+    )
+    assert next(r for r in result if r["path"].endswith("test.jsonl"))["sha256"] == "preserved"

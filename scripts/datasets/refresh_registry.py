@@ -174,13 +174,66 @@ def _entries(current: dict) -> list[dict]:
     return [{"path": path, **metadata} for path, metadata in sorted(current.items())]
 
 
+def scoped_artifacts(
+    registered: dict, root: Path, selected: set[str], allowed: set[str]
+) -> list[dict]:
+    """Refresh only selected contract paths; preserved entries are not reverified."""
+    if not selected or not selected <= allowed:
+        raise ValueError("selected paths must belong to the artifact contract")
+    entries = {r["path"]: r for r in registered.get("artifacts", [])}
+    for name in sorted(selected):
+        path = (root / name).resolve()
+        if not path.is_relative_to(root.resolve()):
+            raise ValueError("artifact outside repository")
+        entries[name] = {
+            "path": name,
+            "sha256": sha(path),
+            "size_bytes": path.stat().st_size,
+        }
+    return [entries[name] for name in sorted(entries)]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        help="explicit contract paths; other hashes preserved unverified",
+    )
     args = parser.parse_args(argv)
     registry = json.loads(require_local_file(REG).read_text(encoding="utf-8"))
     contract = contract_artifacts()
     scripts = current_scripts()
+    if args.only:
+        entries = scoped_artifacts(
+            registry, ROOT, set(args.only), contract.required | contract.optional
+        )
+        if args.check:
+            old = {r["path"]: r for r in registry["artifacts"]}
+            changed = [
+                r["path"]
+                for r in entries
+                if r["path"] in args.only and r != old.get(r["path"])
+            ]
+            print(
+                json.dumps(
+                    {"scope": args.only, "changed": changed, "others": "unverified"}
+                )
+            )
+            return int(bool(changed))
+        registry["artifacts"] = entries
+        registry["scripts"] = _entries(scripts)
+        registry["updated"] = time.strftime("%Y-%m-%d")
+        REG.write_text(
+            json.dumps(registry, ensure_ascii=False, indent=2),
+            encoding="utf8",
+            newline="\n",
+        )
+        print(
+            f"scoped refresh: {len(args.only)} artifacts; others preserved unverified"
+        )
+        return 0
     result = check_registry(
         registry,
         root=ROOT,

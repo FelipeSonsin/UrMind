@@ -13,6 +13,11 @@
       "size_bytes": 916
     },
     {
+      "path": "datasets/annotations/tabular_labeling_protocol.json",
+      "sha256": "50b66096f8f387a1000dc7873506a113227cf29f8f2b5a954232f2aac3ca5307",
+      "size_bytes": 13214
+    },
+    {
       "path": "datasets/annotations/univali_instance_audit_v1.jsonl",
       "sha256": "2d5ff1037272c8e0c8a6a411cfa5b5fbeebab5b0e03a5217658fa14a34756bf0",
       "size_bytes": 32512
@@ -31,6 +36,11 @@
       "path": "datasets/manifests/camber.json",
       "sha256": "761c46001edf05947183b89ee4649cf9d256da351002535c2a3b8ff4fb0b31ef",
       "size_bytes": 2693
+    },
+    {
+      "path": "datasets/manifests/detection_experimental_20260925_train.jsonl",
+      "sha256": "bc4408412642911f3759223f71542698617823221c1728e25ffe299c123a838c",
+      "size_bytes": 17282467
     },
     {
       "path": "datasets/manifests/detection_external_test.jsonl",
@@ -124,8 +134,8 @@
     },
     {
       "path": "datasets/metadata/artifact_contract.yaml",
-      "sha256": "264d0e2f0d04d7aa8cc5d09fe7839ff3fa71e188d545f86fd87f5c0e5a5ed252",
-      "size_bytes": 18860
+      "sha256": "6a1d5949885ae790137b23fd1bedda664a6df1d59e1af4b74a339446bdf69146",
+      "size_bytes": 20830
     },
     {
       "path": "datasets/metadata/bdd100k_acquisition_plan.json",
@@ -173,9 +183,24 @@
       "size_bytes": 3511
     },
     {
+      "path": "datasets/metadata/taxonomy_v2_dataset_candidates.json",
+      "sha256": "0d6063b6c59b2ec2f34b5ad590aed36bcfb9368d942cdb154b479ebbdbe771ed",
+      "size_bytes": 51172
+    },
+    {
       "path": "datasets/metadata/upstream_checksums.json",
       "sha256": "6c72c91dae3efdbb381236c271d1f5a7152696a7847fa8ff6fe0fe3d62058638",
       "size_bytes": 2363
+    },
+    {
+      "path": "datasets/metadata/yolox_model_experimental_20260925.json",
+      "sha256": "251e8a888da4d760d140305380a2ee38d06f185401b35911bc847fbf83de9272",
+      "size_bytes": 4897
+    },
+    {
+      "path": "datasets/metadata/yolox_model_experimental_20260925_10h.json",
+      "sha256": "d39999a2a94ea3ebe40bc19da92bf7ff94d98865191b1c8ac2a657d10d6d1d2c",
+      "size_bytes": 4904
     },
     {
       "path": "datasets/metadata/yolox_model_v1.json",
@@ -203,6 +228,11 @@
       "size_bytes": 37805
     },
     {
+      "path": "datasets/reports/detection_experimental_20260925.json",
+      "sha256": "d0bbf556ca45b0efa4e3c9855966a947582cfe91436ed3721206bf5facce76f4",
+      "size_bytes": 1639
+    },
+    {
       "path": "datasets/reports/detection_loader_smoke.json",
       "sha256": "24aec067619acd01689d2696a51108a889482c76513355bd5558ddb44e64f5fd",
       "size_bytes": 1134
@@ -216,6 +246,16 @@
       "path": "datasets/reports/ird_dashcam_candidate_audit.json",
       "sha256": "0a4a8e54b6e884801c8ec38bf40adf89b99735a9ae1952058eafd4946e2ce790",
       "size_bytes": 3916
+    },
+    {
+      "path": "datasets/reports/missing_data_plan.json",
+      "sha256": "52e09b16599760d016c516f5e6d61a1f296cdaa9e92f10038d20deb879fe3efb",
+      "size_bytes": 194806
+    },
+    {
+      "path": "datasets/reports/ml_preparation_state.json",
+      "sha256": "0d0a6aade5180f233d7327a60747d5f15f533d5a27f6957ec817dc6ea9db1823",
+      "size_bytes": 15055
     },
     {
       "path": "datasets/reports/norway_profile.jsonl",
@@ -278,6 +318,11 @@
       "size_bytes": 609
     },
     {
+      "path": "datasets/reports/review_summary.json",
+      "sha256": "6ae90f60f7e5748102314e3f510449221857f7375ce74292f72debfefcec2b8e",
+      "size_bytes": 819457
+    },
+    {
       "path": "datasets/reports/rtk_br_audit.json",
       "sha256": "d93b5a30b7b1d88c275d679a7e4ef8a23a744b08e29e6243a21ecc8b50b8c2f3",
       "size_bytes": 138796
@@ -286,6 +331,16 @@
       "path": "datasets/reports/rtk_br_provenance.json",
       "sha256": "37838e6da4ca78ca7771e097e60a75c85092ef6c84869e1e293974f9f6e938b6",
       "size_bytes": 1101
+    },
+    {
+      "path": "datasets/reports/taxonomy_coverage.json",
+      "sha256": "fa3bb5c972cc16850b72ff4ad5d3a701a9a3179208020f45e4d5914a0850dd9a",
+      "size_bytes": 222070
+    },
+    {
+      "path": "datasets/reports/training_class_plan.json",
+      "sha256": "129820409b2ed304e29c2a59beb855070dba0217ed956516154704432ae87dd5",
+      "size_bytes": 90692
     },
     {
       "path": "datasets/reports/univali_box_validation.json",
@@ -343,6 +398,11 @@
       "size_bytes": 48400
     },
     {
+      "path": "datasets/reports/urban_vision_v3_draft.json",
+      "sha256": "4b4838f0494fe4293ddad2f3e25091ff165a9729dc181a57b06858fa50f2a8f9",
+      "size_bytes": 1123
+    },
+    {
       "path": "datasets/splits/rdd2022_subset_splits.json",
       "sha256": "0685cce617713034d81c46724317ed1004070c7b0db5d4cb4932676efa8e1823",
       "size_bytes": 6257
@@ -388,6 +448,11 @@
       "path": "scripts/datasets/_univali.py",
       "sha256": "5c4fdb1dd00f2103c1eab822ba7da2725be48d41d4d175ab69642700e6e07e56",
       "size_bytes": 12492
+    },
+    {
+      "path": "scripts/datasets/acquire_attain_annotations.py",
+      "sha256": "facc866e7a6adfa31568bd107fa161db8b46c0bb951d3b78ee4c4f678dd7dd13",
+      "size_bytes": 37002
     },
     {
       "path": "scripts/datasets/acquire_bdd100k.py",
@@ -471,8 +536,8 @@
     },
     {
       "path": "scripts/datasets/build_detection_manifests.py",
-      "sha256": "a5a9fc5cfb5ac1c73e9499298e07234ca0ae5bcfb17f427abafd42a748f04ae9",
-      "size_bytes": 20743
+      "sha256": "89601a9c0680248bc47c444da25a94cd5131f5a9ede0898ed7641ca33dc89b5c",
+      "size_bytes": 41680
     },
     {
       "path": "scripts/datasets/build_report.py",
@@ -513,6 +578,11 @@
       "path": "scripts/datasets/plan_storage.py",
       "sha256": "4cc4e93abc15b2a8554736dd49e06f429cd13acfe8a8c2f387739f3aff495ef0",
       "size_bytes": 1172
+    },
+    {
+      "path": "scripts/datasets/preflight_training.py",
+      "sha256": "32872d17f5c8ddba8283be6a49a675efb8743489623c62af412f407b88bfef3a",
+      "size_bytes": 24221
     },
     {
       "path": "scripts/datasets/prepare_rdd_split_authorization.py",
@@ -556,8 +626,8 @@
     },
     {
       "path": "scripts/datasets/refresh_registry.py",
-      "sha256": "d8b430b0cde7ef3809cceb7cc8bd82c46df5abc5a549b72cd1873f68d3461c84",
-      "size_bytes": 8064
+      "sha256": "f88cd9376f9fc7308db2d82e2d0dbff31676fd1637fdb5e450da44a46ccaa7ba",
+      "size_bytes": 9786
     },
     {
       "path": "scripts/datasets/refresh_sources.py",
@@ -585,6 +655,16 @@
       "size_bytes": 15807
     },
     {
+      "path": "scripts/datasets/review_annotations.py",
+      "sha256": "44051d3448f600c2ea390f2e29648f55f8a4470c56ce4f836e7a14474fc1b318",
+      "size_bytes": 53161
+    },
+    {
+      "path": "scripts/datasets/run_yolox_experimental.py",
+      "sha256": "2262dfacaf58765cb2c7be2f371b4e75fe92aa17121b4a0b739de56ae4e06165",
+      "size_bytes": 9844
+    },
+    {
       "path": "scripts/datasets/safety_snapshot.py",
       "sha256": "2dbc26a6b126bb15f12e88196cc444af91c2048b78a60c4e72b64b7572e9b4e8",
       "size_bytes": 1672
@@ -593,6 +673,11 @@
       "path": "scripts/datasets/smoke_detection_loader.py",
       "sha256": "0972e893ead45f6e2f48f5ac550d247b427c91f77257bf7013fe5d12b5740dce",
       "size_bytes": 4112
+    },
+    {
+      "path": "scripts/datasets/test_acquire_attain_annotations.py",
+      "sha256": "5ec5faee1a5fc3164d957f5642f4a80444c5dbb5b1fe734dc34c91f05f3af3d0",
+      "size_bytes": 4953
     },
     {
       "path": "scripts/datasets/validate_manifests.py",
@@ -625,5 +710,5 @@
       "size_bytes": 7387
     }
   ],
-  "updated": "2026-09-24"
+  "updated": "2026-09-26"
 }

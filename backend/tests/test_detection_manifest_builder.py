@@ -23,6 +23,158 @@ builder = _module("build_detection_manifests")
 rtk = _module("audit_rtk")
 
 
+def v3_row():
+    return {
+        "role": "TRAIN", "training_authorized": True, "authorization_id": "scope-1",
+        "license_status": "VERIFIED", "provenance_status": "VERIFIED", "group": "route-1",
+        "near_duplicate_group": "cluster-1", "image_sha256": "a" * 64,
+        "annotation_sha256": "b" * 64, "image_path": "image.jpg",
+        "image_width": 20, "image_height": 10,
+        "annotation_state_by_class": {"A": "PRESENT_ANNOTATED", "B": "ABSENT_REVIEWED"},
+        "boxes": [{"canonical_class": "A", "bbox": [1, 2, 9, 8]}],
+    }
+
+
+def v3_auth(rows):
+    return {
+        "status": "AUTHORIZED", "decision": "APPROVED_FOR_URMIND_URBAN_VISION_V3",
+        "authorization_id": "scope-1", "authorized_by": "human-reviewer",
+        "authorized_at": "2026-09-25T12:00:00+00:00",
+        "rows_sha256": hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest(),
+        "class_order_sha256": hashlib.sha256(json.dumps(["A", "B"]).encode()).hexdigest(),
+    }
+
+
+def v3_files(tmp_path, monkeypatch, rows, *, overrides=None):
+    monkeypatch.setattr(builder, "PROJECT_ROOT", tmp_path)
+    manifests = {
+        "TRAIN": [rows[0]],
+        "VALIDATION": [{"role": "VALIDATION", "image_path": "validation.jpg",
+                        "image_sha256": "c" * 64, "group": "route-v",
+                        "near_duplicate_group": "cluster-v"}],
+        "HOLDOUT_V3": [{"role": "HOLDOUT_V3", "image_path": "holdout.jpg",
+                        "image_sha256": "d" * 64, "group": "route-h",
+                        "near_duplicate_group": "cluster-h"}],
+        "FROZEN_TEST": [{"role": "FROZEN_TEST", "image_path": "frozen.jpg",
+                         "image_sha256": "e" * 64, "group": "route-f",
+                         "near_duplicate_group": "cluster-f"}],
+    }
+    if overrides:
+        manifests.update(overrides)
+    manifest_hashes = {}
+    for role, name in builder.V3_SPLIT_MANIFESTS.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps(record) + "\n" for record in manifests[role]))
+        manifest_hashes[role] = sha(path)
+    all_records = [record for records in manifests.values() for record in records]
+    artifact = {"schema_version": 1, "authority": "auto_policy_v1",
+                "manifest_sha256": manifest_hashes}
+    for field, collection, identifier in (
+        ("group", "groups", "group_id"),
+        ("near_duplicate_group", "near_duplicate_clusters", "cluster_id"),
+    ):
+        artifact[collection] = [
+            {identifier: value, "members": [
+                {"image_path": record["image_path"], "image_sha256": record["image_sha256"]}
+                for record in all_records if record[field] == value]}
+            for value in sorted({record[field] for record in all_records})
+        ]
+    report_dir = tmp_path / "datasets/reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    adjudication = report_dir / "v3_group_adjudication.json"
+    adjudication.write_text(json.dumps(artifact))
+    owner = report_dir / "v3_owner_decisions.json"
+    owner.write_text(json.dumps({"group_adjudication": {
+        "authority": "auto_policy_v1", "authorized_by": "Felipe",
+        "decision": "AUTHORIZED", "artifact_sha256": sha(adjudication)}}))
+    return manifests, adjudication, owner
+
+
+def test_v3_coco_requires_owner_pinned_adjudication(tmp_path, monkeypatch):
+    row = v3_row()
+    _, adjudication, owner = v3_files(tmp_path, monkeypatch, [row])
+    coco = builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+    assert coco["annotations"][0]["bbox"] == [1, 2, 8, 6]
+    assert coco["images"][0]["group_evidence_sha256"] == sha(adjudication)
+    for changed, message in (
+        ({"training_authorized": False}, "authorization"),
+        ({"license_status": "UNKNOWN"}, "license"),
+        ({"group_status": "REPORTED_UNVERIFIED"}, "scene group"),
+        ({"duplicate_check_status": "REPORTED_UNVERIFIED"}, "near-duplicate"),
+        ({"group": "route-other"}, "conversion row differs"),
+        ({"near_duplicate_group": "cluster-other"}, "conversion row differs"),
+        ({"annotation_state_by_class": {"A": "NOT_ANNOTATED", "B": "ABSENT_REVIEWED"}}, "partial"),
+        ({"boxes": [{"canonical_class": "A", "bbox": [1, 2, 21, 8]}]}, "outside"),
+    ):
+        candidate = {**row, **changed}
+        with pytest.raises(builder.ManifestBuildError, match=message):
+            builder.eligible_rows_to_coco([candidate], ["A", "B"], v3_auth([candidate]))
+    adjudication.write_text(adjudication.read_text() + " ")
+    with pytest.raises(builder.ManifestBuildError, match="SHA256 mismatch"):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+    adjudication.unlink()
+    with pytest.raises(builder.ManifestBuildError, match="adjudication missing"):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+    owner.unlink()
+    with pytest.raises(builder.ManifestBuildError, match="adjudication missing"):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+
+
+def test_v3_adjudication_requires_exact_group_members_and_hashes(tmp_path, monkeypatch):
+    row = v3_row()
+    _, artifact_path, owner_path = v3_files(tmp_path, monkeypatch, [row])
+    artifact = json.loads(artifact_path.read_text())
+    artifact["groups"][0]["members"][0]["image_sha256"] = "0" * 64
+    artifact_path.write_text(json.dumps(artifact))
+    owner = json.loads(owner_path.read_text())
+    owner["group_adjudication"]["artifact_sha256"] = sha(artifact_path)
+    owner_path.write_text(json.dumps(owner))
+    with pytest.raises(builder.ManifestBuildError, match="members or image hashes"):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+
+
+@pytest.mark.parametrize("change, message", [
+    ("holdout_group", "group crosses TRAIN/HOLDOUT_V3"),
+    ("frozen_image", "image_path crosses TRAIN/FROZEN_TEST"),
+    ("holdout_cluster", "near_duplicate_group crosses TRAIN/HOLDOUT_V3"),
+])
+def test_v3_four_split_leakage(tmp_path, monkeypatch, change, message):
+    row = v3_row()
+    overrides = {}
+    if change == "holdout_group":
+        overrides["HOLDOUT_V3"] = [{"role": "HOLDOUT_V3", "image_path": "holdout.jpg",
+                                    "image_sha256": "d" * 64, "group": row["group"],
+                                    "near_duplicate_group": "cluster-h"}]
+    elif change == "frozen_image":
+        overrides["FROZEN_TEST"] = [{"role": "FROZEN_TEST", "image_path": row["image_path"],
+                                     "image_sha256": row["image_sha256"], "group": "route-f",
+                                     "near_duplicate_group": "cluster-f"}]
+    else:
+        overrides["HOLDOUT_V3"] = [{"role": "HOLDOUT_V3", "image_path": "holdout.jpg",
+                                    "image_sha256": "d" * 64, "group": "route-h",
+                                    "near_duplicate_group": row["near_duplicate_group"]}]
+    v3_files(tmp_path, monkeypatch, [row], overrides=overrides)
+    with pytest.raises(builder.ManifestBuildError, match=message):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+
+
+@pytest.mark.parametrize("change, message", [
+    ("stale", "split manifest stale"),
+    ("missing", "split manifest missing"),
+])
+def test_v3_split_manifest_current_and_present(tmp_path, monkeypatch, change, message):
+    row = v3_row()
+    v3_files(tmp_path, monkeypatch, [row])
+    path = tmp_path / builder.V3_SPLIT_MANIFESTS["HOLDOUT_V3"]
+    if change == "stale":
+        path.write_text(path.read_text() + " ")
+    else:
+        path.unlink()
+    with pytest.raises(builder.ManifestBuildError, match=message):
+        builder.eligible_rows_to_coco([row], ["A", "B"], v3_auth([row]))
+
+
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

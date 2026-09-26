@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "dataset_version": "urmind-urban-vision-v3-DRAFT",
+  "state": "QUARANTINED_NO_APPROVED_CLASSES",
+  "training_authorized": false,
+  "source_review_summary_sha256": "6ae90f60f7e5748102314e3f510449221857f7375ce74292f72debfefcec2b8e",
+  "source_class_plan_sha256": "129820409b2ed304e29c2a59beb855070dba0217ed956516154704432ae87dd5",
+  "producer_sha256": "8328e9fdb470b45c0dc660e0ca26bbc99346b481678e70cf75ec2b62312135b3",
+  "candidate_pool": "datasets/processed/urban_vision_v3/candidate_pool.jsonl",
+  "candidate_pool_sha256": "15ec1ee8be14ab8659e32f4fd88a305ec31a2f21073db5205f9232ba84917593",
+  "proposals": 130,
+  "release_evidence_linked": 80,
+  "approved_images": 0,
+  "class_order": [],
+  "train_validation_split_status": "NOT_CREATED_NO_ELIGIBLE_ROWS",
+  "frozen_test_status": "SEALED_UNTOUCHED",
+  "conversion": "eligible_rows_to_coco: fail-closed, not executed on quarantined proposals",
+  "next_action": "import human decisions; adjudicate completeness, rights, groups and exact dataset authorization",
+  "producer": "scripts/datasets/build_detection_manifests.py --generation v3-draft"
+}

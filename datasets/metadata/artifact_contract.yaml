@@ -24,6 +24,10 @@ artifact_registry_contract:
     - datasets/metadata/removed_sources.json
     - datasets/metadata/storage_budget.yaml
     - datasets/metadata/yolox_model_v1.json
+    - datasets/metadata/yolox_model_experimental_20260925.json
+    - datasets/metadata/yolox_model_experimental_20260925_10h.json
+    - datasets/manifests/detection_experimental_20260925_train.jsonl
+    - datasets/reports/detection_experimental_20260925.json
     - datasets/raw/global_streetscapes/labels/global_streetscapes_selected.csv
     - datasets/reports/acquisition_result_global_streetscapes.json
     - datasets/reports/norway_profile.jsonl
@@ -366,6 +370,33 @@ future_preparation:
   create_directory_only_when_used: true
   download_requires_explicit_authorization: true
   training_configured: false
+full_scope_preparation:
+  taxonomy: backend/app/schemas/issue_taxonomy.py
+  coverage_producer: backend/app/datasets/taxonomy_candidates.py
+  coverage_command: python -m app.datasets.cli coverage --write
+  coverage_report: datasets/reports/taxonomy_coverage.json
+  candidate_research: datasets/metadata/taxonomy_v2_dataset_candidates.json
+  review_tool: scripts/datasets/review_annotations.py
+  review_command: python -B scripts/datasets/review_annotations.py --build
+  review_output_note: local ignored HTML in datasets/processed/annotation_review; never public
+  tabular_protocol_producer: backend/app/ml/tabular.py
+  tabular_protocol: datasets/annotations/tabular_labeling_protocol.json
+  training_authorized: false
+training_preparation:
+  producer: scripts/datasets/review_annotations.py
+  command: python -B scripts/datasets/review_annotations.py --plan
+  review_package: datasets/processed/annotation_review/review_1b00e44bcd58.html
+  review_package_sha256: 0f1e9e1806f6c2acc40e7449661b7d52e09aeed9ba48e170893a10921ece37e7
+  smoke_review_package: datasets/processed/annotation_review/review_6225e89cfebf.html
+  smoke_review_package_sha256: ac36936de907c4dbc02c6750bee92c1973f83003760d36facd3b0899fbd2f406
+  class_plan: datasets/reports/training_class_plan.json
+  review_summary: datasets/reports/review_summary.json
+  missing_data_plan: datasets/reports/missing_data_plan.json
+  v3_draft_report: datasets/reports/urban_vision_v3_draft.json
+  ml_preflight_checkpoint: datasets/reports/ml_preparation_state.json
+  v3_draft_producer: scripts/datasets/build_detection_manifests.py --generation v3-draft
+  preflight_command: python -B scripts/datasets/preflight_training.py --write
+  training_authorized: false
 authorized_acquisition:
   plan: datasets/metadata/acquisition_plan.json
   bdd_plan: datasets/metadata/bdd100k_acquisition_plan.json

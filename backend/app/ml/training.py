@@ -36,7 +36,6 @@ from app.ml.detection_dataset import (
     build_yolox_dataloader,
     load_authorized_manifest,
 )
-from app.ml.taxonomy import MODEL_V1_CLASS_ORDER
 from app.ml.yolox_model import (
     MODEL_METADATA_PATH,
     instantiate_model,
@@ -132,6 +131,7 @@ class TrainingConfig:
     persistent_workers: bool = False
     prefetch_factor: int | None = None
     pin_memory: bool = True
+    validation_batch_size: int | None = None
 
     @classmethod
     def from_model_metadata(cls, metadata: Mapping[str, Any]) -> TrainingConfig:
@@ -179,6 +179,7 @@ class TrainingConfig:
                     "prefetch_factor", 2 if training["workers"] > 0 else None
                 ),
                 pin_memory=training.get("pin_memory", True),
+                validation_batch_size=training.get("validation_batch_size"),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("training config ausente ou malformada") from exc
@@ -220,6 +221,8 @@ class TrainingConfig:
             raise ValueError("workers/epochs de fase não podem ser negativos")
         if self.train_num_workers < 0 or self.validation_num_workers < 0:
             raise ValueError("num_workers do DataLoader não pode ser negativo")
+        if self.validation_batch_size is not None and self.validation_batch_size <= 0:
+            raise ValueError("validation_batch_size deve ser positivo")
         if self.train_num_workers == 0:
             if self.persistent_workers:
                 raise ValueError("persistent_workers exige train_num_workers > 0")
@@ -258,6 +261,7 @@ class TrainingConfig:
 
 @dataclass(frozen=True)
 class PretrainedLoadReport:
+    source_sha256: str
     loaded: tuple[str, ...]
     missing: tuple[str, ...]
     unexpected: tuple[str, ...]
@@ -407,6 +411,7 @@ _V2_TRAINING_DEFAULTS: dict[str, Any] = {
     "persistent_workers": False,
     "prefetch_factor": None,
     "pin_memory": True,
+    "validation_batch_size": None,
 }
 
 
@@ -581,7 +586,10 @@ def load_pretrained_compatible(model: torch.nn.Module, path: Path | None) -> Pre
         raise ValueError("pretrained exige path explícito; download automático é proibido")
     if not path.is_file():
         raise FileNotFoundError(path)
+    source_sha256 = _sha256(path)
     payload = torch.load(path, map_location="cpu", weights_only=True)
+    if _sha256(path) != source_sha256:
+        raise ValueError("pretrained changed during load")
     source = payload.get("model", payload) if isinstance(payload, dict) else None
     if not isinstance(source, dict):
         raise TypeError("checkpoint não contém state_dict válido")
@@ -599,9 +607,19 @@ def load_pretrained_compatible(model: torch.nn.Module, path: Path | None) -> Pre
             incompatible.append(key)
         else:
             compatible[key] = value
+    missing_non_classifier = sorted(
+        key for key in target if key not in compatible and not key.startswith("head.cls_preds.")
+    )
+    if missing_non_classifier or unexpected:
+        raise ValueError(
+            "pretrained backbone/head incompleto ou inesperado: "
+            f"missing_non_classifier={missing_non_classifier[:8]}, "
+            f"unexpected={unexpected[:8]}"
+        )
     load_ckpt(model, compatible)
     missing = sorted(set(target) - set(compatible))
     return PretrainedLoadReport(
+        source_sha256=source_sha256,
         loaded=tuple(sorted(compatible)),
         missing=tuple(missing),
         unexpected=tuple(sorted(unexpected)),
@@ -741,22 +759,23 @@ class TrainingEngine:
             peak_vram_bytes=peak,
             **values,
         )
-        logger.info(
-            "epoch={} iteration={} lr={:.6g} total_loss={:.6g} iou_loss={:.6g} "
-            "conf_loss={:.6g} cls_loss={:.6g} l1_loss={:.6g} elapsed={:.3f}s vram={}",
-            epoch,
-            iteration,
-            lr,
-            result.total_loss,
-            result.iou_loss,
-            result.conf_loss,
-            result.cls_loss,
-            result.l1_loss,
-            result.elapsed_seconds,
-            peak,
-        )
-        if self.tracker is not None:
-            self.tracker.log_training_step(result, global_step=self.global_step)
+        if progress == 1 or progress % self.config.log_interval_steps == 0:
+            logger.info(
+                "epoch={} iteration={} lr={:.6g} total_loss={:.6g} iou_loss={:.6g} "
+                "conf_loss={:.6g} cls_loss={:.6g} l1_loss={:.6g} elapsed={:.3f}s vram={}",
+                epoch,
+                iteration,
+                lr,
+                result.total_loss,
+                result.iou_loss,
+                result.conf_loss,
+                result.cls_loss,
+                result.l1_loss,
+                result.elapsed_seconds,
+                peak,
+            )
+            if self.tracker is not None:
+                self.tracker.log_training_step(result, global_step=self.global_step)
         return result
 
     def evaluate_validation(
@@ -894,7 +913,7 @@ class TrainingEngine:
             "model_id": metadata["model_id"],
             "architecture": metadata["architecture"],
             "num_classes": metadata["num_classes"],
-            "class_order": list(MODEL_V1_CLASS_ORDER),
+            "class_order": list(metadata["class_names"]),
             **checkpoint_fingerprints(metadata, self.config),
         }
         labels = {
@@ -1009,6 +1028,15 @@ def _loss_float(value: Any) -> float:
     return float(value)
 
 
+def _parameter_digest(model: torch.nn.Module) -> str:
+    """Hash trainable parameters only; BatchNorm buffer changes do not count as learning."""
+    digest = hashlib.sha256()
+    for name, parameter in model.named_parameters():
+        digest.update(name.encode("utf-8"))
+        digest.update(parameter.detach().cpu().contiguous().numpy().tobytes())
+    return digest.hexdigest()
+
+
 def build_loaders(config: TrainingConfig) -> tuple[DataLoader, DataLoader]:
     train_rows = load_authorized_manifest(
         manifest_for_role("TRAIN", config.dataset), intended_split="TRAIN"
@@ -1038,7 +1066,7 @@ def build_loaders(config: TrainingConfig) -> tuple[DataLoader, DataLoader]:
     # OOM com VRAM livre (E1, 2026-09-21). Validation usa poucos workers efêmeros.
     validation_loader = build_yolox_dataloader(
         validation_dataset,
-        batch_size=config.batch_size,
+        batch_size=config.validation_batch_size or config.batch_size,
         num_workers=config.validation_num_workers,
         pin_memory=config.pin_memory,
         shuffle=False,
@@ -1062,6 +1090,12 @@ def build_training_engine(
     if pretrained_path is not None and resume_path is not None:
         raise ValueError("pretrained e resume são operações mutuamente exclusivas")
     document = load_model_config(contract_path) if metadata is None else dict(metadata)
+    if (
+        metadata is not None
+        and contract_path != MODEL_METADATA_PATH
+        and document != load_model_config(contract_path)
+    ):
+        raise TrainingGateError("metadata em memória diverge do contrato selecionado")
     validate_readiness(document, contract_path=contract_path)
     config = TrainingConfig.from_model_metadata(document)
     overrides: dict[str, Any] = {}
@@ -1073,7 +1107,11 @@ def build_training_engine(
         config = config.with_overrides(**overrides)
     resolved = resolve_device(config.device) if config.device == "cuda" else torch.device("cpu")
     seed_everything(config.seed)
-    model = instantiate_model().to(resolved)
+    # A contract selected on the CLI must also select the detector head. Keep the
+    # no-argument V1 path for historical checkpoints and callers.
+    model = instantiate_model(
+        **({"config_path": contract_path} if contract_path != MODEL_METADATA_PATH else {})
+    ).to(resolved)
     exp = OfficialYOLOXExp()
     exp.model = model
     model = exp.get_model()
@@ -1325,6 +1363,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--single-step", action="store_true")
+    action.add_argument("--smoke", action="store_true")
     action.add_argument("--dry-run", action="store_true")
     action.add_argument("--run", action="store_true")
     parser.add_argument("--batch-size", type=int)
@@ -1450,7 +1489,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             pretrained_path=args.pretrained,
             resume_path=args.resume,
             batch_size=args.batch_size,
-            iters_per_epoch=len(train_loader),
+            # The bounded smoke checks optimizer mechanics. Its warmup must fit
+            # within 50 steps; the main run retains the full TRAIN epoch length.
+            iters_per_epoch=1 if args.smoke else len(train_loader),
             tracker=tracker,
             contract_path=contract_path,
         )
@@ -1459,7 +1500,45 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if args.single_step:
             engine.train_step(next(iter(train_loader)), epoch=0, iteration=0)
+        elif args.smoke:
+            # Technical smoke starts from the selected pretrained checkpoint and
+            # never becomes the initialization for the main run.
+            started = time.monotonic()
+            before = _parameter_digest(engine.model)
+            verified = False
+            for iteration, batch in enumerate(train_loader):
+                if iteration >= 50 or time.monotonic() - started >= 300:
+                    break
+                result = engine.train_step(batch, epoch=0, iteration=iteration)
+                if _parameter_digest(engine.model) != before:
+                    verified = True
+                    break
+            if not verified:
+                raise TrainingGateError("smoke terminou sem atualização verificável de parâmetros")
+            smoke_path = engine.checkpoint_directory / "smoke.pt"
+            smoke_metadata = {
+                "purpose": "EXPERIMENTAL_SMOKE_NOT_APPROVED_FOR_SERVING",
+                "optimizer_update_verified": True,
+                "smoke_iterations": engine.global_step,
+                "last_loss": result.total_loss,
+            }
+            engine._atomic_save(engine._checkpoint_payload(smoke_metadata), smoke_path)
+            saved = torch.load(smoke_path, map_location="cpu", weights_only=True)
+            engine._validate_resume_payload(saved)
+            del saved
+            tracker.log_lightweight_artifact(
+                "smoke-summary.json",
+                {**smoke_metadata, "checkpoint": smoke_path.as_posix()},
+                artifact_path="summary",
+            )
+            logger.info(
+                "smoke_passed iterations={} optimizer_update_verified=true checkpoint={}",
+                engine.global_step,
+                smoke_path,
+            )
         else:
+            initial_parameters = _parameter_digest(engine.model) if args.resume is None else None
+            main_update_verified = False
             start_epoch = engine.current_epoch + 1 if args.resume is not None else 0
             for epoch in range(start_epoch, config.max_epoch):
                 engine.prepare_epoch(epoch)
@@ -1474,7 +1553,34 @@ def main(argv: Sequence[str] | None = None) -> int:
                         prefetch_factor=config.prefetch_factor,
                     )
                 for iteration, batch in enumerate(train_loader):
-                    engine.train_step(batch, epoch=epoch, iteration=iteration)
+                    result = engine.train_step(batch, epoch=epoch, iteration=iteration)
+                    if initial_parameters is not None and not main_update_verified:
+                        current_parameters = _parameter_digest(engine.model)
+                        if current_parameters != initial_parameters:
+                            main_update_verified = True
+                            logger.info(
+                                "main_optimizer_update_verified epoch={} iteration={} global_step={}",
+                                epoch,
+                                iteration,
+                                engine.global_step,
+                            )
+                            tracker.log_lightweight_artifact(
+                                "startup-update.json",
+                                {
+                                    "optimizer_update_verified": True,
+                                    "epoch": epoch,
+                                    "iteration": iteration,
+                                    "global_step": engine.global_step,
+                                    "learning_rate": result.learning_rate,
+                                    "parameter_digest_before": initial_parameters,
+                                    "parameter_digest_after": current_parameters,
+                                },
+                                artifact_path="run-metadata",
+                            )
+                        elif engine.global_step >= 50:
+                            raise TrainingGateError(
+                                "nenhuma atualização de parâmetros nos 50 primeiros passos"
+                            )
                 exhausted = False
                 is_last_epoch = epoch + 1 == config.max_epoch
                 if (epoch + 1) % config.validation_interval_epochs == 0 or is_last_epoch:

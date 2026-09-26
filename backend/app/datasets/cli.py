@@ -170,6 +170,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    coverage = sub.add_parser(
+        "coverage", help="matriz das 35 categorias; sem autorização ou I/O de mídia"
+    )
+    coverage.set_defaults(func=_cmd_coverage)
+    coverage.add_argument(
+        "--write", action="store_true", help="regenerate canonical coverage report"
+    )
+
     inventory = sub.add_parser("inventory", help="estado real dos arquivos em disco")
     inventory.add_argument(
         "--verify", action="store_true", help="confere checksum publicado (lê tudo; é lento)"
@@ -184,9 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     register = sub.add_parser("register", help="monta o payload de dataset_versions")
     register.add_argument("dataset_id", choices=[s.id for s in SOURCES])
-    register.add_argument(
-        "--write", action="store_true", help="grava datasets/manifests/<id>.json"
-    )
+    register.add_argument("--write", action="store_true", help="grava datasets/manifests/<id>.json")
     register.add_argument(
         "--skip-checksum",
         action="store_true",
@@ -195,6 +201,19 @@ def build_parser() -> argparse.ArgumentParser:
     register.set_defaults(func=_cmd_register)
 
     return parser
+
+
+def _cmd_coverage(args: argparse.Namespace) -> int:
+    from app.datasets.taxonomy_candidates import coverage_matrix
+
+    payload = json.dumps(coverage_matrix(), ensure_ascii=False, indent=2)
+    if args.write:
+        path = Path(__file__).resolve().parents[3] / "datasets/reports/taxonomy_coverage.json"
+        path.write_text(payload + "\n", encoding="utf8", newline="\n")
+        print(f"coverage: {path.name}; no training authorization")
+    else:
+        print(payload)
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

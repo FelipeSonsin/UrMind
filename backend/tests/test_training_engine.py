@@ -30,6 +30,18 @@ def test_training_config_has_one_authoritative_source() -> None:
     assert config.augmentation["enabled"] is False
 
 
+def test_smoke_weight_digest_ignores_buffers_but_detects_parameter_change() -> None:
+    from app.ml.training import _parameter_digest
+
+    model = torch.nn.BatchNorm2d(2)
+    before = _parameter_digest(model)
+    model.running_mean.add_(1)
+    assert _parameter_digest(model) == before
+    with torch.no_grad():
+        model.weight.add_(1)
+    assert _parameter_digest(model) != before
+
+
 def test_invalid_training_config_fails_closed() -> None:
     from app.ml.training import TrainingConfig
 
@@ -124,6 +136,35 @@ def test_trainer_instantiation_reuses_official_optimizer_and_scheduler(
     assert isinstance(engine.optimizer, torch.optim.SGD)
     assert isinstance(engine.scheduler, LRScheduler)
     assert engine.scheduler.lr_func.func.__name__ == "yolox_warm_cos_lr"
+
+
+def test_selected_contract_is_used_for_model_head(monkeypatch, tmp_path: Path) -> None:
+    from app.ml import training
+
+    selected = tmp_path / "selected_model.json"
+    selected.write_text(json.dumps(_config()), encoding="utf8")
+    model = torch.nn.Sequential(torch.nn.BatchNorm2d(1), torch.nn.Conv2d(1, 1, 1))
+    paths = []
+    monkeypatch.setattr(training, "validate_readiness", lambda metadata, **kwargs: None)
+    monkeypatch.setattr(
+        training,
+        "instantiate_model",
+        lambda **kwargs: (paths.append(kwargs["config_path"]), model)[1],
+    )
+    monkeypatch.setattr(training.OfficialYOLOXExp, "get_model", lambda exp: exp.model)
+    training.build_training_engine(metadata=_config(), device="cpu", contract_path=selected)
+    assert paths == [selected]
+
+
+def test_selected_contract_rejects_metadata_mismatch(tmp_path: Path) -> None:
+    from app.ml import training
+
+    selected = tmp_path / "selected_model.json"
+    selected.write_text(json.dumps(_config()), encoding="utf8")
+    metadata = _config()
+    metadata["num_classes"] = 5
+    with pytest.raises(training.TrainingGateError, match="diverge"):
+        training.build_training_engine(metadata=metadata, device="cpu", contract_path=selected)
 
 
 def test_cuda_request_never_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -257,6 +298,8 @@ def test_train_step_logs_through_injected_tracker_only() -> None:
     )
     result = engine.train_step(batch, epoch=0, iteration=0)
     assert calls == [(result, 1)]
+    engine.train_step(batch, epoch=0, iteration=1)
+    assert calls == [(result, 1)]  # log_interval_steps from the contract is respected.
 
 
 def test_non_finite_loss_fails_before_optimizer_step() -> None:
@@ -376,14 +419,33 @@ def test_pretrained_reports_and_skips_incompatible_head(tmp_path: Path) -> None:
     model = _FakeModel()
     checkpoint = tmp_path / "official.pth"
     torch.save(
-        {"model": {"weight": torch.tensor(7.0), "head.cls_preds.0.weight": torch.ones(80)}},
+        {
+            "model": {
+                "weight": torch.tensor(7.0),
+                "unused": torch.tensor(0.0),
+                "head.cls_preds.0.weight": torch.ones(80),
+            }
+        },
         checkpoint,
     )
     report = load_pretrained_compatible(model, checkpoint)
     assert model.weight.item() == 7.0
-    assert report.loaded == ("weight",)
+    assert report.loaded == ("unused", "weight")
     assert report.incompatible == ("head.cls_preds.0.weight",)
-    assert report.missing
+    assert report.missing == ()
+    assert len(report.source_sha256) == 64
+
+
+def test_pretrained_rejects_missing_non_classifier_weights(tmp_path: Path) -> None:
+    from app.ml.training import load_pretrained_compatible
+
+    model = _FakeModel()
+    original = model.weight.detach().clone()
+    checkpoint = tmp_path / "incomplete.pth"
+    torch.save({"model": {"unused": torch.tensor(1.0)}}, checkpoint)
+    with pytest.raises(ValueError, match="incompleto"):
+        load_pretrained_compatible(model, checkpoint)
+    assert torch.equal(model.weight, original)
 
 
 def test_windows_safe_module_entrypoint_is_guarded() -> None:
@@ -640,6 +702,7 @@ def test_explicit_loader_contract_controls_train_and_validation(
             "persistent_workers": False,
             "prefetch_factor": 1,
             "pin_memory": False,
+            "validation_batch_size": 1,
         }
     )
     config = training.TrainingConfig.from_model_metadata(metadata)
@@ -657,6 +720,8 @@ def test_explicit_loader_contract_controls_train_and_validation(
     assert validation_loader.persistent_workers is False
     assert validation_loader.prefetch_factor is None
     assert validation_loader.pin_memory is False
+    assert validation_loader.batch_size == 1
+    assert train_loader.batch_size == config.batch_size
 
 
 @pytest.mark.parametrize(

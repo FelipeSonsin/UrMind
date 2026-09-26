@@ -44,7 +44,16 @@
         "441 images is small for a detector; capture device mix unknown",
         "only the package-level CC BY 4.0 statement was read; origin and rights of each image were not verified"
       ],
-      "READINESS": "NEEDS_HUMAN_REVIEW"
+      "READINESS": "NEEDS_HUMAN_REVIEW",
+      "research_update": {
+        "date": "2026-09-25",
+        "primary_sources": [
+          "https://data.mendeley.com/datasets/t395bwcvbw/1"
+        ],
+        "verified": "version 1; 441 annotated images; CC BY 4.0; authors and DOI match",
+        "unknown": "file-level annotation encoding, groups, per-image provenance and exact byte size not exposed by landing page",
+        "action": "metadata/file listing inspection before acquisition; no claim of depth, cause or accident risk"
+      }
     },
     {
       "id": "floodnet_supervised_v1",
@@ -127,7 +136,17 @@
         "repository notes strong class imbalance and unreviewed unofficial annotations",
         "object scale and framing differ from street-level reports"
       ],
-      "READINESS": "NEEDS_HUMAN_REVIEW"
+      "READINESS": "NEEDS_HUMAN_REVIEW",
+      "research_update": {
+        "date": "2026-09-25",
+        "primary_sources": [
+          "https://github.com/pedropro/TACO"
+        ],
+        "annotation": "COCO polygons/boxes of litter; annotations_unofficial explicitly unreviewed",
+        "groups": "photographer/capture scenes require reconstruction",
+        "rights": "retain license per image; code MIT is insufficient",
+        "action": "review official annotation subset and rights per photo; litter is not illegal dumping without contextual evidence"
+      }
     },
     {
       "id": "roboflow_illegal_dumping_detection",
@@ -385,7 +404,19 @@
       "KNOWN_LIMITATIONS": [
         "would need new per-object annotation; release status not confirmed"
       ],
-      "READINESS": "NEEDS_HUMAN_REVIEW"
+      "READINESS": "NEEDS_HUMAN_REVIEW",
+      "research_update": {
+        "date": "2026-09-25",
+        "primary_sources": [
+          "https://github.com/rayford295/DamageArbiter",
+          "https://huggingface.co/datasets/Rayford295/BiTemporal-StreetView-Damage"
+        ],
+        "annotation": "scene severity plus separately human and LLM descriptions; no object boxes verified",
+        "version": "Figshare 28801208.v2; HF collection is not assumed identical to experiment subset",
+        "groups": "post-disaster street-view; spatial/route independence unverified",
+        "rights": "HF card states CC BY-NC 4.0; repository MIT does not override image rights; authors request contact before reuse",
+        "action": "resolve subset identity and image rights; prepare new human object/state labels for tree, branch and debris; no captions used as Ground Truth"
+      }
     },
     {
       "id": "damaged_signs_kaggle_pt",
@@ -1302,6 +1333,96 @@
         "Nenhuma fonte ou licença verificada."
       ],
       "READINESS": "NEEDS_MORE_DATA"
+    }
+  ],
+  "research_followups": [
+    {
+      "id": "project_sidewalk_obstacle_surface",
+      "date": "2026-09-25",
+      "target_issue_codes": [
+        "URMIND_SIDEWALK_DAMAGE",
+        "URMIND_SIDEWALK_OBSTRUCTION",
+        "URMIND_MISSING_CURB_RAMP"
+      ],
+      "sources": [
+        "https://github.com/ProjectSidewalk/sidewalk-cv-2021",
+        "https://huggingface.co/datasets/projectsidewalk/sidewalk-tagger-ai-validated",
+        "https://huggingface.co/datasets/projectsidewalk/sidewalk-validator-ai-dataset-surfaceproblem"
+      ],
+      "evidence": "crops with class/tag or correct/incorrect labels; not RampNet keypoints and not verified object bbox",
+      "version": "pin upstream revision before acquisition",
+      "license": null,
+      "grouping": "panorama/label IDs and overlapping crops must share group",
+      "next_action": "inspect metadata rights and crop lineage; request images legally; annotate geometry only when justified",
+      "training_authorized": false
+    },
+    {
+      "id": "traffic_sign_condition",
+      "date": "2026-09-25",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_TRAFFIC_SIGN",
+        "URMIND_OBSTRUCTED_TRAFFIC_SIGN"
+      ],
+      "sources": [
+        "https://ieeexplore.ieee.org/document/10371993/",
+        "https://github.com/dsphamgithub/tsda"
+      ],
+      "evidence": "primary work on condition/damage, distinct from normal sign recognition; synthetic training cannot establish real-world evaluation",
+      "license": null,
+      "version": null,
+      "next_action": "verify downloadable release, real/synthetic split, image rights, label rubric and capture groups",
+      "training_authorized": false
+    },
+    {
+      "id": "infrastructure_collection",
+      "date": "2026-09-25",
+      "target_issue_codes": [
+        "URMIND_DAMAGED_BARRIER",
+        "URMIND_DAMAGED_STREETLIGHT_POLE",
+        "URMIND_DAMAGED_BUS_STOP",
+        "URMIND_FALLEN_POWER_LINE",
+        "URMIND_EXPOSED_WIRING"
+      ],
+      "sources": [],
+      "evidence": "no primary licensed damage release verified in this research; normal-object datasets are context only",
+      "license": null,
+      "version": null,
+      "next_action": "prepare consented local capture with distance safety, source rights and expert state review; no energization inference",
+      "training_authorized": false
+    }
+  ],
+  "acquisition_dry_run": {
+    "date": "2026-09-25",
+    "current_ml_bytes": 37681969006,
+    "global_limit_bytes": 40000000000,
+    "review_package_reserve_bytes": 70486200,
+    "available_after_review_bytes": 2247544794,
+    "external_download_bytes": 0,
+    "external_final_size": null,
+    "status": "NO_ACQUISITION_UNTIL_SIZE_LICENSE_AND_PER_SOURCE_CAP_KNOWN",
+    "policy": "unknown archive/extraction/derived/cache sizes block acquisition; do not delete to fit; new-source cap must be approved in storage_budget.yaml"
+  },
+  "new_concept_candidates": [
+    {
+      "name": "lixo disperso",
+      "benefit": "fits TACO instance semantics",
+      "overlap": "road debris/illegal dumping depend on location and context",
+      "annotation_cost": "per-object polygons plus context and reviewed absence",
+      "activate": false
+    },
+    {
+      "name": "agua acumulada/poca",
+      "benefit": "preserves RTK waterPuddle without calling it road flooding",
+      "overlap": "flooded road/water leak; cause unknown",
+      "annotation_cost": "water mask plus roadway extent and no depth inference",
+      "activate": false
+    },
+    {
+      "name": "trinca nao especificada",
+      "benefit": "preserves RTK/UNIVALI generic cracks without inventing orientation",
+      "overlap": "parent or auxiliary label of D00/D10/D20",
+      "annotation_cost": "hierarchical completeness and mapping review",
+      "activate": false
     }
   ]
 }
