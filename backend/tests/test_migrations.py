@@ -139,3 +139,102 @@ def test_transicao_parte_da_revisao_remota_sem_drop_table():
     upgrade_sql = migration_path.read_text(encoding="utf-8").split("def downgrade()", 1)[0].lower()
     assert "drop table" not in upgrade_sql
     assert "drop trigger" not in upgrade_sql
+
+
+def _runtime_migration():
+    import importlib.util
+
+    path = ALEMBIC_VERSIONS_DIR / "0033_runtime_least_privilege.py"
+    spec = importlib.util.spec_from_file_location("runtime_role_migration", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module, path.read_text(encoding="utf-8")
+
+
+def _emitted_sql(module, step="upgrade"):
+    import re
+
+    statements = []
+
+    class Collector:
+        def execute(self, sql):
+            statements.append(re.sub(r"\s+", " ", str(sql)).strip().lower())
+
+    module.op = Collector()
+    getattr(module, step)()
+    return statements
+
+
+def test_runtime_role_nao_tem_atributos_administrativos():
+    module, _ = _runtime_migration()
+    emitted = " ; ".join(_emitted_sql(module))
+    attributes = "login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls"
+    assert emitted.count(attributes) == 1  # only at CREATE ROLE
+    # Supabase's non-superuser `postgres` may not ALTER a role mentioning SUPERUSER,
+    # REPLICATION or BYPASSRLS, even negated: attributes are verified, never altered.
+    for statement in emitted.split(" ; "):
+        for clause in statement.split("alter role")[1:]:
+            assert not any(
+                word in clause.split(";")[0]
+                for word in ("superuser", "replication", "bypassrls", "createrole", "login")
+            ), clause
+    assert "rolsuper or rolcreatedb or rolcreaterole or rolreplication or rolbypassrls" in emitted
+    assert "refusing to grant" in emitted
+    assert "password" not in emitted
+    assert "grant execute on function public.snap_to_road" in emitted
+    assert "service_role" not in emitted and "grant postgres" not in emitted
+
+
+def test_runtime_role_downgrade_nao_depende_de_drop_owned():
+    module, _ = _runtime_migration()
+    emitted = " ; ".join(_emitted_sql(module, "downgrade"))
+    assert "drop owned" not in emitted
+    assert "drop role urmind_runtime" in emitted
+    for policy, table in module.CONDITIONAL_POLICIES:
+        assert f"drop policy if exists {policy} on public.{table}" in emitted
+    for table in module.TABLE_PRIVILEGES:
+        assert f"drop policy if exists urmind_runtime_access on public.{table}" in emitted
+
+
+def test_runtime_role_cobre_toda_tabela_mapeada_e_nada_administrativo():
+    module, _ = _runtime_migration()
+    privileges = module.TABLE_PRIVILEGES
+    mapped = {table.name for table in Base.metadata.tables.values()}
+    assert mapped <= set(privileges), f"tabela ORM sem grant de runtime: {mapped - set(privileges)}"
+    assert "demo_events" not in privileges
+    for table in ("model_versions", "dataset_versions", "alembic_version", "operational_territory"):
+        assert privileges[table] == "select"
+    assert "update" not in privileges["audit_log"] and "delete" not in privileges["audit_log"]
+    # Consent evidence is insert-only: the app never deletes consent rows.
+    assert privileges["capture_privacy_consents"] == "select, insert"
+    for grant in privileges.values():
+        assert not {"truncate", "references", "trigger", "all"} & set(
+            grant.replace(",", " ").split()
+        )
+
+
+def test_demo_events_sem_acesso_cliente_no_head():
+    source_0031 = (ALEMBIC_VERSIONS_DIR / "0031_demo_events.py").read_text(encoding="utf-8")
+    upgrade_0031 = source_0031.split("def downgrade()", 1)[0]
+    # A clean upgrade must not fail without DEMO_MODE and must not grant client reads.
+    assert "raise" not in upgrade_0031
+    assert upgrade_0031.index('!= "1"') < upgrade_0031.index("to anon, authenticated")
+    source_0032 = (ALEMBIC_VERSIONS_DIR / "0032_demo_events_private.py").read_text(encoding="utf-8")
+    upgrade_0032 = source_0032.split("def downgrade()", 1)[0]
+    assert "drop policy if exists demo_events_public_read" in upgrade_0032
+    assert "revoke all on public.demo_events from public, anon, authenticated" in upgrade_0032
+
+
+def test_runtime_role_encontra_o_postgis_no_schema_extensions():
+    import importlib.util
+
+    path = ALEMBIC_VERSIONS_DIR / "0034_runtime_search_path.py"
+    spec = importlib.util.spec_from_file_location("runtime_search_path", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    emitted = " ; ".join(_emitted_sql(module))
+    assert 'alter role urmind_runtime set search_path = "$user", public, extensions' in emitted
+    # Only the session default: no attribute and no privilege is touched here.
+    assert "grant" not in emitted and "superuser" not in emitted

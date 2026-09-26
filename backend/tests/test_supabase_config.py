@@ -142,6 +142,42 @@ def test_runtime_sem_pooler_falha_explicito_mesmo_com_database_url() -> None:
         Database(_settings(DATABASE_POOLER_URL=""))
 
 
+def test_conexao_admin_usa_somente_a_url_de_migration() -> None:
+    """Registro/promoção de modelo e manutenção: identidade admin, nunca o runtime."""
+    runtime_url = POOLER.replace("postgres.refficticio", "urmind_runtime.refficticio")
+    db = Database(_settings(DATABASE_POOLER_URL=runtime_url), role="admin")
+    try:
+        assert db.role == "admin"
+        assert db.engine.url.username == "postgres.refficticio"
+    finally:
+        db.engine.sync_engine.dispose()
+    runtime = Database(_settings(DATABASE_POOLER_URL=runtime_url))
+    try:
+        assert runtime.role == "runtime"
+        assert runtime.engine.url.username == "urmind_runtime.refficticio"
+    finally:
+        runtime.engine.sync_engine.dispose()
+
+
+def test_admin_sem_url_de_migration_falha_sem_cair_no_runtime() -> None:
+    with pytest.raises(DatabaseNotConfiguredError, match="MIGRATION_DATABASE_URL"):
+        Database(_settings(MIGRATION_DATABASE_URL=""), role="admin")
+    with pytest.raises(DatabaseNotConfiguredError, match="MIGRATION_DATABASE_URL"):
+        Database(_settings(MIGRATION_DATABASE_URL=TRANSACTION_POOLER), role="admin")
+
+
+def test_operacoes_administrativas_de_modelo_usam_a_conexao_admin() -> None:
+    fonte = (BACKEND / "app" / "ml" / "serving.py").read_text(encoding="utf-8")
+    blocos = (
+        "async def _attach_report",
+        "async def register_model",
+        "async def record_model_metadata_reconciliation",
+    )
+    for bloco in blocos:
+        corpo = fonte.split(bloco, 1)[1].split("\nasync def ", 1)[0].split("\ndef ", 1)[0]
+        assert 'Database(get_settings(), role="admin")' in corpo, bloco
+
+
 def test_migrations_nunca_leem_o_pooler() -> None:
     fonte = (BACKEND / "alembic" / "env.py").read_text(encoding="utf-8")
     assert "database_pooler_url" not in fonte
@@ -259,3 +295,35 @@ def test_cors_exige_origens_explicitas() -> None:
     for invalid in ("*", "http://app.example.org", "https://app.example.org/api"):
         with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS|origem"):
             _settings(CORS_ALLOWED_ORIGINS=invalid)
+
+
+def test_pooler_da_role_runtime_e_reconhecido_como_o_mesmo_projeto() -> None:
+    runtime_url = POOLER.replace("postgres.refficticio", "urmind_runtime.refficticio")
+    assert _settings(DATABASE_POOLER_URL=runtime_url).database_pooler_url == runtime_url
+    other = POOLER.replace("postgres.refficticio", "urmind_runtime.outroprojeto")
+    with pytest.raises(ValueError, match="projetos diferentes"):
+        _settings(DATABASE_POOLER_URL=other)
+
+
+@pytest.mark.parametrize(
+    ("role", "accepted"), [("urmind_runtime", True), ("postgres", True), ("outra_role", False)]
+)
+def test_modo_shadow_aceita_a_role_de_runtime_no_projeto_dev(role: str, accepted: bool) -> None:
+    from app.config import URMIND_DEV_SHADOW_REF
+
+    base = f"https://{URMIND_DEV_SHADOW_REF}.supabase.co"
+    pooler = POOLER.replace("postgres.refficticio", f"{role}.{URMIND_DEV_SHADOW_REF}")
+    overrides = {
+        "SUPABASE_URL": base,
+        "SUPABASE_JWKS_URL": base + JWKS_PATH,
+        "DATABASE_POOLER_URL": pooler,
+        "MIGRATION_DATABASE_URL": POOLER.replace("refficticio", URMIND_DEV_SHADOW_REF),
+        "VISION_EXECUTION_MODE": "shadow",
+        "SHADOW_MODEL_VERSION_ID": "a3ff07ea-2d13-494f-ba4b-f79db51483c3",
+        "APP_ENV": "development",
+    }
+    if accepted:
+        assert _settings(**overrides).vision_execution_mode == "shadow"
+    else:
+        with pytest.raises(ValidationError, match="Urmind DEV confirmado"):
+            _settings(**overrides)

@@ -68,6 +68,9 @@ class Settings(BaseModel):
         default="disabled", alias="VISION_EXECUTION_MODE"
     )
     shadow_model_version_id: UUID | None = Field(default=None, alias="SHADOW_MODEL_VERSION_ID")
+    # Directory of a promoted review_confirmed XGBoost run (report/model/calibration/
+    # promotion). Unset = DISABLED: rules decide alone and nothing is estimated.
+    tabular_model_dir: Path | None = Field(default=None, alias="TABULAR_MODEL_DIR")
     # PostgreSQL/PostGIS do Supabase (SQLAlchemy 2 + psycopg 3) é o único acesso a
     # dados do backend (§4.3): nada de PostgREST com secret key. São conexões com
     # papéis separados e sem fallback entre runtime e migrations:
@@ -274,9 +277,10 @@ class Settings(BaseModel):
             db_parts = urlsplit(self.database_pooler_url)
             username = db_parts.username or ""
             hostname = db_parts.hostname or ""
+            # Supavisor usernames are `<role>.<project_ref>` (postgres or urmind_runtime).
             db_ref = (
-                username.removeprefix("postgres.")
-                if username.startswith("postgres.")
+                username.rsplit(".", 1)[1]
+                if "." in username
                 else hostname.removeprefix("db.").split(".")[0]
                 if hostname.startswith("db.") and hostname.endswith(".supabase.co")
                 else ""
@@ -295,8 +299,10 @@ class Settings(BaseModel):
             raise ValueError("modo shadow permitido somente em DEV/DEMO")
         if self.vision_execution_mode == "shadow" and (
             urlsplit(self.supabase_url or "").hostname != f"{URMIND_DEV_SHADOW_REF}.supabase.co"
+            # Least-privilege runtime (urmind_runtime) or the legacy admin identity,
+            # always on the single authorized DEV project.
             or urlsplit(self.database_pooler_url or "").username
-            != f"postgres.{URMIND_DEV_SHADOW_REF}"
+            not in {f"urmind_runtime.{URMIND_DEV_SHADOW_REF}", f"postgres.{URMIND_DEV_SHADOW_REF}"}
         ):
             raise ValueError("modo shadow permitido somente no Urmind DEV confirmado")
         if (

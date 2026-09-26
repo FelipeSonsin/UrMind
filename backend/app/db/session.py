@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
 from sqlalchemy import text
@@ -72,19 +72,25 @@ class Database:
     conexão.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        if not settings.database_pooler_url:
+    def __init__(
+        self, settings: Settings, *, role: Literal["runtime", "admin"] = "runtime"
+    ) -> None:
+        # runtime = API/Worker (least-privilege `urmind_runtime`); admin = model
+        # registration/promotion and maintenance CLIs, on the migration identity.
+        # Never falls back from one to the other.
+        variable = "DATABASE_POOLER_URL" if role == "runtime" else "MIGRATION_DATABASE_URL"
+        url = settings.database_pooler_url if role == "runtime" else settings.migration_database_url
+        if not url:
             raise DatabaseNotConfiguredError(
-                "DATABASE_POOLER_URL não configurada; o runtime usa o Session Pooler "
-                "do Supabase (porta 5432)."
+                f"{variable} não configurada; use o Session Pooler do Supabase (porta 5432)."
             )
-        url = settings.database_pooler_url
         if is_transaction_pooler_port(url):
             # Transaction mode não preserva prepared statements entre transações.
             raise DatabaseNotConfiguredError(
-                "DATABASE_POOLER_URL aponta para o transaction pooler (porta 6543); "
-                "o runtime usa o Session Pooler do Supabase (porta 5432)."
+                f"{variable} aponta para o transaction pooler (porta 6543); "
+                "use o Session Pooler do Supabase (porta 5432)."
             )
+        self.role = role
         self.engine: AsyncEngine = create_async_engine(
             normalize_database_url(url),
             pool_size=settings.db_pool_size,
@@ -93,9 +99,7 @@ class Database:
             echo=settings.db_echo,
             connect_args=connect_args(url),
         )
-        self.sessionmaker = async_sessionmaker(
-            self.engine, expire_on_commit=False, autoflush=False
-        )
+        self.sessionmaker = async_sessionmaker(self.engine, expire_on_commit=False, autoflush=False)
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:

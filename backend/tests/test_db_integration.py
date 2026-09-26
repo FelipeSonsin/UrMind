@@ -944,12 +944,92 @@ async def test_operational_policy_persistence_and_rls(database):
         await session.rollback()
 
 
+#: Raw fixture rows carry this marker so an interrupted run cannot leave an
+#: unidentifiable image-less Capture behind (A25-09). The teardown only touches
+#: keys this run created: `quality` is client-controlled, so the marker alone
+#: would never be enough to delete a row.
+FIXTURE_MARKER = "test_db_integration"
+FIXTURE_CAPTURE_KEYS: list[str] = []
+
+
 @pytest.fixture(scope="module")
 async def database():
-    db = Database(get_settings())
+    # Fixtures create and clean rows the least-privilege runtime role may not delete
+    # (audit_log, captures). The suite therefore runs on the admin identity; the
+    # runtime role has its own test below.
+    db = Database(get_settings(), role="admin")
     await upgrade()
     yield db
-    await db.close()
+    try:
+        async with db.session() as session:
+            residue = (
+                await session.execute(
+                    text(
+                        "delete from public.captures "
+                        "where quality->>'integration_fixture' = :marker "
+                        "and capture_key = any(:keys) returning id"
+                    ),
+                    {"marker": FIXTURE_MARKER, "keys": FIXTURE_CAPTURE_KEYS},
+                )
+            ).all()
+        assert not residue, f"fixture deixou {len(residue)} Capture(s) sem limpeza"
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_runtime_role_tem_somente_o_privilegio_necessario(database):
+    """Least privilege, observed on the real DEV role; every change is rolled back."""
+    from urllib.parse import urlsplit
+
+    settings = get_settings()
+    if not (urlsplit(settings.database_pooler_url or "").username or "").startswith(
+        "urmind_runtime."
+    ):
+        pytest.skip("DATABASE_POOLER_URL ainda não usa urmind_runtime")
+    runtime = Database(settings)
+    try:
+        async with runtime.engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                assert await connection.scalar(text("select current_user")) == "urmind_runtime"
+                key = f"runtime-privilege-{uuid.uuid4()}"
+                # Capture insert also fires the pgmq enqueue trigger as this role.
+                captured = await connection.scalar(
+                    text(
+                        "insert into public.captures(capture_key, source, source_location, "
+                        "captured_at) values (:key, 'pwa_photo', 'unknown', now()) returning id"
+                    ),
+                    {"key": key},
+                )
+                assert captured is not None
+                await connection.execute(text("select * from pgmq.metrics('inference_jobs')"))
+                await connection.execute(text("select count(*) from public.model_versions"))
+                await connection.execute(
+                    text(
+                        "select * from public.snap_to_road("
+                        "ST_SetSRID(ST_MakePoint(-46.637, -23.556), 4326)::geography, 25)"
+                    )
+                )
+                forbidden = (
+                    "create table public.runtime_should_not_create(id int)",
+                    "delete from public.audit_log where false",
+                    "update public.model_versions set metrics = metrics where false",
+                    "select count(*) from auth.users",
+                    "select count(*) from public.demo_events",
+                    # A role may change its own defaults; changing another role must fail.
+                    "alter role postgres set statement_timeout = '1s'",
+                    "create role runtime_should_not_create",
+                )
+                for statement in forbidden:
+                    savepoint = await connection.begin_nested()
+                    with pytest.raises(exc.DBAPIError):
+                        await connection.execute(text(statement))
+                    await savepoint.rollback()
+            finally:
+                await transaction.rollback()
+    finally:
+        await runtime.close()
 
 
 @pytest.mark.asyncio
@@ -1565,11 +1645,13 @@ async def test_storage_compensates_real_db_constraint_failure(database):
     async with database.session() as session:
         await session.execute(
             text(
-                "insert into public.captures(capture_key, source, source_location, captured_at) "
-                "values (:key, 'pwa_photo', 'unknown', now())"
+                "insert into public.captures(capture_key, source, source_location, captured_at, "
+                "quality) values (:key, 'pwa_photo', 'unknown', now(), "
+                "jsonb_build_object('integration_fixture', cast(:marker as text)))"
             ),
-            {"key": capture_key},
+            {"key": capture_key, "marker": FIXTURE_MARKER},
         )
+    FIXTURE_CAPTURE_KEYS.append(capture_key)
 
     class RecordingStorage(StorageClient):
         uploaded_path = None
@@ -2262,7 +2344,8 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             assert len(dossier["factors"]["evidence"]["capture_ids"]) == 2
             assert dossier["road_segment_id"] is not None
             assert "DNIT" in dossier["report"]
-            assert "Regra aplicada: urmind-risk-rules-v1" in dossier["report"]
+            # Registered values are rendered as quoted literals (report provenance).
+            assert 'Regra aplicada: "urmind-risk-rules-v1"' in dossier["report"]
             assert "Incerteza:" not in dossier["report"]
             assert "Fatores disponíveis:" not in dossier["report"]
             assert dossier["detections"] and all(
