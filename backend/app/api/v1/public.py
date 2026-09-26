@@ -307,6 +307,7 @@ async def public_event(
     risk_row = await repos["decisions"].latest_risk(event_id)
     risk = public_view.risk_public(
         {
+            "id": risk_row.id,
             "severity": risk_row.severity,
             "priority_score": risk_row.priority_score,
             "uncertainty": risk_row.uncertainty,

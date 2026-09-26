@@ -759,3 +759,60 @@ def test_public_image_only_serves_current_verified_derivative(client, case, monk
             "replaced_during_download",
         }:
             storage.download.assert_not_awaited()
+
+
+@pytest.mark.parametrize("with_time", [False, True])
+def test_api_analysis_evidence_requires_persisted_identity_and_time(client, with_time):
+    from app.api.v1 import public as public_api
+
+    assessment_id = uuid.uuid4()
+    row = SimpleNamespace(
+        id=assessment_id,
+        severity="medium",
+        priority_score=None,
+        uncertainty=None,
+        created_at=NOW if with_time else None,
+        responsibility_rule_id=None,
+        action_id=None,
+        factors={
+            "phase5": {
+                "ruleset_version": "rules-v1",
+                "impact": {"potential_domains": ["mobility", "UNSUPPORTED_CAUSE"]},
+                "risk": {"ordinal_level": "medium"},
+                "priority": {"attention_lane": "elevated"},
+            },
+            "limitations": ["UNSUPPORTED_CAUSE"],
+        },
+    )
+    repos = {
+        "public": SimpleNamespace(
+            event=AsyncMock(return_value=ROW), prediction=AsyncMock(return_value=None)
+        ),
+        "service": SimpleNamespace(event_dossier=AsyncMock(return_value={})),
+        "decisions": SimpleNamespace(
+            latest_risk=AsyncMock(return_value=row),
+            get_rule=AsyncMock(return_value=None),
+            get_action=AsyncMock(return_value=None),
+        ),
+        "inference": SimpleNamespace(),
+    }
+    client.app.dependency_overrides[public_api.repositories] = lambda: repos
+    client.app.dependency_overrides[public_api.optional_user] = lambda: None
+    try:
+        response = client.get(f"/api/v1/public/events/{ROW['id']}")
+    finally:
+        client.app.dependency_overrides.pop(public_api.repositories)
+        client.app.dependency_overrides.pop(public_api.optional_user)
+    assert response.status_code == 200
+    analysis = response.json()["analysis"]
+    assert "UNSUPPORTED_CAUSE" not in str(analysis)
+    if with_time:
+        assert analysis["severity"] == "medium"
+        assert (
+            analysis["statement_evidence"]["assessment"]["source"]
+            == f"RiskAssessment:{assessment_id}"
+        )
+        assert len(analysis["potential_consequences"]) == 1
+    else:
+        assert analysis["severity"] is None
+        assert analysis["potential_consequences"] == []

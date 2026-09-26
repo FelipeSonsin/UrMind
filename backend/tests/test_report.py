@@ -7,11 +7,14 @@ entrada sustenta.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from app.schemas.core import EvidenceMode, UrmindClass
 from app.services.report import (
     ActionSuggestion,
+    EvidenceReference,
     ReportInput,
     ResponsibilitySuggestion,
     render_event_report,
@@ -50,13 +53,35 @@ def relatorio_completo(**kwargs) -> str:
         "location_source": "exif",
         "road_segment_name": "Avenida Paulista",
         "distance_to_road_m": 3.4,
-        "evidence": ["foto enviada pelo aplicativo"],
+        "evidence": [
+            EvidenceReference(
+                "capture_id",
+                "Capture:fixture",
+                datetime(2026, 1, 1, tzinfo=UTC),
+                "reported",
+                "fixture",
+            )
+        ],
         "responsibility": ResponsibilitySuggestion(
             responsible="Prefeitura Municipal", source="competência municipal sobre via local"
         ),
         "action": ActionSuggestion(code="INSPECAO_TECNICA", label="Inspeção técnica no local"),
     }
-    return render_event_report(ReportInput(**{**base, **kwargs}))
+    values = {**base, **kwargs}
+    values.setdefault(
+        "provenance",
+        {
+            name: EvidenceReference(
+                name,
+                f"Event:fixture/{name}",
+                datetime(2026, 1, 1, tzinfo=UTC),
+                "reported",
+                "fixture",
+            )
+            for name in values
+        },
+    )
+    return render_event_report(ReportInput(**values))
 
 
 # ------------------------------------------------------------- caminho completo
@@ -152,14 +177,15 @@ def test_sem_evidencias_a_lista_nao_e_preenchida():
 # ------------------------------------------------------------------- previsões
 
 
-def test_previsao_so_aparece_quando_existe():
-    """§15 e §24: previsão sem histórico é precisão fabricada."""
-    sem = relatorio_completo()
-    com = relatorio_completo(predictions=["recorrência estimada no trecho em 90 dias: 0,42"])
+def test_previsao_livre_sem_evidencia_e_recusada():
+    with pytest.raises(ValueError, match="UNSUPPORTED_FREE_TEXT"):
+        relatorio_completo(predictions=["probabilidade de acidente: 0,42"])
 
-    assert "PREVISÕES" not in sem
-    assert "PREVISÕES" in com
-    assert "0,42" in com
+
+@pytest.mark.parametrize("field", ["evidence", "extra_limitations"])
+def test_fatos_livres_nao_entram_como_evidencia_ou_limitacao(field):
+    with pytest.raises(ValueError, match="UNSUPPORTED_FREE_TEXT"):
+        relatorio_completo(**{field: ["profundidade comprovada de 2 metros"]})
 
 
 # ----------------------------------------------------------------- limitações
@@ -298,6 +324,8 @@ def test_analysis_only_copies_persisted_phase5_assessment(source):
 
     risk = RiskPublic(
         assessment_source=source,
+        assessment_id="fixture",
+        assessed_at=datetime(2026, 1, 1, tzinfo=UTC),
         severity="medium",
         risk_level="high",
         priority_lane="expedited",
@@ -337,8 +365,8 @@ def test_analysis_uses_catalog_action_and_responsibility_without_inference():
         },
     )
     result = build_urban_analysis(detail)
-    assert result.action == detail.action
-    assert result.responsibility == detail.responsibility
+    assert result.action is None
+    assert result.responsibility.status == "requires_triage"
     assert "experimental" in " ".join(result.limitations)
     assert "não mede profundidade" in " ".join(result.limitations)
 
@@ -355,3 +383,58 @@ def test_all_candidate_classes_remain_explicitly_without_visual_support():
         assert result.identification.model_support_status == "DATA_REQUIRED"
         assert result.possible_causes == result.potential_consequences == []
         assert result.severity is result.risk_level is result.priority_lane is None
+
+
+def test_public_description_has_field_evidence_and_does_not_attribute_human_label_to_model():
+    from app.services.report import build_urban_analysis
+
+    result = build_urban_analysis(public_detail(reviewed=True))
+    assert "relatada" in result.description
+    assert result.statement_evidence["description"]["kind"] == "reported"
+    assert result.statement_evidence["description"]["field"] == "Event.urmind_class"
+
+
+def test_generic_renderer_refuses_missing_or_mismatched_fact_reference():
+    with pytest.raises(ValueError, match="MISSING_FACT_PROVENANCE"):
+        relatorio_completo(provenance={})
+
+
+def test_reference_free_prose_is_not_rendered():
+    ref = EvidenceReference(
+        "capture_id",
+        "Capture:fixture",
+        datetime(2026, 1, 1, tzinfo=UTC),
+        "reported",
+        "profundidade comprovada de 2 metros",
+    )
+    assert "profundidade comprovada" not in relatorio_completo(evidence=[ref])
+    with pytest.raises(ValueError, match="INCOMPLETE_EVIDENCE"):
+        EvidenceReference(
+            "capture_id", "invented:source", datetime(2026, 1, 1, tzinfo=UTC), "observed", "claim"
+        )
+
+
+def test_risk_free_prose_is_not_rendered():
+    from dataclasses import replace
+
+    risk = replace(risco(), limitations=["acidente iminente comprovado"])
+    assert "acidente iminente" not in relatorio_completo(risk=risk)
+
+
+@pytest.mark.parametrize("field", ["model_version", "location_source", "event_key"])
+def test_text_values_cannot_inject_report_sentences(field):
+    claim = "value\nUNSUPPORTED_NEW_FACT"
+    text = relatorio_completo(**{field: claim})
+    assert "\nUNSUPPORTED_NEW_FACT" not in text
+    assert "\\nUNSUPPORTED_NEW_FACT" in text
+
+
+def test_evidence_field_cannot_inject_sentences():
+    with pytest.raises(ValueError, match="INCOMPLETE_EVIDENCE"):
+        EvidenceReference(
+            "capture_id\nclaim",
+            "Capture:fixture",
+            datetime(2026, 1, 1, tzinfo=UTC),
+            "reported",
+            "claim",
+        )

@@ -180,6 +180,7 @@ def risk_public(row: dict[str, Any] | None) -> RiskPublic | None:
         else {"increased": [], "decreased": [], "unavailable": [], "baseline": None}
     )
     return RiskPublic(
+        assessment_id=str(row["id"]) if row.get("id") else None,
         assessment_source="phase5" if phase5 else "legacy",
         severity=row["severity"],
         priority_score=row.get("priority_score"),

@@ -63,6 +63,7 @@ class RiskExplanationPublic(PublicModel):
 
 
 class RiskPublic(PublicModel):
+    assessment_id: str | None = None
     assessment_source: Literal["phase5", "legacy"] | None = None
     severity: str
     priority_score: float | None
@@ -186,6 +187,7 @@ class UrbanAnalysisPublic(PublicModel):
     context: list[ContextSourcePublic] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     provenance: UrbanAnalysisProvenancePublic
+    statement_evidence: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class EventDetailPublic(EventSummaryPublic):
