@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AdaptiveCadence,
   checkBrowserModelManifest,
   classColor,
   containRect,
   decodeYoloxOutput,
   describeCameraError,
   fillBgrTensor,
+  FrameFreshness,
   InferenceGate,
   isSceneChange,
   LatencyStats,
   letterbox,
   measureFrameQuality,
   ModelContractError,
-  nextInferenceDelay,
   postprocessOptions,
   QUALITY_GRID,
   qualityHints,
@@ -356,8 +357,37 @@ describe('sincronização quadro ↔ resultado', () => {
     expect(gate.accept(ticket.run, ticket.frameId)).toBe(false);
   });
   it('ritmo respeita o teto e deixa folga quando a inferência é lenta', () => {
-    expect(nextInferenceDelay(50, 50, 200)).toBe(150);
-    expect(nextInferenceDelay(800, 800, 200)).toBe(200);
+    expect(new AdaptiveCadence().next(50)).toBe(150);
+    // 800 ms com no máximo 75% de ocupação: período de ~1067 ms, espera de ~267 ms.
+    expect(new AdaptiveCadence().next(800)).toBeCloseTo(266.67, 1);
+  });
+  it('latência maior recua na hora; latência menor acelera aos poucos até o teto', () => {
+    const cadence = new AdaptiveCadence();
+    for (let i = 0; i < 20; i++) cadence.next(60);
+    expect(cadence.periodMs).toBe(200);
+    // Aparelho esquentou: a primeira resposta lenta já espaça os envios.
+    cadence.next(900);
+    expect(cadence.periodMs).toBeCloseTo(1200);
+    // Voltou a ficar rápido: o período encurta no máximo 15% por resultado.
+    const periods: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      cadence.next(60);
+      periods.push(cadence.periodMs!);
+    }
+    for (let i = 1; i < periods.length; i++) {
+      expect(periods[i]).toBeLessThanOrEqual(periods[i - 1]);
+      expect(periods[i]).toBeGreaterThanOrEqual(periods[i - 1] * 0.85 - 1e-9);
+    }
+    expect(periods[0]).toBeGreaterThan(900);
+    expect(periods.at(-1)).toBe(200);
+  });
+  it('nunca envia duas vezes o mesmo quadro de vídeo', () => {
+    const freshness = new FrameFreshness();
+    expect(freshness.accept(1.0)).toBe(true);
+    expect(freshness.accept(1.0)).toBe(false);
+    expect(freshness.accept(1.033)).toBe(true);
+    freshness.reset();
+    expect(freshness.accept(1.033)).toBe(true);
   });
   it('taxa é medida numa janela móvel, sem crescer sem limite', () => {
     const meter = new RateMeter(1000);
@@ -435,7 +465,23 @@ describe('camada temporal (apresentação)', () => {
     const raw = [detection(0, 100, 0.9), detection(2, 300, 0.2)];
     const tracked = new TemporalTracker().update(raw, 0);
     expect(tracked).toHaveLength(2);
-    expect(tracked.map(({ trackId, state, hits, ageMs, ...rest }) => rest)).toEqual(raw);
+    expect(
+      tracked.map(({ trackId, state, hits, ageMs, recentScores, meanScore, ...rest }) => rest),
+    ).toEqual(raw);
+  });
+  it('guarda um histórico curto de confiança por observação, sem filtrar nem alterar o score', () => {
+    const tracker = new TemporalTracker();
+    let last = tracker.update([detection(0, 100, 0.2)], 0)[0];
+    expect(last.recentScores).toEqual([0.2]);
+    [0.4, 0.6, 0.8, 0.9, 0.7].forEach((score, i) => {
+      [last] = tracker.update([detection(0, 101 + i, score)], (i + 1) * 100);
+    });
+    expect(last.recentScores).toEqual([0.4, 0.6, 0.8, 0.9, 0.7]);
+    expect(last.meanScore).toBeCloseTo(0.68, 9);
+    expect(last.score).toBe(0.7);
+    // Nova cena: o histórico recomeça com a observação.
+    tracker.reset();
+    expect(tracker.update([detection(0, 100, 0.3)], 700)[0].recentScores).toEqual([0.3]);
   });
 });
 

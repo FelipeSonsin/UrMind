@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera as CameraIcon, CircleStop, ImageUp, Pause, Play, Send } from 'lucide-react';
 import {
+  AdaptiveCadence,
   BROWSER_MODEL_MANIFEST_PATH,
   checkBrowserModelManifest,
   classColor,
+  FrameFreshness,
   InferenceGate,
   isSceneChange,
   LatencyStats,
-  nextInferenceDelay,
   overlaySize,
   qualityHints,
   qualityHintText,
@@ -26,6 +27,7 @@ import {
   openCamera,
   stopStream,
 } from '../services/cameraStream';
+import { stopWarmUp, warmUp, warmUpIfAllowed } from '../services/deviceLocation';
 import { drafts, validatePhoto, type CaptureDraft } from '../services/drafts';
 import type {
   InferenceProvider,
@@ -33,9 +35,15 @@ import type {
   WorkerResponse,
 } from '../workers/liveDetection.worker';
 
-/** Teto inicial de 5 análises/s: configuração, não promessa; o ritmo real é medido. */
-const MIN_INFERENCE_INTERVAL_MS = 200;
 const INFERENCE_TIMEOUT_MS = 20_000;
+
+/** `requestVideoFrameCallback` ainda não está em todos os tipos DOM do TypeScript. */
+type FrameCallbackVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (
+    callback: (now: number, metadata: { mediaTime: number }) => void,
+  ) => number;
+  cancelVideoFrameCallback?: (handle: number) => void;
+};
 
 type CameraState =
   | { status: 'idle' }
@@ -77,6 +85,8 @@ interface Metrics {
   latencyP50: number | null;
   latencyP95: number | null;
   stages: { preprocess: number; inference: number; postprocess: number } | null;
+  /** Intervalo atual entre envios ao modelo, decidido pelo ritmo adaptativo. */
+  intervalMs: number | null;
 }
 
 const emptyMetrics: Metrics = {
@@ -86,6 +96,7 @@ const emptyMetrics: Metrics = {
   latencyP50: null,
   latencyP95: null,
   stages: null,
+  intervalMs: null,
 };
 
 const statusLabels: Record<BrowserModelManifest['scientific_status'], string> = {
@@ -100,12 +111,6 @@ const scoreFormat = new Intl.NumberFormat('pt-BR', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
-const timeFormat = new Intl.DateTimeFormat('pt-BR', {
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-});
-
 async function fetchManifest(signal: AbortSignal): Promise<ModelState> {
   let response: Response;
   try {
@@ -160,8 +165,10 @@ export function LiveDetectionPage({
   const modelRef = useRef<ModelState>(model);
   const cameraRef = useRef<CameraState>(camera);
   const loopTimer = useRef<number | undefined>(undefined);
+  const frameRequest = useRef(0);
   const watchdog = useRef<number | undefined>(undefined);
-  const lastLatency = useRef(0);
+  const cadence = useRef(new AdaptiveCadence());
+  const freshness = useRef(new FrameFreshness());
   const inferenceMeter = useRef(new RateMeter());
   const cameraMeter = useRef(new RateMeter());
   const latencyStats = useRef(new LatencyStats());
@@ -174,15 +181,29 @@ export function LiveDetectionPage({
     setModel(next);
   }
 
+  function cancelFrameRequest() {
+    if (frameRequest.current)
+      (video.current as FrameCallbackVideo | null)?.cancelVideoFrameCallback?.(
+        frameRequest.current,
+      );
+    frameRequest.current = 0;
+  }
+
   function stopDetection() {
     gate.current.cancel();
     window.clearTimeout(loopTimer.current);
     window.clearTimeout(watchdog.current);
+    cancelFrameRequest();
     detectingRef.current = false;
     inferenceMeter.current.reset();
     latencyStats.current.reset();
+    cadence.current.reset();
+    freshness.current.reset();
     // Pausa, troca de câmera, saída da rota e logout encerram as observações.
     tracker.current.reset();
+    // Caixas antigas sobre um vídeo que continua andando enganariam: saem na pausa.
+    // O resultado de uma imagem avulsa (sem vídeo) continua na tela.
+    setAnalyzed((value) => (value?.temporal ? null : value));
     setDetecting(false);
   }
 
@@ -230,12 +251,32 @@ export function LiveDetectionPage({
     loopTimer.current = window.setTimeout(tick, delay);
   }
 
+  /**
+   * Pede ao vídeo o próximo quadro apresentado (requestVideoFrameCallback) e só então o
+   * envia. O <video> nunca espera pela inferência: ele segue no ritmo da câmera, e o
+   * modelo recebe sempre o quadro mais novo, um por vez, sem fila.
+   */
   function tick() {
+    const player = video.current as FrameCallbackVideo | null;
+    if (!detectingRef.current || document.hidden || !worker.current || !player) return;
+    if (modelRef.current.status !== 'ready' || gate.current.busy) return;
+    if (!player.videoWidth || !player.videoHeight) return schedule(100);
+    if (player.requestVideoFrameCallback) {
+      cancelFrameRequest();
+      frameRequest.current = player.requestVideoFrameCallback((_now, metadata) => {
+        frameRequest.current = 0;
+        sendVideoFrame(metadata.mediaTime);
+      });
+    } else sendVideoFrame(player.currentTime);
+  }
+
+  function sendVideoFrame(mediaTime: number) {
     const player = video.current;
     const current = worker.current;
     if (!detectingRef.current || document.hidden || !current || !player) return;
     if (modelRef.current.status !== 'ready' || gate.current.busy) return;
-    if (!player.videoWidth || !player.videoHeight) return schedule(100);
+    // O mesmo quadro já foi analisado (vídeo parado ou câmera mais lenta): espera o próximo.
+    if (!freshness.current.accept(mediaTime)) return schedule(30);
     const ticket = gate.current.begin(performance.now());
     if (!ticket) return;
     const width = player.videoWidth;
@@ -358,17 +399,18 @@ export function LiveDetectionPage({
       window.clearTimeout(watchdog.current);
       const now = performance.now();
       const latency = sentAt === null ? message.inferenceMs : now - sentAt;
-      lastLatency.current = latency;
       latencyStats.current.add(latency);
       inferenceMeter.current.tick(now);
-      const frame = frameCanvas.current;
-      const source = snapshot.current;
       const live = cameraRef.current;
       const temporal = live.status === 'live';
       // Cena nova (ou imagem avulsa): nenhuma associação anterior vale para este quadro.
       if (!temporal || isSceneChange(message.quality)) tracker.current.reset();
       const tracked = tracker.current.update(message.detections, message.timestamp);
-      if (frame && source) {
+      // Imagem avulsa: o palco mostra a própria imagem analisada. Câmera: o palco segue
+      // mostrando o vídeo ao vivo e só as caixas mudam quando chega um resultado novo.
+      const frame = frameCanvas.current;
+      const source = snapshot.current;
+      if (!temporal && frame && source) {
         frame.width = message.width;
         frame.height = message.height;
         frame.getContext('2d')?.drawImage(source, 0, 0);
@@ -383,8 +425,10 @@ export function LiveDetectionPage({
         temporal,
         hints: qualityHints(message.quality, message.width, message.height),
       });
+      const delay = detectingRef.current ? cadence.current.next(latency) : null;
       setMetrics((value) => ({
         ...value,
+        intervalMs: cadence.current.periodMs,
         latencyMs: latency,
         latencyP50: latencyStats.current.percentile(50),
         latencyP95: latencyStats.current.percentile(95),
@@ -394,8 +438,7 @@ export function LiveDetectionPage({
           postprocess: message.postprocessMs,
         },
       }));
-      if (detectingRef.current)
-        schedule(nextInferenceDelay(latency, latency, MIN_INFERENCE_INTERVAL_MS));
+      if (delay !== null) schedule(delay);
     }
   }
 
@@ -495,33 +538,21 @@ export function LiveDetectionPage({
   async function captureAndRegister() {
     setCaptureError('');
     setCapturing(true);
+    // O registro pede o GPS do aparelho logo em seguida; começa a procurar já.
+    warmUp();
     try {
-      const frame = frameCanvas.current;
       const player = video.current;
-      let file: File;
-      let capturedAt: number;
-      if (analyzed && frame?.width) {
-        // O quadro exibido com as caixas, mas gravado sem elas.
-        capturedAt = analyzed.timestamp;
-        file = await frameToJpeg(
-          frame,
-          analyzed.width,
-          analyzed.height,
-          `deteccao-ao-vivo-${capturedAt}.jpg`,
-          capturedAt,
-        );
-      } else if (player?.videoWidth) {
-        capturedAt = Date.now();
-        file = await frameToJpeg(
-          player,
-          player.videoWidth,
-          player.videoHeight,
-          `deteccao-ao-vivo-${capturedAt}.jpg`,
-          capturedAt,
-        );
-      } else {
-        throw new Error('Não há quadro para capturar. Inicie a câmera.');
-      }
+      if (!player?.videoWidth) throw new Error('Não há quadro para capturar. Inicie a câmera.');
+      // O quadro que está na tela agora, direto do vídeo: as caixas ficam no overlay
+      // e nunca entram na foto registrada.
+      const capturedAt = Date.now();
+      const file = await frameToJpeg(
+        player,
+        player.videoWidth,
+        player.videoHeight,
+        `deteccao-ao-vivo-${capturedAt}.jpg`,
+        capturedAt,
+      );
       await validatePhoto(file);
       const draft: CaptureDraft = {
         id: crypto.randomUUID(),
@@ -530,7 +561,7 @@ export function LiveDetectionPage({
         source: 'pwa_photo',
         captured_at: new Date(capturedAt).toISOString(),
         created_at: new Date().toISOString(),
-        // Localização só é pedida no registro, e nunca inventada aqui.
+        // O registro obtém o GPS deste instante; nada é inventado aqui.
         coordinate: null,
         source_location: 'unknown',
         location_timestamp: null,
@@ -567,6 +598,13 @@ export function LiveDetectionPage({
     },
     [],
   );
+
+  // Com permissão já concedida, o GPS se estabiliza enquanto a câmera está aberta, e
+  // "Capturar e registrar" encontra uma posição recente. Sem permissão, nada é pedido aqui.
+  useEffect(() => {
+    void warmUpIfAllowed();
+    return stopWarmUp;
+  }, []);
 
   // Página oculta: a inferência para e a câmera é desligada; a retomada é sempre explícita.
   useEffect(() => {
@@ -678,9 +716,10 @@ export function LiveDetectionPage({
   const live = camera.status === 'live';
   const hasManifest = 'manifest' in model;
   const manifest = hasManifest ? model.manifest : null;
-  const showAnalyzed = analyzed !== null;
+  // Só uma imagem avulsa ocupa o palco no lugar do vídeo; a câmera nunca é substituída.
+  const showStill = still !== null && analyzed !== null;
   const limit = manifest?.postprocess.max_detections ?? 0;
-  const aspect = showAnalyzed
+  const aspect = showStill
     ? `${analyzed.width} / ${analyzed.height}`
     : live && camera.width && camera.height
       ? `${camera.width} / ${camera.height}`
@@ -689,9 +728,9 @@ export function LiveDetectionPage({
   const startDetectionHint = !live
     ? 'Inicie a câmera para analisar quadros.'
     : !hasManifest
-      ? 'Modelo de detecção indisponível.'
+      ? 'Detecção indisponível.'
       : model.status === 'loading'
-        ? 'Carregando e conferindo o modelo…'
+        ? 'Preparando a detecção…'
         : detecting
           ? 'A detecção já está em andamento.'
           : '';
@@ -699,50 +738,44 @@ export function LiveDetectionPage({
     camera.status === 'starting' && 'Aguardando a câmera…',
     startDetectionHint && `Iniciar detecção: ${startDetectionHint}`,
     !detecting && live && hasManifest && 'Pausar detecção: a detecção não está em andamento.',
-    !live && !showAnalyzed && 'Capturar e registrar: inicie a câmera para ter um quadro.',
+    !live && !still && 'Capturar e registrar: inicie a câmera para ter um quadro.',
     still &&
-      'Capturar e registrar: vale só para a câmera. Para registrar esta imagem use Registrar, que preserva a foto original e seus metadados.',
+      'Capturar e registrar: vale só para a câmera. Para registrar esta imagem, use Registrar evidência.',
   ].filter(Boolean) as string[];
 
-  const modelSummary =
+  // Para quem usa: pronta ou indisponível. O provedor (WebGPU/WASM) fica nos detalhes.
+  const detectionStatus =
     model.status === 'checking'
-      ? 'Consultando o modelo publicado…'
+      ? 'Verificando a detecção…'
       : model.status === 'unavailable'
-        ? model.reason
+        ? `Detecção indisponível. ${model.reason}`
         : model.status === 'loading'
-          ? 'Baixando e conferindo o checksum do modelo…'
+          ? 'Preparando a detecção…'
           : model.status === 'failed'
-            ? model.message
+            ? `Detecção indisponível. ${model.message}`
             : model.status === 'ready'
-              ? `Em execução via ${model.provider === 'webgpu' ? 'WebGPU' : 'WASM (1 thread)'}.`
-              : 'Disponível. O modelo só é baixado quando a detecção começa.';
+              ? 'Detecção pronta'
+              : 'Detecção disponível: começa quando você tocar em Iniciar detecção.';
 
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Evidências / Prévia no navegador</p>
           <h1>Detecção ao vivo</h1>
           <p>
-            A câmera deste aparelho, analisada aqui mesmo. Nada é enviado até você capturar um
-            quadro.
+            Aponte a câmera para a via. A análise acontece neste aparelho e nada é enviado até você
+            registrar.
           </p>
         </div>
-        <span
-          className={
-            manifest?.scientific_status === 'APPROVED' ? 'badge' : 'badge experimental-badge'
-          }
-        >
-          {manifest
-            ? `Modelo ${statusLabels[manifest.scientific_status].toLowerCase()}`
-            : 'Modelo de detecção indisponível'}
-        </span>
+        {manifest && manifest.scientific_status !== 'APPROVED' && (
+          <span className="badge experimental-badge">Prévia experimental</span>
+        )}
       </div>
 
       <div className="live-grid">
         <section className="live-stage-panel" aria-label="Imagem da câmera">
           <div
-            className={`live-stage${showAnalyzed ? ' is-analyzed' : ''}`}
+            className={`live-stage${showStill ? ' is-still' : ''}`}
             style={{ aspectRatio: aspect }}
           >
             <div className="live-frame" ref={stage}>
@@ -755,12 +788,12 @@ export function LiveDetectionPage({
               />
               <canvas
                 ref={frameCanvas}
-                className={`live-analyzed${analyzed?.mirrored ? ' mirrored' : ''}`}
-                aria-label="Quadro analisado"
-                hidden={!showAnalyzed}
+                className="live-analyzed"
+                aria-label="Imagem analisada"
+                hidden={!showStill}
               />
               <canvas ref={overlay} className="live-overlay" aria-hidden="true" />
-              {!live && !showAnalyzed && (
+              {!live && !showStill && (
                 <div className="live-placeholder">
                   <CameraIcon size={30} strokeWidth={1.4} />
                   <p>
@@ -768,70 +801,16 @@ export function LiveDetectionPage({
                       ? 'Abrindo a câmera…'
                       : camera.status === 'error' || camera.status === 'suspended'
                         ? camera.message
-                        : 'Escolha uma câmera e toque em Iniciar câmera.'}
+                        : 'Toque em Iniciar câmera.'}
                   </p>
                 </div>
               )}
             </div>
-            {showAnalyzed && (
-              <span className="live-stage-tag">
-                {still
-                  ? 'Imagem do aparelho · Localização não informada'
-                  : `${detecting ? 'Quadro analisado' : 'Pausado'} · ${timeFormat.format(analyzed.timestamp)}`}
-              </span>
+            {showStill && (
+              <span className="live-stage-tag">Imagem do aparelho · prévia sem localização</span>
             )}
+            {live && detecting && <span className="live-stage-tag">Detectando</span>}
           </div>
-          <dl className="live-readout" aria-label="Desempenho medido">
-            <div>
-              {/* Sem requestVideoFrameCallback só existe o valor declarado pelo dispositivo. */}
-              <dt>
-                {metrics.cameraFps == null && live && camera.declaredFps
-                  ? 'Câmera (declarado)'
-                  : 'Câmera'}
-              </dt>
-              <dd>
-                {metrics.cameraFps != null
-                  ? `${decimal.format(metrics.cameraFps)} fps`
-                  : live && camera.declaredFps
-                    ? `${decimal.format(camera.declaredFps)} fps`
-                    : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>Análises</dt>
-              <dd>
-                {metrics.inferenceFps != null ? `${decimal.format(metrics.inferenceFps)} /s` : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>Latência</dt>
-              <dd>{metrics.latencyMs != null ? `${Math.round(metrics.latencyMs)} ms` : '—'}</dd>
-            </div>
-            <div>
-              <dt>Latência p50 / p95</dt>
-              <dd>
-                {metrics.latencyP50 != null && metrics.latencyP95 != null
-                  ? `${Math.round(metrics.latencyP50)} / ${Math.round(metrics.latencyP95)} ms`
-                  : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>Pré · modelo · pós</dt>
-              <dd>
-                {metrics.stages
-                  ? `${Math.round(metrics.stages.preprocess)} · ${Math.round(metrics.stages.inference)} · ${Math.round(metrics.stages.postprocess)} ms`
-                  : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>Resolução</dt>
-              <dd>{live ? `${camera.width}×${camera.height}` : '—'}</dd>
-            </div>
-            <div>
-              <dt>Quadro</dt>
-              <dd>{analyzed ? `nº ${analyzed.frameId}` : '—'}</dd>
-            </div>
-          </dl>
           {analyzed && analyzed.hints.length > 0 && (
             <ul className="live-quality" aria-label="Qualidade da captura">
               {analyzed.hints.map((hint) => (
@@ -843,25 +822,34 @@ export function LiveDetectionPage({
 
         <div className="live-side">
           <section className="panel" aria-label="Controle da câmera">
-            <h2>Câmera</h2>
-            <label>
-              Câmera do aparelho
-              <select
-                value={selected}
-                disabled={camera.status === 'starting' || capturing}
-                onChange={(event) => {
-                  setSelected(event.target.value);
-                  if (live) void startCamera(event.target.value);
-                }}
-              >
-                <option value="">Automática (traseira quando houver)</option>
-                {cameras.map((device, index) => (
-                  <option key={device.deviceId || index} value={device.deviceId}>
-                    {device.label || `Câmera ${index + 1}`}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p
+              role="status"
+              className={`live-status${model.status === 'ready' ? ' is-ready' : ''}${
+                model.status === 'failed' || model.status === 'unavailable' ? ' is-error' : ''
+              }`}
+            >
+              {detectionStatus}
+            </p>
+            {cameras.length > 1 && (
+              <label>
+                Câmera do aparelho
+                <select
+                  value={selected}
+                  disabled={camera.status === 'starting' || capturing}
+                  onChange={(event) => {
+                    setSelected(event.target.value);
+                    if (live) void startCamera(event.target.value);
+                  }}
+                >
+                  <option value="">Automática (traseira quando houver)</option>
+                  {cameras.map((device, index) => (
+                    <option key={device.deviceId || index} value={device.deviceId}>
+                      {device.label || `Câmera ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="actions">
               <button
                 type="button"
@@ -900,7 +888,7 @@ export function LiveDetectionPage({
               <button
                 type="button"
                 className="secondary"
-                disabled={capturing || still !== null || (!live && !showAnalyzed)}
+                disabled={capturing || still !== null || !live}
                 onClick={() => void captureAndRegister()}
                 aria-describedby="live-hints"
               >
@@ -930,13 +918,50 @@ export function LiveDetectionPage({
               </p>
             )}
             <p className="muted">
-              Capturar grava só a imagem, sem caixas, e abre o registro normal: você confirma o
-              local e envia. O servidor refaz a análise oficial.
+              Capturar grava a imagem sem as caixas e abre o registro com a localização do aparelho.
+              A análise oficial é feita depois do envio.
+            </p>
+          </section>
+
+          <section className="panel" aria-label="Detecções do quadro analisado" aria-live="polite">
+            <h2>O que a prévia encontrou</h2>
+            {!analyzed ? (
+              <p className="muted">As detecções aparecem aqui quando a análise começar.</p>
+            ) : analyzed.detections.length === 0 ? (
+              <p>Nenhum dos problemas reconhecidos apareceu nesta imagem.</p>
+            ) : (
+              <>
+                <ol className="live-detections">
+                  {analyzed.detections.slice(0, limit).map((detection, index) => (
+                    <li key={index}>
+                      <i
+                        style={{ background: classColor(detection.classIndex) }}
+                        aria-hidden="true"
+                      />
+                      <span>
+                        <strong>{labelFor(detection.className)}</strong>
+                      </span>
+                      <b title="Confiança do modelo nesta prévia, de 0 a 1">
+                        {scoreFormat.format(detection.score)}
+                      </b>
+                    </li>
+                  ))}
+                </ol>
+                {analyzed.detections.length > limit && (
+                  <p className="muted">
+                    Exibindo {limit} de {analyzed.detections.length} detecções.
+                  </p>
+                )}
+              </>
+            )}
+            <p className="muted">
+              O número é a confiança do modelo nesta prévia (0 a 1). Não é gravidade nem confirmação
+              do problema.
             </p>
           </section>
 
           <section className="panel" aria-label="Imagem do aparelho">
-            <h2>Imagem do aparelho</h2>
+            <h2>Analisar uma imagem</h2>
             <input
               ref={stillInput}
               type="file"
@@ -961,14 +986,70 @@ export function LiveDetectionPage({
             </div>
             {still && <p className="muted">Arquivo: {still.name}</p>}
             <p className="muted">
-              Só prévia visual neste aparelho: a imagem não é enviada, não vira ocorrência e não
-              ganha localização nem marcador no mapa.
+              Só uma prévia neste aparelho: a imagem não é enviada e não vira relato.
             </p>
           </section>
 
-          <section className="panel" aria-label="Modelo de detecção">
-            <h2>Modelo</h2>
-            {manifest ? (
+          <details className="panel live-technical">
+            <summary>Detalhes técnicos</summary>
+            <dl className="live-readout" aria-label="Desempenho medido">
+              <div>
+                {/* Sem requestVideoFrameCallback só existe o valor declarado pelo dispositivo. */}
+                <dt>
+                  {metrics.cameraFps == null && live && camera.declaredFps
+                    ? 'Câmera (declarado)'
+                    : 'Câmera'}
+                </dt>
+                <dd>
+                  {metrics.cameraFps != null
+                    ? `${decimal.format(metrics.cameraFps)} fps`
+                    : live && camera.declaredFps
+                      ? `${decimal.format(camera.declaredFps)} fps`
+                      : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Análises</dt>
+                <dd>
+                  {metrics.inferenceFps != null
+                    ? `${decimal.format(metrics.inferenceFps)} /s`
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Intervalo</dt>
+                <dd>{metrics.intervalMs != null ? `${Math.round(metrics.intervalMs)} ms` : '—'}</dd>
+              </div>
+              <div>
+                <dt>Latência</dt>
+                <dd>{metrics.latencyMs != null ? `${Math.round(metrics.latencyMs)} ms` : '—'}</dd>
+              </div>
+              <div>
+                <dt>Latência p50 / p95</dt>
+                <dd>
+                  {metrics.latencyP50 != null && metrics.latencyP95 != null
+                    ? `${Math.round(metrics.latencyP50)} / ${Math.round(metrics.latencyP95)} ms`
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Pré · modelo · pós</dt>
+                <dd>
+                  {metrics.stages
+                    ? `${Math.round(metrics.stages.preprocess)} · ${Math.round(metrics.stages.inference)} · ${Math.round(metrics.stages.postprocess)} ms`
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>Resolução</dt>
+                <dd>{live ? `${camera.width}×${camera.height}` : '—'}</dd>
+              </div>
+              <div>
+                <dt>Quadro</dt>
+                <dd>{analyzed ? `nº ${analyzed.frameId}` : '—'}</dd>
+              </div>
+            </dl>
+            {manifest && (
               <dl className="live-model">
                 <div>
                   <dt>Versão</dt>
@@ -990,63 +1071,20 @@ export function LiveDetectionPage({
                       : 'não versionado'}
                   </dd>
                 </div>
+                <div>
+                  <dt>Execução</dt>
+                  <dd>
+                    {model.status === 'ready'
+                      ? model.provider === 'webgpu'
+                        ? 'WebGPU'
+                        : 'WASM (1 thread)'
+                      : '—'}
+                  </dd>
+                </div>
               </dl>
-            ) : null}
-            <p role="status" className={model.status === 'failed' ? 'error' : undefined}>
-              {model.status === 'unavailable' ? 'Modelo de detecção indisponível. ' : ''}
-              {modelSummary}
-            </p>
+            )}
             {model.status === 'ready' && model.fallbackReason && (
               <p className="muted">{model.fallbackReason}</p>
-            )}
-            {manifest && manifest.scientific_status !== 'APPROVED' && (
-              <p className="notice">
-                Prévia de um modelo {statusLabels[manifest.scientific_status].toLowerCase()}: pode
-                errar e não substitui a análise e a revisão oficiais.
-              </p>
-            )}
-          </section>
-
-          <section className="panel" aria-label="Detecções do quadro analisado" aria-live="polite">
-            <h2>Detecções do quadro</h2>
-            {!analyzed ? (
-              <p>As detecções aparecem aqui quando a análise começar.</p>
-            ) : analyzed.detections.length === 0 ? (
-              <p>Nenhuma classe suportada detectada neste quadro.</p>
-            ) : (
-              <>
-                <ol className="live-detections">
-                  {analyzed.detections.slice(0, limit).map((detection, index) => (
-                    <li key={index}>
-                      <i
-                        style={{ background: classColor(detection.classIndex) }}
-                        aria-hidden="true"
-                      />
-                      <span>
-                        <strong>{labelFor(detection.className)}</strong>
-                        {analyzed.temporal && stabilize && (
-                          <small>
-                            {detection.state === 'persistent'
-                              ? `persistente · ${detection.hits} quadros`
-                              : 'momentânea'}
-                          </small>
-                        )}
-                        <small>
-                          {Math.round(detection.x_min)}, {Math.round(detection.y_min)} →{' '}
-                          {Math.round(detection.x_max)}, {Math.round(detection.y_max)} px
-                        </small>
-                      </span>
-                      <b>{scoreFormat.format(detection.score)}</b>
-                    </li>
-                  ))}
-                </ol>
-                {analyzed.detections.length > limit && (
-                  <p className="muted">
-                    Exibindo {limit} de {analyzed.detections.length} detecções (limite do contrato
-                    do modelo).
-                  </p>
-                )}
-              </>
             )}
             <label className="live-toggle">
               <input
@@ -1054,14 +1092,9 @@ export function LiveDetectionPage({
                 checked={stabilize}
                 onChange={(event) => setStabilize(event.target.checked)}
               />
-              Diferenciar observações momentâneas (tracejadas) das persistentes
+              Tracejar detecções que ainda não se repetiram em quadros seguidos
             </label>
-            <p className="muted">
-              O número é o score de detecção do modelo. Não é probabilidade de acidente nem
-              severidade. Persistente só quer dizer que reapareceu em quadros seguidos; não confirma
-              o problema.
-            </p>
-          </section>
+          </details>
         </div>
       </div>
     </>

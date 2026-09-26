@@ -424,13 +424,75 @@ export class InferenceGate {
   }
 }
 
-/** Espera até o próximo envio: respeita o teto de análises/s e deixa folga à máquina. */
-export function nextInferenceDelay(
-  lastLatencyMs: number,
-  elapsedSinceSendMs: number,
-  minIntervalMs: number,
-): number {
-  return Math.max(minIntervalMs - elapsedSinceSendMs, lastLatencyMs * 0.25, 0);
+export interface CadenceOptions {
+  /** Menor intervalo entre dois envios: o teto de análises por segundo. */
+  minIntervalMs: number;
+  /** Parcela máxima do tempo com o modelo ocupado; o resto fica para vídeo, tela e bateria. */
+  maxDuty: number;
+  /** Quanto o intervalo pode encurtar a cada resultado: a subida é gradual. */
+  speedUpStep: number;
+  /** Peso da latência mais recente na média móvel. */
+  smoothing: number;
+}
+
+/** Teto inicial de 5 análises/s: configuração, não promessa; o ritmo real é medido. */
+export const DEFAULT_CADENCE: CadenceOptions = {
+  minIntervalMs: 200,
+  maxDuty: 0.75,
+  speedUpStep: 0.15,
+  smoothing: 0.3,
+};
+
+/**
+ * Ritmo adaptativo da análise ao vivo, independente do vídeo. Latência maior que a
+ * média recua na hora (aparelho aquecendo, outra aba pesada); latência menor só
+ * encurta o intervalo aos poucos, até o teto. Não há fila: o próximo envio sempre
+ * espera a resposta do anterior, e a espera devolvida conta a partir dela.
+ */
+export class AdaptiveCadence {
+  private smoothed: number | null = null;
+  private period: number | null = null;
+  constructor(private readonly options: CadenceOptions = DEFAULT_CADENCE) {}
+
+  /** Recebe a latência medida do último quadro e devolve a espera até o próximo envio. */
+  next(latencyMs: number): number {
+    const { minIntervalMs, maxDuty, speedUpStep, smoothing } = this.options;
+    const latency = Math.max(0, latencyMs);
+    this.smoothed =
+      this.smoothed == null ? latency : smoothing * latency + (1 - smoothing) * this.smoothed;
+    const target = Math.max(minIntervalMs, Math.max(latency, this.smoothed) / maxDuty);
+    this.period =
+      this.period == null || target >= this.period
+        ? target
+        : Math.max(target, this.period * (1 - speedUpStep));
+    return Math.max(0, this.period - latency);
+  }
+
+  /** Intervalo atual entre envios, em ms (nulo antes da primeira medida). */
+  get periodMs(): number | null {
+    return this.period;
+  }
+
+  reset(): void {
+    this.smoothed = null;
+    this.period = null;
+  }
+}
+
+/**
+ * Cada quadro de vídeo vai ao modelo uma vez só: o mesmo `mediaTime` (ou
+ * `currentTime`, sem requestVideoFrameCallback) não é enviado de novo.
+ */
+export class FrameFreshness {
+  private last: number | null = null;
+  accept(mediaTime: number): boolean {
+    if (this.last !== null && mediaTime === this.last) return false;
+    this.last = mediaTime;
+    return true;
+  }
+  reset(): void {
+    this.last = null;
+  }
 }
 
 /** Taxa medida (eventos/s) numa janela móvel; nunca um valor declarado. */
@@ -491,6 +553,10 @@ export interface TrackedDetection extends LiveDetection {
   hits: number;
   /** Tempo desde a primeira vez em que esta observação apareceu. */
   ageMs: number;
+  /** Scores recentes desta observação (mais antigo primeiro), até `historySize`. */
+  recentScores: number[];
+  /** Média de `recentScores`: estabilidade da confiança, não probabilidade nem confirmação. */
+  meanScore: number;
 }
 export interface TrackingOptions {
   /** IoU mínimo para considerar a mesma observação entre quadros. */
@@ -499,8 +565,15 @@ export interface TrackingOptions {
   maxGapMs: number;
   /** Observações para passar de momentânea a persistente. */
   persistentHits: number;
+  /** Tamanho do histórico curto de confiança por observação. */
+  historySize: number;
 }
-export const DEFAULT_TRACKING: TrackingOptions = { minIou: 0.3, maxGapMs: 1500, persistentHits: 2 };
+export const DEFAULT_TRACKING: TrackingOptions = {
+  minIou: 0.3,
+  maxGapMs: 1500,
+  persistentHits: 2,
+  historySize: 5,
+};
 
 interface Track {
   id: number;
@@ -509,6 +582,7 @@ interface Track {
   hits: number;
   firstSeen: number;
   lastSeen: number;
+  scores: number[];
 }
 
 function boxIou(a: readonly number[], b: readonly number[]): number {
@@ -534,7 +608,7 @@ export class TemporalTracker {
   }
 
   update(detections: readonly LiveDetection[], timestamp: number): TrackedDetection[] {
-    const { minIou, maxGapMs, persistentHits } = this.options;
+    const { minIou, maxGapMs, persistentHits, historySize } = this.options;
     // Relógio voltando ou intervalo longo: nada do passado vale para este quadro.
     this.tracks = this.tracks.filter(
       (track) => timestamp >= track.lastSeen && timestamp - track.lastSeen <= maxGapMs,
@@ -574,9 +648,12 @@ export class TemporalTracker {
           hits: 1,
           firstSeen: timestamp,
           lastSeen: timestamp,
+          scores: [],
         };
         this.tracks.push(best);
       }
+      best.scores.push(detection.score);
+      if (best.scores.length > historySize) best.scores.shift();
       used.add(best.id);
       result[index] = {
         ...detection,
@@ -584,6 +661,8 @@ export class TemporalTracker {
         state: best.hits >= persistentHits ? 'persistent' : 'provisional',
         hits: best.hits,
         ageMs: timestamp - best.firstSeen,
+        recentScores: [...best.scores],
+        meanScore: best.scores.reduce((sum, value) => sum + value, 0) / best.scores.length,
       };
     }
     return result;
