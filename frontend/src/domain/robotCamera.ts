@@ -213,3 +213,34 @@ export function linkVerdict(
     ? 'lost'
     : 'reconnecting';
 }
+
+// ---------------------------------------------------------------- visão computacional
+
+export type VisionTone = 'active' | 'idle' | 'error';
+export type VisionModelStatus =
+  'checking' | 'unavailable' | 'available' | 'loading' | 'ready' | 'failed';
+
+/**
+ * O que a tela diz sobre a detecção no vídeo remoto, na ordem que importa para quem
+ * opera: modelo indisponível, vídeo ainda sem imagem, analisando, preparando, pausado.
+ * "Analisando" só aparece com o worker pronto e a detecção ligada.
+ */
+export function visionStatus(state: {
+  model: VisionModelStatus;
+  connected: boolean;
+  videoReady: boolean;
+  detecting: boolean;
+  paused: boolean;
+}): { label: string; tone: VisionTone } {
+  if (state.model === 'unavailable' || state.model === 'failed')
+    return { label: 'Detecção indisponível', tone: 'error' };
+  if (state.connected && !state.videoReady) return { label: 'Aguardando vídeo', tone: 'idle' };
+  if (state.detecting && state.model === 'ready')
+    return { label: 'Analisando vídeo em tempo real', tone: 'active' };
+  if (state.detecting || state.model === 'loading')
+    return { label: 'Preparando detecção…', tone: 'idle' };
+  if (state.paused) return { label: 'Pausado', tone: 'idle' };
+  if (state.model === 'ready') return { label: 'Detecção pronta', tone: 'idle' };
+  if (state.model === 'checking') return { label: 'Verificando a detecção…', tone: 'idle' };
+  return { label: 'Detecção disponível', tone: 'idle' };
+}

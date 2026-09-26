@@ -4,6 +4,7 @@ import {
   BROWSER_MODEL_MANIFEST_PATH,
   checkBrowserModelManifest,
   classColor,
+  DEFAULT_TRACKING,
   FrameFreshness,
   InferenceGate,
   isSceneChange,
@@ -133,6 +134,10 @@ export function useVideoDetection({
   const [analyzed, setAnalyzed] = useState<AnalyzedFrame | null>(null);
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics);
   const [inferenceError, setInferenceError] = useState('');
+  // Caixas de vídeo expiram na mesma janela do rastreador temporal: sem resultado novo,
+  // não ficam paradas sobre uma cena que já mudou.
+  const [stale, setStale] = useState(false);
+  const staleTimer = useRef<number | undefined>(undefined);
 
   const worker = useRef<Worker | null>(null);
   const snapshot = useRef<HTMLCanvasElement | null>(null);
@@ -169,6 +174,7 @@ export function useVideoDetection({
   function stopDetection() {
     gate.current.cancel();
     window.clearTimeout(loopTimer.current);
+    window.clearTimeout(staleTimer.current);
     window.clearTimeout(watchdog.current);
     cancelFrameRequest();
     detectingRef.current = false;
@@ -192,6 +198,8 @@ export function useVideoDetection({
       canvas.height = 0;
     }
     stillPending.current = false;
+    window.clearTimeout(staleTimer.current);
+    setStale(false);
     setAnalyzed(null);
   }
 
@@ -383,6 +391,10 @@ export function useVideoDetection({
         temporal,
         hints: qualityHints(message.quality, message.width, message.height),
       });
+      window.clearTimeout(staleTimer.current);
+      setStale(false);
+      if (temporal)
+        staleTimer.current = window.setTimeout(() => setStale(true), DEFAULT_TRACKING.maxGapMs);
       const delay = detectingRef.current ? cadence.current.next(latency) : null;
       setMetrics((value) => ({
         ...value,
@@ -452,6 +464,7 @@ export function useVideoDetection({
       gate.current.cancel();
       window.clearTimeout(loopTimer.current);
       window.clearTimeout(watchdog.current);
+      window.clearTimeout(staleTimer.current);
       cancelFrameRequest();
       disposeWorker();
     },
@@ -492,6 +505,8 @@ export function useVideoDetection({
     model,
     detecting,
     analyzed,
+    /** Resultado de vídeo mais velho que a janela do rastreador: não desenhar caixas. */
+    stale,
     metrics,
     inferenceError,
     setInferenceError,

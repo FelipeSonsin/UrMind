@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { camera, fakeCamera, liveModelManifest, stubPublicApi } from './fixtures';
 
@@ -204,6 +205,176 @@ test('câmera a 60 fps chega ao notebook a ~60 quadros por segundo, em 1280×720
   ).toHaveText('1280×720');
 });
 
+/**
+ * Worker de fixture, SÓ no teste: responde ao mesmo protocolo do liveDetection.worker
+ * (load → ready, frame → result) com uma detecção fixa, para provar a cadeia vídeo
+ * remoto → quadro → worker → resultado → caixa. O modo muda por um canal local.
+ */
+const FIXTURE_WORKER = `
+let mode = 'detect';
+const control = new BroadcastChannel('fixture-worker-control');
+control.onmessage = (event) => { mode = event.data; };
+const log = new BroadcastChannel('fixture-worker-log');
+self.onmessage = (event) => {
+  const m = event.data;
+  if (m.type === 'load') {
+    self.postMessage({ type: 'ready', provider: 'wasm', fallbackReason: null });
+    return;
+  }
+  if (m.type !== 'frame') return;
+  const { width, height } = m.bitmap;
+  m.bitmap.close();
+  log.postMessage({ frameId: m.frameId, width, height, mode });
+  const hit = mode === 'detect' || mode === 'slow';
+  setTimeout(() => {
+    self.postMessage({
+      type: 'result', run: m.run, frameId: m.frameId, timestamp: m.timestamp,
+      width: m.width, height: m.height,
+      detections: hit
+        ? [{ classIndex: 3, className: 'URMIND_ROAD_D40', score: 0.9,
+             x_min: m.width * 0.3, y_min: m.height * 0.4, x_max: m.width * 0.6, y_max: m.height * 0.7 }]
+        : [],
+      preprocessMs: 4, inferenceMs: 120, postprocessMs: 2,
+      quality: { brightness: 120, sharpness: 400, motion: mode === 'scene' ? 90 : 2 },
+      inferenceProfile: null,
+    });
+  }, mode === 'slow' ? 4000 : 150);
+};
+`;
+
+async function fixtureDetector(context: BrowserContext, notebook: Page) {
+  await context.route('**/models/live-detection.json', (route) =>
+    route.fulfill({ json: liveModelManifest('a'.repeat(64), 16) }),
+  );
+  await context.route(/\/assets\/liveDetection\.worker-[^/]+\.js$/, (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: FIXTURE_WORKER }),
+  );
+  await notebook.addInitScript(() => {
+    const scope = window as unknown as { __workerFrames: Array<Record<string, unknown>> };
+    scope.__workerFrames = [];
+    new BroadcastChannel('fixture-worker-log').onmessage = (event) =>
+      scope.__workerFrames.push(event.data);
+  });
+}
+
+const workerFrames = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __workerFrames: Array<{ width: number; height: number }> })
+        .__workerFrames,
+  );
+const setWorkerMode = (page: Page, mode: string) =>
+  page.evaluate((next) => new BroadcastChannel('fixture-worker-control').postMessage(next), mode);
+
+/** Pixels desenhados no overlay: total e nas posições esperadas da caixa (15% a 45% de largura). */
+const overlayPixels = (page: Page) =>
+  page.locator('.live-overlay').evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    if (!canvas.width || !canvas.height) return { total: 0, leftEdge: 0, inside: 0 };
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    const alpha = (x: number, y: number) =>
+      data[(Math.round(y) * canvas.width + Math.round(x)) * 4 + 3];
+    let total = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i]) total += 1;
+    // Vídeo 16:9 ocupando o palco inteiro: caixa de 30%..60% da largura, 40%..70% da altura.
+    const edgeX = canvas.width * 0.3;
+    const midY = canvas.height * 0.55;
+    return {
+      total,
+      leftEdge: Math.max(alpha(edgeX, midY), alpha(edgeX + 1, midY), alpha(edgeX - 1, midY)),
+      inside: alpha(canvas.width * 0.45, midY),
+    };
+  });
+
+const cvState = (page: Page) => page.getByRole('status', { name: 'Estado da visão computacional' });
+
+test('vídeo remoto vai ao worker de detecção e as caixas aparecem alinhadas sobre ele', async ({
+  page,
+  context,
+}) => {
+  await fixtureDetector(context, page);
+  const { phone } = await connectPhone(context, page);
+  // A detecção começa sozinha quando o celular conecta, com o mesmo manifesto e worker.
+  await expect(cvState(page)).toHaveText('Analisando vídeo em tempo real', { timeout: 20_000 });
+  await expect.poll(async () => (await workerFrames(page)).length).toBeGreaterThanOrEqual(3);
+  // Cada quadro enviado é o do vídeo remoto (1280×720 do celular), não de outra câmera.
+  for (const frame of await workerFrames(page))
+    expect(frame).toMatchObject({ width: 1280, height: 720 });
+  const list = page.getByLabel('Detecções do vídeo remoto');
+  await expect(list.getByText('Buraco', { exact: true })).toBeVisible();
+  await expect.poll(async () => (await overlayPixels(page)).total).toBeGreaterThan(0);
+  const drawn = await overlayPixels(page);
+  expect(drawn.leftEdge).toBeGreaterThan(0);
+  expect(drawn.inside).toBe(0);
+  // O <video> segue rodando enquanto o modelo trabalha (150 ms por quadro).
+  const presented = await page.getByLabel('Vídeo remoto da câmera do robô').evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        const player = element as HTMLVideoElement & {
+          requestVideoFrameCallback: (callback: () => void) => number;
+        };
+        let frames = 0;
+        const started = performance.now();
+        const onFrame = () => {
+          frames += 1;
+          if (performance.now() - started < 2000) player.requestVideoFrameCallback(onFrame);
+          else resolve(frames);
+        };
+        player.requestVideoFrameCallback(onFrame);
+      }),
+  );
+  expect(presented).toBeGreaterThan(20);
+  // Quadro sem nada suportado: mensagem honesta e overlay limpo, sem caixa inventada.
+  await setWorkerMode(page, 'empty');
+  await expect(list).toContainText('Nenhum problema suportado identificado neste quadro.');
+  await expect.poll(async () => (await overlayPixels(page)).total).toBe(0);
+  // Cena nova (movimento grande): nada da cena anterior continua desenhado.
+  await setWorkerMode(page, 'detect');
+  await expect.poll(async () => (await overlayPixels(page)).total).toBeGreaterThan(0);
+  await setWorkerMode(page, 'scene');
+  await expect.poll(async () => (await overlayPixels(page)).total).toBe(0);
+  // Sem resultado novo por mais que a janela do rastreador, as caixas expiram.
+  await setWorkerMode(page, 'detect');
+  await expect.poll(async () => (await overlayPixels(page)).total).toBeGreaterThan(0);
+  await setWorkerMode(page, 'slow');
+  await expect.poll(async () => (await overlayPixels(page)).total, { timeout: 6_000 }).toBe(0);
+  await setWorkerMode(page, 'detect');
+  await expect
+    .poll(async () => (await overlayPixels(page)).total, { timeout: 10_000 })
+    .toBeGreaterThan(0);
+  // Pausar para de enviar quadros e limpa as caixas; retomar volta a analisar.
+  await page.getByRole('button', { name: 'Pausar' }).click();
+  await expect(cvState(page)).toHaveText('Pausado');
+  await expect.poll(async () => (await overlayPixels(page)).total).toBe(0);
+  const pausedAt = (await workerFrames(page)).length;
+  await page.waitForTimeout(800);
+  expect((await workerFrames(page)).length).toBeLessThanOrEqual(pausedAt + 1);
+  await page.getByRole('button', { name: 'Iniciar detecção' }).click();
+  await expect(cvState(page)).toHaveText('Analisando vídeo em tempo real');
+  await expect.poll(async () => (await workerFrames(page)).length).toBeGreaterThan(pausedAt + 2);
+  // Celular desliga: detecção para, caixas somem, nenhum quadro novo vai ao worker.
+  await phone.getByRole('button', { name: 'Encerrar' }).click();
+  await expect(page.getByRole('heading', { name: 'Câmera desconectada' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(cvState(page)).toHaveCount(0);
+  const stoppedAt = (await workerFrames(page)).length;
+  await page.waitForTimeout(800);
+  expect((await workerFrames(page)).length).toBe(stoppedAt);
+  expect(await page.locator('.live-overlay').evaluate((c) => (c as HTMLCanvasElement).width)).toBe(
+    0,
+  );
+  // Reconectar: novo pareamento, detecção volta sozinha com o celular.
+  await page.getByRole('button', { name: 'Reconectar celular' }).click();
+  const link = await page.getByLabel('Link de conexão').inputValue();
+  const again = await context.newPage();
+  await fakeCamera(again);
+  await again.goto(link);
+  await again.getByRole('button', { name: 'Ativar câmera' }).click();
+  await expect(cvState(page)).toHaveText('Analisando vídeo em tempo real', { timeout: 30_000 });
+  await expect.poll(async () => (await workerFrames(page)).length).toBeGreaterThan(stoppedAt + 2);
+});
+
 test('detecção no vídeo remoto usa o mesmo manifesto e worker da Detecção ao vivo', async ({
   page,
   context,
@@ -217,11 +388,18 @@ test('detecção no vídeo remoto usa o mesmo manifesto e worker da Detecção a
     return route.fulfill({ body: Buffer.alloc(16, 7), contentType: 'application/octet-stream' });
   });
   await connectPhone(context, page);
-  await page.getByRole('button', { name: 'Iniciar detecção' }).click();
-  // O worker existente baixa o ONNX do manifesto e confere o checksum antes de usar.
+  // A detecção começa sozinha ao conectar: o worker existente baixa o ONNX do manifesto
+  // e confere o checksum antes de usar. Modelo recusado: só a detecção para.
   await expect(page.getByText(/não confere com o checksum registrado/)).toBeVisible();
   expect(models).toHaveLength(1);
+  await expect(page.getByRole('status', { name: 'Estado da visão computacional' })).toHaveText(
+    'Detecção indisponível',
+  );
   await expect(page.getByRole('button', { name: 'Pausar' })).toBeDisabled();
+  expect((await remoteVideo(page)).hasStream).toBe(true);
+  // Nova tentativa é explícita: outro download, outra verificação.
+  await page.getByRole('button', { name: 'Iniciar detecção' }).click();
+  await expect.poll(() => models.length).toBe(2);
 });
 
 test('capturar evidência leva o quadro original ao registro, sem GPS do notebook', async ({
@@ -347,4 +525,40 @@ test('link sem sessão válida mostra erro e não abre a câmera', async ({ page
   await expect(page.getByRole('alert')).toContainText('Link de conexão inválido');
   await expect(page.getByRole('button', { name: 'Ativar câmera' })).toHaveCount(0);
   expect((await camera(page)).calls).toHaveLength(0);
+});
+
+test.describe('com o modelo real publicado localmente', () => {
+  test.skip(
+    !existsSync(new URL('../public/models/live-detection.json', import.meta.url)),
+    'modelo do navegador não publicado neste checkout',
+  );
+
+  test('o vídeo remoto é analisado pelo modelo ONNX real, quadro a quadro', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(180_000);
+    // Manifesto e ONNX reais (mesmo worker e perfil da Detecção ao vivo).
+    await context.unroute('**/models/live-detection.json');
+    const { phone } = await connectPhone(context, page, 30);
+    // Começa sozinha: "Preparando" enquanto o worker carrega o ONNX, depois "Analisando".
+    await expect(cvState(page)).toHaveText('Analisando vídeo em tempo real', {
+      timeout: 150_000,
+    });
+    await page.getByText('Detalhes técnicos').click();
+    const frame = page.locator('.live-readout div', { hasText: 'Quadro' }).locator('dd');
+    await expect(frame).toContainText('nº', { timeout: 60_000 });
+    const first = Number((await frame.innerText()).replace(/\D/g, ''));
+    await expect
+      .poll(async () => Number((await frame.innerText()).replace(/\D/g, '')), { timeout: 30_000 })
+      .toBeGreaterThan(first + 1);
+    await expect(
+      page.locator('.live-readout div', { hasText: 'Resolução' }).locator('dd'),
+    ).toHaveText('1280×720');
+    // Houve análise de verdade: a lista mostra o resultado do quadro, não o texto de espera.
+    await expect(page.getByLabel('Detecções do vídeo remoto')).not.toContainText(
+      'As detecções aparecem aqui quando a análise começar.',
+    );
+    await phone.close();
+  });
 });

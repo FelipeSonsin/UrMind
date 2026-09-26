@@ -1935,6 +1935,22 @@ tbody tr:hover {
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
+/* Estado da visão computacional sobre o vídeo: ponto verde pulsando só quando analisa. */
+.cv-state.is-idle::before {
+  background: var(--text-secondary);
+}
+.cv-state.is-error::before {
+  background: var(--danger);
+}
+.cv-state.is-active::before {
+  background: var(--success);
+  animation: cv-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cv-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
 .live-stage-tag::before {
   content: '';
   width: 6px;

@@ -73,7 +73,13 @@ export function LiveDetectionPage({
   const { model, detecting, analyzed, metrics, inferenceError, setInferenceError } = detection;
   const { startDetection, stopDetection } = detection;
   const stageSize = useElementSize(stage);
-  useDetectionOverlay(overlay, stageSize, analyzed, model, stabilize);
+  useDetectionOverlay(
+    overlay,
+    stageSize,
+    detection.stale && analyzed?.temporal ? null : analyzed,
+    model,
+    stabilize,
+  );
 
   function stopCamera(next: CameraState = { status: 'idle' }) {
     cameraToken.current += 1;

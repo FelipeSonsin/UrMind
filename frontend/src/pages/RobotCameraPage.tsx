@@ -29,6 +29,7 @@ import {
   pairingLink,
   parsePairingHash,
   robotIceServers,
+  visionStatus,
   type Pairing,
   type SignalMessage,
 } from '../domain/robotCamera';
@@ -157,6 +158,9 @@ export function RobotCameraPage({
   const expiryTimer = useRef<number | undefined>(undefined);
   const graceTimer = useRef<number | undefined>(undefined);
   const resumeDetection = useRef(false);
+  // Primeira conexão da sessão: a detecção começa sozinha quando o vídeo chega.
+  const autoStart = useRef(false);
+  const [paused, setPaused] = useState(false);
   const generation = useRef(0);
 
   function updatePhase(next: ReceiverPhase) {
@@ -169,10 +173,20 @@ export function RobotCameraPage({
     source: () => ({ live: phaseRef.current.kind === 'connected', mirrored: false }),
     measureCamera: phase.kind === 'connected',
   });
-  const { model, detecting, analyzed, metrics, inferenceError, startDetection, stopDetection } =
-    detection;
+  const { model, detecting, analyzed, metrics, inferenceError, stopDetection } = detection;
   const stageSize = useElementSize(stage);
-  useDetectionOverlay(overlay, stageSize, analyzed, model, true);
+  // Vídeo sempre no palco; o canvas por cima só com caixas, que expiram sem resultado novo.
+  useDetectionOverlay(overlay, stageSize, detection.stale ? null : analyzed, model, true);
+
+  function startDetection() {
+    setPaused(false);
+    detection.startDetection();
+  }
+
+  function pauseDetection() {
+    stopDetection();
+    setPaused(true);
+  }
 
   /**
    * Encerra tudo o que a sessão abriu: detecção, caixas, conexão, vídeo remoto,
@@ -184,6 +198,8 @@ export function RobotCameraPage({
     window.clearTimeout(graceTimer.current);
     graceTimer.current = undefined;
     resumeDetection.current = false;
+    autoStart.current = false;
+    setPaused(false);
     stopDetection();
     detection.clear();
     detection.resetMetrics();
@@ -232,6 +248,7 @@ export function RobotCameraPage({
     }
     const pairing = createPairing();
     const run = generation.current;
+    autoStart.current = true;
     updatePhase({ kind: 'waiting', pairing });
     setNow(Date.now());
     signaling.current = openSignaling(
@@ -370,8 +387,9 @@ export function RobotCameraPage({
         window.clearTimeout(graceTimer.current);
         graceTimer.current = undefined;
         updatePhase({ kind: 'connected', pairing });
-        if (resumeDetection.current) {
+        if (resumeDetection.current || autoStart.current) {
           resumeDetection.current = false;
+          autoStart.current = false;
           startDetection();
         }
       } else if (state === 'disconnected' || state === 'failed') {
@@ -486,18 +504,24 @@ export function RobotCameraPage({
   const hasManifest = 'manifest' in model;
   const limit = hasManifest ? model.manifest.postprocess.max_detections : 0;
   const link = 'pairing' in phase ? pairingLink(window.location.origin, phase.pairing) : '';
+  const videoReady = Boolean(remoteSize);
+  const cvState = visionStatus({
+    model: model.status,
+    connected: phase.kind === 'connected',
+    videoReady,
+    detecting,
+    paused,
+  });
   const detectionStatus =
-    model.status === 'checking'
-      ? 'Verificando a detecção…'
-      : model.status === 'unavailable'
-        ? `Detecção indisponível. ${model.reason}`
-        : model.status === 'loading'
-          ? 'Preparando a detecção…'
-          : model.status === 'failed'
-            ? `Detecção indisponível. ${model.message}`
-            : model.status === 'ready'
-              ? 'Detecção pronta'
-              : 'Detecção disponível: começa quando você tocar em Iniciar detecção.';
+    cvState.tone === 'error'
+      ? `Detecção indisponível. ${
+          model.status === 'unavailable'
+            ? model.reason
+            : model.status === 'failed'
+              ? model.message
+              : ''
+        }`
+      : cvState.label;
 
   return (
     <>
@@ -589,7 +613,13 @@ export function RobotCameraPage({
 
       <div className="live-grid" hidden={!showVideo}>
         <section className="live-stage-panel" aria-label="Vídeo da câmera do robô">
-          <div className="live-stage" style={{ aspectRatio: '16 / 9' }}>
+          <div
+            className="live-stage"
+            style={{
+              // Mesma proporção do vídeo recebido (celular em pé ou deitado).
+              aspectRatio: remoteSize ? `${remoteSize.width} / ${remoteSize.height}` : '16 / 9',
+            }}
+          >
             <div className="live-frame" ref={stage}>
               <video
                 ref={video}
@@ -601,8 +631,17 @@ export function RobotCameraPage({
               />
               <canvas ref={overlay} className="live-overlay" aria-hidden="true" />
             </div>
-            {detecting && <span className="live-stage-tag">Detectando</span>}
-            {phase.kind === 'reconnecting' && <span className="live-stage-tag">Reconectando…</span>}
+            {phase.kind === 'reconnecting' ? (
+              <span className="live-stage-tag">Reconectando…</span>
+            ) : (
+              <span
+                className={`live-stage-tag cv-state is-${cvState.tone}`}
+                role="status"
+                aria-label="Estado da visão computacional"
+              >
+                {cvState.label}
+              </span>
+            )}
           </div>
           {analyzed && analyzed.hints.length > 0 && (
             <ul className="live-quality" aria-label="Qualidade da imagem">
@@ -623,7 +662,7 @@ export function RobotCameraPage({
               type="button"
               className="secondary"
               disabled={!detecting}
-              onClick={stopDetection}
+              onClick={pauseDetection}
             >
               <Pause size={16} aria-hidden="true" /> Pausar
             </button>
@@ -661,7 +700,7 @@ export function RobotCameraPage({
             {!analyzed ? (
               <p className="muted">As detecções aparecem aqui quando a análise começar.</p>
             ) : analyzed.detections.length === 0 ? (
-              <p>Nenhum buraco ou trinca apareceu nesta imagem.</p>
+              <p>Nenhum problema suportado identificado neste quadro.</p>
             ) : (
               <ol className="live-detections">
                 {analyzed.detections.slice(0, limit).map((item, index) => (
