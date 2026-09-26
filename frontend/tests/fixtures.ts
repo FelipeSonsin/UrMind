@@ -447,6 +447,9 @@ interface PublicStubs {
 }
 
 /** Intercepta a API pública. Cada rota devolve exatamente o contrato do backend. */
+const ONE_PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
 export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   await page.route('**/api/v1/captures/nearby-reports?*', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/v1/public/privacy-notice', (route) =>
@@ -463,6 +466,12 @@ export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   await page.route(
     (url) => url.hostname === 'tiles.openfreemap.org' && url.pathname.startsWith('/styles/'),
     (route) => json(route, { version: 8, sources: {}, layers: [] }),
+  );
+  // Imagem de satélite (EOX): o teste recebe um ladrilho 1×1 local, sem internet.
+  await page.route(
+    (url) => url.hostname === 'tiles.maps.eox.at',
+    (route) =>
+      route.fulfill({ contentType: 'image/png', body: Buffer.from(ONE_PIXEL_PNG, 'base64') }),
   );
   await page.route('**/api/v1/health', (route) =>
     json(route, { status: 'ok', database: 'connected' }),

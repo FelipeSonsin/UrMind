@@ -34,6 +34,7 @@ import {
   outlinePolygons,
   outsideMask,
   resolveMapProvider,
+  SATELLITE_IMAGERY,
   type Polygon,
 } from '../mapConfig';
 import { reportLabels, statuses, type CaptureMarker } from '../domain/contracts';
@@ -103,8 +104,36 @@ function useBrazilOutline(): boolean {
 
 /** Cores do contorno e das capitais conforme a base carregada (escura por padrão). */
 let basemapIsDark = true;
+let basemapIsSatellite = false;
 function outlineTheme(): MapColors {
+  if (basemapIsSatellite) return MAP_DESIGN.colors.satellite;
   return basemapIsDark ? MAP_DESIGN.colors.dark : MAP_DESIGN.colors.light;
+}
+
+/**
+ * Põe a imagem de satélite como chão do mapa, logo acima do fundo do estilo. Solo,
+ * água, parques e prédios pintados da base vetorial saem (a foto mostra isso); ruas,
+ * divisas e nomes continuam, com texto claro e halo escuro para ler sobre a imagem.
+ */
+function addSatellite(map: maplibregl.Map) {
+  const layers = map.getStyle().layers ?? [];
+  for (const layer of layers) {
+    if (['fill', 'fill-extrusion', 'hillshade', 'raster'].includes(layer.type))
+      map.setLayoutProperty(layer.id, 'visibility', 'none');
+    // Ruas e divisas meio transparentes: guiam sem esconder a imagem.
+    if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-opacity', 0.5);
+    if (layer.type === 'symbol' && map.getLayoutProperty(layer.id, 'text-field') != null) {
+      map.setPaintProperty(layer.id, 'text-color', MAP_DESIGN.colors.satellite.capitalText);
+      map.setPaintProperty(layer.id, 'text-halo-color', MAP_DESIGN.colors.satellite.capitalHalo);
+    }
+  }
+  const { attribution, maxzoom, tileSize, tiles } = SATELLITE_IMAGERY;
+  map.addSource('satellite', { type: 'raster', tiles: [...tiles], tileSize, maxzoom, attribution });
+  map.addLayer(
+    { id: 'satellite', type: 'raster', source: 'satellite' },
+    layers.find((layer) => layer.type !== 'background')?.id,
+  );
+  basemapIsSatellite = true;
 }
 
 /** Reuses the basemap's own label font so the glyphs exist on its server. */
@@ -632,6 +661,7 @@ export default function UrbanMap({
       map.on('style.load', () => {
         styleLoaded = true;
         if (!map || map.getSource('events')) return;
+        addSatellite(map);
         addBrazilMask(map);
         map.addSource('events', {
           type: 'geojson',

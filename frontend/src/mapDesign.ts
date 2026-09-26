@@ -40,8 +40,8 @@ export const MAP_DESIGN = {
   },
 
   /**
-   * Cores do entorno e das linhas, pela base cartográfica: `light` para a base colorida
-   * padrão (OpenFreeMap liberty), `dark` só quando uma base escura é configurada.
+   * Cores do entorno e das linhas, pela base cartográfica: `satellite` para a imagem de
+   * satélite (padrão, ver SATELLITE_IMAGERY), `light`/`dark` para uma base só vetorial.
    */
   colors: {
     light: {
@@ -61,6 +61,17 @@ export const MAP_DESIGN = {
       states: '#68746f',
       capitalText: '#a8b5ae',
       capitalHalo: '#0c1411',
+    },
+    /**
+     * Sobre a imagem de satélite (padrão): entorno no preto do app, fronteira e nomes
+     * em branco-gelo com halo escuro, como no mapa Sentinel de referência.
+     */
+    satellite: {
+      mask: '#050507',
+      border: '#dce9ff',
+      states: '#dce9ff',
+      capitalText: '#dce9ff',
+      capitalHalo: '#050507',
     },
   },
 

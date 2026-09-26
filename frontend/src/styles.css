@@ -27,8 +27,8 @@
   --danger: #d8645a;
   --info: var(--accent-soft);
   --on-primary: #ffffff;
-  /* Fundo do mapa antes das peças carregarem: o cinza-claro do entorno do Brasil. */
-  --map-surface: #eef1ec;
+  /* Fundo do mapa antes da imagem carregar: o mesmo preto do entorno do Brasil. */
+  --map-surface: #050507;
   --on-status: #050507;
   /* Brilho néon: só em foco, botão principal e marcações ativas. */
   --glow: color-mix(in srgb, var(--neon-hot) 55%, transparent);

@@ -107,6 +107,20 @@ export function localizedLabelField(textField: unknown): unknown[] | null {
   return JSON.stringify(textField ?? null).includes('"name_en"') ? LOCAL_LABEL_FIELD : null;
 }
 
+/**
+ * Imagem de satélite sob o mapa: mosaico Sentinel-2 sem nuvens da EOX (cobertura
+ * mundial, inclusive o Brasil; o SentinelMap de referência cobre só a Europa).
+ * Licença CC BY-NC-SA 4.0: uso não comercial com o crédito abaixo, que aparece no
+ * canto do mapa. Acima do zoom máximo o MapLibre amplia o último nível (10 m/pixel).
+ */
+export const SATELLITE_IMAGERY = {
+  tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg'],
+  tileSize: 256,
+  maxzoom: 15,
+  attribution:
+    '<a href="https://s2maps.eu" target="_blank" rel="noopener noreferrer">Sentinel-2 cloudless – s2maps.eu</a> by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024)',
+} as const;
+
 const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 const OPENFREE_ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap';
