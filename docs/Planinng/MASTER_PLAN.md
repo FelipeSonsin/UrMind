@@ -1,5 +1,13 @@
 # MASTER_PLAN
 
+> Atualização de escopo — 25/09/2026: o produto preserva as **35 categorias** de
+> `urmind-issue-taxonomy-v3`. O lote visual treinável é um conjunto distinto e
+> atualmente vazio para novo ciclo autorizado. Capacidades validadas também são
+> distintas. Matriz executável, formulários e fechamento de lacunas em
+> `datasets/reports/taxonomy_coverage.json`; evidências e decisões atuais em
+> `datasets/STATUS.md` e `docs/PROJECT_STATE.md`. Planejamentos históricos com
+> quatro/nove classes não reduzem o escopo desejado. Não há autorização de treino.
+
 ## UrMind Planejamento Completo
 
 **Resumo técnico:** Supabase como backend gerenciado, algoritmo próprio, YOLOX, datasets, geolocalização, mapa e Scout futuro; nenhuma LLM participa do runtime.

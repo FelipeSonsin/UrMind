@@ -1,5 +1,232 @@
 # Estado operacional do UrMind
 
+## Remediação da auditoria A25 — 26/09/2026 (vigente)
+
+Detalhes e evidências: `docs/audits/URMIND_REMEDIATION_REPORT.md` (topo) e
+`docs/audits/URMIND_COMPLETE_AUDIT.md`. Ações humanas: `docs/USER_ACTIONS_PENDING.md`.
+
+- **Publicado:** Vercel → Render conectado (base `/api/v1` e CORS corrigidos pelo
+  usuário); o código publicado ainda é `e57db61`, sem a detecção ao vivo.
+- **Gates locais:** backend 1504 passed / 37 skipped / 0 failed; integração DEV 33 passed
+  (3 que criam usuários Auth excluídos); mypy e Ruff limpos; Vitest; tsc; build; Playwright.
+- **Banco (DEV, head `0034_runtime_search_path`):** 0032 (demo sem acesso cliente), 0033
+  (role `urmind_runtime` de menor privilégio, 24 policies) e 0034 (`search_path` com
+  `extensions`) aplicadas. `backend/.env` usa `urmind_runtime`; migrations, registro de
+  modelo e manutenção usam `Database(role="admin")`/`MIGRATION_DATABASE_URL`. Capture órfã
+  auditada e removida; 12.808 RoadSegments reais (OSM FECAP 3 km), snap verificado.
+- **XGBoost:** worktree reconciliado num único `tabular.py`; `review_confirmed` ligado ao
+  DecisionTrace como estimativa consultiva (`DISABLED` sem modelo promovido). Attain
+  preservado como experimento abaixo do baseline. `XGBOOST_OPERATIONAL=NO` (0 rótulos).
+- **YOLOX:** `MODEL_STATUS=EXPERIMENTAL_SHADOW` (`a3ff07ea`, ONNX `d429bde8…`), não promovido.
+  Navegador e Worker **unificados no perfil `2702eb15`** (autorização shadow própria, com as
+  limitações do proprietário); paridade 8/8 em 6 imagens autorizadas
+  (`datasets/reports/live_detection_parity_2702eb15.json`). `d2b6e1ab` preservado como
+  histórico/rollback documental. ONNX no bucket público `models` (Storage DEV), entregue ao
+  build pela `LIVE_MODEL_ONNX_URL`. Não é production ready; sem Frozen Test nem fotos do Brasil.
+- **Próxima etapa científica YOLOX (pré-requisitos, sem treino nesta rodada):** holdout
+  independente e autorizado (grupos de cena/rota verificados, não abrir o Frozen Test);
+  critérios numéricos por classe pré-registrados antes de medir; avaliação externa/Brasil
+  (UNIVALI/Urban após revisão humana); novo DatasetVersion com hash; parar de ajustar
+  limiares na mesma VALIDATION.
+- **Taxonomia:** `PRODUCT_SCOPE=35`; `CURRENT_MODEL_CLASSES=D00,D10,D20,D40`
+  (EXPERIMENTAL); `DATA_READY=0` no ciclo v3; `REVIEW_REQUIRED`: 130 casos (UNIVALI 32,
+  Urban 50, piloto Noruega 48) + 6 categorias `NEEDS_HUMAN_REVIEW`; `FUTURE_WAVES` 4/8/23
+  preservadas. O MVP D00–D40 não depende das 35.
+- **Photo gate:** `PHOTO_GATE_STATUS=UNCALIBRATED_FAIL_SAFE` (toda foto fica
+  `NEEDS_REVIEW`; publicação exige atestado humano de conteúdo); `PHOTO_GATE_REQUIRED=NO`
+  para o piloto privado, `YES` antes de aceite automático/público;
+  `PHOTO_GATE_BLOCKER=corpus 20+20 (+5+5 rostos) consentido/licenciado`.
+- **Worker:** supervisionado (`scripts/deploy/worker.ps1`, PID registrado, heartbeat,
+  parada graciosa, recusa de duplicata) com a role de runtime. **E2E real e dispositivos
+  físicos:** pendentes (exigem foto real no local piloto e aparelhos).
+
+## Ponto de operação da detecção ao vivo sem retreino — 25/09/2026
+
+Por decisão do usuário, nenhum treino novo: o modelo mantido é o do run `10h-r1` (`best.pt` `425ed936…`, ONNX `d429bde8…`, hash inalterado). Só o pré e o pós-processamento foram ajustados em VALIDATION (TEST fechado). Perfil publicado: letterbox sem ampliar imagem menor que 640, NMS por classe 0,45 e limiares D00 0,03 / D10 0,2 / D20 0,07 / D40 0,2. F1 macro 0,205 (original) → 0,242 (1º ajuste) → 0,281; mAP50 0,116 → 0,122 → 0,159; mAP50-95 0,036 → 0,051. Ganho confirmado em metades por blocos contíguos e reproduzido pelo ONNX real (mAP50 0,1596) e no navegador real (6/6 detecções iguais ao Worker). Estudo de escala: ampliar prejudica (800 px = 0,064; 960 = 0,029); 448/384 foram melhores só nesta VALIDATION e não foram adotados; pesos EMA piores (0,109). A regra "não ampliar" só afeta imagens menores que 640 px; quadros de câmera 720p/1080p não mudam. D40 cai levemente (F1 0,227 → 0,215). É ajuste de ponto de operação, não calibração de probabilidade; não elimina risco de sobreajuste nem mede uso no Brasil. CLAHE e TTA com espelhamento foram medidos e rejeitados. Perfil de inferência versionado (`inference_profile.sha256` `2702eb15…`), com os dois perfis anteriores guardados para rollback. `OnnxDetector`/Worker aceitam o mesmo perfil e têm paridade exata com o decode do navegador (82/82 em 40 imagens), mas o Worker em DEV ainda resolve `yolox-s-quality-rebuild`: registrar o ONNX `d429bde8…` como ModelVersion exige autorização. **[Correção 26/09/2026: superado. O `.env` aponta para o ModelVersion shadow `a3ff07ea` (ONNX `d429bde8…`), mas registrado com o perfil de rollback `d2b6e1ab` (com ampliação); o navegador usa `2702eb15` (sem ampliação). Os perfis NÃO são iguais; ver seção de 26/09.]** Página ao vivo ganhou camada temporal de apresentação (momentânea × persistente), avisos heurísticos de qualidade e latência p50/p95 por etapa; nenhum ganho temporal foi medido sem vídeos autorizados. XGBoost: o worktree `feat/xgboost-preparation-parallel` tem três runs Attain Low/High `EXPERIMENTAL_CANDIDATE`, não promovidos e sem superar o baseline; nada foi conectado ao runtime. Detalhes em [LIVE_DETECTION.md](LIVE_DETECTION.md) e `datasets/reports/live_detection_calibration_d429bde8a9bd_noupscale.json`.
+
+## Detecção ao vivo no navegador — 25/09/2026
+
+Nova aba `#/deteccao-ao-vivo` (detalhes em [LIVE_DETECTION.md](LIVE_DETECTION.md)): câmera do aparelho, ONNX Runtime Web 1.30.0 num Web Worker (WebGPU validado ou WASM 1 thread), contrato YOLOX idêntico ao `app.ml.serving`, no máximo uma inferência em voo e captura para o rascunho canônico. Estado: **interface e contratos prontos, detecção real bloqueada** — não há ONNX finalizado nem autorizado para distribuição; a página mostra "Modelo de detecção indisponível" e não desenha caixas. CSP do backend recebeu só `'wasm-unsafe-eval'`. O manifesto do navegador é gerado por `python -m app.ml.browser_model` a partir do export oficial, com autorização explícita de uso e distribuição. O proprietário autorizou uso e distribuição do export EXPERIMENTAL do run `10h-r1`. Após o treino terminar (`COMPLETED`, 20:01), `scripts/ml/publish_live_detection_after_training.ps1` exportou `yolox-s-model-v2-d429bde8a9bd` (paridade PyTorch × ONNX aprovada; VALIDATION mAP50 0,108, mAP50-95 0,033 — fraco) e publicou em `frontend/public/models/`. Paridade navegador × backend em 6 imagens de VALIDATION: 14/15 detecções com IoU ≥ 0,97; 1 divergência por empate no NMS. WebGPU, ~306 ms, ~2,1 análises/s. Pendentes: teste com câmera física e envio dos artefatos no deploy. O treino não foi afetado: a publicação só começou depois que ele saiu.
+
+## Run YOLOX-S com limite de 10 horas — 25/09/2026
+
+O usuário limitou o treinamento a 10 horas. O run anterior de 50 épocas foi encerrado após cerca de 2.500 iterações da primeira época; preservou logs e smoke, mas ainda não tinha checkpoint principal. Uma primeira tentativa de contrato reduzido falhou antes de treinar por campo de metadata não aceito; a cópia do contrato falho está no diretório da tentativa. O contrato corrigido `datasets/metadata/yolox_model_experimental_20260925_10h.json` mantém o mesmo TRAIN/VALIDATION, D00/D10/D20/D40, YOLOX-S, pesos oficiais COCO, batch 1, resolução 640×640 e zero workers. Define 6 épocas, warmup 1, no-aug 1 e validação ao final. O launcher tem corte automático aos 35.100 segundos (9h45), incluindo preparação e smoke, antes do limite de 36.000 segundos.
+
+O novo run `yolox-s-rdd4-experimental-20260925-10h-r1` passou no smoke e iniciou treino principal com atualização de pesos confirmada. Prazo absoluto registrado: 26/09/2026 01:06:34 UTC (25/09/2026 22:06:34 em São Paulo). Estado e heartbeat: `models/checkpoints/experimental_20260925_rdd4_10h_r1/run_state.json`; log principal: `train.stderr.log` no mesmo diretório. O checkpoint principal será salvo ao fim de cada época; ainda não havia um na primeira verificação. O preflight deste novo run mediu 2.008.862.720 bytes livres após importar PyTorch, acima do piso cauteloso de 2.000.000.000 bytes; a RAM livre durante o treino oscila e continua sendo monitorada no heartbeat. A flag de override permanece registrada por pedido do usuário, mas não foi necessária para passar o piso nesta tentativa. Nenhum TEST/Frozen Test foi aberto e o modelo continua experimental, sem promoção. As seções abaixo registram etapas anteriores.
+
+## Treinamento YOLOX-S experimental em execução — 25/09/2026
+
+Run `yolox-s-rdd4-experimental-20260925`: smoke passou com atualização de pesos e checkpoint; treino principal iniciado a partir dos pesos COCO e atualização do otimizador verificada no primeiro passo. São 23.827 imagens TRAIN e 3.858 VALIDATION, classes D00/D10/D20/D40, 50 épocas, batch 1, 640×640, zero workers e AMP. O usuário autorizou executar com a RAM atual abaixo do piso cauteloso; o piso não foi alterado. Estado e heartbeat: `models/checkpoints/experimental_20260925_rdd4/run_state.json`; log: `train.stderr.log` no mesmo diretório. Sem Frozen Test, promoção ou substituição do Worker. O corpus V3 de 35 categorias permanece DRAFT. As notas abaixo registram estados anteriores. (Atualização 26/09/2026: este run terminou `FAILED`, exit 4294967295.)
+
+## YOLOX-S experimental autorizado — 25/09/2026
+
+O proprietário autorizou iniciar um novo fine-tuning **experimental**, apenas D00/D10/D20/D40. Foi preparado um contrato V1 derivado de quatro classes, identificado internamente como `yolox-s-model-v2`, com 23.827 imagens TRAIN RDD2022, 3.858 VALIDATION, três imagens ambíguas excluídas, pesos oficiais COCO, 50 épocas e perfil batch 1/zero workers. O relatório de derivação e o contrato estão em `datasets/reports/detection_experimental_20260925.json` e `datasets/metadata/yolox_model_experimental_20260925.json`. Nenhum modelo será promovido ou usado no Worker por este run. O Frozen Test segue fechado; as 35 categorias do produto não foram reduzidas.
+
+O contrato/loader passou na checagem e o launcher sequencial de smoke mais treino principal está pronto. **Ainda não houve optimizer.step:** as medições após PyTorch continuam abaixo do piso cauteloso do projeto de 2.000.000.000 bytes; o valor mais recente está em `datasets/reports/ml_preparation_state.json`. Retomar do preflight após o usuário salvar o trabalho e fechar aplicativos não essenciais. Não encerrar o Worker ou baixar o piso apenas para iniciar.
+
+O conversor COCO V3 foi reforcado: recusa placeholders de grupo, exige evidencia de grupo e auditoria de quase duplicatas marcadas VERIFIED, e impede que o mesmo grupo/cluster atravesse TRAIN e VALIDATION. Isso nao certifica os grupos atuais; nenhuma imagem foi convertida.
+
+## Checkpoint de preparacao sem treinamento ? 25/09/2026
+
+O usuario proibiu qualquer aprendizado nesta execucao. Nenhum smoke, backward, optimizer.step ou fit foi executado. Cinco decisoes aprovadas cobrem D00/D10/D20/D40, mas todos os grupos de cena permanecem nao confirmados; tres ambiguidades foram excluidas. Proveniencia/licenca RDD e origem oficial do checkpoint COCO foram verificadas. `urmind-urban-vision-v3-DRAFT` continua sem classes, corpus, splits ou holdout autorizados. O trainer atual ainda e V1/V2, e `--dry-run` chama treino, portanto nao foi usado como preflight. O comando seguro e `backend\.venv\Scripts\python.exe -B scripts\datasets\preflight_training.py --write` na raiz do repositorio. RAM livre apos PyTorch no ultimo preflight: abaixo do piso cauteloso de 2 GB; valor pontual em `datasets/reports/ml_preparation_state.json`. Dependencias opcionais XGBoost locais instaladas, mas sem fit nem corpus tabular elegivel local verificado. Retomar da resolucao de grupos/duplicatas e autorizacao V3, depois implementar contrato V3 e repetir preflight; pedir autorizacao de smoke apenas apos todos os gates.
+
+
+## Smoke YOLOX V3 de quatro classes — 25/09/2026
+
+Foi criado, com a ferramenta de revisão existente, um pacote local de oito
+imagens RDD TRAIN (Índia/Japão, D00/D10/D20/D40) com identidade e hashes
+verificados. O usuário entregou oito decisões; o CLI validou e importou cinco
+aprovações e três ambiguidades (India D10/D20/D40). Todos os grupos constam
+`UNCONFIRMED`. Original em `Downloads/annotation_review_decisions.json`, hash
+`8cb075492cbbb9a25e868b3b07f8a7726cdadb237dbdb93d5adf8026fc3c40f5`;
+cópia e importação ficam na área local ignorada de revisão. A revisão semântica
+não concede autorização de treinamento. Urban Community não faz
+parte deste smoke e continua pendente. O produto conserva 35 categorias.
+
+O checkpoint `datasets/reports/ml_preparation_state.json` separa
+`SOFTWARE_READY`, `SMOKE_DATA_READY`, `SMOKE_PASSED` e `LONG_TRAINING_READY`.
+Todos continuam falsos. Histórico TEST V1 preservado, não aberto; novo holdout
+V3 ausente. O trainer/loader/evaluator/ONNX ainda não possuem contrato V3
+aprovado, portanto não há comando legítimo de treinamento principal.
+Preflights mediram RAM livre entre 0,407–2,861 GB antes e 0,297–2,306 GB
+após importar PyTorch; o checkpoint contém a medição mais recente e a condição
+do piso cauteloso de 2 GB. Smoke: zero iterações, sem pico
+de RAM/VRAM de treinamento medido. Nenhum aplicativo foi fechado pelo agente.
+O download de streaming do release oficial YOLOX-S 0.1.1rc0 coincidiu com o
+SHA-256 local `f55ded7181e1b0c13285c56e7790b8f0e8f8db590fe4edb37f0b7f345c913a30`;
+nenhum peso foi substituído. Fonte Figshare RDD v1, licença CC BY 4.0 e MD5
+oficial foram verificados; grupo e autorização V3 continuam abertos.
+
+## Retomada do preflight local — 25/09/2026
+
+`datasets/reports/ml_preparation_state.json` foi atualizado após nova medição.
+RAM total 16,87 GB; livre antes/depois de importar PyTorch variou de
+~1,68/1,20 GB a ~1,30/0,90 GB entre duas medições.
+O processo de preflight cresceu de ~23 para ~512 MB RSS. RTX 4050 Laptop:
+6.141 MiB totais, ~4.917 MiB livres no `nvidia-smi`; PyTorch não reservou VRAM.
+O piso cauteloso de 2 GB não foi reduzido. Solicitado apenas fechar aplicativos
+não essenciais após salvar o trabalho; nenhum processo foi encerrado pelo agente.
+
+O trainer agora entrega o contrato selecionado à fábrica da cabeça YOLOX,
+vincula o checkpoint à ordem de classes desse contrato e aceita batch de
+VALIDATION independente. Testes focais passaram. Isso é preparação de interface:
+o loader, o avaliador, o export ONNX e o Worker ainda precisam do contrato V3
+aprovado e paridade; `TRAINER_V3_STATUS=PARTIAL`, não há treino V3 elegível.
+O pacote HTML de 115.289.879 bytes permanece com o SHA-256 pinado correto.
+Sem decisões humanas, autorização nova, split V3 ou Frozen Test aberto.
+
+## Preparação técnica de ML — 25/09/2026
+
+Na branch local `ml/urmind-training-prep`, a execução vinculou evidências de
+release a 80 das 130 propostas de revisão, corrigiu validação/importação do
+pacote HTML pinado e gerou `urmind-urban-vision-v3-DRAFT` com 130 candidatos em
+quarentena. Zero decisões humanas, zero classes autorizadas, nenhum split final.
+Conversor COCO com recusa de supervisão parcial e preflight executável têm
+testes focais. Checkpoint para retomar: `datasets/reports/ml_preparation_state.json`.
+
+GPU CUDA e YOLOX estão presentes, mas RAM disponível <1 GB na medição e
+`validate_readiness` exige split autorizado. Smoke YOLOX: zero iterações.
+Treinamento principal, XGBoost, Frozen Test, promoção, deploy e push não foram
+executados. O extra `tabular-ml` foi fixado para instalação local futura; labels
+de severidade, risco e prioridade continuam pendentes. O loader/contrato atual
+suporta apenas quatro classes V1 e precisa de adaptação após decisão da ordem
+V3. Evidência e ações por etapa: `docs/ml/DATA_READINESS.md`.
+
+## Plano de liberação de dados — 25/09/2026
+
+Preparação executável do próximo ciclo em `docs/ml/DATA_READINESS.md`, com três
+relatórios gerados em `datasets/reports/`: `training_class_plan.json`,
+`review_summary.json`, `missing_data_plan.json`. Produtor existente estendido;
+pacote de 130 propostas reaproveitado e validado por hashes, sem nova seleção.
+
+Taxonomia v3 mantida com 35 categorias: quatro candidatas a detector, cinco atributos
+contextuais, três categorias de revisão e 23 sem dados prontos. Nenhuma classe
+aprovada para novo treino; ordem da cabeça vazia. Ondas 4/8/23, mantendo todo o escopo.
+29 planos de aquisição individuais, sem download ou autorização automática.
+130 casos disponíveis para inspeção, zero decisões humanas. Registro histórico de
+release não é verificação de direitos por imagem: 80 precisam vincular a evidência
+existente ao novo ciclo; 50 Urban precisam também resolver origem/direitos e parent antigo.
+
+YOLOX DATA/CLASS/HOLDOUT gates permanecem abertos. Próxima ação humana: direitos e
+revisão dos lotes. Próxima ação técnica: validar exports, reconciliar linhagem pelo
+produtor e atualizar gates somente com evidência real. Nenhum treino/deploy/push.
+
+## Escopo completo preparado — 25/09/2026
+
+Taxonomia preservada: **urmind-issue-taxonomy-v3, 35 categorias**. Não reduzida
+às quatro classes históricas nem a lote de nove. Matriz executável e formulários
+por categoria: `datasets/reports/taxonomy_coverage.json`; decisões, fontes,
+contagens e ações completas: `datasets/STATUS.md`, seção de escopo completo.
+`REQUESTED_PRODUCT_SCOPE=35`; `TRAINABLE_CLASS_SET=[]` e
+`VALIDATED_MODEL_CAPABILITIES=[]` para novo ciclo. **FULL_REQUESTED_SCOPE_READY=NO**.
+
+Entregues ferramenta offline e pacote local com 130 propostas: 32 UNIVALI,
+50 Urban Community e piloto TRAIN 24 Norway D40 + 12 D43 + 12 D44.
+`datasets/processed/annotation_review/review_1b00e44bcd58.html` fica local/ignorado.
+Nenhuma decisão humana preenchida. Urban tem parent hash antigo; aprovação bloqueada
+até reconciliação. Preservadas 461 D40 Norway, inclusive 430 pequenas.
+Recontagem XML TRAIN encontrou D43=310/D44=3195; candidatos, sem mapeamento aprovado.
+
+Renderer genérico endurecido: prosa livre não vira evidência; referências por campo,
+literal relatado separado de inferência e regras condicionais. Contrato público exige
+linhagem de avaliação e mantém desconhecidos. Não demonstra verdade semântica do banco.
+Protocolo/formulário tabular separado em
+`datasets/annotations/tabular_labeling_protocol.json`; export PIT existente preservado.
+Risco/severidade/prioridade/recorrência não usam `review_confirmed` como substituto.
+
+Treino, smoke training, Frozen Test, promoção, deploy, push, `.env`, banco e modelos
+ativos não foram executados/alterados. Próximo passo: revisão humana dos lotes,
+reconciliação Urban e coleta consentida guiada pela matriz. Readiness YOLOX continua NO.
+
+## Preparação científica YOLOX/XGBoost — 25/09/2026
+
+**VERIFICATION_GATE=BLOCKED; YOLOX_DATA_READY=NO; YOLOX_HOLDOUT_READY=NO;
+XGBOOST_LABELS_READY=NO.** Consolidação e evidências atuais em
+`datasets/STATUS.md`; aditivo metodológico em `docs/D40_ROOT_CAUSE_ANALYSIS.md`.
+Os registros anteriores de treinamento/readiness não são autorização para novo ciclo.
+
+Piloto `review_confirmed` (25/09/2026, noite): gate shadow agora é por artefato
+(`datasets/metadata/shadow_authorizations/`); `yolox-s-model-v2` registrado como
+`EXPERIMENTAL_SHADOW` só no Urmind DEV (`a3ff07ea…`, não promovido), Worker resolve o
+modelo com o perfil `d2b6e1ab…` **[Correção 26/09/2026: esse é o perfil de rollback com ampliação; o navegador passou a `2702eb15…` sem ampliação — perfis divergentes até nova autorização shadow.]** Revisão oculta scores
+antes da decisão e exige motivo de rejeição; só erro visual vira negativo. Pipeline
+XGBoost completo, mas **0 exemplos elegíveis**: nenhum caso real processado.
+Detalhes e bloqueios em `datasets/STATUS.md` (seção XGBoost).
+
+Hashes TRAIN/VALIDATION V1 conferem; recontadas 42.244 caixas geometricamente
+válidas nesses manifestos, sem comprovar semântica. D00/D10/D20/D40 têm dados
+RDD e aprovação histórica restrita ao MODEL V1. Nenhuma classe demonstrou
+autorização completa para novo treinamento. Folhas humanas UNIVALI (32) e
+Urban Community (50) continuam integralmente pendentes. Grupo e fingerprint
+de imagem não cruzam TRAIN/VALIDATION, mas sessões/near-duplicates e cobertura
+de classes ainda impedem afirmar ausência global de leakage.
+
+D40 Norway: 430/461 caixas menores que 32² em área projetada; nenhuma removida.
+Essa escala não prova anotação errada. Causalidade alegada no relatório antigo
+foi qualificada por aditivo, preservando histórico. Novo split/holdout e critérios
+numéricos por classe exigem aprovação; V2/quality gate removidos não recriados.
+
+XGBoost atual tem alvo `review_confirmed`, sem equivalência a risco, severidade
+ou prioridade. Allowlist, snapshot pré-revisão e máscaras temporais têm testes;
+corpus real, missingness, cobertura histórica e desempenho do detector que gera
+features não foram medidos no Supabase nesta rodada. Não usar boxes perfeitas
+como substituto de detecções operacionais. Early stopping/calibração e split
+temporal devem integrar futuro contrato aprovado; harness segue bloqueado.
+
+Descrições públicas usam avaliação persistida, causas vazias e limitações;
+renderer genérico aceita textos livres sem vínculo de evidência por frase.
+Gate global de descrições permanece parcial, exigindo guarda antes de admitir
+afirmações de causa, medidas físicas, probabilidade de acidente ou urgência.
+
+Verificação nova: 86 testes focados + 298 testes relacionados passaram; Ruff
+focado e mypy de três módulos passaram. Fixtures não comprovam corpus real,
+paridade ONNX ou E2E cloud. Raw medido por atributos: 36.446.728.071 bytes,
+sem placeholders reportados; tetos individuais observados, inclusive exceção
+RDD de 14 GB. Relatórios antigos de inventário permanecem históricos.
+Sem treinamento/smoke training, acesso ao Frozen Test, inferência, exclusão,
+alteração de `.env`, deploy ou push. Próximo passo: adjudicar anotações e
+grupos, aprovar holdout independente e auditar export tabular point-in-time.
+
 ## Validação territorial operacional — 24/09/2026
 
 No Urmind DEV, a migration `0030_brazil_territory` instalou uma tabela privada com

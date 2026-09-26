@@ -1,5 +1,33 @@
 # D40_ROOT_CAUSE_ANALYSIS — por que o pothole colapsou no MODEL V1
 
+## Aditivo científico vigente — 25/09/2026
+
+O texto histórico abaixo contém interpretações causais mais fortes que suas
+evidências. Estatística observacional, coocorrência e desempenho por domínio
+não isolam uma causa. As expressões históricas “nenhuma causa é conjectura”,
+“funcionam como ruído”, “necessariamente superdispara” e “o modelo só pode” não
+constituem conclusões científicas demonstradas. Preservam-se como registro,
+não como justificativa para excluir exemplos ou alterar rótulos.
+
+Recontagem em `detection_train_authorized.jsonl`, SHA-256
+`899853da0ed47fc0c456dfb7cf87f15c2262364119a28002ae4a546611ea699c`:
+461 caixas Norway/D40, 430 com área projetada inferior a 32², mediana
+100,7205554513 px² em letterbox 640. Nenhuma imagem de TEST ou Frozen Test
+foi aberta. A área pequena não prova ruído nem equivale a largura e altura
+ambas inferiores a 32 pixels. Não foi feito corte, remoção ou reponderação.
+
+Decisão: conservar os exemplos e manter revisão humana OPEN. Revisar semântica,
+tightness, oclusão, contraste e perda por redimensionamento em estratos de
+TRAIN/VALIDATION autorizados, mantendo caixa e imagem originais. Separar erro
+de anotação de dificuldade real do detector. Qualquer intervenção futura exige
+protocolo prévio, adjudicação, derivação versionada e nova autorização.
+
+As tabelas históricas referentes a TEST não foram recalculadas nem usadas para
+ajustar critérios novos. Contaminação histórica não desaparece com remoção dos
+pesos. Relatório canônico de preparação, critérios e limites:
+`datasets/STATUS.md`, seção de 25/09/2026. Treinamento e avaliação oficial de novo
+ciclo permanecem não autorizados; holdout independente ainda não demonstrado.
+
 > Registro histórico preservado em 24/09/2026. Pesos/experimentos anteriores
 > foram removidos conforme TRAINING_CLEANUP_2026-09-24.md. Os 18 artefatos
 > derivados de dataset V2 citados foram removidos para a Lixeira em 24/09/2026,

@@ -1,5 +1,382 @@
 # URMIND_COMPLETE_AUDIT
 
+> Este arquivo acumula execuções. A execução **2026-09-25 22:35 -03** (abaixo) é a atual.
+> A execução de 24/09/2026 foi preservada integralmente mais adiante, sem edição, como histórico.
+
+# Execução 2026-09-25 22:35 -03 — auditoria independente completa (somente leitura)
+
+## 1. Resumo executivo
+
+**FINAL_VERDICT: URMIND_BLOCKED_FOR_REAL_PILOT / NEEDS_ATTENTION.** Não há um único "COMPLETE".
+
+O núcleo local (FastAPI + Worker + Supabase Urmind DEV + React/PWA) está amplamente
+implementado e a suíte offline passa em 1.425 testes, mas:
+
+1. **O produto publicado não funciona além da casca estática** (CONFIRMADO_AGORA, P0):
+   o bundle do Vercel usa como base da API `https://urmind-api.onrender.com` **sem `/api/v1`**
+   (rotas reais respondem 404) e o backend Render **recusa CORS** da origem
+   `https://urmind-lime.vercel.app` (`Disallowed CORS origin`).
+2. **O que está publicado é anterior ao trabalho de 25/09**: GitHub `main` = HEAD local
+   `e57db61`; detecção ao vivo, validação shadow por arquivo de autorização
+   (`validate_shadow_authorization`; o flag `shadow_authorized` básico já estava em HEAD), `browser_model.py`, perfil de
+   inferência e migration `0031` existem só na working copy (não commitados). O bundle
+   publicado não contém a página ao vivo; `/models/*` retorna 404 no Vercel.
+3. **Navegador e Worker usam perfis de inferência diferentes** para o mesmo ONNX
+   `d429bde8…` (navegador `2702eb15…`; Worker/DEV `d2b6e1ab…`).
+4. **YOLOX** `10h-r1` é experimental, fraco (VALIDATION RAW mAP50 0,1075) e está registrado
+   no DEV apenas como `EXPERIMENTAL_SHADOW`; ajuste de limiares feito na mesma VALIDATION.
+5. **XGBoost não tem modelo operacional**: carregador de runtime sem chamador; 0 labels
+   operacionais; três runs Attain (alvo diferente) abaixo do baseline e só no worktree. Ambas as
+   cópias partem de `e57db61` (onde `train_xgboost` já existe) e divergem no mesmo arquivo
+   `tabular.py` (1.315 × 4.060 linhas); merge conflitante.
+6. **DEV**: 1 Capture órfã (sem imagem, localização, status nem auditoria), 0 Events/Reviews/
+   RoadSegments; migration `0031_demo_events` aplicada (tabela demo com SELECT para `anon`)
+   embora o arquivo esteja untracked.
+7. **Runtime ainda usa a credencial `postgres`** (F-04 aberto) e `backend/.env` contém tokens
+   de deploy (Vercel/Render) e Kaggle, aumentando o raio de dano.
+8. **Gate de regressão vermelho**: 3 testes backend, 4 erros mypy, 21 arquivos Prettier.
+
+REAL_E2E=**NOT_VERIFIED**. Nada foi corrigido nesta execução.
+
+## 2. Identidade e cobertura da auditoria
+
+| Campo | Valor |
+|---|---|
+| Início | 2026-09-25T22:35:39-03:00 (America/Sao_Paulo) |
+| Raiz | `C:/Users/felip/OneDrive - Fundação Escola de Comércio Álvares Penteado/FECART Sistema` |
+| Branch / HEAD | `ml/urmind-training-prep` / `e57db6182de2be37a8176b845c87e35376c32a76` |
+| GitHub | `origin/main` = `e57db61`; `feat/urmind-mobile-vercel` = `3d34aff`; `ml/urmind-training-prep` **não existe no remoto** (`git ls-remote`) |
+| Estado dirty | 101 entradas porcelain: 55 arquivos tracked modificados (+6.780/−836), nenhum staged, 53 arquivos untracked (46 entradas, incl. diretórios). Hash de `git diff` no início: `c2d831da…` |
+| Worktrees | principal + `C:/Users/felip/AppData/Local/UrMind/worktrees/xgboost-preparation-parallel` (`feat/xgboost-preparation-parallel`, base `e57db61`, 17 entradas dirty, checkout esparso) |
+| Submódulo | `backend/third_party/YOLOX` `6ddff48` (0.3.0-38) |
+| Ambientes | `backend/.venv` (Python 3.12, único ambiente); Node + `frontend/node_modules` |
+| Processos | Worker `python -m app.worker` (PID 23256/28580, desde 21:44); API `python -m app --port 8000` (39764/28344, 21:45); Vite 5173 (41508). **Nenhum processo de treino.** Nenhum foi tocado. |
+| RAM | 15,71 GB total; 3,91 GB livres no início |
+| Supabase | projeto único visível pelo conector: `Urmind DEV` (`impm…ggy`, sa-east-1, ACTIVE_HEALTHY, PG 17.6.1.166); igual a `URMIND_DEV_SHADOW_REF` (`backend/app/config.py:13`) e ao host de `backend/.env` / `frontend/.env.local` |
+| Fim | Git status, diff, untracked e hashes de artefatos (`datasets/metadata/*.json`, `datasets/reports/*.json`, `models/serving/*`, `frontend/public/models/*`) **idênticos** antes/depois dos testes |
+
+Todas as afirmações abaixo referem-se a essa base: HEAD `e57db61` **mais** as mudanças locais
+não commitadas (não reproduzíveis a partir de HEAD).
+
+Distinção de versões:
+
+| Superfície | Estado verificado |
+|---|---|
+| A. Local principal | HEAD + 101 entradas dirty (detecção ao vivo, gate shadow, perfil, 0031, testes) |
+| B. Só no worktree | harness `train_xgboost`, extrator de features Attain, 3 runs Attain, configs, adaptador Attain |
+| C. GitHub | `e57db61` (sem nada de A-dirty nem B) |
+| D. Vercel | build com `Last-Modified: 2026-09-25 13:20 UTC`; sem página ao vivo; `/models/*` 404; commit exato **não verificável** (sem conector) |
+| E. Render | `urmind-api.onrender.com`, uvicorn, `/api/v1/health` e `/ready` OK com DB; CSP sem `'wasm-unsafe-eval'` (presente só no local `backend/app/main.py:139`) ⇒ código anterior ao local; commit exato **não verificável** |
+| F. Modelo por runtime | Navegador local: `live-detection.json` perfil `2702eb15`; Worker local/DEV: ModelVersion `a3ff07ea` perfil `d2b6e1ab`; Vercel: nenhum; Render: não roda Worker comprovado |
+
+Skills usadas: `urmind-verification-gate` (sua referência `references/gate-protocol.md`
+**não existe** no disco; aplicado o conteúdo do SKILL.md). As demais skills citadas pelo
+usuário (`caveman` indisponível; `karpathy-guidelines`, `no-duplicate-files`,
+`systematic-debugging`, `urmind-cv-dataset-audit`, `urmind-dataset-integrity`,
+`urmind-adversarial-review`) orientaram a inspeção por critério, sem execução formal separada;
+não se alega uso além disso. Conectores: Supabase (somente SELECT e advisors). Sem conector
+Vercel/Render/GitHub; `gh` CLI ausente. Tokens de deploy presentes no `.env` **não** foram usados.
+
+## 3. Fontes canônicas e conflitos de planejamento
+
+Diretório real: `docs/Planinng/` (não existe `docs/Planning/`). Não há `CLAUDE.md`/`AGENTS.md`.
+
+| Conflito | Evidência | Efeito |
+|---|---|---|
+| MD × DOCX | `MASTER_PLAN.md` modificado 25/09 (nota de escopo 35 categorias, `git diff` +8 linhas); DOCX sem alteração desde 05/09 | Viola a regra de sincronização do próprio plano (§31.19 citado no README) |
+| Numeração de fases | MASTER_PLAN define **passos 0–15** (§25); relatórios usam "Fases 3–10A", que não existem no MD nem no DOCX | Status por "fase" em relatórios não é rastreável ao plano |
+| Hospedagem | MASTER_PLAN: Supabase é o único serviço gerenciado; FastAPI/Worker em Python nativo da equipe. Realidade: Vercel + Render | Decisão arquitetural não registrada no plano; requer decisão humana |
+| Detecção ao vivo no navegador | não consta do MASTER_PLAN (§9 fala só de ONNX no Worker) | Escopo informado pelo usuário, sem critério de aceite planejado |
+| Streamlit/demo | `scripts/demo/panel.py`, `0031_demo_events` | Tecnologia fora do plano; tabela no DEV |
+| Taxonomia | MASTER_PLAN §8.2 "Taxonomia V1"; registro atual `urmind-issue-taxonomy-v3` com 35 | Nota de topo resolve parcialmente |
+| PROJECT_STATE interno | linha 5: "Worker em DEV ainda resolve `yolox-s-quality-rebuild`"; linhas 148–152: `a3ff07ea` registrado e resolvido. DB confirma a segunda | Documento contraditório |
+| Contagem v3 | PROJECT_STATE:102 "4 detector / 5 contextuais / 3 revisão / 23"; `taxonomy_coverage.json`: tarefas 25 bbox / 7 atributo / 3 máscara | Categorias descritas de modo inconsistente |
+
+Mapeamento usado neste relatório (sem criar fases novas): passos §25 do MASTER_PLAN; "Fase 3" dos
+relatórios ≈ passo 7; "Fases 4–6" ≈ passos 10–11 e 14; "Fase 7" ≈ passo 15; "Fase 8/9" ≈ §24
+(XGBoost/histórico); "10A" ≈ passo 6 (expansão de taxonomia); detecção ao vivo ≈ expansão do passo 13.
+
+## 4. Arquitetura real e caminho de chamadas
+
+```text
+Vercel (bundle antigo) --X--> Render API (CORS recusa; base sem /api/v1)          [publicado: quebrado]
+Navegador local :5173 -> API local :8000 (/api/v1) -> Supabase DEV                 [local: implementado]
+  upload_photo (api/v1/core.py:642) -> validação/photo gate (services/storage.py)
+  -> Storage privado `captures` (10 MiB) -> Capture -> trigger pgmq inference_jobs
+  -> Worker local (worker.py:263 process_one) -> configured_vision_model (repositories/core.py:1581)
+     -> shadow_vision_model (1555) exige EXPERIMENTAL_SHADOW + escopo DEV + shadow_authorization_current
+  -> OnnxDetector (_detector_for, worker.py:175; ONNX só sob models/serving)
+  -> Detection (model_may_emit bloqueia DATA_REQUIRED) -> consolidate_capture -> Event
+  -> _finish_analysis -> contexto/FeatureBuilder/assess_features/RiskAssessment/DecisionTrace
+  -> Review humana -> publicação sanitizada -> APIs públicas/mapa MapLibre
+  XGBoost: tabular_runtime/predict_review_confirmed (ml/tabular.py:1118/1133) SEM CHAMADOR
+Navegador #/deteccao-ao-vivo -> Web Worker ONNX Runtime Web -> caixas de prévia
+  -> "capturar" salva rascunho local (drafts.save), sem upload automático
+```
+
+Transições relevantes verificadas por código: sem localização ⇒ `location_required`
+(worker.py:~290); status terminais não reprocessam; Detection persistida antes da consolidação
+(idempotência por `event_key`); `detection_completed` ≠ análise concluída; falha de modelo ⇒
+`model_not_available` terminal; erros de Storage/IO com retry até `MAX_ATTEMPTS`.
+Não houve execução E2E real nesta auditoria.
+
+## 5. Matriz de fases (passos do MASTER_PLAN §25)
+
+Legenda de dimensões: IMP=implementação, INT=integração, D/M=dados/modelo, VAL=validação, OP=publicação/operação.
+
+| Passo | Requisito | IMP | INT | D/M | VAL | OP | Evidência principal | Próxima ação / aceite |
+|---|---|---|---|---|---|---|---|---|
+| 0 | decisões antigas limpas | PARTIAL | — | — | — | BLOCKED_HUMAN_DECISION | Vercel/Render/Streamlit fora do plano | Decidir e registrar hospedagem no MD+DOCX |
+| 1 | backend + migrations | VERIFIED_IN_SCOPE | VERIFIED_IN_SCOPE | — | FAILED_NOW parcial (3 testes, mypy) | PARTIAL: DB em `0031`, repo HEAD em `0030` | pytest 1425/3; alembic_version DEV | Commitar/decidir 0031; gate verde |
+| 2 | Supabase/PostGIS/Auth/RLS | VERIFIED_IN_SCOPE | VERIFIED_IN_SCOPE | — | advisors: 15 INFO, 3 WARN anônimo | BLOCKED_CONFIGURATION (runtime `postgres`) | SQL/advisors | Role runtime mínima (F-04) |
+| 3 | Storage + Capture | IMPLEMENTED_NOT_VERIFIED | PARTIAL | — | integração DEV NOT_RUN | Capture órfã no DEV | SQL: 1 capture, 0 objetos | Diagnosticar órfã; E2E real |
+| 4 | EXIF + manual | IMPLEMENTED_NOT_VERIFIED | VERIFIED_IN_SCOPE (unit) | — | unit PASS | aparelho físico NOT_VERIFIED | tests + PROJECT_STATE hist. | Teste físico Android/iPhone |
+| 5 | RoadSegments/PostGIS | IMPLEMENTED_NOT_VERIFIED | PARTIAL | BLOCKED_DATA (0 segmentos) | — | — | SQL road_segments=0 | Recorte OSM após coordenada real |
+| 6 | dataset/taxonomia | PARTIAL | — | BLOCKED_DATA / BLOCKED_HUMAN_DECISION | coverage: 0 aprovadas v3 | — | taxonomia 35; 31 DATA_REQUIRED | Revisão humana dos lotes |
+| 7 | YOLOX PyTorch baseline | VERIFIED_IN_SCOPE (run concluído) | — | BLOCKED_MODEL (qualidade) | VALIDATION apenas; TEST não aberto | — | run_state COMPLETED; log epoch=5 | Holdout independente; critérios por classe |
+| 8 | ONNX + Worker + Queues | VERIFIED_IN_SCOPE (código) | PARTIAL (perfil ≠ navegador) | EXPERIMENTAL_SHADOW | parity histórica; job real NOT_VERIFIED | Worker só local | DB a3ff07ea; worker.py | Unificar perfil; E2E |
+| 9 | Event/deduplicação | IMPLEMENTED_NOT_VERIFIED | VERIFIED_IN_SCOPE (unit) | — | DEV 0 events | — | SQL | E2E |
+| 10 | contexto externo | IMPLEMENTED_NOT_VERIFIED | PARTIAL | — | live opt-in NOT_RUN | — | EXTERNAL_INTEGRATIONS | live-check autorizado |
+| 11 | severidade/prioridade (regras) | VERIFIED_IN_SCOPE (unit) | VERIFIED_IN_SCOPE | regras provisórias | sem calibração | — | tests | Calibração exige dados |
+| 12 | responsável/ação/Jinja2 | VERIFIED_IN_SCOPE (unit) | VERIFIED_IN_SCOPE | catálogo parcial | — | — | hist. | Cobertura por classe/jurisdição |
+| 13 | React/PWA/MapLibre (+ao vivo) | VERIFIED_IN_SCOPE (Vitest 103, tsc) | PARTIAL | modelo local only | Playwright NOT_RUN; câmera física NOT_VERIFIED | **BLOCKED_CONFIGURATION** (API base/CORS) | curl/bundle | Corrigir env Vercel/CORS Render; deploy |
+| 14 | revisão/MLOps/segurança | VERIFIED_IN_SCOPE (unit) | PARTIAL | 0 reviews | — | F-04 aberto | SQL | Runtime mínimo; revisão real |
+| 15 | integração E2E | NOT_VERIFIED | NOT_VERIFIED | — | REAL_E2E NOT_VERIFIED | BLOCKED | — | E2E real autorizado |
+| §24 | XGBoost/recorrência/previsão | PARTIAL (main) + IMPLEMENTED_NOT_INTEGRATED | IMPLEMENTED_NOT_INTEGRATED | BLOCKED_DATA (0 labels) | Attain < baseline | — | tabular.py; handoff | Reconciliar implementações; GT real |
+
+Contagem: 17 linhas; nenhuma com todas as dimensões VERIFIED. Sem porcentagem global.
+
+## 6. Estado por componente
+
+- **Frontend (local)**: rotas `#/`, `#/registrar`, `#/capture`, `#/meus-relatos`, `#/map`,
+  `#/deteccao-ao-vivo`, `#/live`, `#/drafts`, `#/events`, `#/review`, `#/system`,
+  `#/transparency`, `#/sobre`, `#/demo`, `#/app` (`frontend/src/App.tsx`). Vitest 103 PASS, tsc PASS.
+  Detecção ao vivo: `audio:false` (`services/cameraStream.ts:37`), tracks parados
+  (`:53`), uma inferência em voo (`gate.busy`, `LiveDetectionPage.tsx:237`), descarte por
+  `run/frameId` (`:261`, `:357`), câmera desligada em `visibilitychange` e unmount (`:562–582`),
+  espelhamento só para câmera frontal (`:459`), SHA-256 do ONNX conferido
+  (`domain/liveDetection.ts:116`), captura vira rascunho local sem upload (`:542`). PWA não
+  precacheia `/models/` (`vite.config.ts:34–37`). Câmera física NOT_VERIFIED.
+- **Frontend (publicado)**: estático 200, API inutilizável (P0 A25-01), sem ao vivo.
+- **Backend (local)**: ruff PASS; mypy FAIL (4); pytest 1425/3/36; CSP com `wasm-unsafe-eval`.
+- **Backend (Render)**: vivo, DB conectado; CORS recusa Vercel; versão anterior.
+- **Banco DEV**: head `0031_demo_events`; 25 tabelas públicas; extensões plpgsql, pg_stat_statements,
+  uuid-ossp, pgcrypto, supabase_vault, postgis 3.3.7, pgmq 1.5.1; bucket `captures` privado 10 MiB;
+  nenhuma role `urmind*`; `tabular_dataset_versions` **ausente** (não "vazia").
+  Contagens (role `postgres` do conector, sem RLS limitante): captures 1, detections 0, events 0,
+  reviews 0, risk_assessments 0, road_segments 0, model_versions 4, dataset_versions 2,
+  auth.users 0, storage.objects 0, fila pendente 0 / arquivada 5, audit_log 30, demo_events 0.
+- **Worker**: rodando localmente contra o DEV; resolve `a3ff07ea` (modo `shadow` no `.env`).
+- **Deploy**: sem `vercel.json`/`render.yaml` no repositório; configuração só nos painéis
+  (não verificável sem conector).
+
+## 7. Estado científico e operacional dos modelos
+
+| Artefato | Estado |
+|---|---|
+| Run `yolox-s-rdd4-experimental-20260925` | FAILED (exit 4294967295), só `smoke.pt`; dir preservado |
+| Run `…-10h` | FAILED_BEFORE_OR_DURING_MAIN (smoke exit 1) |
+| Run `…-10h-r1` | COMPLETED, exit 0, 6 épocas (validação só ao final, epoch=5 ⇒ best=last na prática); `best.pt` SHA `425ed936…`; COCO `f55ded71…`; TRAIN 23.827 (`bc440841…`); contrato `d39999a2…`; RAM override registrado |
+| Métricas VALIDATION RAW (log) | P 0,119 / R 0,344 / F1 0,177 / mAP50 0,1075 / mAP50-95 0,0332; AP50 D00 0,077, D10 0,163, D20 0,120, D40 0,070 |
+| ONNX `d429bde8…` | idêntico em `models/serving/` e `frontend/public/models/` (SHA-256 recalculado) |
+| Perfil navegador | `2702eb15…`, limiares 0,03/0,2/0,07/0,2, NMS por classe 0,45, `upscale:false` (manifesto `3231b4fa…`) |
+| ModelVersion DEV `a3ff07ea` | `final-epoch5-d429bde8a9bd`, `shadow_authorized:true`, escopo DEV, sem promoção; perfil `d2b6e1ab…` = exatamente o perfil de **rollback** `models/serving/live-detection.rollback-per-class-upscale.json`, 0,05/0,13/0,35/0,13, sem `letterbox_upscale` (Worker usa padrão `True`, `worker.py:234`; `serving.py:661,731`). PROJECT_STATE:150–151 afirma equivocadamente que é o mesmo perfil do navegador |
+| `2527af02` (quality rebuild) | `shadow_authorized:false`; ONNX referenciado ausente do serving |
+| `76eb8ab3`, `dedb1af0` | registros vision sem dataset/serving (referência) |
+| Autorização shadow | arquivo `datasets/metadata/shadow_authorizations/yolox-s-model-v2-d429bde8a9bd.json` (untracked); valida hashes do manifesto/ONNX/contrato/métricas/paridade (`serving.py:2830+`). Não é promoção |
+| XGBoost main | `train_xgboost` (`tabular.py:742`, já em HEAD), `run_tabular_training`, `load_promoted_model` (fail-closed, exige `promotion.json`), `tabular_runtime`, `predict_review_confirmed` — os três últimos **sem chamador** em `backend/app` ou `scripts` (revisor confirmou) |
+| XGBoost worktree | 3 runs Attain `pavement_visual_severity_low_high` (SHA `00e23854…`, `0ccb78da…`, `229de230…`), todos piores que baseline por classe; 2 primeiros com vazamento de cena conhecido; alvo ≠ `review_confirmed`/`RiskAssessment.severity` |
+
+Limites científicos: ganhos de perfil (mAP50 0,116→0,159, PROJECT_STATE:5) medidos na **mesma
+VALIDATION** usada para escolher limiares/letterbox — viés de seleção; Frozen Test não avaliado
+(correto). DatasetVersion `e8c43aa8` chama-se `rdd2022-model-v1-authorized` e sustenta um
+modelo "v2" — nomenclatura confusa a revisar.
+
+## 8. Cobertura das categorias
+
+`urmind-issue-taxonomy-v3`: **35** categorias (`app/schemas/issue_taxonomy.py:42`).
+`model_support_status`: 4 `EXPERIMENTAL_MODEL` (D00/D10/D20/D40), 31 `DATA_REQUIRED`.
+`dataset_status`: 25 NEEDS_MORE_DATA, 6 NEEDS_HUMAN_REVIEW, 4 CURATED_IN_USE.
+`taxonomy_coverage.json`: `TRAINABLE_CLASS_SET=[]`, `VALIDATED_MODEL_CAPABILITIES=[]`,
+`training_authorized=false`, 0 imagens/instâncias/grupos aprovados em **todas** as 35 para o ciclo v3.
+O modelo emite apenas as 4 classes; Worker bloqueia qualquer outra (`model_may_emit`).
+Nenhuma das 31 restantes tem capacidade de detecção. Lacuna é de **dados revisados** (e de
+decisão sobre direitos/grupos), não de código.
+
+## 9. Integrações
+
+| Integração | Chamador | Estado verificado agora |
+|---|---|---|
+| Supabase Postgres/PostGIS | backend/Worker | ACTIVE (SQL, `/api/v1/health` Render) |
+| Supabase Auth | frontend/backend | configurado; 0 usuários; fluxo ao vivo NOT_VERIFIED |
+| Storage `captures` | upload_photo | 0 objetos; NOT_VERIFIED agora |
+| pgmq `inference_jobs` | trigger/Worker | 0 pendentes, 5 arquivados |
+| Realtime | frontend | NOT_VERIFIED agora |
+| OpenFreeMap/CARTO | MapLibre | no CSP do Render; tiles NOT_VERIFIED |
+| Nominatim/Overpass/Open-Meteo/GeoSampa/SIDRA/BrasilAPI/ViaCEP | contexto | HISTORICAL (live-check 24/09); NOT_RUN agora |
+| IBGE malha (0030) | admissão de local | HISTORICAL |
+| ONNX Runtime Web | ao vivo | local apenas |
+| Vercel / Render | hospedagem | publicados, **quebrados entre si** |
+
+## 10. Findings
+
+Severidade: P0 crítico, P1 alto, P2 médio, P3 baixo. IDs novos `A25-*`; F-01..F-12 reconciliados em §10.2.
+
+### 10.1 Novos findings
+
+| ID | Passo | Cat. | Sev. | Estado / confiança | Evidência | Impacto | Ação mínima | Aceite / regressão |
+|---|---|---|---|---|---|---|---|---|
+| A25-01 | 13/15 | DEPLOYMENT | **P0** | CONFIRMADO_AGORA / alta | bundle `assets/api-DK9EYdRL.js` e `index-DNSz-2Iw.js`: base `https://urmind-api.onrender.com` (+`/public`); `GET …/public/auth-origin`=404, `GET …/api/v1/public/auth-origin`=200; `OPTIONS` com Origin Vercel ⇒ 400 "Disallowed CORS origin" | Nenhuma chamada da API funciona no app publicado | Vercel: `VITE_API_BASE_URL=…/api/v1`; Render: incluir origem Vercel em `CORS_ALLOWED_ORIGINS`; rebuild/redeploy (autorizados) | preflight 200 com `Access-Control-Allow-Origin`; smoke de leitura pública pelo navegador |
+| A25-02 | 1/13 | DEPLOYMENT / EVIDENCE_GAP | P1 | CONFIRMADO_AGORA | `git ls-remote`; CSP Render sem `wasm-unsafe-eval`; DB em `0031` (arquivo untracked) | Deploy não reproduz o estado local; Render (código ≤`0030`) opera contra DB `0031` | Commits lógicos revisados, branch remota, decidir 0031 | checkout limpo passa testes; head DB = head repo |
+| A25-03 | 8 | CONFIGURATION / MODEL | P1 | CONFIRMADO_AGORA | manifesto `2702eb15` × DB `d2b6e1ab`; `worker.py:~229` default `letterbox_upscale=True` | Prévia ao vivo ≠ processamento oficial; comparações inválidas | Um perfil versionado único registrado no ModelVersion shadow (com autorização) | `inference_profile_sha256` igual nos dois; teste de paridade |
+| A25-04 | 13 | DEPLOYMENT | P1 | CONFIRMADO_AGORA | `.gitignore:58–59`; Vercel `/models/*` 404; bundle sem `deteccao-ao-vivo` | Ao vivo impossível no publicado; build não reprodutível | Definir entrega do ONNX (artefato versionado/Release/Storage) com checksum no build | `/models/live-detection.json` 200 com SHA esperado |
+| A25-05 | 8/15 | INTEGRATION_GAP | P1 | CONFIRMADO_AGORA (local) / NAO_VERIFICADO (Render) | Worker só local (PID 23256); ONNX só em `models/serving` ignorado | Captures do app publicado dependeriam do notebook ligado | Decidir onde roda o Worker e como obtém o ONNX | job real processado com Worker supervisionado |
+| A25-06 | 2/14 | SECURITY | P1 | CONFIRMADO_AGORA | `current_user=postgres`; pooler e migration com mesmo usuário `postgres.*`; 0 roles `urmind*`; `.env` com `VERCEL_TOKEN`, `RENDER_API_KEY`, `KAGGLE_API_TOKEN` | Comprometimento do backend = superusuário + controle de deploy | Role runtime mínima; tokens fora do `.env` de runtime; **rotacionar senha do DB** (ver incidente §11) | teste de negação de privilégios; `.env` runtime sem tokens de deploy |
+| A25-07 | 7 | MODEL_QUALITY_GAP | P1 | CONFIRMADO_AGORA | log 10h-r1; PROJECT_STATE:5 | Detecção fraca; ganhos medidos na VALIDATION de ajuste | Holdout independente autorizado; critérios pré-registrados | métricas em conjunto não usado para ajuste |
+| A25-08 | §24 | INTEGRATION_GAP | P2 | CONFIRMADO_AGORA | `tabular.py:1078–1145` sem chamador; main +900/−34 e worktree +3.654/−43 sobre o mesmo `tabular.py` de HEAD; worktree sem `load_promoted_model`/`predict_review_confirmed`; `tabular_dataset_versions` ausente | Evolução paralela do mesmo módulo; merge conflitante; nada no runtime | Reconciliar num único `tabular.py` antes de qualquer novo fit, preservando loader fail-closed e alvo externo separado | um módulo; testes dos dois alvos; chamador explícito advisory |
+| A25-09 | 3 | BUG | P2 | CONFIRMADO_AGORA / causa NAO_VERIFICADA | Capture `932d346c…` `pwa_photo`, sem storage_path/point/status/audit, 24/09 21:51 UTC | Registro sem evidência; possível caminho de criação sem foto | Rastrear origem (logs/`create_capture` JSON); decidir limpeza com autorização | nenhuma Capture `pwa_photo` sem imagem; teste |
+| A25-10 | 1 | EVIDENCE_GAP | P2 | CONFIRMADO_AGORA | pytest 3 FAIL; mypy 4; Prettier 21 | Gate de regressão vermelho | Corrigir causas (§11) sem enfraquecer testes | suíte e estáticos verdes |
+| A25-11 | 2/6 | SECURITY / DATA | P2 | CONFIRMADO_AGORA | `0031_demo_events.py` grant SELECT anon; `datasets/demo/demo_events.json` coords `demo_synthetic`; `scripts/demo/panel.py` Streamlit; `India_000005` não está em TRAIN/VALIDATION (papel NAO_VERIFICADO) | Superfície pública extra no DEV; risco de coords sintéticas e de imagem de holdout em demo | Decidir manter/remover demo; confirmar papel das imagens via registro de isolamento | tabela removida ou isolada; imagens com papel comprovado |
+| A25-12 | 13/14 | SECURITY/PRIVACY | P2 | CONFIRMADO_AGORA | `datasets/metadata/photo_gate_calibration.json` ausente ⇒ `UNCALIBRATED`, sem blur (`storage.py:234–296`) | Privacidade depende 100% de revisão humana | Corpus 20+20 autorizado e calibração | derivada com blur quando calibrado |
+| A25-13 | 8 | BUG (design) | P3 | CONFIRMADO_AGORA por código | `model_not_available` é terminal (`worker.py`); ver revisor §17 | Captures enviadas sem modelo não reprocessam | Definir reprocessamento explícito | teste de reprocessamento |
+| A25-14 | — | DOCUMENTATION | P2 | CONFIRMADO_AGORA | PROJECT_STATE:11–19 e STATUS.md com `?` no lugar de acentos (irreversível); contradições §3; DOCX desatualizado | Documentos canônicos não confiáveis | Reescrever seções corrompidas; sincronizar MD/DOCX | leitura sem `?`; teste de data do STATUS verde |
+
+### 10.2 Reconciliação F-01..F-12 (24/09)
+
+| ID | Estado agora | Base |
+|---|---|---|
+| F-01 harness E2E | PARTIALLY_FIXED (relato) / NAO_VERIFICADO | E2E real não executado |
+| F-02 reprodutibilidade Git | OPEN, agravado (branch sem remoto, 101 entradas) | git |
+| F-03 quota | PARTIALLY_FIXED (0020 no DEV) / não reexecutado | relato + DB head posterior |
+| F-04 runtime privilegiado | **OPEN, confirmado** → A25-06 | SQL/env |
+| F-05 PIT histórico | PARTIALLY_FIXED | relato |
+| F-06 janela→zero | VERIFIED_FIXED no escopo (testes de history na suíte passam) | pytest |
+| F-07 docs | OPEN, agravado → A25-14 | leitura |
+| F-08 operação pública | SUPERSEDED por A25-01/02/04/05 | curl |
+| F-09 logout | PARTIALLY_FIXED (relato) | não reexecutado |
+| F-10 locks publicação | PARTIALLY_FIXED (relato) | não reexecutado |
+| F-11 mapa/área privada | PARTIALLY_FIXED (filtros/clustering relatados) | não reexecutado |
+| F-12 bundle/health | PARTIALLY_FIXED | não reexecutado |
+
+Relatos históricos do enunciado: "detector 4 classes vs taxonomia 35" CONFIRMADO_AGORA;
+"modelo configurado ARCHIVED" CORRIGIDO_COM_EVIDENCIA (config aponta `a3ff07ea` shadow);
+"gate shadow preso a artefato antigo" CORRIGIDO_COM_EVIDENCIA no código local (não publicado);
+"navegador e Worker com perfis diferentes" CONFIRMADO_AGORA; "Capture órfã" CONFIRMADO_AGORA;
+"banco sem Reviews/Events" CONFIRMADO_AGORA; "photo gate inativo" CONFIRMADO_AGORA;
+"artefatos do navegador ignorados pelo Git" CONFIRMADO_AGORA; "XGBoost sem modelo operacional"
+CONFIRMADO_AGORA; "Attain abaixo do baseline" CONFIRMADO (handoff; não reexecutado);
+"run cancelado apagado apesar de preservação" NAO_VERIFICADO (diretórios dos 3 runs de 25/09
+existem; histórico de outros runs não reconstituído).
+
+## 11. Testes e limitações
+
+| Comando (dir) | Escopo | Duração | Resultado |
+|---|---|---|---|
+| `ruff check app tests` (backend) | estático | 0,9 s | PASSED_NOW |
+| `ruff format --check app tests` | estático | 0,2 s | FAILED_NOW: 26 arquivos (backend historicamente não format-limpo) |
+| `mypy app` | 75 arquivos | ~64 s | FAILED_NOW: 4 erros — `ml/browser_model.py:158–159` (arg-type), `ml/tabular.py:826,886` (stubs sklearn) |
+| `pytest -q -ra -p no:cacheprovider` (sem vars de DB) | offline | 72 s | FAILED_NOW: **1425 passed, 3 failed, 36 skipped** (35 integração DEV + 1 live), 2 warnings |
+| `vitest run` (frontend) | 7 arquivos | 12 s | PASSED_NOW 103 |
+| `tsc --noEmit` | frontend | 1 s | PASSED_NOW |
+| `prettier --check src tests vite.config.ts` | frontend | — | FAILED_NOW: 21 arquivos |
+| Playwright | — | — | NOT_RUN_BY_SCOPE: usa `vite preview` sobre `dist` anterior; rebuild sobrescreveria `dist` |
+| `npm run build` | — | — | NOT_RUN_BY_SCOPE (mesmo motivo) |
+| `test_db_integration.py` DEV | — | — | NOT_RUN_BY_SCOPE: escreve no DEV |
+| live externos | — | — | NOT_RUN_BY_SCOPE |
+
+Falhas: (1) `test_status_publica_a_data_de_hoje` — cabeçalho de `datasets/STATUS.md` foi
+sobrescrito por prosa manual sem "Atualizado em" (e com acentos corrompidos);
+(2) `test_registro_real_esta_sincronizado_com_os_scripts` — `artifact_registry.json` defasado
+para `scripts/datasets/run_yolox_experimental.py`; (3)
+`test_v3_split_manifest_current_and_present[stale]` — builder retorna "missing or unreadable"
+onde o teste espera "stale" (ordem de validação × fixture). Não corrigidos.
+
+Sondas remotas (somente GET/HEAD/OPTIONS): Vercel `/` 200, `/sw.js` 200, `/models/*` 404;
+Render `/api/v1/health` 200 (DB conectado, PostGIS 3.3), `/api/v1/ready` 200,
+`/api/v1/public/auth-origin` 200, `/public/*` 404, preflight CORS 400.
+
+**Incidente de segredo nesta auditoria:** um comando de mascaramento falhou (aspas no valor) e a
+connection string completa de `DATABASE_POOLER_URL` (usuário `postgres.*`, senha) foi exibida
+na saída de ferramenta **desta sessão**. Não foi gravada neste relatório nem em arquivo. O
+histórico Git contém apenas host fictício (`backend/tests/test_supabase_config.py:33`).
+Recomenda-se rotacionar a senha do banco DEV (ação do usuário; não executada). A senha segue
+padrão previsível (nome do projeto + ano) — trocar por valor aleatório.
+
+Não auditado: conteúdo dos painéis Vercel/Render (commit, env, build/start); Playwright/build
+atuais; integração DEV; APIs externas ao vivo; câmera física; Safari; histórico completo de
+segredos; licenças atuais; hashes de todo o raw; leitura integral de `core.py`/`serving.py`;
+equivalência integral MD×DOCX; causa da Capture órfã; papel científico das imagens de demo.
+
+## 12. Plano de correção priorizado
+
+| # | Grupo | Tarefa | Findings | Quem | Paralelo? | Conclusão |
+|---|---|---|---|---|---|---|
+| 1 | A | Corrigir `VITE_API_BASE_URL` (Vercel) e `CORS_ALLOWED_ORIGINS` (Render) | A25-01 | usuário (painéis) ou agente autorizado | sim | preflight 200 + leitura pública no navegador |
+| 2 | A/F | Consolidar trabalho local em commits lógicos, empurrar branch, decidir `0031` | A25-02, F-02 | agente + revisão humana | não (base de tudo) | checkout limpo verde; head DB=repo |
+| 3 | A | Deixar gate verde: 3 testes, mypy, Prettier; registrar artefato | A25-10 | agente | após 2 | suíte/estáticos verdes |
+| 4 | A | Unificar perfil de inferência navegador/Worker (re-registro shadow autorizado) | A25-03 | agente + autorização | após 2 | mesmo `inference_profile_sha256` |
+| 5 | C | Role runtime mínima; tirar tokens de deploy do `.env` runtime; rotacionar senha | A25-06, F-04 | usuário + agente | sim | negação de privilégio testada |
+| 6 | A | Definir onde roda o Worker e entrega do ONNX (build/Storage/Release com checksum) | A25-04, A25-05 | decisão humana → agente | após 2 | Worker supervisionado processa job real |
+| 7 | B | Investigar Capture órfã; decidir destino da demo `0031` | A25-09, A25-11 | agente + decisão | sim | sem órfãs; demo isolada/removida |
+| 8 | A | E2E real autorizado (foto externa, localização, RoadSegment OSM, revisão, publicação, mapa) + celular físico | F-01, F-08 | usuário + agente | após 1–6 | IDs e tempos registrados |
+| 9 | D | Revisão humana dos lotes; holdout independente; grupos | A25-07, §8 | revisor humano | sim | classes aprovadas com evidência |
+| 10 | E | Reconciliar XGBoost (uma implementação), chamador advisory, GT real | A25-08 | agente + dados | após 2 | modelo só com promoção e dados |
+| 11 | D | Calibração photo gate (20+20) | A25-12 | usuário | sim | blur/cena calibrados |
+| 12 | F | Documentação: corrigir corrupção, contradições, MD×DOCX, registrar Vercel/Render | A25-14, §3 | agente + decisão | sim | docs coerentes |
+| 13 | G | Reprocessamento de `model_not_available`; bundle; health | A25-13, F-12 | agente | sim | testes |
+
+Não exige XGBoost para testar o fluxo YOLOX. Não recomenda "mais épocas" como solução.
+Conflito potencial: o worktree XGBoost e a working copy editam `tabular.py`, `core.py`,
+`features.py`, `services/__init__.py`, `pyproject.toml` — não trabalhar em paralelo nesses.
+
+## 13. Pendências humanas / dados / testes físicos
+
+- Humanas: decisão Vercel/Render no plano; destino da demo; autorização do perfil único;
+  commits; rotação de segredo; revisão dos 130 casos (UNIVALI 32, Urban 50, piloto 48) e grupos.
+- Dados: foto externa com localização; recorte OSM; GT `review_confirmed`; corpus de calibração
+  do photo gate; holdout YOLOX independente; fonte com grupos para severidade visual.
+- Físicos: webcam, Android, iPhone/Safari, HTTPS real, rede móvel.
+
+## 14. Atualizações recomendadas (não aplicadas)
+
+- `docs/PROJECT_STATE.md`: remover contradição da linha 5; corrigir seções corrompidas; registrar A25-01..14.
+- `datasets/STATUS.md`: restaurar cabeçalho gerado ("Atualizado em …").
+- `docs/Planinng/MASTER_PLAN.md` + DOCX: hospedagem, detecção ao vivo, numeração de fases.
+- `docs/LIVE_DETECTION.md`: estado real de publicação (não publicado) e perfil do Worker.
+- `datasets/metadata/artifact_registry.json`: via produtor oficial, não à mão.
+
+## 15. Ponto de retomada
+
+Retomar na tarefa #1/#2 do §12. Estado de referência: HEAD `e57db61` + working copy com hash de
+diff `c2d831da…`; DEV head `0031_demo_events`; ModelVersion shadow `a3ff07ea`; ONNX `d429bde8…`.
+Revalidar A25-01 com as mesmas sondas curl antes de corrigir.
+
+## 16. Estado Git inicial × final
+
+Idênticos (status, diff, untracked e hashes de artefatos). Único arquivo alterado por esta
+auditoria: este relatório. Nenhum commit, deploy, migration, treino, gravação no DEV ou
+alteração de `.env`.
+
+## 17. Revisão independente
+
+Um subagente somente leitura (sem acesso a `.env`, apenas GET/OPTIONS remotos) tentou refutar seis
+afirmações de maior impacto:
+
+| Afirmação | Veredito do revisor | Efeito no relatório |
+|---|---|---|
+| C1 app publicado sem API (prefixo + CORS) | CONFIRMED; mesma base sem `/api/v1` em `api.ts:13`, `auth.ts:134`, `publicApi.ts:16`; sem `vercel.json`/proxy | A25-01 mantido P0 |
+| C2 perfis navegador × Worker | CONFIRMED; DEV usa o perfil de rollback | A25-03 reforçado; PROJECT_STATE:150–151 incorreto |
+| C3 XGBoost sem chamador / divergente | PARTIAL: `train_xgboost` também existe em main (HEAD) | corrigido §1 e §7, A25-08 |
+| C4 trabalho só local / demo anon | PARTIAL: flag shadow básico já estava em HEAD; só a validação por arquivo é local; 0031 exige `DEMO_MODE=1` | corrigido §1 |
+| C5 photo gate sem blur | CONFIRMED; publicação exige `visible_content_reviewed` (`api/v1/core.py:1234–1245`), mas é um booleano declarado pelo revisor | A25-12 mantido |
+| C6 `model_not_available` terminal | CONFIRMED; `enqueue_capture` só é chamado por detach-evidence | A25-13 confirmado |
+
+Nenhum achado novo de alto impacto além da contradição de perfil no PROJECT_STATE.
+
+---
+
+# Execução anterior — 24/09/2026 (histórico preservado)
+
 Data: 24/09/2026. Escopo: auditoria, sem correção de implementação.
 Referência Git: `feat/urmind-v1-public-center`, HEAD `437c21d`.
 Ambiente consultado: exclusivamente Urmind DEV, `impm...ggy`.

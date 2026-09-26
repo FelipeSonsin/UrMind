@@ -1,5 +1,144 @@
 # UrMind — remediação parcial, 24/09/2026
 
+> Este arquivo acumula rodadas. A rodada **2026-09-25/26 (remediação da auditoria A25)** está
+> logo abaixo; as rodadas de 24/09 seguem preservadas.
+
+# Rodada 2026-09-25/26 — remediação da auditoria A25
+
+## Checkpoint inicial (2026-09-25T23:51:17-03:00)
+
+| Campo | Valor |
+|---|---|
+| Branch / HEAD | `ml/urmind-training-prep` / `e57db6182de2` (= `origin/main`) |
+| Staged | nenhum |
+| Dirty | 102 entradas (as 101 da auditoria + o próprio relatório de auditoria); hash do diff tracked sem o relatório = `c2d831da…` (idêntico ao da auditoria ⇒ nenhum outro terminal alterou arquivos) |
+| Worktrees | principal + `C:/Users/felip/AppData/Local/UrMind/worktrees/xgboost-preparation-parallel` (`feat/xgboost-preparation-parallel`) |
+| Submódulo | YOLOX `6ddff48` |
+| Processos | Worker local PID 23256 (21:44), API local 39764 (:8000), Vite 41508 (:5173); **nenhum treino** |
+| RAM livre | 1,39 GB ⇒ testes somente sequenciais |
+| Já resolvido pelo usuário (não refeito) | senha DEV rotacionada; `backend/.env` e `DATABASE_POOLER_URL` do Render atualizados; `VITE_API_BASE_URL` e `CORS_ALLOWED_ORIGINS` corretos (verificação Vercel→Render `ISSUE_RESOLVED=YES`) |
+
+## Execução autorizada — 2026-09-26 00:40–01:30 -03
+
+O proprietário autorizou as escritas no DEV, o perfil `2702eb15` **somente como SHADOW
+EXPERIMENTAL no DEV**, o bucket público de modelos, o recorte OSM FECAP 3 km e o push.
+
+### Revisão adversarial → correções (antes de tocar no DEV)
+
+| Achado | Correção | Regressão |
+|---|---|---|
+| HIGH 0033 com `ALTER ROLE … NOSUPERUSER` (proibido ao `postgres` do Supabase) | atributos só no `CREATE ROLE`; papel preexistente é **verificado** (atributos elevados, sem LOGIN ou membro de outra role ⇒ aborta) | `test_runtime_role_nao_tem_atributos_administrativos` |
+| HIGH registro/promoção/integração pela conexão de runtime | `Database(settings, role="admin")` usa só `MIGRATION_DATABASE_URL`; registro, `_attach_report`, reconciliação e fixtures de integração em admin; checagem de identidade DEV do registro passa para a URL de migration | `test_conexao_admin_*`, `test_shadow_registration_refuses_a_non_admin_migration_identity` |
+| (achado novo) `Settings` recusava pooler `urmind_runtime.<ref>` (projeto e modo shadow) | ref extraído de `<role>.<ref>`; shadow aceita `urmind_runtime`/`postgres` só no DEV | `test_pooler_da_role_runtime_*`, `test_modo_shadow_aceita_*` |
+| MEDIUM downgrade com `drop owned` | remoção explícita de policies (incl. 0025–0030), revokes e `drop role` | `test_runtime_role_downgrade_nao_depende_de_drop_owned` |
+| MEDIUM heartbeat podia derrubar o Worker | falha de escrita vira `worker_heartbeat_write_failed`; heartbeat inicial antes do 1º job | `test_falha_ao_gravar_heartbeat_nao_derruba_o_worker` |
+| MEDIUM `runtime-password` trocava senha antes de validar | valida env/chave/BOM/identidade DEV/role/atributos/URL antes; `.env` gravado atomicamente; leitura em bytes (preserva CRLF); `--rollback` e `verify-runtime` | 6 cenários "senha nunca muda" + rotação + rollback |
+| MEDIUM `letterbox_upscale` ausente ampliava | perfil versionado sem a chave ⇒ `model_not_available`; sem perfil ⇒ `preproc` legado | `test_perfil_versionado_sem_letterbox_explicito_falha_fechado` |
+| MEDIUM `report.json` malformado | loader exige `model.json`/`calibration.json` com hash e tipos; `tabular_runtime` degrada qualquer falha para `UNAVAILABLE` | `test_malformed_report_degrades_to_unavailable_without_raising` |
+| LOW consentimentos com DELETE; path do ONNX sem contenção; Start sem mutex; limpeza por marcador cliente | `select, insert`; path preso a `dist/models`; mutex `Local\UrMindWorkerStart`; limpeza só das chaves criadas na execução | testes correspondentes |
+
+Gate após correções: backend **1504 passed / 37 skipped / 0 failed**; mypy 75; Ruff; `git diff --check`.
+
+### Banco, role e dados no Urmind DEV
+
+- Dry-run 0032+0033 no schema real dentro de transação com `ROLLBACK` (versão e role voltaram).
+  Upgrade limpo em banco vazio **não executado** (sem PostgreSQL local; Docker proibido).
+- `alembic upgrade head`: **0032, 0033 e 0034 aplicadas**. A 0034 nasceu do teste real de
+  privilégio: a nova role não tinha `extensions` no `search_path` (PostGIS). Conexão do pool
+  aberta antes da 0034 manteve o valor antigo até ser reciclada.
+- Catálogo: `urmind_runtime` sem SUPERUSER/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS, LOGIN,
+  24 policies, `audit_log` SELECT/INSERT, `model_versions` SELECT, demo sem acesso.
+- `runtime-password` (SCRAM local) → `verify-runtime`: `current_user=urmind_runtime`.
+- Teste de privilégio real (DEV, transação desfeita): insert em Capture com trigger pgmq,
+  métricas da fila, leitura de modelos e `snap_to_road` **ok**; CREATE TABLE, DELETE em
+  audit_log, UPDATE em model_versions, `auth.users`, tabela demo, ALTER de outra role e
+  CREATE ROLE **negados**. Suíte de integração DEV: **33 passed**, 3 excluídos (criam usuários Auth).
+- Capture órfã `932d346c…`: auditada (`capture_fixture_residue_removed`, causa, evidências,
+  prevenção, dependentes zero) e removida na mesma transação. Captures no DEV: 0.
+- OSM FECAP (−23,5560, −46,6370, 3 km, Overpass): **12.808 RoadSegments**, `osm_id` único,
+  LINESTRING/4326, válidos, `geog` computada, GiST em geom/geog, 1.212 km. Snap pela role de
+  runtime: FECAP → trunk_link 7,5 m; Praça da Sé → footway 0,0 m; Morumbi (fora) → nenhuma via.
+
+### Modelo, perfil, ONNX e Worker
+
+- ONNX `d429bde8…` publicado em bucket público **separado** `models`, caminho imutável
+  `yolox-s-model-v2-d429bde8a9bd/<sha256>/…onnx`, `x-upsert:false`, URL pública re-hasheada;
+  registro em `datasets/metadata/model_distribution/yolox-s-model-v2-d429bde8a9bd.json`.
+  Build simulado sem ONNX local: `downloaded_verified`. `LIVE_MODEL_ONNX_URL` criado na Vercel
+  (produção); `VITE_API_BASE_URL`/CORS intocados.
+- Autorização `…-profile-2702eb15.json` (nova, sem sobrescrever a do `d2b6e1ab`): ONNX,
+  contrato, ordem de classes, perfil, calibração, VALIDATION, paridade PyTorch×ONNX, run e
+  escopo DEV, com as limitações ditadas pelo proprietário. Re-registro idempotente do mesmo
+  ModelVersion `a3ff07ea` (1 linha por ONNX): perfil 2702eb15, 0,03/0,2/0,07/0,2, NMS por
+  classe 0,45, sem ampliação, `EXPERIMENTAL_SHADOW`, não promovido.
+- O `d2b6e1ab` fica como **histórico/rollback de documento** (autorização e perfil preservados);
+  voltar a ele exige re-registro com essa autorização — não há mais registro ativo com ele.
+- Paridade navegador × Worker (`datasets/reports/live_detection_parity_2702eb15.json`): Worker
+  resolvido pelo gate real com a role de runtime; navegador Edge headless com o `dist`, ONNX
+  Runtime Web/WebGPU. 6 imagens autorizadas (5 VALIDATION 512 px, 1 TRAIN 720 px): contagens
+  iguais, **8/8** mesma classe, IoU 0,959–0,9997, |Δscore| ≤ 0,004. Paridade ≠ qualidade.
+- Worker antigo sem supervisão (PID 23256, config anterior e detector do perfil antigo em
+  cache) encerrado com a fila vazia; Worker supervisionado PID 41856 via `worker.ps1`,
+  heartbeat ok, 0 erros.
+
+## Bloqueio de permissão (escritas em recurso compartilhado)
+
+> Superado pela autorização acima; mantido como histórico.
+
+A tentativa de `alembic upgrade head` no Urmind DEV (0032/0033) foi **negada pelo
+classificador de permissões** (recurso compartilhado). Não houve contorno por outra via.
+Ficam pendentes, dependentes de autorização explícita do proprietário: aplicar 0032/0033
+no DEV; `python -m app.db.migrate runtime-password`; trocar `DATABASE_POOLER_URL` no
+Render; re-registrar o ModelVersion shadow; marcar/remover a Capture órfã; importar o
+recorte OSM; hospedar o ONNX; push/deploy.
+
+## O que foi feito (código local, testado)
+
+| Item | Antes | Depois | Evidência |
+|---|---|---|---|
+| Gate backend | 1425 passed / 3 failed; mypy 4 erros | **1482 passed / 36 skipped / 0 failed**; mypy 75 arquivos OK; Ruff `app tests` OK | suíte offline 26/09 00:28 |
+| Falha STATUS.md | cabeçalho gerado sobrescrito, acentos corrompidos (`?`) | data gerada restaurada com ressalva; acentos reconstruídos | `test_status_publica_a_data_de_hoje` PASS |
+| Registro de artefatos | launcher e contrato defasados | regenerado pelo gerador oficial; launcher = `2262dfac…` (o que executou `10h-r1`) | `refresh_registry.py --check` sem diferenças |
+| Builder V3 | erro "stale" mascarado como "missing" (`ManifestBuildError` é `RuntimeError`) | verificação de hash fora do `try` | teste parametrizado stale/missing PASS |
+| mypy | `browser_model.py:158–159`; stubs sklearn | validação que retorna `float`; ignore pontual `import-untyped` | mypy OK |
+| Migration 0031 | `upgrade` limpo falhava sem `DEMO_MODE=1` | DDL sempre roda; grant/policy anônimos só com `DEMO_MODE=1` | render offline 0030→head OK |
+| 0032 (nova) | tabela demo com SELECT para `anon`/`authenticated` | policy pública removida e grants revogados; DEV e clone limpo convergem | `test_demo_events_sem_acesso_cliente_no_head` |
+| 0033 (nova) | runtime como `postgres` | role `urmind_runtime` sem SUPERUSER/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS, grants por tabela conforme escritas reais + policy RLS explícita, pgmq e `snap_to_road` | `tests/test_migrations.py` (SQL emitido), **não aplicada no DEV** |
+| Senha da role | — | `python -m app.db.migrate runtime-password`: senha gerada localmente, só verificador SCRAM-SHA-256 vai ao banco; reescreve apenas `DATABASE_POOLER_URL` | `tests/test_runtime_role.py` |
+| Tokens de deploy | `VERCEL_TOKEN`, `RENDER_API_KEY` em `backend/.env` | movidos para `.env.deploy` (raiz, ignorado); nenhum código de runtime os lê; Render nunca os teve | `git check-ignore`; histórico só com placeholder `sb_secret_…` |
+| Capture órfã | 1 linha sem imagem/local/status | causa identificada: resíduo do fixture `test_storage_compensates_real_db_constraint_failure` (insert direto, mesma forma); fixture agora marca a linha e a desmontagem do módulo apaga só linhas marcadas e falha se houver resíduo | remoção no DEV **pendente de autorização** |
+| XGBoost | `tabular.py` divergente (1.315 × 4.060 linhas); runtime sem chamador | um módulo, um `train_xgboost`, uma CLI; parser estrito único; runtime ligado a `decision_trace.review_confirmed_advisory` (DISABLED/AVAILABLE/ERROR, `advisory_only`) | 117+ testes tabulares; 3 testes novos de não-interferência |
+| Perfil de inferência | registro não gravava `letterbox_upscale` (Worker ampliava por padrão) | `shadow_inference_profile` e registro gravam o valor explícito | teste parametrizado PASS |
+| Worker | sem supervisão | `Supervision` (heartbeat + `stop.request`) e `scripts/deploy/worker.ps1 Start/Stop/Status` com recusa de duplicata e checagem de PID+horário | testes + execução real (ver nota) |
+| ONNX no deploy | ignorado pelo Git, 404 na Vercel | manifesto versionado; `frontend/build/liveModel.ts` confere SHA-256/tamanho, baixa de `LIVE_MODEL_ONNX_URL` ou retira o manifesto | 7 testes Vitest; build local verifica a cópia |
+| Contadores GT | só totais | confirmados/rejeitados/corrigidos/conflitos/estado/motivos/grupos independentes | teste 1200 Events |
+| Prettier | 19–21 arquivos "fora do padrão" | causa: `core.autocrlf=true` (índice LF, checkout CRLF); `endOfLine: auto` | `prettier --check` OK |
+
+Nota operacional: ao validar `worker.ps1`, um defeito de desenrolamento de array do
+PowerShell fez o primeiro `Start` não detectar o Worker preexistente e iniciar um segundo
+(PID 40596/14724). Ele foi encerrado em segundos pelo próprio `Stop` (via `stop.request`),
+com heartbeat `jobs_processed=0`, `iteration_errors=0` — nenhum job consumido. Corrigido
+(`@(...)` em todas as chamadas) e a recusa foi reverificada contra o Worker real.
+
+## Verificação final desta rodada
+
+| Gate | Resultado |
+|---|---|
+| PYTEST (offline) | PASS — 1482 passed, 36 skipped (35 integração DEV + 1 live) |
+| MYPY | PASS — 75 arquivos |
+| RUFF (`app tests`) | PASS |
+| FRONTEND_UNIT (Vitest) | PASS — 110 |
+| TYPECHECK (tsc) | PASS |
+| BUILD | PASS (aviso de chunk grande preexistente) |
+| PLAYWRIGHT | PASS — 158 passed, 2 skipped (E2E real sem foto aprovada) |
+| GIT_DIFF_CHECK | PASS |
+| DEV_INTEGRATION | NOT_RUN — escrita no DEV bloqueada nesta sessão |
+| MIGRATION_REPRODUCIBILITY | PARTIAL — cadeia renderizada offline e testes estruturais; sem PostgreSQL isolado (Docker proibido; nenhum PG local) |
+| BROWSER_WORKER_PARITY | NOT_RUN — perfis divergem por falta de autorização; paridade histórica 82/82 é do perfil anterior |
+| LIVE external check | Overpass, OpenFreeMap, SIDRA, Supabase, Open-Meteo, GeoSampa, BrasilAPI, ViaCEP OK; Geofabrik OK após 2 retries; Nominatim não sondado (lease no banco) |
+| REAL_E2E | NOT_RUN — BLOCKED (DEV write + foto/localização reais) |
+| PHYSICAL_DEVICE_TESTS | PHYSICAL_TEST_PENDING |
+
 ## Exclusão autorizada de treinamentos anteriores
 
 81 artefatos removidos para Lixeira; inventário em `TRAINING_CLEANUP_2026-09-24.md`.

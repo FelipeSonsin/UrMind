@@ -1,5 +1,42 @@
 # UrMind — Checklist da demonstração na feira
 
+## Detecção ao vivo (25/09/2026)
+
+Ver [LIVE_DETECTION.md](LIVE_DETECTION.md). Sem ONNX autorizado a aba abre a câmera e
+mostra "Modelo de detecção indisponível": não apresentar isso como detecção.
+
+- [x] AUTO: rota, erros de câmera, troca/encerramento/saída, página oculta, modelo
+  ausente, download/checksum inválidos, captura → rascunho sem upload.
+- [x] Autorização de uso e distribuição do export EXPERIMENTAL `10h-r1` registrada
+  (LIVE_DETECTION.md); publicação automática após o treino, só se o export passar.
+- [x] DEV: treino concluído → export com paridade → `yolox-s-model-v2-d429bde8a9bd`
+  publicado em `frontend/public/models/` (EXPERIMENTAL; VALIDATION mAP50 0,108 — fraco).
+- [x] AUTO: gerador `python -m app.ml.browser_model` (fail-closed) e logout com câmera aberta.
+- [x] DEV: paridade navegador × `OnnxDetector`: 14/15 detecções IoU ≥ 0,97, Δscore ≤ 0,021;
+  1 divergência explicada por empate no NMS. WebGPU, ~306 ms, ~2,1 análises/s.
+- [x] DEPLOY (26/09): manifesto versionado; ONNX no bucket público `models` do Storage DEV;
+  `LIVE_MODEL_ONNX_URL` na Vercel (o build confere SHA-256; sem peso verificado o app mostra
+  "indisponível"). Navegador e Worker no mesmo perfil `2702eb15` (paridade 8/8).
+- [ ] MANUAL: webcam do notebook do estande, Android Chrome e iPhone Safari; anotar
+  provider (WebGPU/WASM), latência e análises/s medidas na tela.
+- [ ] MANUAL: primeiro uso na rede da feira (~6,7 MB de `.wasm` + ONNX).
+- [ ] MANUAL: "Capturar e registrar" → confirmar local → enviar → processamento oficial.
+
+### Matriz física (PHYSICAL_TEST_PENDING — Playwright não substitui hardware)
+
+| Verificação | Webcam Windows | Android Chrome | iPhone Safari |
+|---|---|---|---|
+| Início só por ação explícita; sem pedido de microfone | [ ] | [ ] | [ ] |
+| Escolha/troca de câmera (frontal espelhada, traseira não) | [ ] | [ ] | [ ] |
+| Pausar, parar, ocultar a aba e logout desligam a câmera (luz apaga) | [ ] | [ ] | [ ] |
+| Caixas alinhadas ao objeto em retrato e paisagem | [ ] | [ ] | [ ] |
+| Provider (WebGPU/WASM), latência p50/p95 e análises/s anotados | [ ] | [ ] | [ ] |
+| "Analisar imagem" sem GPS não cria ocorrência | [ ] | [ ] | [ ] |
+| Foto tirada agora usa GPS atual com precisão e horário exibidos | [ ] | [ ] | [ ] |
+| Foto da galeria usa EXIF; GPS atual só após confirmação explícita | [ ] | [ ] | [ ] |
+| GPS negado → seleção manual; nenhum ponto inventado | [ ] | [ ] | [ ] |
+| Capturar e registrar → frame sem overlay → fluxo oficial | [ ] | [ ] | [ ] |
+
 ## Continuação atual (24/09/2026)
 
 - [x] DEV: Auth descartável reviewer/admin e sessões anônimas, JWT/JWKS e remoção.
