@@ -327,8 +327,12 @@ test('captura usa o tema escuro do UrMind e alvos de toque em 320px', async ({ p
   await page.goto('/#/registrar');
   // Identidade única, escura, qualquer que seja a preferência do aparelho.
   await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(12, 20, 17)');
-  await expect(page.locator('.panel').first()).toHaveCSS('background-color', 'rgb(25, 41, 35)');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(5, 5, 7)');
+  // Blocos em azul-marinho translúcido sobre o fundo de espaço (--surface-elevated a 78%).
+  await expect(page.locator('.panel').first()).toHaveCSS(
+    'background-color',
+    /^(color\(srgb 0\.05\d* 0\.07\d* 0\.18\d* \/ 0\.78\)|rgba\(13, 19, 48, 0\.78\))$/,
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   for (const button of await page.getByRole('button').all()) {
     // File input is intentionally transparent; its enclosing label is the touch target.
