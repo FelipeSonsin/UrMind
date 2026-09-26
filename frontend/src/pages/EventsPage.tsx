@@ -43,7 +43,6 @@ export function EventsPage({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">OBSERVATÓRIO / {map ? 'TERRITÓRIO' : 'OCORRÊNCIAS'}</p>
           <h1>{map ? 'Gêmeo digital 2D' : 'Ocorrências urbanas'}</h1>
           <p>
             {map

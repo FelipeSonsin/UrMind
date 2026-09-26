@@ -1,5 +1,10 @@
-import { labelFor, priorityBand, severityOf, type PublicEvent } from '../../domain/public';
-import { statuses } from '../../domain/contracts';
+import {
+  labelFor,
+  priorityBand,
+  severityOf,
+  situationLabel,
+  type PublicEvent,
+} from '../../domain/public';
 
 export function EventFeed({
   events,
@@ -37,9 +42,9 @@ export function EventFeed({
                   onClick={() => onSelect(event)}
                 >
                   <time dateTime={event.occurred_at}>
-                    {new Date(event.occurred_at).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
+                    {new Date(event.occurred_at).toLocaleDateString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
                     })}
                   </time>
                   <span className="feed-main">
@@ -50,13 +55,8 @@ export function EventFeed({
                     <i aria-hidden="true">{severity.shape}</i> {severity.label}
                   </span>
                   <span className="feed-meta">
-                    {event.visual_confidence != null
-                      ? `${(event.visual_confidence * 100).toFixed(0)}%`
-                      : '—'}
-                    <small>
-                      {priorityBand(event.priority_score)} ·{' '}
-                      {statuses[event.status as keyof typeof statuses] ?? event.status}
-                    </small>
+                    {situationLabel(event.status)}
+                    <small>prioridade {priorityBand(event.priority_score)}</small>
                   </span>
                 </button>
               </li>

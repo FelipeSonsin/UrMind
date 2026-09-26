@@ -356,15 +356,24 @@ describe('sincronização quadro ↔ resultado', () => {
     expect(gate.busy).toBe(false);
     expect(gate.accept(ticket.run, ticket.frameId)).toBe(false);
   });
-  it('ritmo respeita o teto e deixa folga quando a inferência é lenta', () => {
-    expect(new AdaptiveCadence().next(50)).toBe(150);
-    // 800 ms com no máximo 75% de ocupação: período de ~1067 ms, espera de ~267 ms.
+  it('ritmo chega a 60 análises/s e deixa folga quando a inferência é lenta', () => {
+    // Inferência de 5 ms (GPU rápida): o teto é o ritmo da câmera, 60 por segundo.
+    const fast = new AdaptiveCadence();
+    fast.next(5);
+    expect(fast.periodMs).toBeCloseTo(1000 / 60, 5);
+    // 10 ms com no máximo 75% de ocupação: período de ~13,3 ms, abaixo do teto de 60/s.
+    const quick = new AdaptiveCadence();
+    quick.next(10);
+    expect(quick.periodMs).toBeCloseTo(1000 / 60, 5);
+    // 50 ms: período de ~66,7 ms, espera de ~16,7 ms.
+    expect(new AdaptiveCadence().next(50)).toBeCloseTo(16.67, 1);
+    // 800 ms: período de ~1067 ms, espera de ~267 ms (folga para o vídeo).
     expect(new AdaptiveCadence().next(800)).toBeCloseTo(266.67, 1);
   });
   it('latência maior recua na hora; latência menor acelera aos poucos até o teto', () => {
     const cadence = new AdaptiveCadence();
     for (let i = 0; i < 20; i++) cadence.next(60);
-    expect(cadence.periodMs).toBe(200);
+    expect(cadence.periodMs).toBeCloseTo(80, 1);
     // Aparelho esquentou: a primeira resposta lenta já espaça os envios.
     cadence.next(900);
     expect(cadence.periodMs).toBeCloseTo(1200);
@@ -379,7 +388,7 @@ describe('sincronização quadro ↔ resultado', () => {
       expect(periods[i]).toBeGreaterThanOrEqual(periods[i - 1] * 0.85 - 1e-9);
     }
     expect(periods[0]).toBeGreaterThan(900);
-    expect(periods.at(-1)).toBe(200);
+    expect(periods.at(-1)).toBeCloseTo(80, 1);
   });
   it('nunca envia duas vezes o mesmo quadro de vídeo', () => {
     const freshness = new FrameFreshness();

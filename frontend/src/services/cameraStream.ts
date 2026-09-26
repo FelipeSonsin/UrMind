@@ -17,25 +17,63 @@ export class CameraError extends Error {
   }
 }
 
+/** Quadros por segundo pedidos a toda câmera do UrMind. */
+export const TARGET_CAMERA_FPS = 60;
+
 /**
  * Tamanho preferido, nunca exigido: sem ele muitos navegadores escolhem 640×480,
  * cujo lado menor reprova a política de foto; com `exact` câmeras compatíveis falhariam.
  */
-export async function openCamera(deviceId?: string): Promise<MediaStream> {
+function defaultProfile(deviceId?: string): MediaTrackConstraints {
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } }),
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+  };
+}
+
+/**
+ * Primeira tentativa exige pelo menos 60 quadros por segundo (o navegador escolhe a
+ * maior resolução que ainda os entrega); a segunda só prefere 60, para câmeras que não
+ * têm esse modo. Microfone nunca é pedido.
+ */
+export function cameraConstraints(
+  profile: MediaTrackConstraints,
+  requireTargetFps: boolean,
+): MediaStreamConstraints {
+  return {
+    video: {
+      ...profile,
+      frameRate: requireTargetFps
+        ? { min: TARGET_CAMERA_FPS, ideal: TARGET_CAMERA_FPS }
+        : { ideal: TARGET_CAMERA_FPS },
+    },
+    audio: false,
+  };
+}
+
+function overconstrained(reason: unknown): boolean {
+  const name = (reason as { name?: string } | null)?.name;
+  return name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError';
+}
+
+export async function openCamera(
+  deviceId?: string,
+  /** Perfil de vídeo de quem transmite (ex.: celular como câmera do robô). */
+  profile?: MediaTrackConstraints,
+): Promise<MediaStream> {
   const environment = cameraEnvironment();
   if (!environment.secure || !environment.supported)
     throw new CameraError(...fromDescription(undefined, environment));
+  const video = profile ?? defaultProfile(deviceId);
   try {
-    return await navigator.mediaDevices.getUserMedia({
-      video: {
-        ...(deviceId
-          ? { deviceId: { exact: deviceId } }
-          : { facingMode: { ideal: 'environment' } }),
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-      audio: false,
-    });
+    return await navigator.mediaDevices.getUserMedia(cameraConstraints(video, true));
+  } catch (reason) {
+    if (!overconstrained(reason)) throw new CameraError(...fromDescription(reason, environment));
+  }
+  try {
+    // Câmera sem modo de 60 fps: a melhor que ela oferece; o ritmo real é medido na tela.
+    return await navigator.mediaDevices.getUserMedia(cameraConstraints(video, false));
   } catch (reason) {
     throw new CameraError(...fromDescription(reason, environment));
   }

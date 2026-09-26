@@ -4,20 +4,30 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { convertFilter, expression } from '@maplibre/maplibre-gl-style-spec';
 import {
+  EMPTY_PUBLIC_FILTERS,
   familyFor,
   filterMapRecords,
+  filterPublicMap,
   formatBrDate,
+  issueHeadline,
   labelFor,
   mapFilterOptions,
   maskBrDate,
   parseBrDate,
+  publicMapFilterOptions,
+  publicSituation,
+  publicSituationLabels,
   severityOf,
+  situationLabel,
   type MapFilters,
+  type PublicMapFilters,
+  type PublicSituation,
 } from '../domain/public';
 import {
   BRAZIL_OUTLINE_BOUNDS,
   BRAZIL_OUTLINE_URL,
   BRAZIL_STATES_URL,
+  isDarkBasemap,
   isInBrazilMapViewport,
   isInsidePolygons,
   localizedLabelField,
@@ -91,25 +101,10 @@ function useBrazilOutline(): boolean {
   return ready;
 }
 
-const DARK_QUERY = '(prefers-color-scheme: dark)';
+/** Cores do contorno e das capitais conforme a base carregada (escura por padrão). */
+let basemapIsDark = true;
 function outlineTheme(): MapColors {
-  const dark = window.matchMedia?.(DARK_QUERY).matches ?? false;
-  return dark ? MAP_DESIGN.colors.dark : MAP_DESIGN.colors.light;
-}
-
-function applyOutlineTheme(map: maplibregl.Map) {
-  const theme = outlineTheme();
-  const paints: [string, keyof maplibregl.AllPaintProperties, string][] = [
-    ['brazil-mask', 'fill-color', theme.mask],
-    ['brazil-border', 'line-color', theme.border],
-    ['brazil-states', 'line-color', theme.states],
-    ['brazil-capitals-dot', 'circle-color', theme.capitalText],
-    ['brazil-capitals-dot', 'circle-stroke-color', theme.capitalHalo],
-    ['brazil-capitals', 'text-color', theme.capitalText],
-    ['brazil-capitals', 'text-halo-color', theme.capitalHalo],
-  ];
-  for (const [layer, property, value] of paints)
-    if (map.getLayer(layer)) map.setPaintProperty(layer, property, value);
+  return basemapIsDark ? MAP_DESIGN.colors.dark : MAP_DESIGN.colors.light;
 }
 
 /** Reuses the basemap's own label font so the glyphs exist on its server. */
@@ -295,7 +290,8 @@ function showEvents(
   map: maplibregl.Map,
   located: MapMarker[],
   fittedKey: { current: string },
-  focusId?: string | null,
+  focusId: string | null | undefined,
+  audience: MapAudience,
 ) {
   const source = map.getSource('events') as maplibregl.GeoJSONSource | undefined;
   if (!source) return;
@@ -316,10 +312,7 @@ function showEvents(
       geometry: { type: 'Point' as const, coordinates: [event.longitude!, event.latitude!] },
       properties: {
         id: event.id,
-        label: markerLabel(event),
-        report: Boolean(event.report_status),
-        severity: severityOf(event.severity).label,
-        road: event.road_name ?? '',
+        popup: markerPopup(event, audience),
         marker: markerIds.get(event.id) ?? '',
       },
     })),
@@ -363,11 +356,44 @@ export interface MapMarker {
   occurred_at?: string | null;
 }
 
+/** Público: situação agrupada e nome simples. Equipe: estado técnico completo. */
+export type MapAudience = 'public' | 'team';
+
 const LEGEND = ['critical', 'high', 'medium', 'low', 'unknown'];
-function markerLabel(event: MapMarker) {
+const SITUATION_ORDER: PublicSituation[] = [
+  'received',
+  'analyzing',
+  'confirmed',
+  'needs_location',
+  'declined',
+];
+/** Cor do círculo de cada situação pública: a mesma de um estado técnico do grupo. */
+const SITUATION_SAMPLE: Record<PublicSituation, string> = {
+  received: 'received',
+  analyzing: 'processing',
+  confirmed: 'published',
+  needs_location: 'location_required',
+  declined: 'rejected',
+};
+
+function markerLabel(event: MapMarker, audience: MapAudience) {
+  if (audience === 'team')
+    return event.report_status
+      ? `${reportLabels[event.report_status]}${event.urmind_class ? ` · ${labelFor(event.urmind_class)}` : ''}`
+      : labelFor(event.urmind_class ?? '');
+  const headline = event.urmind_class ? issueHeadline(event.urmind_class, event.severity) : '';
   return event.report_status
-    ? `${reportLabels[event.report_status]}${event.urmind_class ? ` · ${labelFor(event.urmind_class)}` : ''}`
-    : labelFor(event.urmind_class ?? '');
+    ? `${situationLabel(event.report_status)}${headline ? ` · ${headline}` : ''}`
+    : headline || 'Ocorrência';
+}
+
+function markerPopup(event: MapMarker, audience: MapAudience) {
+  const label = markerLabel(event, audience);
+  if (event.report_status) return label;
+  const road = event.road_name ? ` · ${event.road_name}` : '';
+  return audience === 'team'
+    ? `${label} · severidade ${severityOf(event.severity).label}${road}`
+    : `${label}${road}`;
 }
 
 export default function UrbanMap({
@@ -381,6 +407,9 @@ export default function UrbanMap({
   allowExport = false,
   emptyMessage = 'Ainda não há pontos para mostrar neste mapa.',
   showFilters = true,
+  audience = 'public',
+  pickedPoint,
+  initialZoom,
 }: {
   events: MapMarker[];
   selectedId?: string | null;
@@ -393,6 +422,12 @@ export default function UrbanMap({
   emptyMessage?: string;
   /** Mapas de apoio (início) mostram os pontos sem a barra de filtros. */
   showFilters?: boolean;
+  /** Público vê filtros simples e nomes simples; a equipe, o vocabulário técnico. */
+  audience?: MapAudience;
+  /** Ponto escolhido fora do mapa (busca de endereço): o marcador vai até ele. */
+  pickedPoint?: { latitude: number; longitude: number } | null;
+  /** Zoom inicial ao abrir em `initialCenter` (padrão: nível de rua). */
+  initialZoom?: number;
 }) {
   const exportController = useRef<AbortController | null>(null);
   const [exportError, setExportError] = useState('');
@@ -408,31 +443,35 @@ export default function UrbanMap({
       to: query.get('map_to') ?? '',
     };
   });
+  const [publicFilters, setPublicFilters] = useState<PublicMapFilters>(() => {
+    const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
+    return {
+      issue: query.get('map_class') ?? '',
+      severity: query.get('map_severity') ?? '',
+      period: query.get('map_period') ?? '',
+    };
+  });
+  const team = audience === 'team';
   const events = useMemo(
-    () => (onPickLocation ? allEvents : filterMapRecords(allEvents, filters)),
-    [allEvents, filters, onPickLocation],
+    () =>
+      onPickLocation
+        ? allEvents
+        : team
+          ? filterMapRecords(allEvents, filters)
+          : filterPublicMap(allEvents, publicFilters),
+    [allEvents, filters, publicFilters, onPickLocation, team],
   );
   const options = mapFilterOptions(allEvents, filters.family, {
     reports: reportLabels,
     events: statuses,
   });
-  const filtering = Object.values(filters).some(Boolean);
-  function changeFilters(requested: MapFilters) {
-    // A classe escolhida precisa pertencer à família escolhida.
-    const next =
-      requested.issue && requested.family && familyFor(requested.issue) !== requested.family
-        ? { ...requested, issue: '' }
-        : requested;
-    setFilters(next);
-    onCloseDetail?.();
+  const publicOptions = useMemo(() => publicMapFilterOptions(allEvents), [allEvents]);
+  const filtering = team
+    ? Object.values(filters).some(Boolean)
+    : Object.values(publicFilters).some(Boolean);
+  function writeQuery(values: Record<string, string>) {
     const query = new URLSearchParams(location.hash.split('?')[1] ?? '');
-    for (const [key, value] of Object.entries({
-      map_status: next.status,
-      map_family: next.family,
-      map_class: next.issue,
-      map_from: next.from,
-      map_to: next.to,
-    })) {
+    for (const [key, value] of Object.entries(values)) {
       if (value) query.set(key, value);
       else query.delete(key);
     }
@@ -441,6 +480,31 @@ export default function UrbanMap({
       '',
       `${location.hash.split('?')[0]}${query.size ? `?${query}` : ''}`,
     );
+  }
+  function changePublicFilters(next: PublicMapFilters) {
+    setPublicFilters(next);
+    onCloseDetail?.();
+    writeQuery({ map_class: next.issue, map_severity: next.severity, map_period: next.period });
+  }
+  function clearFilters() {
+    if (team) changeFilters({ status: '', family: '', issue: '', from: '', to: '' });
+    else changePublicFilters(EMPTY_PUBLIC_FILTERS);
+  }
+  function changeFilters(requested: MapFilters) {
+    // A classe escolhida precisa pertencer à família escolhida.
+    const next =
+      requested.issue && requested.family && familyFor(requested.issue) !== requested.family
+        ? { ...requested, issue: '' }
+        : requested;
+    setFilters(next);
+    onCloseDetail?.();
+    writeQuery({
+      map_status: next.status,
+      map_family: next.family,
+      map_class: next.issue,
+      map_from: next.from,
+      map_to: next.to,
+    });
   }
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map>(null);
@@ -454,7 +518,6 @@ export default function UrbanMap({
   const primaryProvider = resolveMapProvider(mapEnvironment);
   const cartoFallback = resolveMapProvider(mapEnvironment, 'carto');
   const style = primaryProvider.styleUrl;
-  const [activeProviderName, setActiveProviderName] = useState(primaryProvider.name);
   const [activeAttribution, setActiveAttribution] = useState(primaryProvider.attribution);
 
   // Points outside the IBGE outline would sit invisible under the mask while
@@ -479,6 +542,8 @@ export default function UrbanMap({
   selectedRef.current = selectedId;
   const selectCallback = useRef(onSelect);
   selectCallback.current = onSelect;
+  const audienceRef = useRef(audience);
+  audienceRef.current = audience;
   const fittedKey = useRef('');
   const pickMode = Boolean(onPickLocation);
   const pickedMarker = useRef<maplibregl.Marker | null>(null);
@@ -491,15 +556,15 @@ export default function UrbanMap({
     }
     setError('');
     pickedMarker.current?.remove();
-    pickedMarker.current = new maplibregl.Marker({ color: '#123f36' }).setLngLat(point).addTo(map);
+    pickedMarker.current = new maplibregl.Marker({ color: MAP_DESIGN.markers.picked })
+      .setLngLat(point)
+      .addTo(map);
     pickCallback.current?.(point.lat, point.lng);
   }
 
   useEffect(() => {
     if (!container.current) return;
     let map: maplibregl.Map | undefined;
-    let schemeQuery: MediaQueryList | undefined;
-    let schemeListener: (() => void) | undefined;
     try {
       const shownCenter =
         initialCenter && isInsideBrazil(initialCenter.latitude, initialCenter.longitude)
@@ -512,7 +577,7 @@ export default function UrbanMap({
         ...(shownCenter
           ? {
               center: [shownCenter.longitude, shownCenter.latitude],
-              zoom: MAP_DESIGN.framing.pointZoom,
+              zoom: initialZoom ?? MAP_DESIGN.framing.pointZoom,
             }
           : { bounds: BRAZIL_FIT, fitBoundsOptions: { padding: BRAZIL_PADDING } }),
         renderWorldCopies: false,
@@ -536,10 +601,7 @@ export default function UrbanMap({
       };
       lockToBrazil();
       map.on('resize', lockToBrazil);
-      schemeQuery = window.matchMedia?.(DARK_QUERY);
-      schemeListener = () => map && applyOutlineTheme(map);
-      schemeQuery?.addEventListener?.('change', schemeListener);
-      setActiveProviderName(primaryProvider.name);
+      basemapIsDark = isDarkBasemap(style);
       setActiveAttribution(primaryProvider.attribution);
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
       map.addControl(
@@ -557,8 +619,8 @@ export default function UrbanMap({
         // failed tile or overlay later on must not replace the whole style.
         if (!styleLoaded && !fallbackUsed && cartoFallback.name === 'CARTO') {
           fallbackUsed = true;
+          basemapIsDark = isDarkBasemap(cartoFallback.styleUrl);
           map?.setStyle(cartoFallback.styleUrl);
-          setActiveProviderName('CARTO');
           setActiveAttribution(cartoFallback.attribution);
           setError(
             'Base cartográfica principal indisponível; usando o fallback CARTO configurado.',
@@ -589,7 +651,7 @@ export default function UrbanMap({
           paint: {
             'circle-color': cluster.fill,
             'circle-radius': cluster.radius,
-            'circle-stroke-color': '#ffffff',
+            'circle-stroke-color': cluster.stroke,
             'circle-stroke-width': 2,
           },
         });
@@ -627,7 +689,7 @@ export default function UrbanMap({
         });
         // A style swap (CARTO fallback) empties the map: refit the current data.
         fittedKey.current = '';
-        showEvents(map, locatedRef.current, fittedKey, selectedRef.current);
+        showEvents(map, locatedRef.current, fittedKey, selectedRef.current, audienceRef.current);
       });
       // Diagnóstico do que a camada realmente desenhou (não apenas da lista recebida).
       map.on('idle', () => {
@@ -658,11 +720,7 @@ export default function UrbanMap({
         const properties = feature.properties as Record<string, string>;
         new maplibregl.Popup()
           .setLngLat(feature.geometry.coordinates as [number, number])
-          .setText(
-            properties.report
-              ? properties.label
-              : `${properties.label} · severidade ${properties.severity}${properties.road ? ` · ${properties.road}` : ''}`,
-          )
+          .setText(properties.popup)
           .addTo(map);
         selectCallback.current?.(properties.id);
       });
@@ -676,7 +734,6 @@ export default function UrbanMap({
       setError('Mapa indisponível: verifique o suporte a WebGL do navegador.');
     }
     return () => {
-      if (schemeListener) schemeQuery?.removeEventListener?.('change', schemeListener);
       mapRef.current = null;
       map?.remove();
     };
@@ -694,8 +751,26 @@ export default function UrbanMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (map?.getSource('events')) showEvents(map, located, fittedKey, selectedRef.current);
+    if (map?.getSource('events'))
+      showEvents(map, located, fittedKey, selectedRef.current, audienceRef.current);
   }, [located]);
+
+  // Endereço escolhido na busca: o marcador e o mapa vão até ele; a pessoa ainda pode ajustar.
+  const pickedLatitude = pickedPoint?.latitude;
+  const pickedLongitude = pickedPoint?.longitude;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pickMode || pickedLatitude == null || pickedLongitude == null) return;
+    if (!isInsideBrazil(pickedLatitude, pickedLongitude)) return;
+    pickedMarker.current?.remove();
+    pickedMarker.current = new maplibregl.Marker({ color: MAP_DESIGN.markers.picked })
+      .setLngLat([pickedLongitude, pickedLatitude])
+      .addTo(map);
+    map.jumpTo({
+      center: [pickedLongitude, pickedLatitude],
+      zoom: Math.max(map.getZoom(), MAP_DESIGN.framing.pointZoom + 2),
+    });
+  }, [pickMode, pickedLatitude, pickedLongitude]);
 
   const centerLatitude = initialCenter?.latitude;
   const centerLongitude = initialCenter?.longitude;
@@ -703,7 +778,10 @@ export default function UrbanMap({
     const map = mapRef.current;
     if (!map || centerLatitude == null || centerLongitude == null) return;
     if (!isInsideBrazil(centerLatitude, centerLongitude)) return;
-    map.jumpTo({ center: [centerLongitude, centerLatitude], zoom: MAP_DESIGN.framing.pointZoom });
+    map.jumpTo({
+      center: [centerLongitude, centerLatitude],
+      zoom: initialZoom ?? MAP_DESIGN.framing.pointZoom,
+    });
   }, [centerLatitude, centerLongitude]);
 
   useEffect(() => {
@@ -732,14 +810,91 @@ export default function UrbanMap({
   }, [selectedId, selectedLatitude, selectedLongitude]);
 
   const shownStatuses = new Set(located.map((event) => event.report_status).filter(Boolean));
+  const shownSituations = new Set(
+    located
+      .filter((event) => event.report_status)
+      .map((event) => publicSituation(event.report_status)),
+  );
   const showReportLegend = shownStatuses.size > 0;
+  // Público: a legenda explica só as gravidades que estão no mapa agora.
+  const shownLevels = new Set(
+    located
+      .filter((event) => !event.report_status || event.severity != null)
+      .map((event) => severityOf(event.severity).level),
+  );
   const showSeverityLegend = located.some(
     (event) => !event.report_status || event.severity != null,
   );
   const reportColors: Record<string, string> = MAP_DESIGN.markers.reportStatus;
+  const { keyline } = MAP_DESIGN.markers;
+  const count = located.length === 1 ? '1 ponto visível' : `${located.length} pontos visíveis`;
   return (
     <section className="panel map-panel">
-      {!onPickLocation && showFilters && allEvents.length > 0 && (
+      {!onPickLocation && showFilters && allEvents.length > 0 && !team && (
+        <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
+          {publicOptions.issues.length > 1 && (
+            <label>
+              Tipo de problema
+              <select
+                aria-label="Tipo de problema"
+                value={publicFilters.issue}
+                onChange={(event) =>
+                  changePublicFilters({ ...publicFilters, issue: event.target.value })
+                }
+              >
+                <option value="">Todos</option>
+                {publicOptions.issues.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {publicOptions.severities.length > 1 && (
+            <label>
+              Gravidade
+              <select
+                aria-label="Gravidade"
+                value={publicFilters.severity}
+                onChange={(event) =>
+                  changePublicFilters({ ...publicFilters, severity: event.target.value })
+                }
+              >
+                <option value="">Todas</option>
+                {publicOptions.severities.map(([level, label]) => (
+                  <option key={level} value={level}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {publicOptions.periods.length > 0 && (
+            <label>
+              Período
+              <select
+                aria-label="Período"
+                value={publicFilters.period}
+                onChange={(event) =>
+                  changePublicFilters({ ...publicFilters, period: event.target.value })
+                }
+              >
+                <option value="">Qualquer data</option>
+                {publicOptions.periods.map(([days, label]) => (
+                  <option key={days} value={days}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p role="status" className="map-count">
+            {count}
+          </p>
+        </div>
+      )}
+      {!onPickLocation && showFilters && allEvents.length > 0 && team && (
         <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
           {options.statuses.length > 1 && (
             <label>
@@ -800,7 +955,7 @@ export default function UrbanMap({
             onChange={(to) => changeFilters({ ...filters, to })}
           />
           <p role="status" className="map-count">
-            {located.length === 1 ? '1 ponto visível' : `${located.length} pontos visíveis`}
+            {count}
           </p>
         </div>
       )}
@@ -816,14 +971,12 @@ export default function UrbanMap({
           <div className="map-empty" role="status">
             {filtering && allEvents.length > 0 ? (
               <>
-                <span>Nenhum ponto corresponde a estes filtros.</span>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() =>
-                    changeFilters({ status: '', family: '', issue: '', from: '', to: '' })
-                  }
-                >
+                <span>
+                  {team
+                    ? 'Nenhum ponto corresponde a estes filtros.'
+                    : 'Nenhuma ocorrência encontrada'}
+                </span>
+                <button type="button" className="secondary" onClick={clearFilters}>
                   Limpar filtros
                 </button>
               </>
@@ -835,8 +988,11 @@ export default function UrbanMap({
         {(showReportLegend || showSeverityLegend) && (
           <div className="map-legends">
             {showSeverityLegend && (
-              <ul className="map-legend" aria-label="Legenda de severidade">
-                {LEGEND.map((level) => {
+              <ul
+                className="map-legend"
+                aria-label={team ? 'Legenda de severidade' : 'Legenda de gravidade'}
+              >
+                {LEGEND.filter((level) => team || shownLevels.has(level)).map((level) => {
                   const sign = markerStyle({ severity: level });
                   return (
                     <li key={level}>
@@ -847,7 +1003,7 @@ export default function UrbanMap({
                 })}
               </ul>
             )}
-            {showReportLegend && (
+            {showReportLegend && team && (
               <ul className="map-legend" aria-label="Legenda de relatos">
                 {Object.entries(reportLabels)
                   .filter(([status]) => shownStatuses.has(status as CaptureMarker['report_status']))
@@ -856,8 +1012,8 @@ export default function UrbanMap({
                       <SignSwatch
                         style={{
                           shape: 'circle',
-                          fill: reportColors[status] ?? '#64748b',
-                          glyph: '#ffffff',
+                          fill: reportColors[status] ?? MAP_DESIGN.markers.reportStatus.received,
+                          glyph: keyline,
                         }}
                       />
                       {label}
@@ -865,17 +1021,36 @@ export default function UrbanMap({
                   ))}
               </ul>
             )}
+            {showReportLegend && !team && (
+              <ul className="map-legend" aria-label="Legenda de relatos">
+                {SITUATION_ORDER.filter((situation) => shownSituations.has(situation)).map(
+                  (situation) => (
+                    <li key={situation}>
+                      <SignSwatch
+                        style={{
+                          shape: 'circle',
+                          fill: reportColors[SITUATION_SAMPLE[situation]],
+                          glyph: keyline,
+                        }}
+                      />
+                      {publicSituationLabels[situation]}
+                    </li>
+                  ),
+                )}
+              </ul>
+            )}
           </div>
         )}
+        {/* Sobre o mapa, abaixo dos filtros: nunca cobre a barra de filtros. */}
+        {detail && selectedId && (
+          <aside className="map-detail" aria-label="Detalhe do ponto">
+            <button type="button" className="secondary compact" onClick={onCloseDetail}>
+              Fechar detalhe
+            </button>
+            {detail}
+          </aside>
+        )}
       </div>
-      {detail && selectedId && (
-        <aside className="map-detail" aria-label="Detalhe do ponto">
-          <button type="button" className="secondary" onClick={onCloseDetail}>
-            Fechar detalhe
-          </button>
-          {detail}
-        </aside>
-      )}
       {pickMode && (
         <div className="map-footer map-pick-center">
           {/* Alternativa ao toque: teclado (setas, + e -) move o mapa até o local. */}
@@ -886,10 +1061,7 @@ export default function UrbanMap({
           >
             Marcar o centro do mapa
           </button>
-          <small>
-            Toque no local da foto ou mova o mapa (arrastando ou com as setas do teclado) e marque o
-            centro.
-          </small>
+          <small>Toque no local da foto ou mova o mapa até ele e marque o centro.</small>
         </div>
       )}
       <div className="map-footer" hidden={pickMode}>
@@ -901,14 +1073,21 @@ export default function UrbanMap({
               <li key={event.id} data-event-id={event.id}>
                 <button
                   type="button"
+                  className="text-button"
                   onClick={() => onSelect?.(event.id)}
-                  aria-label={`Selecionar ponto: ${markerLabel(event)}`}
+                  aria-label={`Selecionar ponto: ${markerLabel(event, audience)}`}
                 >
-                  {markerLabel(event)}
+                  {markerLabel(event, audience)}
                 </button>{' '}
-                {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`} ·{' '}
-                {event.road_name ?? 'via não associada'} · {event.latitude!.toFixed(5)},{' '}
-                {event.longitude!.toFixed(5)}
+                {team ? (
+                  <>
+                    {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`}{' '}
+                    · {event.road_name ?? 'via não associada'} · {event.latitude!.toFixed(5)},{' '}
+                    {event.longitude!.toFixed(5)}
+                  </>
+                ) : (
+                  <>· {event.road_name ?? 'via não identificada'}</>
+                )}
               </li>
             ))}
           </ul>
@@ -958,11 +1137,10 @@ export default function UrbanMap({
             {exportError && <p role="alert">{exportError}</p>}
           </div>
         )}
-        <p className="map-caption">
-          Pontos na posição informada; o trecho de via associado aparece no detalhe.{' '}
-          {activeProviderName}: {activeAttribution}.
-        </p>
+        {/* Crédito da base cartográfica, compacto e sempre presente. */}
+        <p className="map-caption">{activeAttribution}</p>
       </div>
+      {pickMode && <p className="map-caption map-footer">{activeAttribution}</p>}
       {error && (
         <p role="alert" className="notice">
           {error}
@@ -1024,13 +1202,13 @@ function SignSwatch({ style }: { style: MarkerStyle }) {
     <svg className="map-sign" viewBox="-2 -2 36 36" aria-hidden="true" focusable="false">
       <path
         d={SHAPE_PATHS[style.shape]}
-        fill={ring ? '#ffffff' : style.fill}
-        stroke={ring ? style.fill : '#ffffff'}
+        fill={ring ? MAP_DESIGN.markers.keyline : style.fill}
+        stroke={ring ? style.fill : MAP_DESIGN.markers.keyline}
         strokeWidth={ring ? 3 : 2.5}
         strokeLinejoin="round"
       />
       {style.shape === 'warning' && (
-        <path d={WARNING_INSET} fill="none" stroke="#ffffff" strokeWidth={1.6} />
+        <path d={WARNING_INSET} fill="none" stroke={MAP_DESIGN.markers.keyline} strokeWidth={1.6} />
       )}
     </svg>
   );

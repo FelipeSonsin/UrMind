@@ -251,7 +251,7 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
   await panel.getByRole('button', { name: 'Confirmar rótulo humano' }).click();
   await expect(panel.getByText(/correct URMIND_ROAD_D40/)).toBeVisible();
   await panel.getByLabel(/Atesto que o conteúdo visual/).check();
-  await panel.getByRole('button', { name: 'Publicar relato', exact: true }).click();
+  await panel.getByRole('button', { name: 'Publicar foto', exact: true }).click();
   await expect.poll(() => published).toBe(true);
   await page.route('**/api/v1/public/events?*', (route) =>
     route.fulfill({ json: [{ ...eventDetail, id: publicId, status: 'confirmed' }] }),

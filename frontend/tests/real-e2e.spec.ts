@@ -128,7 +128,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
   const bounds = await map.boundingBox();
   if (!bounds) throw new Error('Mapa não carregou para confirmar a localização informada');
   await map.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
-  await page.getByRole('button', { name: 'Confirmar localização', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirmar local', exact: true }).click();
   await expect(page.getByText('Local marcado no mapa')).toBeVisible();
   const uploadResponse = page.waitForResponse(
     (response) =>
@@ -176,9 +176,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
     .toBe(true);
   if (processing!.status === 'no_supported_detection') {
     expect(processing!.event_ids).toEqual([]);
-    await expect(
-      page.getByText('Situação: Analisado: nenhum problema reconhecido', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText('Situação: Em análise', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
     testInfo.annotations.push({
       type: 'real_outcome',
@@ -188,7 +186,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
   }
   if (processing!.status !== 'completed')
     throw new Error(`Pipeline não concluiu análise: ${processing!.status}`);
-  await expect(page.getByText(/Análise experimental/)).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByText(/Resultado automático em teste/)).toBeVisible({ timeout: 180_000 });
   const eventLink = page.getByRole('link', { name: 'Ver ocorrência no mapa' }).first();
   await expect(eventLink).toBeVisible({
     timeout: 180_000,
@@ -232,7 +230,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
   await expect(page.getByLabel('Contexto urbano')).toBeVisible();
 
   await page.goto('/#/map');
-  await expect(page.getByRole('heading', { name: 'Mapa operacional' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mapa', exact: true })).toBeVisible();
   await expect(page.locator('.map canvas')).toBeVisible();
   await expect(page.locator(`.map-panel [data-event-id="${eventId}"]`)).toHaveCount(0);
   testInfo.annotations.push({

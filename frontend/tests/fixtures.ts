@@ -461,7 +461,7 @@ export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
   // A suíte comum não depende da internet. O runtime continua usando o style
   // OpenFreeMap real; apenas o navegador de teste recebe um style MapLibre mínimo.
   await page.route(
-    (url) => url.hostname === 'tiles.openfreemap.org' && url.pathname === '/styles/liberty',
+    (url) => url.hostname === 'tiles.openfreemap.org' && url.pathname.startsWith('/styles/'),
     (route) => json(route, { version: 8, sources: {}, layers: [] }),
   );
   await page.route('**/api/v1/health', (route) =>
@@ -497,3 +497,120 @@ export async function stubPublicApi(page: Page, stubs: PublicStubs = {}) {
     (route) => json(route, stubs.detail ?? eventDetail),
   );
 }
+
+// Câmera e modelo simulados SÓ no navegador de teste. Isto prova interface e
+// contratos; não é teste de câmera física nem de detecção real.
+export type FakeCameraMode = 'ok' | 'NotAllowedError' | 'NotReadableError' | 'NotFoundError';
+
+export async function fakeCamera(page: Page, mode: FakeCameraMode = 'ok', fps = 15) {
+  await page.addInitScript(
+    ([failure, rate]) => {
+      const state = {
+        calls: [] as MediaStreamConstraints[],
+        tracks: [] as MediaStreamTrack[],
+        stopped: 0,
+      };
+      (window as unknown as { __camera: typeof state }).__camera = state;
+      const devices = [
+        { deviceId: 'cam-a', kind: 'videoinput', label: 'Webcam integrada', groupId: 'a' },
+        { deviceId: 'cam-b', kind: 'videoinput', label: 'Câmera USB', groupId: 'b' },
+      ];
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          enumerateDevices: async () => devices.map((d) => ({ ...d, toJSON: () => d })),
+          getUserMedia: async (constraints: MediaStreamConstraints) => {
+            state.calls.push(constraints);
+            if (failure !== 'ok') throw new DOMException('simulada', failure);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1280;
+            canvas.height = 720;
+            const context = canvas.getContext('2d')!;
+            // Textura fixa (passa no porteiro de nitidez), gerada uma vez, e uma faixa que
+            // anda a cada quadro: cada quadro é diferente, no ritmo pedido, com custo baixo.
+            const texture = document.createElement('canvas');
+            texture.width = 1280;
+            texture.height = 720;
+            const textureContext = texture.getContext('2d')!;
+            const image = textureContext.createImageData(1280, 720);
+            for (let i = 0; i < image.data.length; i += 4) {
+              const v = (i * 2654435761) % 200;
+              image.data[i] = image.data[i + 1] = image.data[i + 2] = 30 + v;
+              image.data[i + 3] = 255;
+            }
+            textureContext.putImageData(image, 0, 0);
+            let frame = 0;
+            const paint = () => {
+              context.drawImage(texture, 0, 0);
+              context.fillStyle = '#d0d0d0';
+              context.fillRect((frame++ * 8) % 1280, 0, 4, 720);
+            };
+            paint();
+            const timer = setInterval(paint, 1000 / rate);
+            const stream = canvas.captureStream(rate);
+            for (const track of stream.getVideoTracks()) {
+              const stop = track.stop.bind(track);
+              track.stop = () => {
+                state.stopped += 1;
+                clearInterval(timer);
+                stop();
+              };
+              state.tracks.push(track);
+            }
+            return stream;
+          },
+        },
+      });
+    },
+    [mode, fps] as const,
+  );
+}
+
+export const camera = (page: Page) =>
+  page.evaluate(() => {
+    const s = (
+      window as unknown as {
+        __camera: { calls: MediaStreamConstraints[]; stopped: number; tracks: MediaStreamTrack[] };
+      }
+    ).__camera;
+    return {
+      calls: s.calls,
+      stopped: s.stopped,
+      live: s.tracks.filter((t) => t.readyState === 'live').length,
+    };
+  });
+
+/** Manifesto de modelo do navegador só para teste de contrato (checksum/tamanho). */
+export const liveModelManifest = (sha256: string, size: number) => ({
+  schema_version: 1,
+  model_id: 'yolox-s-model-v2',
+  model_version: 'contrato-de-teste',
+  scientific_status: 'EXPERIMENTAL',
+  use_authorized: true,
+  distribution_authorized: true,
+  authorization_ref: 'tests/live-detection.spec.ts',
+  onnx: { path: '/models/teste.onnx', sha256, size_bytes: size },
+  input: {
+    name: 'images',
+    size: [640, 640],
+    layout: 'NCHW',
+    dtype: 'float32',
+    color: 'BGR',
+    range: '0..255',
+    normalization: 'none',
+    letterbox: { pad_value: 114, anchor: 'top-left' },
+  },
+  output: { name: 'output', format: 'yolox_decoded_cxcywh_obj_cls' },
+  class_names: ['URMIND_ROAD_D00', 'URMIND_ROAD_D10', 'URMIND_ROAD_D20', 'URMIND_ROAD_D40'],
+  postprocess: {
+    score_threshold: 0.25,
+    nms_threshold: 0.65,
+    nms: 'class_agnostic',
+    max_detections: 50,
+  },
+  provenance: {
+    registration_manifest_sha256: 'd'.repeat(64),
+    closure_manifest_sha256: null,
+    contract_sha256: 'c'.repeat(64),
+  },
+});

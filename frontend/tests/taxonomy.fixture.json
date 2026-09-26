@@ -64,7 +64,7 @@
     {
       "issue_code": "URMIND_ROAD_D20",
       "family": "ROAD_SURFACE",
-      "display_name_pt": "Trinca em malha (couro de jacaré)",
+      "display_name_pt": "Trinca em malha",
       "display_name_en": "Alligator crack",
       "description": "Categoria RDD2022 preservada da taxonomia V1 (URMIND_ROAD_D20).",
       "visual_definition": "Rede de fissuras interligadas formando blocos pequenos.",

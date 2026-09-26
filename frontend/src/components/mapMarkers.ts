@@ -38,7 +38,7 @@ export function markerStyle(marker: {
   const statusColors: Record<string, string> = markers.reportStatus;
   const reportColor = statusColors[marker.report_status ?? marker.status ?? ''];
   if (marker.report_status && reportColor)
-    return { shape: 'circle', fill: reportColor, glyph: '#ffffff' };
+    return { shape: 'circle', fill: reportColor, glyph: markers.reportGlyph };
   const level = severityOf(marker.severity).level as keyof typeof markers.severity;
   return markers.severity[level] ?? markers.severity.unknown;
 }
@@ -105,12 +105,13 @@ export function markerImage(style: MarkerStyle, family: string): ImageData | nul
   context.scale(scale, scale);
   context.lineJoin = 'round';
   const outline = new Path2D(SHAPE_PATHS[style.shape]);
-  // White keyline first so every sign separates from any basemap colour.
-  context.strokeStyle = '#ffffff';
+  // Keyline first so every sign separates from any basemap colour.
+  const { keyline } = MAP_DESIGN.markers;
+  context.strokeStyle = keyline;
   context.lineWidth = 3.5;
   context.stroke(outline);
   if (style.shape === 'ring') {
-    context.fillStyle = '#ffffff';
+    context.fillStyle = keyline;
     context.fill(outline);
     context.strokeStyle = style.fill;
     context.lineWidth = 3;
@@ -120,7 +121,7 @@ export function markerImage(style: MarkerStyle, family: string): ImageData | nul
     context.fill(outline);
   }
   if (style.shape === 'warning') {
-    context.strokeStyle = '#ffffff';
+    context.strokeStyle = keyline;
     context.lineWidth = 1.4;
     context.stroke(new Path2D(WARNING_INSET));
   }

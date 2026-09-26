@@ -283,6 +283,16 @@ export const api = {
         photo_gate: z.record(z.string(), z.unknown()).nullable(),
         human_review: z.record(z.string(), z.unknown()).nullable(),
         additional_evidence: z.record(z.string(), z.unknown()).nullable().optional(),
+        urban_auxiliary: z
+          .object({
+            status: z.string(),
+            suggestions: z
+              .array(z.object({ code: z.string(), probability: z.number() }))
+              .optional(),
+          })
+          .passthrough()
+          .nullable()
+          .optional(),
         events: z.array(
           z.object({
             id: z.string(),

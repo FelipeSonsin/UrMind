@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   LocateFixed,
   MapPin,
+  Search,
   Send,
 } from 'lucide-react';
 import { Camera } from '../components/Camera';
@@ -26,11 +27,40 @@ import {
   warmUp,
   warmUpIfAllowed,
 } from '../services/deviceLocation';
-import { publicApi } from '../services/publicApi';
+import { publicApi, type AddressResult } from '../services/publicApi';
+import { MAP_DESIGN } from '../mapDesign';
 import { gps } from 'exifr';
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
 
 const NO_EVENTS: [] = [];
+
+/**
+ * Onde o mapa abre quando a foto não tem localização: a última região usada neste
+ * aparelho (arredondada, ~1 km) ou a área piloto — nunca o Brasil inteiro.
+ */
+const LAST_AREA_KEY = 'urmind.lastArea';
+function lastArea(): { latitude: number; longitude: number } | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(LAST_AREA_KEY) ?? 'null');
+    const parsed = coordinateSchema.pick({ latitude: true, longitude: true }).safeParse(value);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function rememberArea(point: { latitude: number; longitude: number }) {
+  try {
+    localStorage.setItem(
+      LAST_AREA_KEY,
+      JSON.stringify({
+        latitude: Math.round(point.latitude * 100) / 100,
+        longitude: Math.round(point.longitude * 100) / 100,
+      }),
+    );
+  } catch {
+    // Sem armazenamento local, o mapa abre na área piloto.
+  }
+}
 
 /** Some Android cameras hand back a file without extension; name it by its type. */
 function cameraFile(file: File): File {
@@ -63,6 +93,8 @@ function newDraft(): CaptureDraft {
 
 /** A photo taken now (camera or live capture) can still get the device position. */
 function takenNow(draft: CaptureDraft, now = Date.now()) {
+  // Quadro da câmera do robô: o aparelho que registra não é o que fotografou.
+  if (draft.camera_origin === 'robot_remote') return false;
   return draft.source === 'pwa_photo' && fixMatchesPhoto(now, draft.captured_at);
 }
 
@@ -84,6 +116,19 @@ export function CapturePage({
     longitude: number;
   } | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [addressQuery, setAddressQuery] = useState('');
+  const [addressResults, setAddressResults] = useState<AddressResult[] | null>(null);
+  const [addressAttribution, setAddressAttribution] = useState('');
+  const [addressError, setAddressError] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [addressPoint, setAddressPoint] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [chosenAddress, setChosenAddress] = useState<number | null>(null);
+  const searchController = useRef<AbortController | null>(null);
+  useEffect(() => () => searchController.current?.abort(), []);
+  const [focusArea] = useState(() => lastArea() ?? MAP_DESIGN.framing.pilotArea);
   // Each photo (and each manual point) starts a new selection: a GPS answer that
   // arrives for an earlier one is discarded instead of landing on the current photo.
   const selectionVersion = useRef(0);
@@ -163,6 +208,7 @@ export function CapturePage({
         photo: file,
         filename: file.name,
         source: fromCamera ? 'pwa_photo' : 'exif_upload',
+        camera_origin: undefined,
         captured_at: taken,
         coordinate: exifCoordinate,
         source_location: exifCoordinate ? 'exif' : 'unknown',
@@ -231,7 +277,43 @@ export function CapturePage({
 
   function openMap() {
     setPickedLocation(null);
+    setAddressPoint(null);
+    setChosenAddress(null);
     setShowMap(true);
+  }
+
+  /** Busca só quando a pessoa pede (botão ou Enter): nada de consulta a cada tecla. */
+  async function searchAddress() {
+    const query = addressQuery.trim();
+    if (query.length < 3 || searching) return;
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    setSearching(true);
+    setAddressError('');
+    try {
+      const found = await publicApi.searchAddress(query, controller.signal);
+      if (controller.signal.aborted) return;
+      setAddressResults(found.results);
+      setAddressAttribution(found.attribution);
+      setChosenAddress(null);
+    } catch (reason) {
+      if (!controller.signal.aborted) {
+        setAddressResults(null);
+        setAddressError(
+          reason instanceof Error ? reason.message : 'Busca de endereço indisponível.',
+        );
+      }
+    } finally {
+      if (!controller.signal.aborted) setSearching(false);
+    }
+  }
+
+  function chooseAddress(result: AddressResult, index: number) {
+    const point = { latitude: result.latitude, longitude: result.longitude };
+    setChosenAddress(index);
+    setAddressPoint(point);
+    setPickedLocation(point);
   }
 
   function confirmMapLocation() {
@@ -240,6 +322,7 @@ export function CapturePage({
     selectionVersion.current += 1;
     setLocating(false);
     setLocationError('');
+    rememberArea(pickedLocation);
     setDraft((value) => ({
       ...value,
       coordinate: { ...pickedLocation, accuracy_m: null },
@@ -268,6 +351,7 @@ export function CapturePage({
         privacy_version: privacy.version,
         source_location: draft.coordinate ? draft.source_location : 'unknown',
       };
+      if (saved.coordinate) rememberArea(saved.coordinate);
       await drafts.save(saved);
       await onSaved(saved);
     } catch (reason) {
@@ -296,7 +380,10 @@ export function CapturePage({
       <form onSubmit={save} className="capture-grid">
         <section className="panel" aria-labelledby="capture-photo">
           <h2 id="capture-photo">
-            <span className="step">1</span> Foto
+            <span className="step" data-done={hasPhoto}>
+              1
+            </span>{' '}
+            Foto
           </h2>
           <div className="upload-area">
             {hasPhoto ? (
@@ -366,7 +453,10 @@ export function CapturePage({
         </section>
         <section className="panel capture-details">
           <h2>
-            <span className="step">2</span> Localização
+            <span className="step" data-done={located}>
+              2
+            </span>{' '}
+            Localização
           </h2>
           <div
             className={`location-status${located ? ' is-located' : ''}${locationError ? ' is-error' : ''}`}
@@ -440,18 +530,82 @@ export function CapturePage({
           {hasPhoto && showMap && (
             <div className="location-picker">
               <h3>Selecione no mapa onde esta foto foi tirada</h3>
+              <div className="address-search" role="search">
+                <label>
+                  Buscar endereço ou CEP
+                  <input
+                    type="search"
+                    value={addressQuery}
+                    maxLength={200}
+                    autoComplete="street-address"
+                    placeholder="Ex.: Rua Galvão Bueno, 100, São Paulo"
+                    onChange={(event) => setAddressQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        // Enter busca o endereço; nunca envia o relato.
+                        event.preventDefault();
+                        void searchAddress();
+                      }
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={searching || addressQuery.trim().length < 3}
+                  onClick={() => void searchAddress()}
+                >
+                  <Search size={16} aria-hidden="true" /> {searching ? 'Buscando…' : 'Buscar'}
+                </button>
+              </div>
+              {addressError && (
+                <p className="field-error" role="alert">
+                  {addressError}
+                </p>
+              )}
+              {addressResults &&
+                (addressResults.length ? (
+                  <ul className="address-results" aria-label="Endereços encontrados">
+                    {addressResults.map((result, index) => (
+                      <li key={`${result.latitude},${result.longitude},${index}`}>
+                        <button
+                          type="button"
+                          aria-pressed={chosenAddress === index}
+                          onClick={() => chooseAddress(result, index)}
+                        >
+                          {result.label}
+                          {result.detail && <small>{result.detail}</small>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="address-hint" role="status">
+                    Nenhum endereço encontrado. Tente com a rua e a cidade, ou marque no mapa.
+                  </p>
+                ))}
+              <p className="address-hint">
+                {chosenAddress != null
+                  ? 'Confira o marcador e toque no mapa para ajustar ao local exato.'
+                  : 'Ou toque no mapa onde a foto foi tirada.'}
+              </p>
               <Suspense fallback={<p role="status">Carregando mapa…</p>}>
                 <UrbanMap
                   events={NO_EVENTS}
-                  initialCenter={draft.coordinate}
+                  initialCenter={draft.coordinate ?? focusArea}
+                  initialZoom={draft.coordinate ? undefined : MAP_DESIGN.framing.areaZoom}
+                  pickedPoint={addressPoint}
                   onPickLocation={(latitude, longitude) =>
                     setPickedLocation({ latitude, longitude })
                   }
                 />
               </Suspense>
+              {addressAttribution && (
+                <p className="map-caption">Busca de endereço: {addressAttribution}</p>
+              )}
               <div className="actions">
                 <button type="button" disabled={!pickedLocation} onClick={confirmMapLocation}>
-                  <MapPin size={16} /> Confirmar localização
+                  <MapPin size={16} /> Confirmar local
                 </button>
                 {located && (
                   <button type="button" className="secondary" onClick={() => setShowMap(false)}>
@@ -462,7 +616,10 @@ export function CapturePage({
             </div>
           )}
           <h2>
-            <span className="step">3</span> Descrição
+            <span className="step" data-done={draft.note.trim().length > 0}>
+              3
+            </span>{' '}
+            Descrição
           </h2>
           <label>
             Descreva o que você observou (opcional)

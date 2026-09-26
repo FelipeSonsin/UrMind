@@ -46,7 +46,7 @@ describe('Brazil operational map viewport', () => {
 describe('resolveMapProvider', () => {
   it('uses OpenFreeMap as the primary provider', () => {
     expect(resolveMapProvider({}).name).toBe('OpenFreeMap');
-    expect(resolveMapProvider({}).styleUrl).toBe('https://tiles.openfreemap.org/styles/liberty');
+    expect(resolveMapProvider({}).styleUrl).toBe('https://tiles.openfreemap.org/styles/dark');
   });
 
   it('identifies an explicit OpenFreeMap URL from its provider host', () => {
@@ -77,7 +77,7 @@ describe('resolveMapProvider', () => {
   it('builds CARTO only when the optional public key is configured', () => {
     const fallback = resolveMapProvider({ VITE_CARTO_BASEMAPS_API_KEY: 'public key' }, 'carto');
     expect(fallback.name).toBe('CARTO');
-    expect(fallback.styleUrl).toContain('voyager-gl-style/style.json?key=public%20key');
+    expect(fallback.styleUrl).toContain('dark-matter-gl-style/style.json?key=public%20key');
     expect(fallback.attribution).toContain('OpenStreetMap');
   });
 

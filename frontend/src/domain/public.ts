@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { automaticClasses } from './capabilities';
 
 // Espelha app/schemas/public.py. Campo ausente chega como null com motivo: a tela
 // mostra "não disponível" e nunca preenche com número plausível.
@@ -21,24 +22,6 @@ export const publicStatusSchema = z.object({
   checked_at: z.string(),
 });
 export type PublicStatus = z.infer<typeof publicStatusSchema>;
-
-export const scoutCameraSchema = z.object({
-  mode: z.enum(['live_video', 'live_snapshots', 'unavailable']),
-  reason: z.string().nullable(),
-  stream_url: z.string().nullable(),
-  frame_url: z.string().nullable(),
-  latency_ms: z.number().nullable(),
-});
-export const publicScoutSchema = z.object({
-  status: z.enum(['live', 'degraded', 'offline', 'no_device']),
-  device_code: z.string().nullable(),
-  last_seen: z.string().nullable(),
-  camera: scoutCameraSchema,
-  telemetry: z.record(z.string(), z.unknown()),
-  mission: z.string().nullable(),
-});
-export type PublicScout = z.infer<typeof publicScoutSchema>;
-export type ScoutCamera = z.infer<typeof scoutCameraSchema>;
 
 export const publicEventSchema = z.object({
   id: z.string().min(12),
@@ -262,15 +245,78 @@ export const publicClassLabels: Record<string, string> = {
   URMIND_UNKNOWN: 'Não classificado',
 };
 
-/** Risco nunca depende só de cor: cada nível tem rótulo e símbolo próprios (WCAG). */
+/**
+ * Gravidade em palavras do público, sempre vinda da avaliação registrada. Cada nível
+ * tem rótulo e símbolo próprios (WCAG); sem avaliação, nunca vira "leve".
+ */
 export const severityPresentation: Record<string, { label: string; shape: string; level: string }> =
   {
     critical: { label: 'Crítica', shape: '▲▲', level: 'critical' },
-    high: { label: 'Alta', shape: '▲', level: 'high' },
-    medium: { label: 'Média', shape: '■', level: 'medium' },
-    low: { label: 'Baixa', shape: '●', level: 'low' },
-    unknown: { label: 'Não determinada', shape: '?', level: 'unknown' },
+    high: { label: 'Grave', shape: '▲', level: 'high' },
+    medium: { label: 'Moderada', shape: '■', level: 'medium' },
+    low: { label: 'Leve', shape: '●', level: 'low' },
+    unknown: { label: 'Ainda não avaliada', shape: '?', level: 'unknown' },
   };
+
+/** Níveis avaliados, do mais grave ao mais leve (ordem dos filtros e da legenda). */
+export const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
+
+/** "Buraco · Grave": tipo e gravidade separados; sem avaliação, só o tipo. */
+export function issueHeadline(code: string | null | undefined, severity?: string | null): string {
+  const type = code ? labelFor(code) : 'Problema ainda não identificado';
+  const assessed = severity && severity !== 'unknown' ? severityPresentation[severity] : undefined;
+  return assessed ? `${type} · ${assessed.label}` : type;
+}
+
+/**
+ * Situação pública agrupada. O estado técnico continua no dado (e na área da equipe);
+ * o público vê só o caminho do relato: recebido, em análise, confirmado ou pendente de local.
+ * Recusado ou duplicado aparece como "Não confirmado", nunca como confirmado.
+ */
+export type PublicSituation =
+  'received' | 'analyzing' | 'confirmed' | 'needs_location' | 'declined';
+export const publicSituationLabels: Record<PublicSituation, string> = {
+  received: 'Recebido',
+  analyzing: 'Em análise',
+  confirmed: 'Confirmado',
+  needs_location: 'Precisa de localização',
+  declined: 'Não confirmado',
+};
+const SITUATION_BY_STATUS: Record<string, PublicSituation> = {
+  received: 'received',
+  // Etapas internas do processamento (Worker): para o público, só "Em análise".
+  queued: 'received',
+  processing_detection: 'analyzing',
+  detection_completed: 'analyzing',
+  building_event: 'analyzing',
+  enriching_context: 'analyzing',
+  building_features: 'analyzing',
+  assessing: 'analyzing',
+  completed: 'analyzing',
+  no_event: 'analyzing',
+  needs_review: 'analyzing',
+  failed: 'analyzing',
+  processing: 'analyzing',
+  model_not_available: 'analyzing',
+  experimental: 'analyzing',
+  no_supported_detection: 'analyzing',
+  human_confirmed: 'confirmed',
+  published: 'confirmed',
+  location_required: 'needs_location',
+  rejected: 'declined',
+  duplicate: 'declined',
+  // Ocorrências (Event)
+  detected: 'analyzing',
+  review: 'analyzing',
+  triage_required: 'analyzing',
+  confirmed: 'confirmed',
+};
+export function publicSituation(status: string | null | undefined): PublicSituation {
+  return SITUATION_BY_STATUS[status ?? ''] ?? 'received';
+}
+export function situationLabel(status: string | null | undefined): string {
+  return publicSituationLabels[publicSituation(status)];
+}
 
 /** Taxonomia canônica servida por `/public/taxonomy` (fonte única de classes). */
 export const issueTaxonomySchema = z.object({
@@ -435,10 +481,81 @@ export function mapFilterOptions(
   return { statuses, families, issues };
 }
 
+/** Filtros do mapa público: tipo de problema, gravidade e período. */
+export type PublicMapFilters = { issue: string; severity: string; period: string };
+export const EMPTY_PUBLIC_FILTERS: PublicMapFilters = { issue: '', severity: '', period: '' };
+export const PERIOD_OPTIONS: [string, string][] = [
+  ['7', 'Últimos 7 dias'],
+  ['30', 'Últimos 30 dias'],
+  ['90', 'Últimos 90 dias'],
+];
+
+type PublicMapRecord = {
+  urmind_class?: string | null;
+  severity?: string | null;
+  created_at?: string | null;
+  occurred_at?: string | null;
+};
+
+export function filterPublicMap<T extends PublicMapRecord>(
+  records: T[],
+  filters: PublicMapFilters,
+  now = Date.now(),
+): T[] {
+  const days = Number(filters.period);
+  const since = days > 0 ? now - days * 86_400_000 : null;
+  return records.filter((row) => {
+    const stamp = row.created_at ?? row.occurred_at;
+    return (
+      (!filters.issue || row.urmind_class === filters.issue) &&
+      (!filters.severity || (row.severity ?? 'unknown') === filters.severity) &&
+      (since == null || (stamp != null && Date.parse(stamp) >= since))
+    );
+  });
+}
+
+/**
+ * Opções reais: só os tipos e as gravidades que existem nos pontos carregados. Nada
+ * de listar a taxonomia inteira nem categoria que ninguém registrou.
+ */
+export function publicMapFilterOptions(
+  records: PublicMapRecord[],
+  now = Date.now(),
+): {
+  issues: [string, string][];
+  severities: [string, string][];
+  periods: [string, string][];
+} {
+  const codes = new Set(records.map((row) => row.urmind_class).filter((c): c is string => !!c));
+  const levels = new Set(records.map((row) => row.severity ?? 'unknown'));
+  // Período só aparece quando separa pontos: nem vazio, nem igual a "qualquer data",
+  // nem igual ao período mais curto já oferecido.
+  let previous = -1;
+  const periods = PERIOD_OPTIONS.filter(([days]) => {
+    const inside = filterPublicMap(records, { issue: '', severity: '', period: days }, now).length;
+    const useful = inside > 0 && inside < records.length && inside !== previous;
+    if (useful) previous = inside;
+    return useful;
+  });
+  return {
+    periods,
+    issues: [...codes]
+      .map((code): [string, string] => [code, labelFor(code)])
+      .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')),
+    severities: [...SEVERITY_ORDER, 'unknown']
+      .filter((level) => levels.has(level))
+      .map((level): [string, string] => [level, severityOf(level).label]),
+  };
+}
+
 /** Classes que podem aparecer como detecção de modelo (filtros de ocorrência). */
 export function filterableClasses(): [string, string][] {
-  const codes = emittableCodes.length ? emittableCodes : Object.keys(publicClassLabels);
-  return codes.map((code) => [code, labelFor(code)]);
+  return automaticClassCodes().map((code) => [code, labelFor(code)]);
+}
+
+/** Classes da detecção automática: taxonomia servida ou, offline, o registro de capacidades. */
+export function automaticClassCodes(): readonly string[] {
+  return automaticClasses(emittableCodes);
 }
 
 /**

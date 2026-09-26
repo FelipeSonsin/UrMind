@@ -43,6 +43,12 @@ const ROUTES = [
   { name: 'detalhe', path: `/#/events/${EVENT_ID}` },
   { name: 'transparencia', path: '/#/transparency' },
   { name: 'sistema', path: '/#/system' },
+  { name: 'registrar', path: '/#/registrar' },
+  { name: 'mapa', path: '/#/mapa' },
+  { name: 'ao-vivo', path: '/#/deteccao-ao-vivo' },
+  { name: 'meus-relatos', path: '/#/meus-relatos' },
+  { name: 'camera-robo', path: '/#/camera-robo' },
+  { name: 'camera-robo-celular', path: '/#/camera-robo/celular?session=x&token=y' },
 ];
 
 for (const size of WIDTHS) {
@@ -52,6 +58,8 @@ for (const size of WIDTHS) {
     for (const route of ROUTES) {
       await page.goto(route.path);
       await expect(page.locator('main')).toBeVisible();
+      // Páginas carregadas sob demanda: a captura só vale com o conteúdo na tela.
+      await expect(page.locator('main h1').first()).toBeVisible();
       await page.screenshot({
         path: testInfo.outputPath(`${size.name}-${route.name}.png`),
         fullPage: true,

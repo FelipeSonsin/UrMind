@@ -2,20 +2,12 @@ import {
   labelFor,
   priorityBand,
   severityOf,
+  situationLabel,
   type PublicEventDetail,
   type PublicEvent,
 } from '../../domain/public';
-import { statuses } from '../../domain/contracts';
 
 const NA = 'não disponível';
-
-function percent(value: number | null | undefined): string {
-  return value == null ? NA : `${(value * 100).toFixed(1)}%`;
-}
-
-function statusLabel(status: string): string {
-  return statuses[status as keyof typeof statuses] ?? status;
-}
 
 /** Selo obrigatório para resultado de modelo EXPERIMENTAL_SHADOW. */
 export function ExperimentalBadge({ stage }: { stage: string | null | undefined }) {
@@ -81,35 +73,27 @@ function UrbanAnalysis({ event }: { event: PublicEventDetail }) {
 
 export function QuickDiagnosis({ event }: { event: PublicEventDetail }) {
   const severity = severityOf(event.risk?.severity);
+  const band = priorityBand(event.risk?.priority_score);
   return (
     <div className="quick-diagnosis">
-      <h3 className="section-label">Problema detectado</h3>
+      <h3 className="section-label">Ocorrência selecionada</h3>
       <ExperimentalBadge stage={event.model_stage} />
       <h2>{labelFor(event.urmind_class)}</h2>
       <UrbanAnalysis event={event} />
       <div className="quick-grid">
         <div>
-          <span>Prioridade</span>
-          <strong>
-            {priorityBand(event.risk?.priority_score).toUpperCase()}
-            {event.risk?.priority_score != null && (
-              <small> {event.risk.priority_score.toFixed(2)}</small>
-            )}
-          </strong>
-        </div>
-        <div>
-          <span>Confiança visual</span>
-          <strong>{percent(event.visual_confidence)}</strong>
-        </div>
-        <div>
-          <span>Severidade</span>
+          <span>Gravidade</span>
           <strong className={`risk-${severity.level}`}>
             <i aria-hidden="true">{severity.shape}</i> {severity.label}
           </strong>
         </div>
         <div>
+          <span>Prioridade</span>
+          <strong>{band.charAt(0).toUpperCase() + band.slice(1)}</strong>
+        </div>
+        <div>
           <span>Situação</span>
-          <strong>{statusLabel(event.status)}</strong>
+          <strong>{situationLabel(event.status)}</strong>
         </div>
       </div>
     </div>

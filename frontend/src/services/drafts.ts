@@ -16,6 +16,11 @@ export interface CaptureDraft {
   note: string;
   privacy_version?: string;
   additional_to?: string;
+  /**
+   * Foto vinda da câmera de outro aparelho (celular do robô): o GPS deste aparelho não
+   * descreve onde ela foi tirada, então o local vem da busca de endereço ou do mapa.
+   */
+  camera_origin?: 'robot_remote';
   status: 'local_draft';
 }
 interface DraftDatabase extends DBSchema {

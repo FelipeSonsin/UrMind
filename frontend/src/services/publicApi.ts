@@ -3,7 +3,6 @@ import {
   issueTaxonomySchema,
   publicEventDetailSchema,
   publicEventSchema,
-  publicScoutSchema,
   publicStatusSchema,
   transparencySchema,
 } from '../domain/public';
@@ -40,7 +39,45 @@ export interface EventQuery {
   bbox?: { south: number; west: number; north: number; east: number };
 }
 
+export const addressSearchSchema = z.object({
+  results: z.array(
+    z.object({
+      label: z.string(),
+      detail: z.string().nullable(),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+    }),
+  ),
+  attribution: z.string(),
+});
+export type AddressResult = z.infer<typeof addressSearchSchema>['results'][number];
+
 export const publicApi = {
+  /**
+   * Busca explícita (botão ou Enter), nunca a cada tecla: o servidor respeita o limite
+   * de 1 consulta por segundo do Nominatim. POST mantém o endereço fora dos logs de URL.
+   */
+  searchAddress: (query: string, signal?: AbortSignal) =>
+    requestJson(`${base}/geocode`, addressSearchSchema, {
+      method: 'POST',
+      signal,
+      timeoutMs: 12_000,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      statusError: (status) =>
+        status === 429
+          ? new Error('A busca está ocupada. Aguarde um instante e tente de novo.')
+          : status === 422
+            ? new Error('Digite ao menos 3 letras do endereço ou um CEP.')
+            : status === 503
+              ? new Error('Busca de endereço indisponível agora. Marque o local no mapa.')
+              : undefined,
+      messages: {
+        network: 'Sem conexão para buscar o endereço. Marque o local no mapa.',
+        timeout: 'A busca de endereço demorou a responder. Tente de novo.',
+        contract: 'A busca de endereço devolveu uma resposta inesperada.',
+      },
+    }),
   privacyNotice: (signal?: AbortSignal) =>
     get(
       '/privacy-notice',
@@ -63,7 +100,6 @@ export const publicApi = {
   captureMarkers: (signal?: AbortSignal) =>
     get('/capture-markers', z.array(captureMarkerSchema), signal),
   status: (signal?: AbortSignal) => get('/status', publicStatusSchema, signal),
-  scout: (signal?: AbortSignal) => get('/scout', publicScoutSchema, signal),
   transparency: (signal?: AbortSignal) => get('/transparency', transparencySchema, signal),
   taxonomy: (signal?: AbortSignal) => get('/taxonomy', issueTaxonomySchema, signal),
   // Existing owner session only: browsing never creates an anonymous account.

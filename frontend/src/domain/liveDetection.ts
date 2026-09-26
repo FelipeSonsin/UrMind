@@ -375,7 +375,8 @@ export function overlaySize(cssWidth: number, cssHeight: number, devicePixelRati
   return { width: Math.round(cssWidth * dpr), height: Math.round(cssHeight * dpr), dpr };
 }
 
-const CLASS_COLORS = ['#d0ed9e', '#f5b83d', '#6cc4e0', '#ff8f70', '#c4a7ff', '#e8d8a8'];
+// Paleta do UrMind (acento, alerta, informação, perigo, sucesso, texto): sem roxo nem neon.
+const CLASS_COLORS = ['#b7e36b', '#e3b341', '#6fa6a0', '#d8645a', '#55b685', '#edf2ed'];
 /** Cor pela posição da classe no artefato: estável entre quadros e sessões. */
 export function classColor(classIndex: number): string {
   return CLASS_COLORS[classIndex % CLASS_COLORS.length];
@@ -435,9 +436,14 @@ export interface CadenceOptions {
   smoothing: number;
 }
 
-/** Teto inicial de 5 análises/s: configuração, não promessa; o ritmo real é medido. */
+/**
+ * Teto de 60 análises/s, o mesmo ritmo da câmera: aparelho rápido (WebGPU) analisa
+ * até um quadro por quadro apresentado. Aparelho lento fica no próprio limite, com 25%
+ * do tempo livre para o vídeo seguir fluido. Configuração, não promessa: o ritmo real
+ * aparece nos detalhes técnicos.
+ */
 export const DEFAULT_CADENCE: CadenceOptions = {
-  minIntervalMs: 200,
+  minIntervalMs: 1000 / 60,
   maxDuty: 0.75,
   speedUpStep: 0.15,
   smoothing: 0.3,

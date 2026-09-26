@@ -22,6 +22,12 @@ export const MAP_DESIGN = {
     padding: { top: 56, right: 56, bottom: 44, left: 16 },
     /** Zoom ao abrir num ponto conhecido (captura, relato). */
     pointZoom: 15,
+    /**
+     * Sem localização na foto, o mapa de marcação abre numa região útil: a última
+     * usada no aparelho ou a área piloto (FECAP, Liberdade, São Paulo), neste zoom.
+     */
+    pilotArea: { latitude: -23.5573, longitude: -46.6355 },
+    areaZoom: 13,
     /** Zoom máximo ao enquadrar vários pontos. */
     pointsMaxZoom: 16,
     /** Folga ao enquadrar vários pontos. */
@@ -33,25 +39,29 @@ export const MAP_DESIGN = {
     countryZoomSpan: 1.5,
   },
 
-  /** Cores do entorno e das linhas; `dark` vale no modo escuro do sistema. */
+  /**
+   * Cores do entorno e das linhas, pela base cartográfica: `dark` para base escura
+   * (padrão, igual ao tema do UrMind), `light` quando uma base clara é configurada.
+   * O entorno fora do Brasil é sempre a superfície do painel.
+   */
   colors: {
     light: {
-      /** Tudo fora do Brasil — igual à superfície do cartão. */
-      mask: '#f4f6f2',
+      /** Tudo fora do Brasil — igual à superfície do painel. */
+      mask: '#121f1a',
       /** Fronteira nacional. */
-      border: '#123f36',
+      border: '#2f7d61',
       /** Divisas estaduais. */
-      states: '#123f36',
+      states: '#2f7d61',
       /** Nome e ponto das capitais. */
-      capitalText: '#182c25',
-      capitalHalo: '#ffffff',
+      capitalText: '#0c1411',
+      capitalHalo: '#edf2ed',
     },
     dark: {
-      mask: '#1c302a',
-      border: '#d0ed9e',
-      states: '#123f36',
-      capitalText: '#182c25',
-      capitalHalo: '#ffffff',
+      mask: '#121f1a',
+      border: '#2f7d61',
+      states: '#68746f',
+      capitalText: '#a8b5ae',
+      capitalHalo: '#0c1411',
     },
   },
 
@@ -103,28 +113,36 @@ export const MAP_DESIGN = {
     size: 24,
     selectedScale: 1.3,
     severity: {
-      critical: { shape: 'warning', fill: '#b3261e', glyph: '#ffffff' },
-      high: { shape: 'triangle', fill: '#d9480f', glyph: '#ffffff' },
-      medium: { shape: 'square', fill: '#e0a526', glyph: '#182c25' },
-      low: { shape: 'circle', fill: '#2f6f5e', glyph: '#ffffff' },
-      unknown: { shape: 'ring', fill: '#66766f', glyph: '#66766f' },
+      critical: { shape: 'warning', fill: '#d8645a', glyph: '#0c1411' },
+      high: { shape: 'triangle', fill: '#dd874f', glyph: '#0c1411' },
+      medium: { shape: 'square', fill: '#e3b341', glyph: '#0c1411' },
+      low: { shape: 'circle', fill: '#55b685', glyph: '#0c1411' },
+      unknown: { shape: 'ring', fill: '#a8b5ae', glyph: '#a8b5ae' },
     },
-    /** Relatos de cidadãos (sem severidade): círculo na cor do estado. */
+    /**
+     * Relatos de cidadãos (sem gravidade): círculo na cor da situação pública —
+     * recebido, em análise, confirmado, precisa de localização, não confirmado.
+     */
     reportStatus: {
-      location_required: '#be123c',
-      received: '#64748b',
-      processing: '#0e7490',
-      model_not_available: '#a16207',
-      experimental: '#7c3aed',
-      no_supported_detection: '#57534e',
-      human_confirmed: '#047857',
-      published: '#123f36',
-      confirmed: '#047857',
-      rejected: '#991b1b',
-      duplicate: '#475569',
+      location_required: '#e3b341',
+      received: '#a8b5ae',
+      processing: '#6fa6a0',
+      model_not_available: '#6fa6a0',
+      experimental: '#6fa6a0',
+      no_supported_detection: '#6fa6a0',
+      human_confirmed: '#55b685',
+      published: '#55b685',
+      confirmed: '#55b685',
+      rejected: '#68746f',
+      duplicate: '#68746f',
     },
+    /** Contorno de todo marcador e ícone interno dos relatos: separa de qualquer base. */
+    keyline: '#0c1411',
+    reportGlyph: '#0c1411',
+    /** Ponto marcado pela pessoa ao escolher o local da foto. */
+    picked: '#b7e36b',
     /** Grupos de pontos próximos. */
-    cluster: { fill: '#123f36', text: '#ffffff', radius: 20 },
+    cluster: { fill: '#2f7d61', text: '#ffffff', stroke: '#0c1411', radius: 20 },
   },
 } as const;
 

@@ -155,9 +155,12 @@ export const captureMarkerSchema = z.object({
   priority_score: optionalNumber,
 });
 export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
-/** Estado do relato em palavras do cidadão; a ordem é a do caminho do relato. */
+/**
+ * Estado técnico do relato, para a área da equipe (fila, filtros, exportação). O público
+ * vê a situação agrupada de `publicSituation` (domain/public).
+ */
 export const reportLabels: Record<CaptureMarker['report_status'], string> = {
-  location_required: 'Necessita localização',
+  location_required: 'Precisa de localização',
   received: 'Recebido',
   processing: 'Processando',
   model_not_available: 'Análise indisponível',
@@ -239,9 +242,9 @@ export type ReviewPayload =
     };
 
 export const severities: Record<string, string> = {
-  unknown: 'Não determinada',
-  low: 'Baixa',
-  medium: 'Média',
-  high: 'Alta',
+  unknown: 'Ainda não avaliada',
+  low: 'Leve',
+  medium: 'Moderada',
+  high: 'Grave',
   critical: 'Crítica',
 };

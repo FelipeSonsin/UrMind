@@ -5,9 +5,10 @@ import {
   ChartNoAxesCombined,
   ClipboardList,
   FileImage,
-  LayoutDashboard,
+  House,
   Map,
   ScanEye,
+  Webcam,
   ScanLine,
   Settings2,
 } from 'lucide-react';
@@ -23,7 +24,6 @@ import {
   PublicMapPage,
   PublicSystemPage,
   PublicTransparencyPage,
-  PublicDemoPage,
   TaxonomyPanel,
   usePublicEvents,
   useSystemStatus,
@@ -40,13 +40,25 @@ import {
   registerTaxonomy,
   filterMapRecords,
   familyFor,
+  issueHeadline,
   labelFor,
+  publicSituation,
+  publicSituationLabels,
+  situationLabel,
   type MapFilters,
+  type PublicSituation,
 } from './domain/public';
 import { publicApi } from './services/publicApi';
+import { activeCapabilities } from './domain/capabilities';
 
 const CapturePage = lazy(() =>
   import('./pages/CapturePage').then((m) => ({ default: m.CapturePage })),
+);
+const RobotCameraPage = lazy(() =>
+  import('./pages/RobotCameraPage').then((m) => ({ default: m.RobotCameraPage })),
+);
+const RobotPhonePage = lazy(() =>
+  import('./pages/RobotCameraPage').then((m) => ({ default: m.RobotPhonePage })),
 );
 const LiveDetectionPage = lazy(() =>
   import('./pages/LiveDetectionPage').then((m) => ({ default: m.LiveDetectionPage })),
@@ -82,24 +94,28 @@ const GroundTruthPage = lazy(() =>
  * para não pesar na API. */
 const PUBLIC_REFRESH_MS = 30_000;
 
-/** Etapa do processamento em palavras de quem enviou; o código fica em `data-stage`. */
-const processingLabels: Record<CaptureProcessing['status'], string> = {
-  received: 'Recebido',
-  queued: 'Recebido, na fila de análise',
-  processing_detection: 'Processando: procurando o problema na foto',
-  detection_completed: 'Processando: detecção concluída',
-  building_event: 'Processando: consolidando a ocorrência',
-  enriching_context: 'Processando: consultando o contexto do local',
-  building_features: 'Processando: preparando a avaliação',
-  assessing: 'Processando: avaliando a prioridade',
-  completed: 'Analisado',
-  no_supported_detection: 'Analisado: nenhum problema reconhecido',
-  no_event: 'Analisado: sem ocorrência consolidada',
-  needs_review: 'Aguardando revisão humana',
-  failed: 'Falha no processamento',
-  model_not_available: 'Recebido, sem análise automática disponível',
-  location_required: 'Necessita localização',
-};
+/** Páginas públicas que dependem de uma capacidade real do registro. */
+function pageAvailable(id: string): boolean {
+  if (id === 'capture') return activeCapabilities.capture;
+  if (id === 'live-detection') return activeCapabilities.liveDetection;
+  if (id === 'robot-camera') return activeCapabilities.robotCamera;
+  if (id === 'map') return activeCapabilities.map;
+  return true;
+}
+
+/** Filtro essencial de Meus relatos: a situação pública, sem o estado técnico. */
+const MINE_FILTERS: [PublicSituation | '', string][] = [
+  ['', 'Todos'],
+  ['analyzing', publicSituationLabels.analyzing],
+  ['confirmed', publicSituationLabels.confirmed],
+  ['needs_location', publicSituationLabels.needs_location],
+];
+
+function reportPlace(report: CaptureMarker): string | null {
+  const address = report.address;
+  if (address?.status !== 'ok') return null;
+  return [address.road, address.suburb].filter(Boolean).join(', ') || null;
+}
 
 const navigation = [
   {
@@ -116,8 +132,8 @@ const navigation = [
     href: '#/sobre',
     section: 'público',
   },
-  { id: 'overview', label: 'Início', icon: LayoutDashboard, href: '#/', section: 'público' },
-  { id: 'map', label: 'Mapa operacional', icon: Map, href: '#/map', section: 'público' },
+  { id: 'overview', label: 'Início', icon: House, href: '#/', section: 'público' },
+  { id: 'map', label: 'Mapa', icon: Map, href: '#/map', section: 'público' },
   { id: 'events', label: 'Ocorrências', icon: ClipboardList, href: '#/events', section: 'público' },
   {
     id: 'analysis',
@@ -126,7 +142,6 @@ const navigation = [
     href: '#/transparency',
     section: 'público',
   },
-  { id: 'demo', label: 'Exemplos revisados', icon: BadgeCheck, href: '#/demo', section: 'público' },
   { id: 'settings', label: 'Sistema', icon: Settings2, href: '#/system', section: 'público' },
   {
     id: 'capture',
@@ -140,6 +155,13 @@ const navigation = [
     label: 'Detecção ao vivo',
     icon: ScanEye,
     href: '#/deteccao-ao-vivo',
+    section: 'operação',
+  },
+  {
+    id: 'robot-camera',
+    label: 'Câmera do robô',
+    icon: Webcam,
+    href: '#/camera-robo',
     section: 'operação',
   },
   {
@@ -174,7 +196,8 @@ type Page =
   | 'private-detail'
   | 'private-not-found'
   | 'login'
-  | 'processing';
+  | 'processing'
+  | 'robot-phone';
 interface Route {
   page: Page;
   eventId?: string;
@@ -195,7 +218,11 @@ function parseRoute(): Route {
   if (first === 'registrar') return { page: 'capture' };
   // A antiga página do Scout (hardware fora do escopo) leva à detecção no próprio aparelho.
   if (first === 'live') return { page: 'live-detection' };
+  // O celular abre pelo QR da Câmera do robô; o notebook fica na rota principal.
+  if (first === 'camera-robo' && second === 'celular') return { page: 'robot-phone' };
   if (first === 'mapa') return { page: 'map' };
+  // Os antigos exemplos revisados são as ocorrências confirmadas do próprio mapa.
+  if (first === 'demo') return { page: 'map' };
   if (first === 'transparency') return { page: 'analysis' };
   if (first === 'system') return { page: 'settings' };
   if (first === 'login') return { page: 'login' };
@@ -294,6 +321,7 @@ export default function App() {
     from: '',
     to: '',
   });
+  const [mineFilter, setMineFilter] = useState<PublicSituation | ''>('');
   const [queueConflict, setQueueConflict] = useState(false);
   const [queuePending, setQueuePending] = useState(false);
   const [reportPhoto, setReportPhoto] = useState<{ owner: string; id: string; url: string } | null>(
@@ -333,6 +361,14 @@ export default function App() {
               (a.created_at ?? '').localeCompare(b.created_at ?? ''),
           )
       : ownReports;
+  const presentSituations = new Set(ownReports.map((row) => publicSituation(row.report_status)));
+  const mineOptions = MINE_FILTERS.filter(
+    ([value]) => value === '' || presentSituations.has(value),
+  );
+  const mineReports =
+    page === 'my-reports' && mineFilter
+      ? ownReports.filter((row) => publicSituation(row.report_status) === mineFilter)
+      : ownReports;
   useEffect(() => {
     if (page === 'review' && canReview && route.captureId) setSelectedReport(route.captureId);
     // O relato que acabou de ser enviado (ou reaberto pelo link) fica em foco no mapa.
@@ -350,6 +386,8 @@ export default function App() {
   useEffect(() => {
     setReportCursors([null]);
     setEventCursors([null]);
+    // Página nova começa do topo, não na rolagem da anterior.
+    window.scrollTo({ top: 0 });
   }, [page]);
   useEffect(() => {
     const controller = new AbortController();
@@ -597,21 +635,21 @@ export default function App() {
           received: 'Foto recebida.',
           location_required: 'Foto preservada. Selecione e confirme a localização no mapa.',
           queued: 'Foto recebida; aguardando processamento.',
-          processing_detection: 'Foto em processamento visual experimental.',
-          detection_completed: 'Detecção concluída; análise ainda em andamento.',
-          building_event: 'Consolidando a ocorrência a partir das detecções.',
-          enriching_context: 'Consultando o contexto disponível.',
-          building_features: 'Construindo features e avaliação.',
-          assessing: 'Concluindo a avaliação da ocorrência.',
-          completed: 'Processamento concluído. A ocorrência já pode ser consultada.',
+          processing_detection: 'Foto em análise.',
+          detection_completed: 'Foto analisada; o relato segue para as próximas etapas.',
+          building_event: 'Organizando o relato.',
+          enriching_context: 'Consultando informações do local.',
+          building_features: 'Preparando a avaliação.',
+          assessing: 'Concluindo a avaliação.',
+          completed: 'Análise concluída. O resultado já pode ser consultado.',
           no_supported_detection:
-            'Nenhuma ocorrência das classes suportadas foi detectada nesta foto. A captura foi preservada.',
+            'A análise automática não reconheceu buraco nem trinca nesta foto. O relato foi preservado.',
           no_event:
-            'Houve detecção visual, mas nenhuma ocorrência foi consolidada. A captura foi preservada.',
-          needs_review: 'A evidência precisa de revisão humana.',
+            'A foto foi analisada, mas o relato ainda depende da revisão da equipe. A foto foi preservada.',
+          needs_review: 'O relato aguarda a revisão da equipe.',
           model_not_available:
-            'Foto preservada, mas não há modelo experimental autorizado para inferência.',
-          failed: 'O processamento falhou. A foto permanece preservada para verificação.',
+            'Foto preservada. A análise automática não está disponível agora; a equipe revisa o relato.',
+          failed: 'A análise falhou. A foto continua preservada para verificação.',
         };
         setNotice(
           result.additional_evidence
@@ -795,14 +833,12 @@ export default function App() {
           <img src="/icon.svg" alt="" />
           <span>
             ur<span className="brand-light">mind</span>
-            <small>INTELIGÊNCIA URBANA</small>
           </span>
         </a>
-        <div className="workspace-label">
-          ESPAÇO DE TRABALHO <span>V1</span>
-        </div>
         <nav aria-label="Navegação principal">
-          {(['overview', 'capture', 'live-detection', 'my-reports', 'map'] as const)
+          {(['overview', 'capture', 'live-detection', 'robot-camera', 'my-reports', 'map'] as const)
+            // Só entra no menu o que está ligado no registro de capacidades.
+            .filter((id) => pageAvailable(id))
             .map((id) => navigation.find((item) => item.id === id))
             .filter((item): item is NonNullable<typeof item> => item != null)
             .map((item) => (
@@ -815,34 +851,42 @@ export default function App() {
                   if (item.id === 'capture') setEditing(undefined);
                 }}
               >
-                <item.icon size={19} strokeWidth={1.6} />
+                <item.icon size={16} strokeWidth={1.8} aria-hidden="true" />
                 {item.label}
-                {item.id === 'drafts' && draftsLoaded && localDrafts.length > 0 && (
-                  <span className="nav-count">{localDrafts.length}</span>
-                )}
               </a>
             ))}
         </nav>
-        <div className="sidebar-bottom">
-          <p>
-            FECART <span>Projeto UrMind</span>
-          </p>
-        </div>
+        {draftsLoaded && localDrafts.length > 0 && (
+          <div className="sidebar-bottom">
+            <a href="#/drafts" aria-current={page === 'drafts' ? 'page' : undefined}>
+              <FileImage size={15} strokeWidth={1.8} aria-hidden="true" />
+              Rascunhos neste aparelho
+              <span className="nav-count">{localDrafts.length}</span>
+            </a>
+          </div>
+        )}
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span>
-            Observatório urbano <span className="topbar-separator">/</span>{' '}
+            UrMind <span className="topbar-separator">/</span>{' '}
             <strong>
               {privateNavigation.find((item) => item.id === page)?.label ??
                 navigation.find((item) => item.id === page)?.label ??
-                'Análise da ocorrência'}
+                (page === 'processing'
+                  ? 'Seu relato'
+                  : page === 'robot-phone'
+                    ? 'Câmera do robô'
+                    : 'Ocorrência')}
             </strong>
           </span>
-          <span className="network">
-            <i className={online ? 'online' : ''} />
-            {online ? 'Rede disponível' : 'Sem rede'}
-          </span>
+          {/* Só o que muda o que a pessoa pode fazer: sem rede, o relato fica no aparelho. */}
+          {!online && (
+            <span className="network" role="status">
+              <i />
+              Sem rede: o relato fica salvo neste aparelho
+            </span>
+          )}
           {session && privatePage && canReview && (
             <span className="network" title="Supabase Realtime (Postgres Changes)">
               <i className={realtime === 'connected' ? 'online' : ''} />
@@ -866,6 +910,43 @@ export default function App() {
                   Atualizar aplicativo
                 </button>
               </div>
+            )}
+            {/* Menu da equipe no topo da área interna, antes de qualquer conteúdo. */}
+            {privatePage && canReview && (
+              <nav className="internal-navigation" aria-label="Navegação interna">
+                <span className="internal-badge">Área interna</span>
+                {internalTabs.map((item) => (
+                  <a
+                    key={item.id}
+                    href={privateNavigation.find((entry) => entry.id === item.id)!.href}
+                    aria-current={page === item.id ? 'page' : undefined}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+                <details>
+                  <summary>Mais</summary>
+                  <div className="internal-more">
+                    {privateNavigation
+                      .filter(
+                        (item) =>
+                          !['dashboard', 'review', 'private-map', 'ground-truth'].includes(
+                            item.id,
+                          ) &&
+                          (item.id !== 'admin' || canAdmin),
+                      )
+                      .map((item) => (
+                        <a key={item.id} href={item.href}>
+                          {item.label}
+                        </a>
+                      ))}
+                    <a href="#/">Área do cliente</a>
+                    <button className="text-button" onClick={() => void auth.signOut()}>
+                      Sair
+                    </button>
+                  </div>
+                </details>
+              </nav>
             )}
             {notice && (
               <p className="success" role="status">
@@ -916,7 +997,7 @@ export default function App() {
                 {!session ? <p>Recuperando sessão segura desta captura…</p> : null}
                 {captureStatus && (
                   <p role="status" className="stage" data-stage={captureStatus.status}>
-                    Situação: <strong>{processingLabels[captureStatus.status]}</strong>
+                    Situação: <strong>{situationLabel(captureStatus.status)}</strong>
                   </p>
                 )}
                 {captureStatus?.protocol_code && (
@@ -924,6 +1005,7 @@ export default function App() {
                     Protocolo: <strong>{captureStatus.protocol_code}</strong>{' '}
                     <button
                       type="button"
+                      className="secondary compact"
                       onClick={() => {
                         void navigator.clipboard.writeText(captureStatus.protocol_code!).then(
                           () => setNotice('Protocolo copiado.'),
@@ -937,7 +1019,7 @@ export default function App() {
                 )}
                 {captureStatus?.model_status === 'EXPERIMENTAL_SHADOW' && (
                   <p className="notice">
-                    Análise experimental: o modelo ainda não foi aprovado para uso oficial.
+                    Resultado automático em teste: a equipe confere antes de qualquer publicação.
                   </p>
                 )}
                 {captureStatus &&
@@ -965,23 +1047,62 @@ export default function App() {
               </section>
             )}
             {reportSection && session && (page !== 'private-map' || canReview) && (
-              <section className="panel">
+              <section className={page === 'my-reports' ? 'my-reports' : 'panel'}>
                 {page === 'private-map' ? (
                   <h1>Gêmeo digital 2D</h1>
+                ) : page === 'my-reports' ? (
+                  <div className="page-heading">
+                    <div>
+                      <h1>Meus relatos</h1>
+                      <p>
+                        Relatos enviados por este aparelho. Um relato vira ocorrência confirmada
+                        depois da revisão da equipe.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <h2>
-                    {canReview && page !== 'my-reports' && page !== 'processing'
-                      ? 'Relatos recebidos'
-                      : 'Meus relatos'}
+                    {canReview && page !== 'processing' ? 'Relatos recebidos' : 'Meus relatos'}
                   </h2>
                 )}
-                <p className="muted">
-                  Um relato recebido ainda não é um problema confirmado. O ponto é a posição
-                  informada, com a precisão do aparelho.
-                </p>
+                {page === 'my-reports' ? (
+                  mineOptions.length > 2 && (
+                    <div className="segmented" role="radiogroup" aria-label="Situação do relato">
+                      {mineOptions.map(([value, label]) => (
+                        <label
+                          key={value || 'all'}
+                          className={mineFilter === value ? 'active' : undefined}
+                        >
+                          <input
+                            type="radio"
+                            name="mine-filter"
+                            checked={mineFilter === value}
+                            onChange={() => {
+                              setMineFilter(value);
+                              setSelectedReport(null);
+                            }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <p className="muted">
+                    Um relato recebido ainda não é um problema confirmado. O ponto é a posição
+                    informada, com a precisão do aparelho.
+                  </p>
+                )}
                 {page !== 'review' && (
                   <UrbanMap
-                    events={ownReports}
+                    events={mineReports}
+                    audience={privatePage && canReview ? 'team' : 'public'}
+                    showFilters={privatePage && canReview}
+                    emptyMessage={
+                      mineFilter
+                        ? 'Nenhum relato nesta situação.'
+                        : 'Seus relatos com localização aparecem aqui.'
+                    }
                     allowExport={canReview}
                     selectedId={selectedReport}
                     onSelect={setSelectedReport}
@@ -1131,80 +1252,143 @@ export default function App() {
                       onChanged={() => setRevision((value) => value + 1)}
                     />
                   )}
-                <ul>
-                  {listedReports.map((report) => (
-                    <li key={report.id}>
-                      <button onClick={() => setSelectedReport(report.id)}>
-                        {reportLabels[report.report_status]}
-                      </button>
-                      {report.user_description && <p>{report.user_description}</p>}
-                      {report.protocol_code && (
-                        <a
-                          href={
-                            canReview && privatePage
-                              ? `#/app/relato/${report.id}`
-                              : `#/relato/${report.protocol_code}`
-                          }
+                {canReview && privatePage ? (
+                  <ul className="queue-list" aria-label="Fila de relatos">
+                    {listedReports.map((report) => (
+                      <li key={report.id}>
+                        <button
+                          className="secondary compact"
+                          onClick={() => setSelectedReport(report.id)}
                         >
-                          {report.protocol_code}
-                        </a>
-                      )}
-                      {report.created_at && (
-                        <time dateTime={report.created_at}>
-                          {new Date(report.created_at).toLocaleString('pt-BR')}
-                        </time>
-                      )}
-                      {report.report_status === 'location_required' && (
-                        <a href={`#/processando/${report.id}`}>Informar localização</a>
-                      )}
-                      {report.location_conflict && (
-                        <p>GPS do dispositivo e EXIF divergentes — necessita revisão.</p>
-                      )}
-                      {report.event_public_id && (
-                        <a href={`#/resultado/${report.event_public_id}`}>Ver análise</a>
-                      )}
-                      {page === 'my-reports' && (
-                        <OwnerReportTimeline
-                          key={`${session.user.id}:${report.id}`}
-                          id={report.id}
-                          revision={revision}
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <div className="actions" aria-label="Páginas de relatos">
-                  <button
-                    disabled={reportCursors.length === 1}
-                    onClick={() => setReportCursors(reportCursors.slice(0, -1))}
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    disabled={ownReports.length < 100 || !ownReports.at(-1)?.created_at}
-                    onClick={() => {
-                      const last = ownReports.at(-1)!;
-                      setReportCursors([...reportCursors, `${last.created_at}|${last.id}`]);
-                    }}
-                  >
-                    Próxima
-                  </button>
-                  <span>
-                    Página {reportCursors.length}; filtros visuais aplicados a esta página. A
-                    exportação consulta todos os relatos correspondentes.
-                  </span>
-                </div>
+                          {reportLabels[report.report_status]}
+                        </button>
+                        {report.user_description && <p>{report.user_description}</p>}
+                        {report.protocol_code && (
+                          <a href={`#/app/relato/${report.id}`}>{report.protocol_code}</a>
+                        )}
+                        {report.created_at && (
+                          <time dateTime={report.created_at}>
+                            {new Date(report.created_at).toLocaleString('pt-BR')}
+                          </time>
+                        )}
+                        {report.report_status === 'location_required' && (
+                          <a href={`#/processando/${report.id}`}>Informar localização</a>
+                        )}
+                        {report.location_conflict && (
+                          <p>GPS do dispositivo e EXIF divergentes — necessita revisão.</p>
+                        )}
+                        {report.event_public_id && (
+                          <a href={`#/resultado/${report.event_public_id}`}>Ver análise</a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="report-list" aria-label="Lista de relatos">
+                    {(page === 'my-reports' ? mineReports : listedReports).map((report) => (
+                      <li key={report.id}>
+                        <span
+                          className={`report-chip situation-${publicSituation(report.report_status)}`}
+                        >
+                          {situationLabel(report.report_status)}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => setSelectedReport(report.id)}
+                          aria-label={`Ver no mapa: ${
+                            report.urmind_class
+                              ? issueHeadline(report.urmind_class, report.severity)
+                              : 'relato enviado'
+                          }`}
+                        >
+                          {report.urmind_class
+                            ? issueHeadline(report.urmind_class, report.severity)
+                            : 'Relato enviado'}
+                        </button>
+                        <span className="report-place">
+                          {reportPlace(report) ?? report.user_description ?? ''}
+                        </span>
+                        {report.created_at && (
+                          <time dateTime={report.created_at}>
+                            {new Date(report.created_at).toLocaleDateString('pt-BR')}
+                          </time>
+                        )}
+                        {report.report_status === 'location_required' ? (
+                          <a href={`#/processando/${report.id}`}>Informar localização</a>
+                        ) : report.event_public_id ? (
+                          <a href={`#/resultado/${report.event_public_id}`}>Ver análise</a>
+                        ) : (
+                          page !== 'processing' && (
+                            <a href={`#/processando/${report.id}`}>Acompanhar</a>
+                          )
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {page === 'my-reports' && ownReports.length > 0 && mineReports.length === 0 && (
+                  <p className="muted">Nenhum relato nesta situação.</p>
+                )}
+                {page === 'my-reports' && ownReports.length === 0 && (
+                  <div className="empty">
+                    <h2>Você ainda não enviou relatos por este aparelho</h2>
+                    <p>Tire uma foto do problema; a localização vem do aparelho ou da foto.</p>
+                    <a className="button" href="#/registrar">
+                      Registrar evidência
+                    </a>
+                  </div>
+                )}
+                {(privatePage || reportCursors.length > 1 || ownReports.length >= 100) && (
+                  <div className="actions" aria-label="Páginas de relatos">
+                    <button
+                      className="secondary"
+                      disabled={reportCursors.length === 1}
+                      onClick={() => setReportCursors(reportCursors.slice(0, -1))}
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={ownReports.length < 100 || !ownReports.at(-1)?.created_at}
+                      onClick={() => {
+                        const last = ownReports.at(-1)!;
+                        setReportCursors([...reportCursors, `${last.created_at}|${last.id}`]);
+                      }}
+                    >
+                      Próxima
+                    </button>
+                    <span className="muted">
+                      Página {reportCursors.length}
+                      {privatePage &&
+                        '; filtros visuais aplicados a esta página. A exportação consulta todos os relatos correspondentes.'}
+                    </span>
+                  </div>
+                )}
               </section>
             )}
             {page === 'analysis' && <PublicTransparencyPage revision={publicRevision} />}
             {page === 'my-reports' && !session && (
-              <section className="panel">
-                <h1>Meus relatos</h1>
-                <p>
-                  Abra a sessão usada para enviar os relatos. Relatos de outro visitante não são
-                  exibidos.
-                </p>
-                <a href="#/registrar">Registrar problema</a>
+              <section className="my-reports">
+                <div className="page-heading">
+                  <div>
+                    <h1>Meus relatos</h1>
+                    <p>
+                      Os relatos enviados por este aparelho aparecem aqui, com a situação de cada
+                      um.
+                    </p>
+                  </div>
+                </div>
+                <div className="panel empty">
+                  <h2>Nenhum relato neste aparelho ainda</h2>
+                  <p>
+                    Tire uma foto do problema; a localização vem do aparelho ou da foto. Relatos
+                    enviados por outro navegador ficam na sessão dele.
+                  </p>
+                  <a className="button" href="#/registrar">
+                    Registrar evidência
+                  </a>
+                </div>
               </section>
             )}
             {page === 'about' && (
@@ -1218,14 +1402,14 @@ export default function App() {
                     plano ou placas de veículos.
                   </p>
                   <p>
-                    Um relato recebido não é um problema confirmado pela IA. Classes em
-                    desenvolvimento não são reconhecidas automaticamente.
+                    A detecção automática reconhece buraco e trincas no asfalto (longitudinal,
+                    transversal e em malha). Qualquer outro problema pode ser relatado com foto e é
+                    avaliado pela equipe. Um relato recebido ainda não é um problema confirmado.
                   </p>
                 </section>
-                <PublicTransparencyPage revision={publicRevision} />
+                <TaxonomyPanel revision={publicRevision} />
               </>
             )}
-            {page === 'demo' && <PublicDemoPage revision={publicRevision} />}
             {page === 'settings' && (
               <PublicSystemPage
                 status={publicStatus}
@@ -1256,12 +1440,32 @@ export default function App() {
                 }}
               />
             )}
+            {page === 'robot-camera' && !pageAvailable('robot-camera') && (
+              <section className="panel">
+                <h1>Câmera do robô</h1>
+                <p>Esta função não está habilitada neste ambiente.</p>
+                <a className="button" href="#/deteccao-ao-vivo">
+                  Abrir Detecção ao vivo
+                </a>
+              </section>
+            )}
+            {page === 'robot-camera' && pageAvailable('robot-camera') && (
+              // Remontada por sessão, como a Detecção ao vivo.
+              <RobotCameraPage
+                key={session?.user.id ?? 'no-session'}
+                onOpenDraft={async (draft) => {
+                  setEditing(draft);
+                  navigate('capture');
+                  await reloadDrafts();
+                }}
+              />
+            )}
+            {page === 'robot-phone' && pageAvailable('robot-camera') && <RobotPhonePage />}
             {page === 'drafts' && (
               <>
                 <div className="page-heading">
                   <div>
-                    <p className="eyebrow">EVIDÊNCIAS / ARMAZENAMENTO LOCAL</p>
-                    <h1>Rascunhos locais</h1>
+                    <h1>Rascunhos neste aparelho</h1>
                     <p>Fotos reais, guardadas neste navegador para continuar depois.</p>
                   </div>
                   <button onClick={newCapture}>Novo rascunho</button>
@@ -1351,40 +1555,6 @@ export default function App() {
             )}
             {privatePage && canReview && (
               <>
-                <nav className="internal-navigation" aria-label="Navegação interna">
-                  <span className="internal-badge">Área interna</span>
-                  {internalTabs.map((item) => (
-                    <a
-                      key={item.id}
-                      href={privateNavigation.find((entry) => entry.id === item.id)!.href}
-                      aria-current={page === item.id ? 'page' : undefined}
-                    >
-                      {item.label}
-                    </a>
-                  ))}
-                  <details>
-                    <summary>Mais</summary>
-                    <div className="internal-more">
-                      {privateNavigation
-                        .filter(
-                          (item) =>
-                            !['dashboard', 'review', 'private-map', 'ground-truth'].includes(
-                              item.id,
-                            ) &&
-                            (item.id !== 'admin' || canAdmin),
-                        )
-                        .map((item) => (
-                          <a key={item.id} href={item.href}>
-                            {item.label}
-                          </a>
-                        ))}
-                      <a href="#/">Área do cliente</a>
-                      <button className="text-button" onClick={() => void auth.signOut()}>
-                        Sair
-                      </button>
-                    </div>
-                  </details>
-                </nav>
                 {(page === 'dashboard' || page === 'login') && (
                   <section className="panel">
                     <h1>Painel interno</h1>
@@ -1463,7 +1633,7 @@ export default function App() {
                 {(page === 'dashboard' || page === 'login') && (
                   <>
                     <ReportIndicators key={`${session?.access_token}:${revision}`} />
-                    <TaxonomyPanel revision={revision} />
+                    <TaxonomyPanel revision={revision} includeDevelopment />
                   </>
                 )}
                 {page === 'ground-truth' && <GroundTruthPage key={session?.access_token} />}
@@ -1533,8 +1703,8 @@ export default function App() {
           </Suspense>
           <footer>
             <a href="#/sobre">Sobre e privacidade</a>
-            UrMind <span>Percepção e decisão urbana auditável.</span>
-            <span className="footer-right">FECART · Desenvolvimento</span>
+            <span>Relatos revisados por pessoas antes de chegar ao mapa público.</span>
+            <span className="footer-right">UrMind · FECART</span>
           </footer>
         </main>
       </div>

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Camera, ScanEye } from 'lucide-react';
+import { Camera, ScanEye, Webcam } from 'lucide-react';
+import { activeCapabilities } from '../../domain/capabilities';
 import {
   ContextPanel,
   DecisionTrace,
@@ -14,18 +15,21 @@ import {
 import { EventFeed } from '../../components/public/EventFeed';
 import { SystemStatusBar } from '../../components/public/SystemStatusBar';
 import {
-  filterableClasses,
+  automaticClassCodes,
+  issueHeadline,
   labelFor,
   modelSupportLabel,
   priorityBand,
+  publicSituation,
   severityOf,
+  situationLabel,
   type IssueTaxonomy,
   type PublicEvent,
   type PublicEventDetail,
   type PublicStatus,
   type Transparency,
 } from '../../domain/public';
-import { reportLabels, statuses, type CaptureMarker } from '../../domain/contracts';
+import { statuses, type CaptureMarker } from '../../domain/contracts';
 import { api } from '../../services/api';
 import { publicApi } from '../../services/publicApi';
 
@@ -104,6 +108,15 @@ const LOCATION_SOURCES: Record<string, string> = {
   manual: 'ponto marcado no mapa',
 };
 
+function SeverityTag({ severity }: { severity: string | null | undefined }) {
+  const level = severityOf(severity);
+  return (
+    <span className={`risk-tag risk-${level.level}`}>
+      <i aria-hidden="true">{level.shape}</i> {level.label}
+    </span>
+  );
+}
+
 function reportPlace(report: CaptureMarker): string | null {
   const address = report.address;
   if (address?.status !== 'ok') return null;
@@ -111,8 +124,8 @@ function reportPlace(report: CaptureMarker): string | null {
 }
 
 /**
- * Relato do próprio autor no mapa: situação, ponto informado com a precisão real e,
- * depois da análise, o trecho de via associado, sempre separado do ponto informado.
+ * Relato do próprio autor no mapa: tipo, gravidade, local, data, situação e foto.
+ * O ponto informado e o trecho de via associado continuam separados.
  */
 export function OwnReportDetail({
   report,
@@ -124,30 +137,51 @@ export function OwnReportDetail({
   children?: ReactNode;
 }) {
   const source = report.location_source ? LOCATION_SOURCES[report.location_source] : undefined;
+  const severity = severityOf(report.severity);
   return (
     <>
       <h2>{report.urmind_class ? labelFor(report.urmind_class) : 'Seu relato'}</h2>
       <p>
-        <span className={`report-chip report-${report.report_status}`}>
-          {reportLabels[report.report_status]}
+        <span className={`report-chip situation-${publicSituation(report.report_status)}`}>
+          {situationLabel(report.report_status)}
         </span>
       </p>
-      {report.created_at && (
-        <p className="muted">
-          Enviado em{' '}
-          <time dateTime={report.created_at}>
-            {new Date(report.created_at).toLocaleString('pt-BR')}
-          </time>
-        </p>
-      )}
-      <p>{reportPlace(report) ?? 'Endereço aproximado indisponível'}</p>
-      <dl className="data-list">
+      <dl className="data-list report-facts">
         <div>
-          <dt>Ponto informado</dt>
+          <dt>Tipo</dt>
+          <dd>{report.urmind_class ? labelFor(report.urmind_class) : 'Ainda não identificado'}</dd>
+        </div>
+        <div>
+          <dt>Gravidade</dt>
           <dd>
-            {source ?? 'origem não registrada'}
+            {severity.level === 'unknown' ? (
+              severity.label
+            ) : (
+              <span className={`risk-tag risk-${severity.level}`}>
+                <i aria-hidden="true">{severity.shape}</i> {severity.label}
+              </span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Local</dt>
+          <dd>
+            {reportPlace(report) ?? 'Endereço aproximado indisponível'}
+            <small>{source ?? 'origem não registrada'}</small>
             {report.accuracy_m != null && (
               <small>Precisão aproximada: {Math.round(report.accuracy_m)} m</small>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Data</dt>
+          <dd>
+            {report.created_at ? (
+              <time dateTime={report.created_at}>
+                {new Date(report.created_at).toLocaleString('pt-BR')}
+              </time>
+            ) : (
+              'não registrada'
             )}
           </dd>
         </div>
@@ -168,8 +202,8 @@ export function OwnReportDetail({
       )}
       {report.photo_gate?.status === 'NEEDS_REVIEW' && (
         <p className="notice">
-          Verificação pendente: nem todas as condições de cena e privacidade foram confirmadas. Isso
-          não é uma detecção de problema.
+          A equipe ainda vai conferir a foto (cena e privacidade). Isso não indica que há um
+          problema.
         </p>
       )}
       {report.user_description && <p className="report-note">{report.user_description}</p>}
@@ -177,7 +211,7 @@ export function OwnReportDetail({
         <>
           <img src={photoUrl} alt="Foto privada do relato selecionado" />
           <a href={photoUrl} target="_blank" rel="noopener noreferrer">
-            Ver original
+            Ver foto original
           </a>
         </>
       )}
@@ -206,23 +240,43 @@ export function PublicHome({
   const [selected, setSelected] = useState<string | null>(null);
   const current = selected ?? events[0]?.id ?? null;
   const { data: detail } = useEventDetail(current, revision);
+  const automatic = automaticClassCodes().map(labelFor);
   return (
     <>
       <section className="home-hero" aria-labelledby="home-title">
         <div>
           <h1 id="home-title">Viu um problema na rua? Registre com uma foto.</h1>
           <p>
-            O UrMind guarda onde a foto foi tirada, analisa a imagem e acompanha o relato até a
-            revisão da equipe.
+            A localização vem do aparelho ou da própria foto. A equipe revisa cada relato antes de
+            ele aparecer no mapa público.
           </p>
+          {activeCapabilities.liveDetection && (
+            <div className="home-capabilities">
+              <span>Reconhece automaticamente:</span>
+              <ul aria-label="Reconhecidos automaticamente">
+                {automatic.map((label) => (
+                  <li key={label} className="badge">
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="actions">
           <a className="button" href="#/registrar">
-            <Camera size={17} /> Registrar evidência
+            <Camera size={16} aria-hidden="true" /> Registrar evidência
           </a>
-          <a className="button secondary" href="#/deteccao-ao-vivo">
-            <ScanEye size={17} /> Detecção ao vivo
-          </a>
+          {activeCapabilities.liveDetection && (
+            <a className="button secondary" href="#/deteccao-ao-vivo">
+              <ScanEye size={16} aria-hidden="true" /> Detecção ao vivo
+            </a>
+          )}
+          {activeCapabilities.robotCamera && (
+            <a className="button secondary" href="#/camera-robo">
+              <Webcam size={16} aria-hidden="true" /> Câmera do robô
+            </a>
+          )}
         </div>
       </section>
       <section className="panel home-reports" aria-label="Seus relatos">
@@ -244,11 +298,13 @@ export function PublicHome({
           <ul className="report-list">
             {reports.slice(0, 3).map((report) => (
               <li key={report.id}>
-                <span className={`report-chip report-${report.report_status}`}>
-                  {reportLabels[report.report_status]}
+                <span className={`report-chip situation-${publicSituation(report.report_status)}`}>
+                  {situationLabel(report.report_status)}
                 </span>
                 <span className="report-place">
-                  {reportPlace(report) ?? report.user_description ?? 'Relato enviado'}
+                  {report.urmind_class
+                    ? issueHeadline(report.urmind_class, report.severity)
+                    : (reportPlace(report) ?? report.user_description ?? 'Relato enviado')}
                 </span>
                 {report.created_at && (
                   <time dateTime={report.created_at}>
@@ -262,7 +318,7 @@ export function PublicHome({
         )}
       </section>
       <div className="section-heading home-section">
-        <h2>Ocorrências publicadas</h2>
+        <h2>Ocorrências confirmadas</h2>
         <a className="text-button" href="#/map">
           Abrir mapa
         </a>
@@ -298,8 +354,8 @@ export function PublicHome({
             <div className="empty">
               <h3>Nenhuma ocorrência publicada ainda</h3>
               <p>
-                Depois da revisão da equipe, cada ocorrência aparece aqui com severidade, prioridade
-                e ação sugerida.
+                Depois da revisão da equipe, cada ocorrência aparece aqui com tipo, gravidade e o
+                que fazer.
               </p>
               <a className="text-button" href="#/registrar">
                 Registrar a primeira evidência
@@ -315,35 +371,24 @@ export function PublicHome({
 
 // ------------------------------------------------------------------ mapa e lista
 
+/** Tipo de problema com as opções que existem nas ocorrências carregadas. */
 function Filters({
   urmindClass,
-  status,
+  options,
   onClass,
-  onStatus,
 }: {
   urmindClass: string;
-  status: string;
+  options: [string, string][];
   onClass: (value: string) => void;
-  onStatus: (value: string) => void;
 }) {
+  if (options.length < 2 && !urmindClass) return null;
   return (
     <div className="filters panel">
       <div>
-        <label htmlFor="public-class">Classe</label>
+        <label htmlFor="public-class">Tipo de problema</label>
         <select id="public-class" value={urmindClass} onChange={(e) => onClass(e.target.value)}>
-          <option value="">Todas as classes</option>
-          {filterableClasses().map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label htmlFor="public-status">Estado</label>
-        <select id="public-status" value={status} onChange={(e) => onStatus(e.target.value)}>
-          <option value="">Todos os estados</option>
-          {Object.entries(statuses).map(([value, label]) => (
+          <option value="">Todos os tipos</option>
+          {options.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
@@ -358,7 +403,7 @@ type MapKind = 'all' | 'mine' | 'published';
 const MAP_KINDS: [MapKind, string][] = [
   ['all', 'Tudo'],
   ['mine', 'Meus relatos'],
-  ['published', 'Ocorrências publicadas'],
+  ['published', 'Confirmados'],
 ];
 
 export function PublicMapPage({
@@ -371,6 +416,8 @@ export function PublicMapPage({
   const query = () => new URLSearchParams(location.hash.split('?')[1] ?? '');
   const [selected, setSelected] = useState<string | null>(() => query().get('ponto'));
   const [kind, setKind] = useState<MapKind>(() => {
+    // O antigo endereço de exemplos revisados abre direto nas ocorrências confirmadas.
+    if (location.hash.startsWith('#/demo')) return 'published';
     const requested = query().get('mostrar');
     return MAP_KINDS.some(([value]) => value === requested) ? (requested as MapKind) : 'all';
   });
@@ -414,8 +461,8 @@ export function PublicMapPage({
     return () => controller.abort();
   }, [ownId]);
   const markers = useMemo(() => {
-    if (kind === 'mine') return reports;
-    if (kind === 'published') return events;
+    if (kind === 'mine' && reports.length) return reports;
+    if (kind === 'published' && events.length) return events;
     const reportIds = new Set(reports.map((report) => report.public_id));
     const eventIds = new Set(reports.map((report) => report.event_public_id));
     return [
@@ -424,6 +471,16 @@ export function PublicMapPage({
       ...reports,
     ];
   }, [events, reports, generic, kind]);
+  // "Meus relatos" e "Confirmados" só aparecem quando têm pontos e diferem de "Tudo".
+  const located = (rows: Array<{ latitude?: number | null; longitude?: number | null }>) =>
+    rows.filter((row) => row.latitude != null && row.longitude != null).length;
+  const everything = located([...events, ...(generic ?? []), ...reports]);
+  const views = MAP_KINDS.filter(([value]) => {
+    if (value === 'all') return true;
+    const count = located(value === 'mine' ? reports : events);
+    return count > 0 && count < everything;
+  });
+  const shownKind: MapKind = views.some(([value]) => value === kind) ? kind : 'all';
   function changeKind(next: MapKind) {
     setKind(next);
     setSelected(null);
@@ -437,21 +494,19 @@ export function PublicMapPage({
     <>
       <div className="page-heading public">
         <div>
-          <h1>Mapa operacional</h1>
-          <p>
-            Ocorrências publicadas e, se você enviou, os seus relatos com a situação de cada um.
-          </p>
+          <h1>Mapa</h1>
+          <p>Ocorrências confirmadas pela equipe e, se você enviou, os seus relatos.</p>
         </div>
       </div>
-      {reports.length > 0 && (
+      {views.length > 1 && (
         <div className="segmented" role="radiogroup" aria-label="Mostrar no mapa">
-          {MAP_KINDS.map(([value, label]) => (
-            <label key={value} className={kind === value ? 'active' : undefined}>
+          {views.map(([value, label]) => (
+            <label key={value} className={shownKind === value ? 'active' : undefined}>
               <input
                 type="radio"
                 name="map-kind"
                 value={value}
-                checked={kind === value}
+                checked={shownKind === value}
                 onChange={() => changeKind(value)}
               />
               {label}
@@ -461,14 +516,15 @@ export function PublicMapPage({
       )}
       <Suspense fallback={<p role="status">Carregando mapa…</p>}>
         <UrbanMap
-          key={kind}
+          key={shownKind}
           events={markers}
           selectedId={selected}
           emptyMessage={
-            kind === 'mine'
+            shownKind === 'mine'
               ? 'Seus relatos com localização aparecem aqui.'
               : 'Nenhuma ocorrência publicada ainda.'
           }
+          audience="public"
           onSelect={(id) => {
             setSelected(id);
             if (events.some((event) => event.id === id)) {
@@ -485,13 +541,16 @@ export function PublicMapPage({
                 <a href={`#/processando/${own.id}`}>Acompanhar relato</a>
               </OwnReportDetail>
             ) : isGeneric ? (
-              <p>Relato de outra pessoa. Foto e descrição não são públicas.</p>
+              <p>Relato de outra pessoa, ainda em análise. Foto e descrição não são públicas.</p>
             ) : (
               <>
                 {pointError && <p role="alert">{pointError}</p>}
                 {pointDetail && pointDetail.id === selected ? (
                   <>
                     <h2>{labelFor(pointDetail.urmind_class)}</h2>
+                    <p>
+                      <SeverityTag severity={pointDetail.risk?.severity ?? pointDetail.severity} />
+                    </p>
                     <ExperimentalBadge stage={pointDetail.model_stage} />
                     {pointDetail.image.available && pointDetail.image.url && (
                       <img
@@ -519,12 +578,12 @@ export function PublicMapPage({
           }
         />
       </Suspense>
-      {kind !== 'mine' && (
+      {shownKind !== 'mine' && (
         <EventFeed
           events={events}
           selectedId={selected}
           onSelect={(event) => openEvent(event.id)}
-          title="Ocorrências publicadas"
+          title="Ocorrências confirmadas"
           emptyHint="Nenhuma ocorrência publicada ainda. Relatos aparecem aqui depois da revisão."
         />
       )}
@@ -545,20 +604,24 @@ export function PublicEventsPage({
   filters: { urmind_class: string; status: string };
   onFilters: (value: { urmind_class: string; status: string }) => void;
 }) {
+  // Só tipos presentes; com um tipo escolhido, ele continua na lista para voltar a "Todos".
+  const present = new Set(events.map((event) => event.urmind_class));
+  if (filters.urmind_class) present.add(filters.urmind_class);
+  const classOptions = [...present]
+    .map((code): [string, string] => [code, labelFor(code)])
+    .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
   return (
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">OCORRÊNCIAS</p>
-          <h1>Tudo que o UrMind registrou</h1>
-          <p>Lista pública com classe, confiança, severidade e prioridade de cada ocorrência.</p>
+          <h1>Ocorrências confirmadas</h1>
+          <p>Cada ocorrência com tipo, gravidade, local e situação.</p>
         </div>
       </div>
       <Filters
         urmindClass={filters.urmind_class}
-        status={filters.status}
-        onClass={(urmind_class) => onFilters({ ...filters, urmind_class })}
-        onStatus={(status) => onFilters({ ...filters, status })}
+        options={classOptions}
+        onClass={(urmind_class) => onFilters({ ...filters, urmind_class, status: '' })}
       />
       {error && (
         <p className="error" role="alert">
@@ -596,19 +659,25 @@ export function PublicEventDetailPage({ id, revision }: { id: string; revision: 
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">ANÁLISE COMPLETA</p>
           <ExperimentalBadge stage={event.model_stage} />
           <h1>{labelFor(event.urmind_class)}</h1>
           <p>
             <span className={`risk-tag risk-${severity.level}`}>
               <i aria-hidden="true">{severity.shape}</i> {severity.label}
             </span>{' '}
-            · prioridade {priorityBand(event.risk?.priority_score)} · confiança visual{' '}
-            {event.visual_confidence != null
-              ? `${(event.visual_confidence * 100).toFixed(1)}%`
-              : 'não disponível'}{' '}
-            · {statuses[event.status as keyof typeof statuses] ?? event.status}
+            · {situationLabel(event.status)} · prioridade {priorityBand(event.risk?.priority_score)}
           </p>
+          <details className="technical-details">
+            <summary>Detalhes técnicos</summary>
+            <p>
+              Confiança visual{' '}
+              {event.visual_confidence != null
+                ? `${(event.visual_confidence * 100).toFixed(1)}%`
+                : 'não disponível'}
+              {' · '}
+              {statuses[event.status as keyof typeof statuses] ?? event.status}
+            </p>
+          </details>
         </div>
         <a className="secondary button" href="#/events">
           Voltar às ocorrências
@@ -649,7 +718,6 @@ export function PublicEventDetailPage({ id, revision }: { id: string; revision: 
             <li key={index}>
               <strong>{labelFor(detection.urmind_class)}</strong>
               <span>{(detection.confidence * 100).toFixed(1)}%</span>
-              <small>{detection.urmind_class}</small>
             </li>
           ))}
           {!event.detections.length && <li className="muted">Sem detecções publicadas.</li>}
@@ -719,7 +787,6 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">TRANSPARÊNCIA</p>
           <h1>Como o UrMind analisou</h1>
           <p>Modelo, dados, métricas medidas e limites declarados. Sem número estimado.</p>
         </div>
@@ -769,7 +836,9 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
             </div>
             <div>
               <dt>Classes</dt>
-              <dd>{data.classes.length ? data.classes.join(', ') : 'não disponível'}</dd>
+              <dd>
+                {data.classes.length ? data.classes.map(labelFor).join(', ') : 'não disponível'}
+              </dd>
             </div>
             <div>
               <dt>Entrada</dt>
@@ -942,14 +1011,39 @@ export function PublicSystemPage({
   );
 }
 
-/** Classes da taxonomia canônica e o que o modelo atual realmente suporta. */
-export function TaxonomyPanel({ revision }: { revision: number }) {
+/**
+ * O que o modelo atual reconhece sozinho, em destaque; as demais categorias ficam
+ * recolhidas, como relato com foto avaliado pela equipe, nunca como detecção automática.
+ */
+export function TaxonomyPanel({
+  revision,
+  includeDevelopment = false,
+}: {
+  revision: number;
+  /** Só a área da equipe lista as categorias ainda sem detecção automática. */
+  includeDevelopment?: boolean;
+}) {
   const { data, error } = usePublicData<IssueTaxonomy>(
     (signal) => publicApi.taxonomy(signal),
     [revision],
   );
   if (error) return null;
   if (!data) return <Skeleton lines={3} />;
+  const order = automaticClassCodes();
+  const rank = (code: string) => (order.includes(code) ? order.indexOf(code) : order.length);
+  const automatic = data.issues
+    .filter((issue) => issue.model_may_emit)
+    .sort((a, b) => rank(a.issue_code) - rank(b.issue_code));
+  const others = data.issues.filter((issue) => !issue.model_may_emit);
+  const item = (issue: IssueTaxonomy['issues'][number]) => (
+    <li key={issue.issue_code} data-support={issue.model_support_status}>
+      <strong>{issue.display_name_pt}</strong>
+      <span className="badge">{modelSupportLabel(issue)}</span>
+      {issue.limitations?.map((limitation) => (
+        <small key={limitation}>{limitation}</small>
+      ))}
+    </li>
+  );
   return (
     <section className="panel" aria-label="Classes de problemas urbanos">
       <div className="section-heading">
@@ -957,69 +1051,16 @@ export function TaxonomyPanel({ revision }: { revision: number }) {
         <span className="muted">{data.taxonomy_version}</span>
       </div>
       <p className="muted">
-        Só classes com modelo são detectadas automaticamente. As demais estão em desenvolvimento:
-        precisam de dados revisados antes de qualquer detecção.
+        A detecção automática reconhece só os tipos abaixo. Outros problemas podem ser relatados com
+        foto e são avaliados pela equipe.
       </p>
-      <ul className="taxonomy-list">
-        {data.issues.map((issue) => (
-          <li key={issue.issue_code} data-support={issue.model_support_status}>
-            <strong>{issue.display_name_pt}</strong>
-            <span className="badge">{modelSupportLabel(issue)}</span>
-            {issue.limitations?.map((limitation) => (
-              <small key={limitation}>{limitation}</small>
-            ))}
-          </li>
-        ))}
-      </ul>
+      <ul className="taxonomy-list">{automatic.map(item)}</ul>
+      {includeDevelopment && others.length > 0 && (
+        <details>
+          <summary>Outros problemas, avaliados pela equipe ({others.length})</summary>
+          <ul className="taxonomy-list">{others.map(item)}</ul>
+        </details>
+      )}
     </section>
-  );
-}
-
-/**
- * Exemplos reais já revisados por humano. Nunca representam o resultado de uma
- * foto recém-enviada: cada cartão leva o selo EXEMPLO REVISADO.
- */
-export function PublicDemoPage({ revision }: { revision: number }) {
-  const { data, error, loading } = usePublicData<PublicEvent[]>(
-    (signal) => publicApi.events({ limit: 12, status: 'confirmed' }, signal),
-    [revision],
-  );
-  return (
-    <>
-      <div className="page-heading public">
-        <div>
-          <p className="eyebrow">DEMONSTRAÇÃO</p>
-          <h1>Exemplos revisados</h1>
-          <p>
-            Ocorrências reais confirmadas por revisão humana. Não são o resultado da sua foto; o
-            resultado de um envio aparece em “Processando”.
-          </p>
-        </div>
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading && !data && <Skeleton lines={4} />}
-      {data && data.length === 0 && (
-        <p className="panel muted">Nenhum exemplo revisado disponível ainda.</p>
-      )}
-      {data && data.length > 0 && (
-        <ul className="demo-list">
-          {data.map((event) => (
-            <li key={event.id} className="panel">
-              <span className="badge demo-badge">EXEMPLO REVISADO</span>
-              <strong>{labelFor(event.urmind_class)}</strong>
-              <span className="muted">
-                {new Date(event.occurred_at).toLocaleDateString('pt-BR')} · severidade{' '}
-                {severityOf(event.severity).label}
-              </span>
-              <a href={`#/events/${event.id}`}>Ver diagnóstico</a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
   );
 }

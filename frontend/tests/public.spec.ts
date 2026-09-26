@@ -8,18 +8,18 @@ import {
   stubPublicApi,
 } from './fixtures';
 
-test('public primary navigation has five citizen actions and keeps legacy routes', async ({
-  page,
-}) => {
+test('public primary navigation has six actions and keeps legacy routes', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/');
   const links = page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link');
-  await expect(links).toHaveCount(5);
-  await expect(links.nth(0)).toHaveText(/Início/);
-  await expect(links.nth(1)).toHaveText(/Registrar/);
-  await expect(links.nth(2)).toHaveText(/Detecção ao vivo/);
-  await expect(links.nth(3)).toHaveText(/Meus relatos/);
-  await expect(links.nth(4)).toHaveText(/Mapa/);
+  await expect(links).toHaveText([
+    /Início/,
+    /Registrar/,
+    /Detecção ao vivo/,
+    /Câmera do robô/,
+    /Meus relatos/,
+    /Mapa/,
+  ]);
   await expect(page.getByRole('link', { name: 'Sobre e privacidade' })).toBeVisible();
   await page.goto('/#/transparency');
   await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
@@ -60,8 +60,19 @@ test('a página inicial leva a registrar, acompanhar relatos e ver o mapa', asyn
   // Diagnóstico rápido da ocorrência publicada mais recente.
   const diagnosis = page.getByLabel('Diagnóstico da ocorrência selecionada');
   await expect(diagnosis.getByRole('heading', { name: 'Buraco', exact: true })).toBeVisible();
-  await expect(diagnosis).toContainText('MÉDIA');
-  await expect(diagnosis).toContainText('61.0%');
+  // Tipo e gravidade separados; confiança do modelo só na análise completa.
+  await expect(diagnosis).toContainText('Grave');
+  await expect(diagnosis).toContainText('Média');
+  await expect(diagnosis).not.toContainText('61.0%');
+  // Só as classes que a detecção automática reconhece aparecem como automáticas.
+  const automatic = page.getByRole('list', { name: 'Reconhecidos automaticamente' });
+  await expect(automatic.getByRole('listitem')).toHaveText([
+    'Buraco',
+    'Trinca longitudinal',
+    'Trinca transversal',
+    'Trinca em malha',
+  ]);
+  await expect(page.locator('main')).not.toContainText('Árvore caída');
   await expect(diagnosis).toContainText('Tapar buraco');
   await expect(diagnosis).toContainText('Prefeitura — zeladoria viária');
   await page.screenshot({ path: testInfo.outputPath('public-home.png'), fullPage: true });
@@ -178,57 +189,103 @@ test('ocorrência sem avaliação não recebe severidade nem prioridade plausív
   const action = page.getByLabel('Ação recomendada');
   await expect(action).toContainText('Ação ainda não sugerida');
   await expect(action).toContainText('Em triagem');
-  await expect(page.getByText('confiança visual 0.0%')).toBeVisible();
+  // Confiança do modelo fica nos detalhes técnicos, recolhidos.
+  await expect(page.getByText('Confiança visual 0.0%')).toBeHidden();
+  await page.getByText('Detalhes técnicos').click();
+  await expect(page.getByText('Confiança visual 0.0%')).toBeVisible();
   await expect(page.getByText('prioridade não calculada')).toBeVisible();
   await expect(page.getByLabel('Evidência visual')).toContainText('Sem detecções publicadas.');
 });
 
-test('filtros do mapa persistem na URL e removem pontos fora do período', async ({ page }) => {
+test('filtros do mapa público: tipo, gravidade e período reais, persistidos na URL', async ({
+  page,
+}) => {
+  // Relógio fixo: as ocorrências da fixture (17/09/2026) caem nos últimos 7 dias.
+  await page.clock.setFixedTime(new Date('2026-09-20T12:00:00Z'));
   await stubPublicApi(page);
   await page.goto('/#/mapa');
-  // Data em pt-BR, digitada como dd/mm/aaaa (nunca mm/dd/yyyy).
-  const since = page.getByLabel('Desde');
-  await expect(since).toHaveAttribute('placeholder', 'dd/mm/aaaa');
-  await since.fill('01012099');
-  await expect(since).toHaveValue('01/01/2099');
-  await expect(page).toHaveURL(/map_from=2099-01-01/);
-  await expect(page.getByText('0 pontos visíveis', { exact: true })).toBeVisible();
-  await expect(page.getByText('Nenhum ponto corresponde a estes filtros.')).toBeVisible();
-  await page.reload();
-  await expect(page.getByLabel('Desde')).toHaveValue('01/01/2099');
-  await page.getByRole('button', { name: 'Limpar filtros' }).click();
-  await expect(page.getByLabel('Desde')).toHaveValue('');
-  // Data impossível não filtra e é apontada.
-  await page.getByLabel('Até').fill('31/02/2026');
-  await expect(page.getByText('Data inexistente')).toBeVisible();
-  await expect(page).not.toHaveURL(/map_to=/);
-  await page.getByLabel('Até').fill('');
-  await page.getByLabel('Classe do ponto').selectOption('URMIND_ROAD_D40');
+  const toolbar = page.getByRole('group', { name: 'Filtros do mapa' });
+  // Nada de status técnico, família ou lista inteira da taxonomia no mapa público.
+  await expect(toolbar.getByLabel('Classe do ponto')).toHaveCount(0);
+  await expect(toolbar.getByLabel('Família do ponto')).toHaveCount(0);
+  await expect(toolbar.getByLabel('Status do ponto')).toHaveCount(0);
+  await expect(page.getByLabel('Tipo de problema').locator('option')).toHaveText([
+    'Todos',
+    'Buraco',
+    'Trinca longitudinal',
+  ]);
+  await expect(page.getByLabel('Gravidade', { exact: true }).locator('option')).toHaveText([
+    'Todas',
+    'Grave',
+    'Ainda não avaliada',
+  ]);
+  await page.getByLabel('Tipo de problema').selectOption('URMIND_ROAD_D40');
   await expect(page).toHaveURL(/map_class=URMIND_ROAD_D40/);
+  await expect(page.getByText('1 ponto visível', { exact: true })).toBeVisible();
+  // Sem resultado: o mapa continua na tela, com aviso e atalho para limpar.
+  await page.getByLabel('Gravidade', { exact: true }).selectOption('unknown');
+  await expect(page.getByText('0 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nenhuma ocorrência encontrada')).toBeVisible();
+  await expect(page.locator('.map canvas')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Gravidade', { exact: true })).toHaveValue('unknown');
+  await page.getByRole('button', { name: 'Limpar filtros' }).click();
+  await expect(page.getByText('2 pontos visíveis', { exact: true })).toBeVisible();
+  // As duas ocorrências são da mesma semana: um período não mudaria nada, então não aparece.
+  await expect(page.getByLabel('Período', { exact: true })).toHaveCount(0);
+});
+
+test('período aparece só quando separa pontos e filtra de verdade', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-20T12:00:00Z'));
+  await stubPublicApi(page, {
+    events: [publicEvents[0], { ...publicEvents[1], occurred_at: '2026-06-01T12:00:00+00:00' }],
+  });
+  await page.goto('/#/mapa');
+  const period = page.getByLabel('Período', { exact: true });
+  // 7, 30 e 90 dias dariam o mesmo resultado: só o primeiro aparece.
+  await expect(period.locator('option')).toHaveText(['Qualquer data', 'Últimos 7 dias']);
+  await period.selectOption('7');
+  await expect(page).toHaveURL(/map_period=7/);
   await expect(page.getByText('1 ponto visível', { exact: true })).toBeVisible();
 });
 
-test('filtros do mapa oferecem status, família e classe reais, com a classe presa à família', async ({
+const otherReport = {
+  id: 'a1b2c3d4e5f6a7b8c9d0',
+  latitude: -23.5584,
+  longitude: -46.6352,
+  report_status: 'processing',
+};
+
+test('mapa mostra visões só quando mudam os pontos e cada uma filtra de verdade', async ({
   page,
 }) => {
   await stubPublicApi(page);
+  // Só ocorrências confirmadas: "Confirmados" seria igual a "Tudo" e não aparece.
   await page.goto('/#/mapa');
-  const classes = page.getByLabel('Classe do ponto').locator('option');
-  // As quatro classes que o modelo experimental emite, com nome em português.
-  await expect(classes).toHaveText([
-    'Todas',
-    'Buraco',
-    'Trinca em malha (couro de jacaré)',
-    'Trinca longitudinal',
-    'Trinca transversal',
-  ]);
-  await expect(page.getByLabel('Família do ponto')).toHaveCount(0);
+  await expect(page.getByText('2 pontos visíveis', { exact: true })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Mostrar no mapa' })).toHaveCount(0);
+  // Com um relato de outra pessoa no mapa, "Confirmados" passa a separar pontos.
+  await page.route('**/api/v1/public/capture-markers', (route) =>
+    route.fulfill({ json: [otherReport] }),
+  );
+  await page.reload();
+  const views = page.getByRole('radiogroup', { name: 'Mostrar no mapa' });
+  await expect(views.getByRole('radio')).toHaveCount(2);
+  await expect(views.getByRole('radio', { name: 'Tudo' })).toBeChecked();
+  await expect(page.getByText('3 pontos visíveis', { exact: true })).toBeVisible();
+  // Sem relatos próprios, "Meus relatos" devolveria sempre zero: não aparece.
+  await expect(views.getByRole('radio', { name: 'Meus relatos' })).toHaveCount(0);
+  await views.getByText('Confirmados').click();
+  await expect(page).toHaveURL(/mostrar=published/);
+  await expect(page.getByText('2 pontos visíveis', { exact: true })).toBeVisible();
+  await views.getByText('Tudo').click();
+  await expect(page.getByText('3 pontos visíveis', { exact: true })).toBeVisible();
 });
 
 test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/map');
-  await expect(page.getByRole('heading', { name: 'Mapa operacional' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mapa', exact: true })).toBeVisible();
   await expect(page.locator('.map canvas')).toBeVisible();
   // A canvas alone can hide a missing worker. Verify GeoJSON was processed and
   // its event marker actually rendered by MapLibre (fixture data, not real E2E).
@@ -236,11 +293,13 @@ test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', as
     'data-rendered-event-ids',
     new RegExp(EVENT_ID),
   );
-  const legend = page.getByLabel('Legenda de severidade');
-  await expect(legend).toContainText('Crítica');
-  await expect(legend).toContainText('Não determinada');
+  // A legenda explica só as gravidades que estão no mapa (aqui: Grave e sem avaliação).
+  const legend = page.getByLabel('Legenda de gravidade');
+  await expect(legend).toContainText('Grave');
+  await expect(legend).toContainText('Ainda não avaliada');
+  await expect(legend).not.toContainText('Crítica');
   // Cada nível traz a forma de placa que o mapa desenha, não só uma cor.
-  await expect(legend.locator('svg.map-sign')).toHaveCount(5);
+  await expect(legend.locator('svg.map-sign')).toHaveCount(2);
   await page
     .getByRole('button', { name: /Buraco/ })
     .first()
@@ -251,17 +310,22 @@ test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', as
 test('a lista pública filtra por classe e declara quando nada corresponde', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/events');
-  await expect(page.getByRole('heading', { name: 'Tudo que o UrMind registrou' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ocorrências confirmadas' })).toBeVisible();
   await expect(page.getByText('2 registros')).toBeVisible();
   await page.route(
     (url) => url.pathname === '/api/v1/public/events',
     (route) => route.fulfill({ json: [] }),
   );
   // Only classes a model can emit are filterable; DATA_REQUIRED classes are not offered.
-  const classFilter = page.getByLabel('Classe');
-  await expect(classFilter.locator('option[value="URMIND_FALLEN_TREE"]')).toHaveCount(0);
-  await expect(classFilter.locator('option[value="URMIND_SIGNAGE"]')).toHaveCount(0);
-  await classFilter.selectOption('URMIND_ROAD_D10');
+  // Só os tipos que existem nas ocorrências; nada de taxonomia inteira nem estado técnico.
+  const classFilter = page.getByLabel('Tipo de problema');
+  await expect(classFilter.locator('option')).toHaveText([
+    'Todos os tipos',
+    'Buraco',
+    'Trinca longitudinal',
+  ]);
+  await expect(page.getByLabel('Situação')).toHaveCount(0);
+  await classFilter.selectOption('URMIND_ROAD_D00');
   await expect(page.getByText('Nenhuma ocorrência corresponde a este filtro.')).toBeVisible();
 });
 
@@ -357,38 +421,63 @@ test('sem ocorrência publicada, a página inicial convida a registrar e não pa
   await expect(page.getByRole('group', { name: 'Filtros do mapa' })).toHaveCount(0);
 });
 
-test('demo mostra só exemplos revisados e nunca como resultado da foto enviada', async ({
-  page,
-}) => {
+test('o antigo endereço de exemplos abre o mapa nas ocorrências confirmadas', async ({ page }) => {
   await stubPublicApi(page);
-  await page.route(
-    (url) => url.pathname === '/api/v1/public/events',
-    (route) =>
-      route.fulfill({
-        json:
-          new URL(route.request().url()).searchParams.get('status') === 'confirmed'
-            ? publicEvents.slice(0, 1)
-            : [],
-      }),
+  await page.route('**/api/v1/public/capture-markers', (route) =>
+    route.fulfill({ json: [otherReport] }),
   );
   await page.goto('/#/demo');
-  await expect(page.getByRole('heading', { name: 'Exemplos revisados' })).toBeVisible();
-  await expect(page.getByText('Não são o resultado da sua foto')).toBeVisible();
-  await expect(page.getByText('EXEMPLO REVISADO')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Mapa', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('radiogroup', { name: 'Mostrar no mapa' }).getByRole('radio', {
+      name: 'Confirmados',
+    }),
+  ).toBeChecked();
+  await expect(page.getByText('EXEMPLO REVISADO')).toHaveCount(0);
 });
 
-test('transparência lista classes em desenvolvimento sem afirmar reconhecimento', async ({
+test('transparência mostra só as classes da detecção automática, sem categorias futuras', async ({
   page,
 }) => {
   await stubPublicApi(page);
-  await page.goto('/#/transparency');
-  const taxonomy = page.getByLabel('Classes de problemas urbanos');
-  const fallenTree = taxonomy.locator('li', { hasText: 'Árvore caída' });
-  await expect(fallenTree).toContainText('Em desenvolvimento');
-  await expect(taxonomy.locator('li')).toHaveCount(35);
-  await expect(taxonomy.getByText('Em desenvolvimento', { exact: true })).toHaveCount(31);
-  await expect(taxonomy.locator('li', { hasText: 'Buraco' })).toContainText('Análise experimental');
-  await expect(taxonomy).not.toContainText('Reconhecida por modelo aprovado');
+  for (const route of ['/#/transparency', '/#/sobre']) {
+    await page.goto(route);
+    const taxonomy = page.getByLabel('Classes de problemas urbanos');
+    await expect(taxonomy.locator('li')).toHaveText([
+      /Buraco/,
+      /Trinca longitudinal/,
+      /Trinca transversal/,
+      /Trinca em malha/,
+    ]);
+    await expect(taxonomy).not.toContainText('Árvore caída');
+    await expect(taxonomy).not.toContainText('Em desenvolvimento');
+    await expect(taxonomy).not.toContainText('Reconhecida por modelo aprovado');
+  }
+  // "Sobre" é para o cidadão: privacidade e o que é reconhecido, sem métricas do modelo.
+  await expect(page.getByLabel('Métricas medidas')).toHaveCount(0);
+});
+
+test('a Home leva a cada função pública que ela mostra', async ({ page }) => {
+  await stubPublicApi(page);
+  const targets: Array<[string, RegExp, string]> = [
+    ['Registrar evidência', /#\/registrar$/, 'Registrar evidência'],
+    ['Detecção ao vivo', /#\/deteccao-ao-vivo$/, 'Detecção ao vivo'],
+    ['Câmera do robô', /#\/camera-robo$/, 'Câmera do robô'],
+  ];
+  for (const [name, url, heading] of targets) {
+    await page.goto('/');
+    await page.locator('main').getByRole('link', { name, exact: true }).click();
+    await expect(page).toHaveURL(url);
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+  }
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Abrir mapa' }).click();
+  await expect(page.getByRole('heading', { name: 'Mapa', exact: true })).toBeVisible();
+  // Sem promessas de funções futuras na Home.
+  const main = page.locator('main');
+  for (const future of ['Em breve', 'Árvore caída', 'Alagamento', 'Scout']) {
+    await expect(main).not.toContainText(future);
+  }
 });
 
 test('resultado de modelo shadow leva o selo ANÁLISE EXPERIMENTAL', async ({ page }) => {

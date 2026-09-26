@@ -43,7 +43,7 @@ export function OwnerReportTimeline({ id, revision }: { id: string; revision: nu
   }, [id, revision, expanded]);
   const labels: Record<string, string> = {
     received: 'Recebido',
-    photo_gate: 'Porteiro',
+    photo_gate: 'Verificação da foto',
     location: 'Localização',
     analysis: 'Análise',
     review: 'Revisão humana',
@@ -57,14 +57,14 @@ export function OwnerReportTimeline({ id, revision }: { id: string; revision: nu
     attached: 'Evidência anexada',
     detached: 'Evidência desanexada',
     published: 'Publicado',
-    withdrawn: 'Despublicado',
+    withdrawn: 'Retirado do mapa',
     adjusted: 'Localização ajustada',
     declared: 'Localização declarada',
-    model_not_available: 'Análise indisponível — sem modelo autorizado',
+    model_not_available: 'Análise automática indisponível',
     experimental: 'Análise experimental',
     queued: 'Na fila',
     processing_detection: 'Em análise',
-    location_required: 'Localização necessária',
+    location_required: 'Precisa de localização',
     unknown: 'Não registrado',
     blur: 'Nitidez insuficiente',
     resolution: 'Resolução insuficiente',
@@ -215,6 +215,19 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
             </p>
           )}
           {detail.location_conflict && <p>Conflito GPS × EXIF: conferir localização.</p>}
+          {detail.urban_auxiliary?.suggestions?.length ? (
+            <p className="field-note">
+              Sugestão auxiliar (não calibrada, só para revisão):{' '}
+              {detail.urban_auxiliary.suggestions
+                .map(
+                  (item) =>
+                    issues.find((entry) => entry.issue_code === item.code)?.display_name_pt ??
+                    item.code,
+                )
+                .join(', ')}
+              . Confira a foto; a classe é sempre escolhida por você.
+            </p>
+          ) : null}
           {detail.additional_evidence && (
             <aside className="notice">
               <p>Foto anexada a outro relato; não cria ponto independente.</p>
@@ -292,7 +305,8 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
           </button>
           <p>
             Consenso entre revisores distintos ou adjudicação continuam obrigatórios. Isto não é
-            inferência da IA.
+            inferência da IA. Ao confirmar, o ponto aparece no mapa público; a foto só é publicada
+            com o atestado abaixo.
           </p>
           <label>
             <input
@@ -316,7 +330,7 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
               )
             }
           >
-            Publicar relato
+            Publicar foto
           </button>
           <button
             disabled={busy || !event}
@@ -329,7 +343,7 @@ export function CaptureReviewPanel({ id, onChanged }: { id: string; onChanged: (
               )
             }
           >
-            Despublicar relato
+            Retirar do mapa público
           </button>
           <h4>Histórico</h4>
           <ul>

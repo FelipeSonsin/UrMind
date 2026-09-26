@@ -4,6 +4,11 @@ import {
   filterableClasses,
   exportMapRecords,
   filterMapRecords,
+  filterPublicMap,
+  issueHeadline,
+  publicMapFilterOptions,
+  publicSituation,
+  situationLabel,
   formatBrDate,
   issueTaxonomySchema,
   labelFor,
@@ -16,7 +21,6 @@ import {
   priorityBand,
   publicEventDetailSchema,
   publicEventSchema,
-  publicScoutSchema,
   severityOf,
 } from './public';
 
@@ -109,10 +113,43 @@ describe('apresentação pública sem inventar dado', () => {
     }
   });
 
-  it('severidade ausente ou desconhecida vira "não determinada", não "baixa"', () => {
+  it('gravidade ausente ou desconhecida vira "ainda não avaliada", nunca "leve"', () => {
     expect(severityOf(null).level).toBe('unknown');
-    expect(severityOf(undefined).label).toBe('Não determinada');
+    expect(severityOf(undefined).label).toBe('Ainda não avaliada');
     expect(severityOf('inexistente').level).toBe('unknown');
+  });
+
+  it('gravidade pública: Leve, Moderada, Grave e Crítica', () => {
+    expect(['low', 'medium', 'high', 'critical'].map((level) => severityOf(level).label)).toEqual([
+      'Leve',
+      'Moderada',
+      'Grave',
+      'Crítica',
+    ]);
+  });
+
+  it('tipo e gravidade aparecem separados; sem avaliação, só o tipo', () => {
+    expect(issueHeadline('URMIND_ROAD_D40', 'high')).toBe('Buraco · Grave');
+    expect(issueHeadline('URMIND_ROAD_D00', null)).toBe('Trinca longitudinal');
+    expect(issueHeadline('URMIND_ROAD_D20', 'unknown')).toBe('Trinca em malha');
+    expect(labelFor('URMIND_ROAD_D20')).not.toContain('jacaré');
+  });
+
+  it('situação pública agrupa o estado técnico sem promover recusa a confirmado', () => {
+    expect(situationLabel('received')).toBe('Recebido');
+    for (const status of [
+      'processing',
+      'model_not_available',
+      'experimental',
+      'no_supported_detection',
+    ])
+      expect(situationLabel(status)).toBe('Em análise');
+    expect(situationLabel('human_confirmed')).toBe('Confirmado');
+    expect(situationLabel('published')).toBe('Confirmado');
+    expect(situationLabel('location_required')).toBe('Precisa de localização');
+    expect(publicSituation('rejected')).toBe('declined');
+    expect(situationLabel('duplicate')).toBe('Não confirmado');
+    expect(situationLabel('confirmed')).toBe('Confirmado');
   });
 
   it('prioridade sem número não recebe faixa plausível', () => {
@@ -225,36 +262,6 @@ describe('contrato público espelha o backend', () => {
     expect(detail.responsibility.status).toBe('requires_triage');
     expect(detail.trace[0].status).toBe('unavailable');
   });
-
-  it('estado do Scout fora do enum real é rejeitado', () => {
-    const scout = publicScoutSchema.safeParse({
-      status: 'transmitindo',
-      device_code: null,
-      last_seen: null,
-      camera: {
-        mode: 'unavailable',
-        reason: 'sem câmera',
-        stream_url: null,
-        frame_url: null,
-        latency_ms: null,
-      },
-      telemetry: {},
-      mission: null,
-    });
-    expect(scout.success).toBe(false);
-  });
-
-  it('modo de câmera fora dos estados reais é rejeitado', () => {
-    const scout = publicScoutSchema.safeParse({
-      status: 'no_device',
-      device_code: null,
-      last_seen: null,
-      camera: { mode: 'demo', reason: null, stream_url: null, frame_url: null, latency_ms: null },
-      telemetry: {},
-      mission: null,
-    });
-    expect(scout.success).toBe(false);
-  });
 });
 
 describe('taxonomia canônica', () => {
@@ -346,5 +353,46 @@ describe('taxonomia canônica', () => {
     expect(modelSupportLabel({ model_support_status: 'EXPERIMENTAL_MODEL' })).toBe(
       'Análise experimental',
     );
+  });
+});
+
+describe('filtros do mapa público', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  const rows = [
+    { urmind_class: 'URMIND_ROAD_D40', severity: 'high', occurred_at: '2026-09-25T12:00:00Z' },
+    { urmind_class: 'URMIND_ROAD_D00', severity: null, created_at: '2026-08-01T12:00:00Z' },
+    { urmind_class: null, severity: null, created_at: null },
+  ];
+
+  it('filtra por tipo, gravidade e período sem inventar data', () => {
+    const none = { issue: '', severity: '', period: '' };
+    expect(filterPublicMap(rows, none, now)).toHaveLength(3);
+    expect(filterPublicMap(rows, { ...none, issue: 'URMIND_ROAD_D40' }, now)).toEqual([rows[0]]);
+    expect(filterPublicMap(rows, { ...none, severity: 'unknown' }, now)).toEqual([
+      rows[1],
+      rows[2],
+    ]);
+    expect(filterPublicMap(rows, { ...none, period: '7' }, now)).toEqual([rows[0]]);
+    expect(filterPublicMap(rows, { ...none, period: '90' }, now)).toEqual([rows[0], rows[1]]);
+  });
+
+  it('oferece só tipos e gravidades que existem nos pontos', () => {
+    const options = publicMapFilterOptions(rows);
+    // Rótulos vêm da taxonomia registrada (outro teste registra rótulos próprios).
+    expect(options.issues.map(([code]) => code).sort()).toEqual([
+      'URMIND_ROAD_D00',
+      'URMIND_ROAD_D40',
+    ]);
+    expect(options.severities).toEqual([
+      ['high', 'Grave'],
+      ['unknown', 'Ainda não avaliada'],
+    ]);
+    expect(publicMapFilterOptions([]).issues).toEqual([]);
+    // Períodos: só os que separam pontos e dão resultado diferente do anterior.
+    expect(publicMapFilterOptions(rows, now).periods).toEqual([
+      ['7', 'Últimos 7 dias'],
+      ['90', 'Últimos 90 dias'],
+    ]);
+    expect(publicMapFilterOptions(rows.slice(0, 1), now).periods).toEqual([]);
   });
 });

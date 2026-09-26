@@ -195,6 +195,48 @@ export const auth = {
 
 export type RealtimeStatus = 'connected' | 'connecting' | 'unavailable';
 
+export interface BroadcastLink {
+  send(payload: Record<string, unknown>): Promise<boolean>;
+  close(): Promise<void>;
+}
+
+/**
+ * Canal efêmero de broadcast no mesmo projeto Supabase: só mensagens pequenas entre
+ * aparelhos, sem banco e sem histórico. Quem conhece o nome do canal pode entrar;
+ * o conteúdo precisa carregar a própria prova (ex.: token do pareamento).
+ */
+export function openBroadcastChannel(
+  name: string,
+  event: string,
+  onMessage: (payload: unknown) => void,
+  onStatus: (status: RealtimeStatus) => void,
+): BroadcastLink {
+  if (!authConfigured) {
+    onStatus('unavailable');
+    return { send: async () => false, close: async () => undefined };
+  }
+  const channel = supabase().channel(name, {
+    config: { broadcast: { self: false, ack: true } },
+  });
+  channel.on('broadcast', { event }, ({ payload }) => onMessage(payload));
+  onStatus('connecting');
+  channel.subscribe((status) =>
+    onStatus(
+      status === 'SUBSCRIBED'
+        ? 'connected'
+        : status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'
+          ? 'unavailable'
+          : 'connecting',
+    ),
+  );
+  return {
+    send: async (payload) => (await channel.send({ type: 'broadcast', event, payload })) === 'ok',
+    close: async () => {
+      await supabase().removeChannel(channel);
+    },
+  };
+}
+
 // Postgres Changes (MASTER_PLAN §16.1): só `events` e `risk_assessments`. A mudança
 // não carrega o dado para a tela; ela só avisa para recarregar via HTTP, o que evita
 // evento duplicado e mantém o HTTP como caminho oficial quando o Realtime cair.
