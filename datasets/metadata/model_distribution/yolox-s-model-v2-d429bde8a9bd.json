@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "purpose": "Distribuição pública do ONNX da detecção ao vivo (prévia no navegador). Não é aprovação de produção.",
+  "model_version": "yolox-s-model-v2-d429bde8a9bd",
+  "dev_model_version_id": "a3ff07ea-2d13-494f-ba4b-f79db51483c3",
+  "scientific_status": "EXPERIMENTAL",
+  "operational_status": "EXPERIMENTAL_SHADOW",
+  "onnx_sha256": "d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9",
+  "size_bytes": 35855173,
+  "class_names": ["URMIND_ROAD_D00", "URMIND_ROAD_D10", "URMIND_ROAD_D20", "URMIND_ROAD_D40"],
+  "inference_profile_sha256": "2702eb15a291ec6b6a87b5fa2091d95d68bfd8a29dedc211f525f7eab458c2a0",
+  "browser_manifest": "frontend/public/models/live-detection.json",
+  "manifest_schema_version": 1,
+  "storage": {
+    "project_ref": "impmeitwtusjtwjouggy",
+    "bucket": "models",
+    "bucket_public": true,
+    "object_path": "yolox-s-model-v2-d429bde8a9bd/d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9/yolox-s-model-v2-d429bde8a9bd.onnx",
+    "public_url": "https://impmeitwtusjtwjouggy.supabase.co/storage/v1/object/public/models/yolox-s-model-v2-d429bde8a9bd/d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9/yolox-s-model-v2-d429bde8a9bd.onnx",
+    "published_at": "2026-09-26",
+    "publisher": "python -m app.ml.browser_model publish-storage (x-upsert false; public URL re-hashed)"
+  },
+  "distribution_authorization": "docs/LIVE_DETECTION.md#autorizacao-de-uso-e-distribuicao-25092026",
+  "build_delivery": "frontend/build/liveModel.ts via LIVE_MODEL_ONNX_URL (Vercel, production)"
+}

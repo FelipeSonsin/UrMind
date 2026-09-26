@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
+import os
 import re
 import selectors
 import sys
 import time
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
 
@@ -65,6 +68,8 @@ class Worker:
         self._detector: OnnxDetector | None = None
         self._detector_version: uuid.UUID | None = None
         self._score_threshold: float | None = None
+        self._max_detections: int | None = None
+        self._inference_profile_sha256: str | None = None
 
     async def process_pending_address(self, capture_id: uuid.UUID | None = None) -> bool:
         """Retry explicit mobile address requests, independently of detector availability."""
@@ -217,6 +222,28 @@ class Worker:
             onnx_path = (PROJECT_ROOT / serving["onnx_path"]).resolve()
             if not onnx_path.is_relative_to((PROJECT_ROOT / "models" / "serving").resolve()):
                 raise ModelNotAvailableError("ONNX fora do diretório de serving")
+            # Perfil por classe opcional, no mesmo formato do manifesto do navegador;
+            # sem ele o comportamento é o agnóstico de sempre.
+            nms_mode = serving.get("nms", "class_agnostic")
+            class_score_thresholds = serving.get("class_score_thresholds")
+            if class_score_thresholds is not None and (
+                not isinstance(class_score_thresholds, list)
+                or any(
+                    isinstance(value, bool) or not isinstance(value, (int, float))
+                    for value in class_score_thresholds
+                )
+            ):
+                raise ModelNotAvailableError("ModelVersion com limiares por classe inválidos")
+            # A versioned inference profile must state its letterbox: the profile hash
+            # covers it, so a missing key would silently run another profile. Only
+            # legacy registrations without a profile keep the original YOLOX preproc.
+            if "inference_profile_sha256" in serving and "letterbox_upscale" not in serving:
+                raise ModelNotAvailableError(
+                    "perfil de inferência sem letterbox_upscale explícito; re-registre o modelo"
+                )
+            letterbox_upscale = serving.get("letterbox_upscale", True)
+            if not isinstance(letterbox_upscale, bool):
+                raise ModelNotAvailableError("ModelVersion com letterbox_upscale inválido")
             self._detector = OnnxDetector(
                 onnx_path,
                 model.checksum,
@@ -225,9 +252,22 @@ class Worker:
                 expected_class_names=class_names,
                 contract_path=PROJECT_ROOT / serving["model_contract_path"],
                 expected_contract_sha256=serving["model_contract_sha256"],
+                nms_mode=nms_mode,
+                class_score_thresholds=class_score_thresholds,
+                letterbox_upscale=letterbox_upscale,
             )
+            max_detections = serving.get("max_detections")
+            if max_detections is not None and (
+                isinstance(max_detections, bool)
+                or not isinstance(max_detections, int)
+                or not 0 < max_detections <= 1000
+            ):
+                raise ModelNotAvailableError("ModelVersion com max_detections inválido")
             self._detector_version = model.id
             self._score_threshold = float(serving["score_threshold"])
+            self._max_detections = max_detections
+            # Same weights with another threshold/NMS are another configuration.
+            self._inference_profile_sha256 = serving.get("inference_profile_sha256")
         return self._detector
 
     async def process_one(self) -> bool:
@@ -300,6 +340,11 @@ class Worker:
                             )
                         except ImportError as exc:
                             raise ModelNotAvailableError("runtime YOLOX indisponível") from exc
+                        if self._max_detections is not None:
+                            # Same cap as the browser profile, highest scores first.
+                            found = sorted(found, key=lambda d: -d.confidence)[
+                                : self._max_detections
+                            ]
                         from app.models.core import Detection
 
                         unsupported = sorted(
@@ -347,6 +392,7 @@ class Worker:
                             "model_version": model.version,
                             "model_status": model.operational_status,
                             "onnx_sha256": model.checksum,
+                            "inference_profile_sha256": self._inference_profile_sha256,
                             "execution_provider": detector.provider,
                             "detections": len(capture.detections),
                             "events": len(event_ids),
@@ -541,26 +587,85 @@ class Worker:
             await session.commit()
 
 
+class Supervision:
+    """Optional heartbeat and graceful stop for a supervised local Worker.
+
+    Enabled by URMIND_WORKER_STATE_DIR (scripts/deploy/worker.ps1 sets it). A
+    `stop.request` file ends the loop between jobs: a hidden Windows console
+    process has no reliable signal for a clean shutdown.
+    """
+
+    def __init__(self, directory: Path | None) -> None:
+        self.directory = directory
+        self.started_at = datetime.now(UTC).isoformat()
+        self.jobs = 0
+        self.errors = 0
+        self.last_job_at: str | None = None
+        self.last_error: str | None = None
+
+    def stop_requested(self) -> bool:
+        return self.directory is not None and (self.directory / "stop.request").is_file()
+
+    def beat(self, worker: Worker, *, processed: bool, error: str | None = None) -> None:
+        if processed:
+            self.jobs += 1
+            self.last_job_at = datetime.now(UTC).isoformat()
+        if error is not None:
+            self.errors += 1
+            self.last_error = error
+        if self.directory is None:
+            return
+        state = {
+            "pid": os.getpid(),
+            "started_at": self.started_at,
+            "heartbeat_at": datetime.now(UTC).isoformat(),
+            "queue": "inference_jobs",
+            "jobs_processed": self.jobs,
+            "iteration_errors": self.errors,
+            "last_job_at": self.last_job_at,
+            "last_error": self.last_error,
+            "model_version_id": str(worker._detector_version) if worker._detector_version else None,
+            "inference_profile_sha256": worker._inference_profile_sha256,
+        }
+        target = self.directory / "heartbeat.json"
+        partial = target.with_suffix(".json.tmp")
+        try:
+            partial.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            os.replace(partial, target)
+        except OSError as exc:
+            # A reader or antivirus holding the file must never stop the Worker;
+            # the next iteration writes a fresh heartbeat.
+            log.warning("worker_heartbeat_write_failed", error=type(exc).__name__)
+
+
 async def run(once: bool) -> int:
     configure_logging()
     settings = get_settings()
     database = Database(settings)
     worker = Worker(database, StorageClient(settings))
+    state_dir = os.environ.get("URMIND_WORKER_STATE_DIR")
+    supervision = Supervision(Path(state_dir) if state_dir else None)
+    # First heartbeat before any model load or job, so supervision sees the process.
+    supervision.beat(worker, processed=False)
     try:
-        while True:
+        while not supervision.stop_requested():
             try:
                 await worker.process_pending_address()
                 processed = await worker.process_one()
             except Exception as exc:
                 log.error("worker_iteration_failed", error=type(exc).__name__)
+                supervision.beat(worker, processed=False, error=type(exc).__name__)
                 if once:
                     raise
                 await asyncio.sleep(IDLE_SLEEP_S)
                 continue
+            supervision.beat(worker, processed=processed)
             if not processed:
                 if once:
                     return 0
                 await asyncio.sleep(IDLE_SLEEP_S)
+        log.info("worker_stop_requested", jobs_processed=supervision.jobs)
+        return 0
     finally:
         await database.close()
 

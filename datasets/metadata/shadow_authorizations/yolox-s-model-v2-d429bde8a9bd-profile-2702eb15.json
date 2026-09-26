@@ -1,0 +1,61 @@
+{
+  "schema": "urmind-shadow-dev-authorization-v1",
+  "decision": "SHADOW_DEV_AUTHORIZED",
+  "production_approved": false,
+  "revoked": false,
+  "scope": "URMIND_DEV_ONLY",
+  "project_ref": "impmeitwtusjtwjouggy",
+  "purpose": "Unificar navegador e Worker no perfil 2702eb15 para o piloto supervisionado no Urmind DEV; não é aprovação operacional nem promoção.",
+  "authorized_by": "FelipeSonsin (proprietário do projeto)",
+  "authorized_at": "2026-09-26T04:08:58.656242+00:00",
+  "approval_evidence": "Autorização explícita do proprietário na sessão Claude Code de 26/09/2026 (~01:00 -03): perfil de inferência 2702eb15 somente como SHADOW EXPERIMENTAL no Urmind DEV, mesmo ONNX d429bde8. Limitações obrigatórias: não é PRODUCTION_APPROVED; não validado em Frozen Test independente; não validado com fotos brasileiras; ganho em imagens grandes de celular desconhecido; D40 piorou ligeiramente; a VALIDATION já foi usada para seleção/tuning. Não alterar thresholds, NMS ou regra de upscale nesta execução. d2b6e1ab preservado como histórico/rollback.",
+  "scientific_status": "EXPERIMENTAL",
+  "artifact": {
+    "model_id": "yolox-s-model-v2",
+    "architecture": "YOLOX-s",
+    "onnx_path": "models/serving/yolox-s-model-v2-d429bde8a9bd.onnx",
+    "onnx_sha256": "d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9",
+    "checkpoint_sha256": "425ed936a5f21edc072636aa6479b4b23aae1e5d582c9bb8f58274f73123d83f",
+    "model_contract_path": "datasets/metadata/yolox_model_experimental_20260925_10h.json",
+    "model_contract_sha256": "d39999a2a94ea3ebe40bc19da92bf7ff94d98865191b1c8ac2a657d10d6d1d2c",
+    "class_names": [
+      "URMIND_ROAD_D00",
+      "URMIND_ROAD_D10",
+      "URMIND_ROAD_D20",
+      "URMIND_ROAD_D40"
+    ],
+    "input_size": [
+      640,
+      640
+    ],
+    "opset": 17,
+    "registration_manifest_path": "models/serving/yolox-s-model-v2-d429bde8a9bd.json",
+    "registration_manifest_sha256": "99ebb69ec69b163987a11d3a4027f3c90c28eec00da01c6406cbda455eb20667",
+    "validation_metrics_sha256": "bea9619e8b18cc715e50a4ef964048b502dc6b1fd0651bc511016d19fdea99de",
+    "validation_summary": {
+      "source": "training_run_validation (evaluator oficial, VALIDATION completa)",
+      "map50": 0.107537,
+      "map50_95": 0.03318,
+      "precision": 0.118988,
+      "recall": 0.343612
+    },
+    "parity_sha256": "1ba550338dd7e8c7ab9dcd387b82feb5d2b17880a6811d8441e6bdc381e7e840",
+    "training_run_state_path": "models/checkpoints/experimental_20260925_rdd4_10h_r1/run_state.json",
+    "training_run_state_sha256": "21714ba060dcf551bcc939186b03f84af52b6979355b54acd9fecc9564435aab",
+    "calibration_path": "datasets/reports/live_detection_calibration_d429bde8a9bd_noupscale.json",
+    "calibration_sha256": "b4cf9bf6013bba8b7842128aa826a770be6b86faee2591e4d3d16e2f461cb0a9",
+    "inference_profile_sha256": "2702eb15a291ec6b6a87b5fa2091d95d68bfd8a29dedc211f525f7eab458c2a0",
+    "inference_postprocess": {
+      "score_threshold": 0.03,
+      "nms_threshold": 0.45,
+      "nms": "per_class",
+      "max_detections": 100,
+      "class_score_thresholds": [
+        0.03,
+        0.2,
+        0.07,
+        0.2
+      ]
+    }
+  }
+}

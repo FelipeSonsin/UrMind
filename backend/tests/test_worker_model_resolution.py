@@ -217,6 +217,62 @@ def test_worker_recusa_contrato_de_serving_incompleto(field, value) -> None:
         worker._detector_for(_model(**{field: value}))
 
 
+def test_worker_repassa_perfil_por_classe_do_model_version(monkeypatch) -> None:
+    captured = {}
+
+    class FakeDetector:
+        def __init__(self, path, checksum, **contract):
+            captured.update(contract)
+
+    monkeypatch.setattr("app.worker.OnnxDetector", FakeDetector)
+    Worker(SimpleNamespace(), SimpleNamespace())._detector_for(_model())
+    assert captured["nms_mode"] == "class_agnostic"
+    assert captured["class_score_thresholds"] is None
+
+    thresholds = [0.05, 0.13, 0.35, 0.13]
+    Worker(SimpleNamespace(), SimpleNamespace())._detector_for(
+        _model(nms="per_class", class_score_thresholds=thresholds)
+    )
+    assert captured["nms_mode"] == "per_class"
+    assert captured["class_score_thresholds"] == thresholds
+
+
+@pytest.mark.parametrize("value", ["0.1", [0.1, True, 0.2, 0.3], {"D00": 0.1}])
+def test_worker_recusa_limiares_por_classe_malformados(value) -> None:
+    worker = Worker(SimpleNamespace(), SimpleNamespace())
+    with pytest.raises(ModelNotAvailableError, match="limiares por classe"):
+        worker._detector_for(_model(nms="per_class", class_score_thresholds=value))
+
+
+def test_onnx_detector_por_classe_usa_limiar_proprio_e_nms_dentro_da_classe() -> None:
+    import numpy as np
+
+    from app.ml.serving import OnnxDetector
+
+    detector = object.__new__(OnnxDetector)
+    detector.class_names = ["D00", "D10", "D20", "D40"]
+    detector.nms_threshold = 0.45
+    detector.nms_mode = "per_class"
+    detector.class_score_thresholds = (0.05, 0.13, 0.35, 0.13)
+    rows = np.array(
+        [
+            # cx, cy, w, h, obj, D00, D10, D20, D40
+            [100, 100, 50, 50, 1, 0.9, 0, 0, 0],
+            [101, 100, 50, 50, 1, 0.7, 0, 0, 0],  # mesma classe, sobreposta: suprimida
+            [102, 101, 50, 50, 1, 0, 0.6, 0, 0],  # outra classe: mantida
+            [300, 300, 20, 20, 1, 0, 0, 0.3, 0],  # D20 0,3 < 0,35: cai
+            [400, 400, 20, 20, 1, 0.1, 0, 0, 0],  # D00 0,1 > 0,05: passa
+        ],
+        dtype=np.float32,
+    )[None]
+    served = detector.postprocess(rows, 1.0, (640, 640, 3), score_threshold=0.25)
+    assert sorted((d.urmind_class, round(d.confidence, 3)) for d in served) == [
+        ("D00", 0.1),
+        ("D00", 0.9),
+        ("D10", 0.6),
+    ]
+
+
 def test_worker_recusa_onnx_fora_do_serving():
     worker = Worker(SimpleNamespace(), SimpleNamespace())
     with pytest.raises(ModelNotAvailableError, match="fora do diretório"):
@@ -415,7 +471,9 @@ async def test_resolucao_recusa_modelo_legado_sem_quality_gate() -> None:
         ({"shadow_authorized": True, "quality_classification": "WEAK"}, False),
     ],
 )
-async def test_shadow_model_requires_explicit_dev_authorization(metrics, expected):
+async def test_shadow_model_requires_explicit_dev_authorization(metrics, expected, monkeypatch):
+    # The artifact-bound authorization file is covered in test_shadow_authorization.py.
+    monkeypatch.setattr("app.ml.serving.shadow_authorization_current", lambda metrics: True)
     model_id = uuid.uuid4()
     dataset_id = uuid.uuid4()
     model = ModelVersion(
@@ -429,6 +487,27 @@ async def test_shadow_model_requires_explicit_dev_authorization(metrics, expecte
     session = SimpleNamespace(get=AsyncMock(side_effect=[model, object()]))
     resolved = await InferenceRepository(session).shadow_vision_model(model_id)
     assert (resolved is model) is expected
+
+
+@pytest.mark.asyncio
+async def test_shadow_model_with_revoked_or_missing_authorization_is_not_resolved(monkeypatch):
+    monkeypatch.setattr("app.ml.serving.shadow_authorization_current", lambda metrics: False)
+    model = ModelVersion(
+        id=uuid.uuid4(),
+        kind="vision",
+        promoted_at=None,
+        dataset_version_id=uuid.uuid4(),
+        checksum="a" * 64,
+        metrics={
+            "shadow_authorized": True,
+            "serving_status": "EXPERIMENTAL_SHADOW",
+            "quality_classification": "EXPERIMENTAL",
+            "shadow_scope": "URMIND_DEV_ONLY",
+            "shadow_project_ref": "impmeitwtusjtwjouggy",
+        },
+    )
+    session = SimpleNamespace(get=AsyncMock(side_effect=[model, object()]))
+    assert await InferenceRepository(session).shadow_vision_model(model.id) is None
 
 
 def test_scientific_rejection_remains_distinct_from_dev_shadow_status():
@@ -500,3 +579,51 @@ async def test_production_refuses_inactive_lifecycle_even_with_promoted_at(lifec
     repository = InferenceRepository(SimpleNamespace(execute=AsyncMock(return_value=result)))
     with pytest.raises(RuntimeError, match="arquivado ou em quarentena"):
         await repository.promoted_vision_model()
+
+
+def test_preprocess_sem_ampliar_mantem_escala_1_e_nao_muda_imagem_grande() -> None:
+    import numpy as np
+
+    from app.ml.serving import _preprocess
+
+    small = np.random.default_rng(0).integers(0, 255, (512, 384, 3), dtype=np.uint8)
+    tensor, ratio = _preprocess(small, (640, 640), upscale=False)
+    assert ratio == 1.0 and tensor.shape == (1, 3, 640, 640)
+    assert np.array_equal(tensor[0, :, :512, :384], small.transpose(2, 0, 1).astype(np.float32))
+    assert (tensor[0, :, 512:, :] == 114).all() and (tensor[0, :, :, 384:] == 114).all()
+    _, stretched = _preprocess(small, (640, 640))
+    assert stretched == 1.25
+
+    large = np.random.default_rng(1).integers(0, 255, (720, 1280, 3), dtype=np.uint8)
+    a, ra = _preprocess(large, (640, 640), upscale=False)
+    b, rb = _preprocess(large, (640, 640))
+    assert ra == rb and np.array_equal(a, b)
+
+
+def test_worker_repassa_letterbox_sem_ampliar(monkeypatch) -> None:
+    captured = {}
+
+    class FakeDetector:
+        def __init__(self, path, checksum, **contract):
+            captured.update(contract)
+
+    monkeypatch.setattr("app.worker.OnnxDetector", FakeDetector)
+    Worker(SimpleNamespace(), SimpleNamespace())._detector_for(_model())
+    assert captured["letterbox_upscale"] is True
+    Worker(SimpleNamespace(), SimpleNamespace())._detector_for(_model(letterbox_upscale=False))
+    assert captured["letterbox_upscale"] is False
+    with pytest.raises(ModelNotAvailableError, match="letterbox_upscale"):
+        Worker(SimpleNamespace(), SimpleNamespace())._detector_for(_model(letterbox_upscale="no"))
+
+
+
+def test_perfil_versionado_sem_letterbox_explicito_falha_fechado(monkeypatch) -> None:
+    monkeypatch.setattr("app.worker.OnnxDetector", lambda *args, **kwargs: None)
+    with pytest.raises(ModelNotAvailableError, match="letterbox_upscale explícito"):
+        Worker(SimpleNamespace(), SimpleNamespace())._detector_for(
+            _model(inference_profile_sha256="p" * 64)
+        )
+    # With the key stated, the same profile loads.
+    Worker(SimpleNamespace(), SimpleNamespace())._detector_for(
+        _model(inference_profile_sha256="p" * 64, letterbox_upscale=False)
+    )

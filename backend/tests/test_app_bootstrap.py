@@ -69,7 +69,9 @@ def test_ready_is_503_without_database_and_security_headers_are_set() -> None:
     assert "camera=(self)" in response.headers["Permissions-Policy"]
     assert "Strict-Transport-Security" not in response.headers  # plain-HTTP test client
     policy = response.headers["Content-Security-Policy"]
-    assert "script-src 'self';" in policy
+    assert "script-src 'self' 'wasm-unsafe-eval';" in policy
     assert "worker-src 'self' blob:" in policy
     assert "object-src 'none'" in policy
-    assert "unsafe-eval" not in policy
+    # 'wasm-unsafe-eval' só permite compilar WebAssembly; eval de JavaScript continua proibido.
+    assert "'unsafe-eval'" not in policy
+    assert "'unsafe-inline'" not in policy.split("script-src", 1)[1].split(";", 1)[0]

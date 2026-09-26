@@ -1566,6 +1566,12 @@ class InferenceRepository:
             or metrics.get("shadow_project_ref") != URMIND_DEV_SHADOW_REF
         ):
             return None
+        from app.ml.serving import shadow_authorization_current
+
+        # Revoking or editing the artifact-bound authorization takes effect here.
+        if not shadow_authorization_current(metrics):
+            logger.error("shadow_authorization_invalid: %s", model_version_id)
+            return None
         if model.dataset_version_id is None or not model.checksum:
             return None
         if await self.session.get(DatasetVersion, model.dataset_version_id) is None:

@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -626,11 +627,20 @@ class ServedDetection:
     """Normalizada 0–1 em relação à imagem original (x, y, width, height)."""
 
 
-def _preprocess(image_bgr: np.ndarray, input_size: tuple[int, int]) -> tuple[np.ndarray, float]:
+def _preprocess(
+    image_bgr: np.ndarray, input_size: tuple[int, int], *, upscale: bool = True
+) -> tuple[np.ndarray, float]:
     from yolox.data.data_augment import preproc  # type: ignore[import-not-found]
 
-    tensor, ratio = preproc(image_bgr, input_size)
-    return tensor[None, :, :, :].astype(np.float32), float(ratio)
+    if upscale or (image_bgr.shape[0] >= input_size[0] or image_bgr.shape[1] >= input_size[1]):
+        tensor, ratio = preproc(image_bgr, input_size)
+        return tensor[None, :, :, :].astype(np.float32), float(ratio)
+    # Imagem menor que a entrada, sem ampliar: escala 1, padding 114 no canto superior
+    # esquerdo, BGR 0..255, CHW — o mesmo que `preproc` faria com razão 1.
+    padded = np.full((input_size[0], input_size[1], 3), 114, dtype=np.uint8)
+    padded[: image_bgr.shape[0], : image_bgr.shape[1]] = image_bgr
+    tensor = np.ascontiguousarray(padded.transpose(2, 0, 1), dtype=np.float32)
+    return tensor[None, :, :, :], 1.0
 
 
 class OnnxDetector:
@@ -646,6 +656,9 @@ class OnnxDetector:
         expected_class_names: tuple[str, ...] | None = None,
         contract_path: Path = MODEL_METADATA_PATH,
         expected_contract_sha256: str | None = None,
+        nms_mode: str = "class_agnostic",
+        class_score_thresholds: Sequence[float] | None = None,
+        letterbox_upscale: bool = True,
     ) -> None:
         if not onnx_path.is_file():
             raise ModelNotAvailableError(f"ONNX ausente: {onnx_path.name}")
@@ -678,6 +691,24 @@ class OnnxDetector:
         if not 0.0 < configured_nms <= 1.0:
             raise ModelNotAvailableError("NMS threshold do ModelVersion é inválido")
         self.nms_threshold = configured_nms
+        # Perfil por classe (mesmo contrato de `live-detection.json`): cada classe
+        # acima do próprio limiar é candidata e o NMS roda dentro da classe.
+        if nms_mode not in ("class_agnostic", "per_class"):
+            raise ModelNotAvailableError("modo de NMS desconhecido")
+        if (nms_mode == "per_class") != (class_score_thresholds is not None):
+            raise ModelNotAvailableError("NMS por classe exige um limiar por classe")
+        if class_score_thresholds is not None:
+            thresholds = [float(value) for value in class_score_thresholds]
+            if len(thresholds) != len(self.class_names) or not all(
+                0.0 < value <= 1.0 for value in thresholds
+            ):
+                raise ModelNotAvailableError("limiares por classe inválidos")
+            self.class_score_thresholds: tuple[float, ...] | None = tuple(thresholds)
+        else:
+            self.class_score_thresholds = None
+        self.nms_mode = nms_mode
+        # False: imagem menor que a entrada não é ampliada (mesmo campo do manifesto do navegador).
+        self.letterbox_upscale = bool(letterbox_upscale)
         self.session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         self.provider = self.session.get_providers()[0]
 
@@ -696,7 +727,9 @@ class OnnxDetector:
         return image
 
     def preprocess(self, image_bgr: np.ndarray) -> tuple[np.ndarray, float]:
-        return _preprocess(image_bgr, self.input_size)
+        return _preprocess(
+            image_bgr, self.input_size, upscale=getattr(self, "letterbox_upscale", True)
+        )
 
     def infer(self, tensor: np.ndarray) -> np.ndarray:
         (output,) = self.session.run(None, {"images": tensor})
@@ -722,12 +755,21 @@ class OnnxDetector:
         xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2
         xyxy /= ratio
         scores = predictions[:, 4:5] * predictions[:, 5:]
-        kept = multiclass_nms(
-            xyxy,
-            scores,
-            nms_thr=self.nms_threshold,
-            score_thr=score_threshold,
-        )
+        if self.class_score_thresholds is not None:
+            # Limiar estrito por classe antes do NMS por classe; o limiar global
+            # recebido não se aplica a este perfil.
+            limits = np.asarray(self.class_score_thresholds, dtype=scores.dtype)
+            scores = np.where(scores > limits[None, :], scores, 0).astype(scores.dtype)
+            kept = multiclass_nms(
+                xyxy, scores, nms_thr=self.nms_threshold, score_thr=0.0, class_agnostic=False
+            )
+        else:
+            kept = multiclass_nms(
+                xyxy,
+                scores,
+                nms_thr=self.nms_threshold,
+                score_thr=score_threshold,
+            )
         detections: list[ServedDetection] = []
         if kept is None:
             return detections
@@ -1271,7 +1313,7 @@ async def _attach_report(model_version_id: Any, key: str, value: dict[str, Any])
     from app.db.session import Database
     from app.repositories.core import InferenceRepository
 
-    database = Database(get_settings())
+    database = Database(get_settings(), role="admin")
     try:
         async with database.sessionmaker() as session:
             await InferenceRepository(session).merge_model_metrics(model_version_id, key, value)
@@ -2726,8 +2768,262 @@ def _close_model_command(args: argparse.Namespace) -> int:
     return 0
 
 
+SHADOW_AUTHORIZATION_SCHEMA = "urmind-shadow-dev-authorization-v1"
+SHADOW_DEV_AUTHORIZED = "SHADOW_DEV_AUTHORIZED"
+SHADOW_AUTHORIZATION_DIR = PROJECT_ROOT / "datasets" / "metadata" / "shadow_authorizations"
+# Fields of the export record that the authorization must pin, one by one.
+_SHADOW_PINNED_FIELDS = (
+    "model_id",
+    "architecture",
+    "onnx_path",
+    "onnx_sha256",
+    "checkpoint_sha256",
+    "model_contract_path",
+    "model_contract_sha256",
+    "class_names",
+    "input_size",
+    "opset",
+)
+
+
+class ShadowAuthorizationError(ValueError):
+    """Candidato sem autorização SHADOW_DEV íntegra e presa ao artefato exato."""
+
+
+def _evidence_sha256(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+
+
+def _project_relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(PROJECT_ROOT.resolve()).as_posix()
+    except ValueError as exc:
+        raise ShadowAuthorizationError(f"caminho fora do projeto: {path.name}") from exc
+
+
+def _read_evidence(path: Path, what: str) -> dict[str, Any]:
+    if not path.is_file():
+        raise ShadowAuthorizationError(f"{what} ausente: {_project_relative(path)}")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ShadowAuthorizationError(f"{what} ilegível: {path.name}") from exc
+    if not isinstance(document, dict):
+        raise ShadowAuthorizationError(f"{what} malformado: {path.name}")
+    return document
+
+
+def shadow_inference_profile(manifest_path: Path, calibration_path: Path | None) -> dict[str, Any]:
+    """Perfil de inferência do candidato, derivado pelo mesmo código do navegador.
+
+    Reusar `build_browser_manifest` garante o mesmo pós-processamento e o mesmo
+    `inference_profile_sha256` nos dois caminhos: mesmos pesos com outro limiar
+    ou NMS são outra configuração.
+    """
+    from app.ml.browser_model import BrowserPublishError, build_browser_manifest
+
+    try:
+        manifest, _ = build_browser_manifest(
+            manifest_path,
+            status="EXPERIMENTAL",
+            authorize_use=True,
+            authorize_distribution=True,
+            authorization_ref="shadow-dev-inference-profile",
+            calibration_path=calibration_path,
+        )
+    except BrowserPublishError as exc:
+        raise ShadowAuthorizationError(f"perfil de inferência inválido: {exc}") from exc
+    return {
+        "sha256": manifest["inference_profile"]["sha256"],
+        "calibration_sha256": manifest["inference_profile"]["calibration_sha256"],
+        "postprocess": manifest["postprocess"],
+        # Part of the same profile: the Worker must letterbox exactly like the browser.
+        "letterbox_upscale": manifest["input"]["letterbox"].get("upscale", True),
+    }
+
+
+def validate_shadow_authorization(
+    authorization_path: Path, manifest_path: Path, *, dev_ref: str
+) -> dict[str, Any]:
+    """Confere a autorização SHADOW_DEV contra as evidências do próprio candidato.
+
+    Nenhuma evidência de outro checkpoint é aceita; arquivo ausente vira erro
+    com o caminho esperado. Autorização shadow nunca é aprovação de produção.
+    """
+    authorization = _read_evidence(authorization_path, "autorização shadow")
+    if authorization.get("schema") != SHADOW_AUTHORIZATION_SCHEMA:
+        raise ShadowAuthorizationError("schema da autorização shadow desconhecido")
+    if authorization.get("decision") != SHADOW_DEV_AUTHORIZED:
+        raise ShadowAuthorizationError(f"decisão da autorização != {SHADOW_DEV_AUTHORIZED}")
+    if authorization.get("production_approved") is not False:
+        raise ShadowAuthorizationError("autorização shadow não pode aprovar produção")
+    if authorization.get("revoked") is not False:
+        raise ShadowAuthorizationError("autorização shadow revogada")
+    if (
+        authorization.get("scope") != "URMIND_DEV_ONLY"
+        or authorization.get("project_ref") != dev_ref
+    ):
+        raise ShadowAuthorizationError("autorização shadow é de outro ambiente")
+    for field in ("authorized_by", "authorized_at", "purpose", "approval_evidence"):
+        value = authorization.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ShadowAuthorizationError(f"autorização sem {field}")
+    artifact = authorization.get("artifact")
+    if not isinstance(artifact, dict):
+        raise ShadowAuthorizationError("autorização sem artefato vinculado")
+
+    if artifact.get("registration_manifest_path") != _project_relative(manifest_path):
+        raise ShadowAuthorizationError("autorização é de outro manifesto de export")
+    record = _read_evidence(manifest_path, "manifesto de export")
+    if sha256_file(manifest_path) != artifact.get("registration_manifest_sha256"):
+        raise ShadowAuthorizationError("manifesto de export alterado desde a autorização")
+    for field in _SHADOW_PINNED_FIELDS:
+        if record.get(field) != artifact.get(field):
+            raise ShadowAuthorizationError(f"{field} do candidato diverge da autorização")
+    if record.get("stage") != "final" or record.get("checkpoint") != "best":
+        raise ShadowAuthorizationError("candidato não é o export final do best checkpoint")
+    try:
+        validate_registration_manifest(record, promote=False)
+    except ValueError as exc:
+        raise ShadowAuthorizationError(str(exc)) from exc
+    if _evidence_sha256(record["validation_metrics"]) != artifact.get("validation_metrics_sha256"):
+        raise ShadowAuthorizationError("VALIDATION do candidato diverge da autorização")
+    if _evidence_sha256(record["parity"]) != artifact.get("parity_sha256"):
+        raise ShadowAuthorizationError("paridade do candidato diverge da autorização")
+
+    onnx_path = (PROJECT_ROOT / record["onnx_path"]).resolve()
+    if not onnx_path.is_relative_to(SERVING_DIR.resolve()):
+        raise ShadowAuthorizationError("ONNX fora do diretório canônico de serving")
+    if not onnx_path.is_file() or sha256_file(onnx_path) != record["onnx_sha256"]:
+        raise ShadowAuthorizationError(f"ONNX ausente ou alterado: {record['onnx_path']}")
+    contract_path = PROJECT_ROOT / record["model_contract_path"]
+    if not contract_path.is_file() or sha256_file(contract_path) != record["model_contract_sha256"]:
+        raise ShadowAuthorizationError(
+            f"contrato ausente ou alterado: {record['model_contract_path']}"
+        )
+    if list(load_model_config(contract_path)["canonical_class_names"]) != record["class_names"]:
+        raise ShadowAuthorizationError("ordem de classes do export diverge do contrato")
+
+    # Factual end of the run that produced this checkpoint.
+    run_state_value = artifact.get("training_run_state_path")
+    if not isinstance(run_state_value, str):
+        raise ShadowAuthorizationError("autorização sem estado do run de treino")
+    run_state_path = PROJECT_ROOT / run_state_value
+    run_state = _read_evidence(run_state_path, "estado do run de treino")
+    if sha256_file(run_state_path) != artifact.get("training_run_state_sha256"):
+        raise ShadowAuthorizationError("estado do run alterado desde a autorização")
+    if run_state.get("status") != "COMPLETED":
+        raise ShadowAuthorizationError("run de treino do candidato não terminou (COMPLETED)")
+    if run_state.get("contract_sha256") != record["model_contract_sha256"]:
+        raise ShadowAuthorizationError("run de treino usou outro contrato")
+
+    calibration_value = artifact.get("calibration_path")
+    calibration_path = None
+    if calibration_value is not None:
+        calibration_path = PROJECT_ROOT / calibration_value
+        if not calibration_path.is_file():
+            raise ShadowAuthorizationError(f"calibração ausente: {calibration_value}")
+        if sha256_file(calibration_path) != artifact.get("calibration_sha256"):
+            raise ShadowAuthorizationError("calibração alterada desde a autorização")
+    profile = shadow_inference_profile(manifest_path, calibration_path)
+    if profile["sha256"] != artifact.get("inference_profile_sha256"):
+        raise ShadowAuthorizationError("perfil de inferência diverge do autorizado")
+    return {
+        "authorization": authorization,
+        "authorization_path": _project_relative(authorization_path),
+        "authorization_sha256": sha256_file(authorization_path),
+        "record": record,
+        "profile": profile,
+    }
+
+
+def build_shadow_authorization(
+    manifest_path: Path,
+    *,
+    run_state_path: Path,
+    calibration_path: Path | None,
+    authorized_by: str,
+    approval_evidence: str,
+    purpose: str,
+    dev_ref: str,
+) -> dict[str, Any]:
+    """Human decision recorded as data; every hash is computed, never typed."""
+    record = _read_evidence(manifest_path, "manifesto de export")
+    try:
+        validate_registration_manifest(record, promote=False)
+    except ValueError as exc:
+        raise ShadowAuthorizationError(str(exc)) from exc
+    checkpoint_path = run_state_path.parent / "best.pt"
+    if not checkpoint_path.is_file() or sha256_file(checkpoint_path) != record.get(
+        "checkpoint_sha256"
+    ):
+        raise ShadowAuthorizationError("best.pt do run não corresponde ao checkpoint do export")
+    profile = shadow_inference_profile(manifest_path, calibration_path)
+    from datetime import UTC, datetime
+
+    return {
+        "schema": SHADOW_AUTHORIZATION_SCHEMA,
+        "decision": SHADOW_DEV_AUTHORIZED,
+        "production_approved": False,
+        "revoked": False,
+        "scope": "URMIND_DEV_ONLY",
+        "project_ref": dev_ref,
+        "purpose": purpose,
+        "authorized_by": authorized_by,
+        "authorized_at": datetime.now(UTC).isoformat(),
+        "approval_evidence": approval_evidence,
+        "scientific_status": record.get("quality_classification") or "EXPERIMENTAL",
+        "artifact": {
+            **{field: record.get(field) for field in _SHADOW_PINNED_FIELDS},
+            "registration_manifest_path": _project_relative(manifest_path),
+            "registration_manifest_sha256": sha256_file(manifest_path),
+            "validation_metrics_sha256": _evidence_sha256(record["validation_metrics"]),
+            "validation_summary": {
+                key: record["validation_metrics"].get(key)
+                for key in ("source", "map50", "map50_95", "precision", "recall")
+            },
+            "parity_sha256": _evidence_sha256(record["parity"]),
+            "training_run_state_path": _project_relative(run_state_path),
+            "training_run_state_sha256": sha256_file(run_state_path),
+            "calibration_path": (
+                _project_relative(calibration_path) if calibration_path is not None else None
+            ),
+            "calibration_sha256": (
+                sha256_file(calibration_path) if calibration_path is not None else None
+            ),
+            "inference_profile_sha256": profile["sha256"],
+            "inference_postprocess": profile["postprocess"],
+        },
+    }
+
+
+def shadow_authorization_current(metrics: dict[str, Any]) -> bool:
+    """Runtime check: the authorization file still exists, unchanged and not revoked."""
+    reference = metrics.get("shadow_authorization")
+    if not isinstance(reference, dict) or not isinstance(reference.get("path"), str):
+        return False
+    path = PROJECT_ROOT / reference["path"]
+    try:
+        if sha256_file(path) != reference.get("sha256"):
+            return False
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        document.get("decision") == SHADOW_DEV_AUTHORIZED
+        and document.get("revoked") is False
+        and document.get("production_approved") is False
+    )
+
+
 async def register_model(
-    manifest_path: Path, *, promote: bool, shadow_dev: bool = False
+    manifest_path: Path,
+    *,
+    promote: bool,
+    shadow_dev: bool = False,
+    shadow_authorization: Path | None = None,
 ) -> dict[str, Any]:
     """Grava dataset_versions + model_versions a partir de um export verificado (§9, §10)."""
     from datetime import UTC, datetime
@@ -2747,32 +3043,20 @@ async def register_model(
             promote
             or settings.app_env.lower() not in {"development", "dev", "demo"}
             or urlsplit(settings.supabase_url or "").hostname != f"{dev_ref}.supabase.co"
-            or urlsplit(settings.database_pooler_url or "").username != f"postgres.{dev_ref}"
+            # Registration is an admin task: it runs on the migration identity.
+            or urlsplit(settings.migration_database_url or "").username != f"postgres.{dev_ref}"
         ):
             raise ValueError("registro shadow permitido somente no Urmind DEV")
     # Reject an unauthorized environment before reading local scientific artifacts.
-    record = json.loads(manifest_path.read_text(encoding="utf-8"))
+    shadow_binding: dict[str, Any] | None = None
     if shadow_dev:
-        frozen_path = SERVING_DIR / "frozen-test-result-f0e81ba65bb1.json"
-        frozen = json.loads(frozen_path.read_text(encoding="utf-8"))
-        lock = json.loads(
-            (SERVING_DIR / "yolox-s-quality-rebuild-operating-point-lock-verified.json").read_text(
-                encoding="utf-8"
-            )
+        # Authorization is per candidate artifact, never pinned to a historical file.
+        if shadow_authorization is None:
+            raise ShadowAuthorizationError("--shadow-dev exige --shadow-authorization do candidato")
+        shadow_binding = validate_shadow_authorization(
+            shadow_authorization, manifest_path, dev_ref=dev_ref
         )
-        if (
-            record.get("onnx_path") != "models/serving/yolox-s-quality-rebuild-7d91f7f6f0c0.onnx"
-            or frozen.get("fixed_validation_criteria_applied_to_test", {}).get("decision")
-            != "REJECTED"
-            or frozen.get("checkpoint_sha256") != record.get("checkpoint_sha256")
-            or frozen.get("operating_point_lock_sha256") != lock.get("operating_point_lock_sha256")
-            or lock.get("checkpoint_sha256") != record.get("checkpoint_sha256")
-            or lock.get("confidence_threshold") != record.get("serving_score_threshold")
-            or record.get("parity", {}).get("passed") is not True
-            or record.get("class_names")
-            != ["URMIND_ROAD_D00", "URMIND_ROAD_D10", "URMIND_ROAD_D20", "URMIND_ROAD_D40"]
-        ):
-            raise ValueError("evidência científica do shadow DEV incompatível")
+    record = json.loads(manifest_path.read_text(encoding="utf-8"))
     validate_registration_manifest(record, promote=False)
     closure: dict[str, Any] | None = None
     training_run: dict[str, Any] | None = None
@@ -2870,7 +3154,7 @@ async def register_model(
             "split_fingerprint": closure["dataset"]["version"],
             "manifests": closure["dataset"]["manifests"],
         }
-    database = Database(get_settings())
+    database = Database(get_settings(), role="admin")
     try:
         async with database.sessionmaker() as session:
             repository = InferenceRepository(session)
@@ -2918,20 +3202,31 @@ async def register_model(
                     ),
                     "closure_artifact": record.get("closure_artifact"),
                     "promotion_manifest": promotion_reference,
-                    "quality_classification": "REJECTED"
-                    if shadow_dev
-                    else record.get("quality_classification"),
+                    # Shadow keeps the scientific verdict of the export itself; an
+                    # unevaluated candidate is EXPERIMENTAL, never APPROVED.
+                    "quality_classification": (
+                        record.get("quality_classification") or "EXPERIMENTAL"
+                        if shadow_dev
+                        else record.get("quality_classification")
+                    ),
                     "serving_status": "EXPERIMENTAL_SHADOW" if shadow_dev else None,
                     "shadow_authorized": shadow_dev,
                     "shadow_scope": "URMIND_DEV_ONLY" if shadow_dev else None,
                     "shadow_project_ref": dev_ref if shadow_dev else None,
-                    "frozen_test_quality": (
+                    "shadow_authorization": (
                         {
-                            "decision": "REJECTED",
-                            "result_path": frozen_path.relative_to(PROJECT_ROOT).as_posix(),
-                            "result_sha256": sha256_file(frozen_path),
-                            "operating_point_lock_sha256": frozen["operating_point_lock_sha256"],
+                            "path": shadow_binding["authorization_path"],
+                            "sha256": shadow_binding["authorization_sha256"],
+                            "decision": SHADOW_DEV_AUTHORIZED,
+                            "production_approved": False,
+                            "authorized_by": shadow_binding["authorization"]["authorized_by"],
+                            "authorized_at": shadow_binding["authorization"]["authorized_at"],
                         }
+                        if shadow_binding is not None
+                        else None
+                    ),
+                    "frozen_test_quality": (
+                        {"decision": "NOT_EVALUATED", "note": "Frozen Test selado"}
                         if shadow_dev
                         else record.get("frozen_test_quality")
                     ),
@@ -2969,6 +3264,34 @@ async def register_model(
                         "representation": record.get("representation"),
                         "model_contract_sha256": record["model_contract_sha256"],
                         "model_contract_path": record.get("model_contract_path"),
+                        # Authorized shadow profile: the same postprocess as the browser.
+                        **(
+                            {
+                                "score_threshold": shadow_binding["profile"]["postprocess"][
+                                    "score_threshold"
+                                ],
+                                "nms_threshold": shadow_binding["profile"]["postprocess"][
+                                    "nms_threshold"
+                                ],
+                                "nms": shadow_binding["profile"]["postprocess"]["nms"],
+                                "class_score_thresholds": shadow_binding["profile"][
+                                    "postprocess"
+                                ].get("class_score_thresholds"),
+                                "max_detections": shadow_binding["profile"]["postprocess"][
+                                    "max_detections"
+                                ],
+                                "inference_profile_sha256": shadow_binding["profile"]["sha256"],
+                                "calibration_sha256": shadow_binding["profile"][
+                                    "calibration_sha256"
+                                ],
+                                # Explicit: the Worker refuses a profile without it.
+                                "letterbox_upscale": shadow_binding["profile"][
+                                    "letterbox_upscale"
+                                ],
+                            }
+                            if shadow_binding is not None
+                            else {}
+                        ),
                     },
                 },
                 promoted_at=None,
@@ -2999,7 +3322,7 @@ async def record_model_metadata_reconciliation(
     from app.repositories.core import DecisionRepository, InferenceRepository
 
     identifier = uuid.UUID(str(model_version_id))
-    database = Database(get_settings())
+    database = Database(get_settings(), role="admin")
     try:
         async with database.sessionmaker() as session:
             inference = InferenceRepository(session)
@@ -3381,6 +3704,21 @@ def main(argv: list[str] | None = None) -> int:
     register.add_argument(
         "--shadow-dev", action="store_true", help="autoriza somente este artifact no Urmind DEV"
     )
+    authorize = sub.add_parser(
+        "authorize-shadow",
+        help="grava a decisão humana SHADOW_DEV vinculada a um candidato (não promove)",
+    )
+    authorize.add_argument("--manifest", type=Path, required=True)
+    authorize.add_argument("--run-state", type=Path, required=True)
+    authorize.add_argument("--calibration", type=Path)
+    authorize.add_argument("--authorized-by", required=True)
+    authorize.add_argument("--approval-evidence", required=True)
+    authorize.add_argument("--purpose", required=True)
+    register.add_argument(
+        "--shadow-authorization",
+        type=Path,
+        help="autorização SHADOW_DEV vinculada a este candidato (datasets/metadata/shadow_authorizations)",
+    )
     reconcile = sub.add_parser(
         "reconcile-model-metadata",
         help="registra auditoria posterior de metadata reconciliada com o closure",
@@ -3436,12 +3774,44 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "close-model":
         return _close_model_command(args)
 
+    if args.command == "authorize-shadow":
+        from app.config import URMIND_DEV_SHADOW_REF
+
+        document = build_shadow_authorization(
+            args.manifest.resolve(),
+            run_state_path=args.run_state.resolve(),
+            calibration_path=args.calibration.resolve() if args.calibration else None,
+            authorized_by=args.authorized_by,
+            approval_evidence=args.approval_evidence,
+            purpose=args.purpose,
+            dev_ref=URMIND_DEV_SHADOW_REF,
+        )
+        # One file per candidate *and* inference profile: authorizing another profile
+        # of the same ONNX never overwrites (or silently revokes) an earlier decision.
+        profile_prefix = document["artifact"]["inference_profile_sha256"][:8]
+        target = SHADOW_AUTHORIZATION_DIR / f"{args.manifest.stem}-profile-{profile_prefix}.json"
+        if target.exists():
+            raise ShadowAuthorizationError(
+                f"autorização já existe, não sobrescrevo: {_project_relative(target)}"
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        print(json.dumps({"path": _project_relative(target), "sha256": sha256_file(target)}))
+        return 0
+
     if args.command == "register":
         import asyncio
         import selectors
         import sys
 
-        coroutine = register_model(args.manifest, promote=args.promote, shadow_dev=args.shadow_dev)
+        coroutine = register_model(
+            args.manifest,
+            promote=args.promote,
+            shadow_dev=args.shadow_dev,
+            shadow_authorization=args.shadow_authorization,
+        )
         if sys.platform == "win32":
             result = asyncio.run(
                 coroutine,
