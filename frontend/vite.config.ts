@@ -1,8 +1,26 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
 import { liveModelDelivery } from './build/liveModel';
+
+/**
+ * A área da equipe tem endereço próprio (/admin/), separado do site do cidadão: o
+ * mesmo app, com a mesma página, publicada também em admin/index.html (o app decide
+ * a superfície pelo caminho; ver src/surface.ts).
+ */
+function adminEntry(): Plugin {
+  return {
+    name: 'urmind-admin-entry',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const page = bundle['index.html'];
+      if (page?.type !== 'asset') throw new Error('index.html ausente no build');
+      this.emitFile({ type: 'asset', fileName: 'admin/index.html', source: page.source });
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -18,6 +36,7 @@ export default defineConfig(({ mode }) => {
       ...(devHttps ? [basicSsl()] : []),
       react(),
       liveModelDelivery(env.LIVE_MODEL_ONNX_URL),
+      adminEntry(),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],

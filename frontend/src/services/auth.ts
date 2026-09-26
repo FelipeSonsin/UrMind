@@ -1,4 +1,5 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import { currentSurface } from '../surface';
 
 // Só a publishable key vai ao navegador (MASTER_PLAN §6.2, §17). A secret key
 // fica no backend; o token do usuário é validado pelo FastAPI via JWKS.
@@ -17,7 +18,11 @@ interface VisitorOperation {
 let visitorOperation: VisitorOperation | null = null;
 // Keep each candidate tied to its original operation until the SDK settles.
 const signupCandidates = new Map<string, VisitorOperation>();
-const sessionKey = url ? `sb-${new URL(url).hostname.split('.')[0]}-auth-token` : '';
+// A área da equipe guarda a sessão numa chave própria: entrar em /admin/ não loga o
+// site do cidadão, e a sessão de visitante do site não chega à área da equipe.
+const sessionKey = url
+  ? `sb-${new URL(url).hostname.split('.')[0]}-${currentSurface() === 'admin' ? 'admin-' : ''}auth-token`
+  : '';
 
 function storedOwner(): string | null {
   const stored = localStorage.getItem(sessionKey);

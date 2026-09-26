@@ -884,18 +884,33 @@ test('foto sem detecção termina sem anunciar revisão de Event inexistente', a
   await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
 });
 
-test('separa o centro público da operação e navega entre os dois', async ({ page }, testInfo) => {
+test('site do cidadão e área da equipe ficam em endereços separados', async ({
+  page,
+}, testInfo) => {
+  const home = page.getByRole('heading', {
+    name: 'Viu um problema na rua? Registre com uma foto.',
+  });
   await page.goto('/');
-  await expect(
-    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
-  ).toBeVisible();
+  await expect(home).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('overview.png'), fullPage: true });
   await expect(page.getByRole('navigation', { name: 'Navegação principal' })).not.toContainText(
     'Revisão',
   );
-  await page.goto('/#/review');
-  // Sem sessão, a revisão pede login em vez de mostrar números.
+  // Rotas da equipe não abrem no site do cidadão: voltam ao Início, sem pedir login.
+  for (const hash of ['#/review', '#/app/reviews', '#/app/admin', '#/login']) {
+    await page.goto(`/${hash}`);
+    await expect(home).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toHaveCount(0);
+  }
+  // A área da equipe fica em /admin/: sem sessão pede login e não mostra o menu do cidadão.
+  await page.goto('/admin/');
   await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Sobre e privacidade' })).toHaveCount(0);
+  // Página do cidadão pedida em /admin/ abre o painel da equipe, não o site público.
+  await page.goto('/admin/#/transparency');
+  await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toHaveCount(0);
   await page.goto('/#/transparency');
   await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -1010,8 +1025,8 @@ test('a revisão exibe dados da API, filtra e mantém zero de confiança', async
       },
     }),
   );
-  await signedIn(page);
-  await page.goto('/#/review');
+  await signedIn(page, 'admin');
+  await page.goto('/admin/#/app/reviews');
   // Evento ainda em revisão: o score do modelo não aparece antes da decisão humana.
   await expect(page.getByText('Oculto até a revisão', { exact: true })).toBeVisible();
   await expect(page.getByText('0.0%', { exact: true })).toHaveCount(0);

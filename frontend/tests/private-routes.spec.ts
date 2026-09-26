@@ -30,7 +30,7 @@ test('navegação interna dedicada cabe em 320px e usa menu inferior', async ({ 
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.goto('/#/app/dashboard');
+  await page.goto('/admin/#/app/dashboard');
   const nav = page.getByRole('navigation', { name: 'Navegação interna' });
   await expect(nav.getByText('Área interna')).toBeVisible();
   await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa', 'Relatos/GT']);
@@ -43,14 +43,15 @@ test('navegação interna dedicada cabe em 320px e usa menu inferior', async ({ 
   await expect(nav.getByRole('link', { name: 'Administração' })).toHaveCount(0);
 });
 
-async function session(page: Page, anonymous = false) {
+/** Sessão da área da equipe (/admin/) por padrão; `public` para o site do cidadão. */
+async function session(page: Page, anonymous = false, surface: 'public' | 'admin' = 'admin') {
   const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
   const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1]?.trim();
   if (!url) throw new Error('VITE_SUPABASE_URL ausente');
   await page.addInitScript(
     ([key, value]) => localStorage.setItem(key, value),
     [
-      `sb-${new URL(url).hostname.split('.')[0]}-auth-token`,
+      `sb-${new URL(url).hostname.split('.')[0]}-${surface === 'admin' ? 'admin-' : ''}auth-token`,
       JSON.stringify({
         access_token: 'private-test-token',
         token_type: 'bearer',
@@ -139,7 +140,7 @@ test('painel apresenta saúde observada sem transformar configuração em sucess
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.goto('/#/app/dashboard');
+  await page.goto('/admin/#/app/dashboard');
   const panel = page.getByRole('region', { name: 'Integrações' });
   await expect(panel.getByText('Nominatim: UNAVAILABLE')).toBeVisible();
   await expect(panel.getByText(/Último sucesso: não observado/)).toBeVisible();
@@ -234,7 +235,7 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
       body: 'latitude,longitude,issue_code,status,date\r\n-23.55,-46.63,,model_not_available,2026-09-24T12:00:00Z\r\n',
     });
   });
-  await page.goto('/#/app/mapa');
+  await page.goto('/admin/#/app/mapa');
   const csvDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Exportar CSV', exact: true }).click();
   expect((await csvDownload).suggestedFilename()).toBe('urmind-pontos-filtrados.csv');
@@ -287,7 +288,7 @@ for (const anonymous of [false, true]) {
       return route.fulfill({ json: [] });
     });
     for (const path of paths) {
-      await page.goto(`/#/app/${path}`);
+      await page.goto(`/admin/#/app/${path}`);
       await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
     }
     expect(reads).toBe(0);
@@ -305,7 +306,7 @@ test('metadados editáveis não dão acesso de revisor', async ({ page }) => {
     return route.fulfill({ json: [] });
   });
   for (const path of paths) {
-    await page.goto(`/#/app/${path}`);
+    await page.goto(`/admin/#/app/${path}`);
     await expect(page.getByRole('heading', { name: 'Acesso restrito' })).toBeVisible();
   }
   expect(reads).toBe(0);
@@ -334,7 +335,7 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
       },
     }),
   );
-  await page.goto('/#/app/eventos');
+  await page.goto('/admin/#/app/eventos');
   await expect(page.getByText('private-fixture')).toBeVisible();
   await page.getByRole('link', { name: 'Ver registro' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/eventos/${EVENT_ID}$`));
@@ -351,7 +352,7 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
     ['ground-truth', 'Ground truth'],
     ['admin', 'Acesso restrito'],
   ]) {
-    await page.goto(`/#/app/${path}`);
+    await page.goto(`/admin/#/app/${path}`);
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
   }
   await expect(
@@ -362,7 +363,7 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
 });
 
 test('resultado do proprietário desaparece ao encerrar sessão em outra aba', async ({ page }) => {
-  await session(page, true);
+  await session(page, true, 'public');
   await page.route(`**/api/v1/public/events/${EVENT_ID}`, (route) =>
     route.request().headers().authorization
       ? route.fulfill({ json: { ...eventDetail, road_name: 'Somente proprietário', road: null } })
@@ -404,14 +405,14 @@ test('admin verificado acessa administração; login autenticado abre painel', a
     if (route.request().method() === 'PUT') policy = route.request().postDataJSON();
     return route.fulfill({ json: policy });
   });
-  await page.goto('/#/app/admin');
+  await page.goto('/admin/#/app/admin');
   await expect(page.getByRole('heading', { name: 'Administração' })).toBeVisible();
   await page.getByLabel('Menor lado da imagem (px)').fill('800');
   await page.getByRole('button', { name: 'Salvar configuração' }).click();
   await expect(page.getByText('Configuração salva com auditoria.')).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Menor lado da imagem (px)')).toHaveValue('800');
-  await page.goto('/#/login');
+  await page.goto('/admin/#/login');
   await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fila de processamento' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Classes de problemas urbanos' })).toBeVisible();
@@ -427,7 +428,7 @@ test('falha de métricas não vira contagem zero', async ({ page }) => {
   await page.route('**/api/v1/ops/metrics', (route) =>
     route.fulfill({ status: 503, json: { detail: 'indisponível' } }),
   );
-  await page.goto('/#/app/dashboard');
+  await page.goto('/admin/#/app/dashboard');
   await expect(page.getByRole('alert')).toContainText('Métricas indisponíveis');
   await expect(page.getByText('Pendentes', { exact: true })).toHaveCount(0);
 });
@@ -466,10 +467,10 @@ test('modelos e auditoria interna carregam dados e filtros sem identidades', asy
       ],
     }),
   );
-  await page.goto('/#/app/modelos');
+  await page.goto('/admin/#/app/modelos');
   await expect(page.getByRole('heading', { name: 'Modelos registrados' })).toBeVisible();
   await expect(page.getByText('ARCHIVED · visual')).toBeVisible();
-  await page.goto('/#/app/auditoria');
+  await page.goto('/admin/#/app/auditoria');
   await expect(page.getByRole('heading', { name: 'Auditoria operacional' })).toBeVisible();
   await page.getByLabel('Operação', { exact: true }).fill('photo_gate_configuration');
   await expect(page.getByText('photo_gate_configuration', { exact: true })).toBeVisible();
@@ -482,10 +483,10 @@ test('ground truth vazio não habilita exportação científica', async ({ page 
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.goto('/#/app/ground-truth');
+  await page.goto('/admin/#/app/ground-truth');
   await expect(page.getByText('Nenhuma revisão de ocorrência disponível.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exportar rótulos elegíveis (0)' })).toBeDisabled();
-  await page.goto('/#/app');
+  await page.goto('/admin/#/app');
   await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
   await expect(page.getByText('Dia civil em UTC; semana = últimos sete dias.')).toBeVisible();
   await expect(page.getByText('blur: 2')).toBeVisible();
@@ -514,7 +515,7 @@ test('ground truth agrega todas as páginas e exporta em lotes autenticados', as
       headers: { 'Content-Disposition': 'attachment; filename="urmind-ground-truth.ndjson"' },
     });
   });
-  await page.goto('/#/app/ground-truth');
+  await page.goto('/admin/#/app/ground-truth');
   await expect(page.getByText('1200 Events revisados')).toBeVisible();
   await expect(page.getByText('D40: 1200')).toBeVisible();
   const download = page.waitForEvent('download');

@@ -4,13 +4,14 @@ import taxonomyFixture from './taxonomy.fixture.json' with { type: 'json' };
 
 // Sessão Supabase simulada SÓ no navegador de teste: a chave de armazenamento é a
 // do projeto configurado no build (frontend/.env.local), e a API é interceptada.
-export function supabaseStorageKey(): string {
+// A área da equipe (/admin/) guarda a sessão numa chave própria (src/surface.ts).
+export function supabaseStorageKey(surface: 'public' | 'admin' = 'public'): string {
   const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
   const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1]?.trim();
   if (!url) throw new Error('VITE_SUPABASE_URL ausente em frontend/.env.local');
-  return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+  return `sb-${new URL(url).hostname.split('.')[0]}-${surface === 'admin' ? 'admin-' : ''}auth-token`;
 }
-export async function signedIn(page: Page) {
+export async function signedIn(page: Page, surface: 'public' | 'admin' = 'public') {
   const session = {
     access_token: 'token-de-teste',
     token_type: 'bearer',
@@ -25,7 +26,7 @@ export async function signedIn(page: Page) {
   };
   await page.addInitScript(
     ([key, value]) => localStorage.setItem(key, value),
-    [supabaseStorageKey(), JSON.stringify(session)],
+    [supabaseStorageKey(surface), JSON.stringify(session)],
   );
 }
 /** Logout como o Supabase propaga entre abas. */

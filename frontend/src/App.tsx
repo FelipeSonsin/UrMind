@@ -50,6 +50,7 @@ import {
 } from './domain/public';
 import { publicApi } from './services/publicApi';
 import { activeCapabilities } from './domain/capabilities';
+import { currentSurface } from './surface';
 
 const CapturePage = lazy(() =>
   import('./pages/CapturePage').then((m) => ({ default: m.CapturePage })),
@@ -204,8 +205,27 @@ interface Route {
   captureId?: string;
   protocol?: string;
 }
-/** Rotas por hash: `#/`, `#/live`, `#/events`, `#/events/<id>`… sem dependência nova. */
+/** Páginas da equipe: só abrem em /admin/, nunca no site do cidadão. */
+function isTeamPage(page: Page): boolean {
+  return (
+    page === 'login' ||
+    page === 'private-detail' ||
+    page === 'private-not-found' ||
+    privateNavigation.some((item) => item.id === page)
+  );
+}
+/**
+ * Rota da superfície atual. Em /admin/ só existem páginas da equipe (o resto abre o
+ * painel); no site do cidadão uma rota da equipe (#/app/…, #/review, #/login) volta
+ * ao Início. Assim um endereço nunca leva ao outro.
+ */
 function parseRoute(): Route {
+  const route = parseHash();
+  if (currentSurface() === 'admin') return isTeamPage(route.page) ? route : { page: 'dashboard' };
+  return isTeamPage(route.page) ? { page: 'overview' } : route;
+}
+/** Rotas por hash: `#/`, `#/live`, `#/events`, `#/events/<id>`… sem dependência nova. */
+function parseHash(): Route {
   const [, first = '', second = '', third = ''] = location.hash
     .split('?')[0]
     .replace(/^#\/?/, '/')
@@ -276,11 +296,8 @@ export default function App() {
   const [accessError, setAccessError] = useState('');
   const [metrics, setMetrics] = useState<Awaited<ReturnType<typeof api.opsMetrics>> | null>(null);
   const [metricsError, setMetricsError] = useState('');
-  const privatePage =
-    page === 'login' ||
-    page === 'private-detail' ||
-    page === 'private-not-found' ||
-    privateNavigation.some((item) => item.id === page);
+  const privatePage = isTeamPage(page);
+  const adminSurface = currentSurface() === 'admin';
   const accessCurrent = Boolean(session && access?.token === session.access_token);
   const canReview = accessCurrent && access?.review === true && !isVisitor;
   const canAdmin = canReview && access?.admin === true;
@@ -842,28 +859,40 @@ export default function App() {
             height={322}
           />
         </a>
-        <nav aria-label="Navegação principal">
-          {(['overview', 'capture', 'live-detection', 'robot-camera', 'my-reports', 'map'] as const)
-            // Só entra no menu o que está ligado no registro de capacidades.
-            .filter((id) => pageAvailable(id))
-            .map((id) => navigation.find((item) => item.id === id))
-            .filter((item): item is NonNullable<typeof item> => item != null)
-            .map((item) => (
-              <a
-                key={item.id}
-                href={item.href}
-                aria-current={page === item.id ? 'page' : undefined}
-                onClick={() => {
-                  setNotice('');
-                  if (item.id === 'capture') setEditing(undefined);
-                }}
-              >
-                <item.icon size={16} strokeWidth={1.8} aria-hidden="true" />
-                {item.label}
-              </a>
-            ))}
-        </nav>
-        {draftsLoaded && localDrafts.length > 0 && (
+        {/* A área da equipe não mostra o menu do cidadão: navega só pelo menu interno. */}
+        {!adminSurface && (
+          <nav aria-label="Navegação principal">
+            {(
+              [
+                'overview',
+                'capture',
+                'live-detection',
+                'robot-camera',
+                'my-reports',
+                'map',
+              ] as const
+            )
+              // Só entra no menu o que está ligado no registro de capacidades.
+              .filter((id) => pageAvailable(id))
+              .map((id) => navigation.find((item) => item.id === id))
+              .filter((item): item is NonNullable<typeof item> => item != null)
+              .map((item) => (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  aria-current={page === item.id ? 'page' : undefined}
+                  onClick={() => {
+                    setNotice('');
+                    if (item.id === 'capture') setEditing(undefined);
+                  }}
+                >
+                  <item.icon size={16} strokeWidth={1.8} aria-hidden="true" />
+                  {item.label}
+                </a>
+              ))}
+          </nav>
+        )}
+        {!adminSurface && draftsLoaded && localDrafts.length > 0 && (
           <div className="sidebar-bottom">
             <a href="#/drafts" aria-current={page === 'drafts' ? 'page' : undefined}>
               <FileImage size={15} strokeWidth={1.8} aria-hidden="true" />
@@ -1709,7 +1738,7 @@ export default function App() {
             )}
           </Suspense>
           <footer>
-            <a href="#/sobre">Sobre e privacidade</a>
+            {!adminSurface && <a href="#/sobre">Sobre e privacidade</a>}
             <span>Relatos revisados por pessoas antes de chegar ao mapa público.</span>
             <span className="footer-right">UrMind · FECART</span>
           </footer>
