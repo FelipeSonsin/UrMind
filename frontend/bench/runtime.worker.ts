@@ -37,7 +37,11 @@ interface Request {
   configs: Config[];
   runs: number;
   slicing: SlicingConfig;
+  /** Manifesto a medir (só `/models/*.json`); padrão = o publicado. */
+  manifest: string;
 }
+
+const MANIFEST_PATH = /^\/models\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
 
 const percentile = (values: number[], q: number) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -293,7 +297,8 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     };
   }
   try {
-    const raw = await (await fetch('/models/live-detection.json', { cache: 'no-cache' })).json();
+    if (!MANIFEST_PATH.test(request.manifest)) throw new Error('manifesto fora de /models/');
+    const raw = await (await fetch(request.manifest, { cache: 'no-cache' })).json();
     const checked = checkBrowserModelManifest(raw);
     if (!checked.ok) throw new Error(checked.reason);
     const manifest = checked.manifest;

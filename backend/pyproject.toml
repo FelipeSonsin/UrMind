@@ -49,6 +49,7 @@ ml = [
   "loguru==0.7.3",
   "onnx==1.19.1",  # export do modelo promovido (§9)
   "onnxruntime==1.23.2",  # inferência do Worker (§9)
+  "onnxconverter-common==1.16.0",  # ONNX FP16 do navegador (browser_model --float16)
   "opencv-python==4.14.0.94",
   "packaging==26.3",
   "psutil==7.1.0",

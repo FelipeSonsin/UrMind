@@ -15,6 +15,25 @@ export type DeliveryResult =
 
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 
+const CONTENT_ADDRESSED = /^(https:\/\/.+)\/[^/]+\/[0-9a-f]{64}\/[^/]+\.onnx$/;
+
+/**
+ * The model bucket is content-addressed (`<model_version>/<sha256>/<file>.onnx`, see
+ * `storage_object_path` in the backend). When `LIVE_MODEL_ONNX_URL` follows that layout,
+ * the object pinned by the versioned manifest is fetched from the same bucket, so a new
+ * ONNX ships with the manifest alone; any other URL is used as is. The bytes are
+ * verified against the manifest either way.
+ */
+export function modelDownloadUrl(
+  onnxUrl: string,
+  manifest: { model_version?: unknown; onnx: { path: string; sha256: string } },
+): string {
+  const match = CONTENT_ADDRESSED.exec(onnxUrl);
+  if (!match || typeof manifest.model_version !== 'string') return onnxUrl;
+  const file = manifest.onnx.path.split('/').pop();
+  return `${match[1]}/${manifest.model_version}/${manifest.onnx.sha256}/${file}`;
+}
+
 /**
  * Live-detection weights are not in Git (35 MB). The versioned manifest pins the ONNX
  * by SHA-256 and size; this step makes the deployed pair reproducible: a local copy
@@ -31,6 +50,7 @@ export async function deliverLiveModel(
   const manifestPath = join(outDir, 'models', 'live-detection.json');
   if (!existsSync(manifestPath)) return { status: 'no_manifest' };
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    model_version?: unknown;
     onnx: { path: string; sha256: string; size_bytes: number };
   };
   const modelsDir = resolve(outDir, 'models');
@@ -53,7 +73,7 @@ export async function deliverLiveModel(
   if (!onnxUrl) return withdraw('LIVE_MODEL_ONNX_URL não definido e ONNX ausente');
   if (!onnxUrl.startsWith('https://')) return withdraw('LIVE_MODEL_ONNX_URL deve ser https');
   try {
-    const response = await fetchImpl(onnxUrl);
+    const response = await fetchImpl(modelDownloadUrl(onnxUrl, manifest));
     if (!response.ok) return withdraw(`download HTTP ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength !== manifest.onnx.size_bytes || digest(bytes) !== manifest.onnx.sha256) {

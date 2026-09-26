@@ -358,3 +358,77 @@ def test_publicacao_recusa_bucket_privado_objeto_divergente_e_sem_autorizacao(
     path, onnx, settings, _, _ = _storage_setup(tmp_path, distribution=distribution)
     with pytest.raises(BrowserPublishError, match=message):
         publish_to_storage(path, onnx, settings, storage)
+
+
+def _yolox_like_onnx(path: Path) -> None:
+    """Conv (corpo) -> Transpose (cabeça) -> Exp/Mul (decodificação), E/S FP32."""
+    import numpy as np
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+
+    rng = np.random.default_rng(0)
+    graph = helper.make_graph(
+        [
+            helper.make_node("Conv", ["images", "w"], ["features"], name="/backbone/Conv"),
+            helper.make_node(
+                "Transpose", ["features"], ["t"], name="/head/Transpose", perm=[0, 2, 3, 1]
+            ),
+            helper.make_node("Exp", ["t"], ["e"], name="/head/Exp"),
+            helper.make_node("Mul", ["e", "stride"], ["output"], name="/head/Mul"),
+        ],
+        "yolox_like",
+        [helper.make_tensor_value_info("images", TensorProto.FLOAT, [1, 3, 8, 8])],
+        [helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 8, 8, 4])],
+        [
+            numpy_helper.from_array(
+                (rng.standard_normal((4, 3, 1, 1)) * 0.1).astype(np.float32), "w"
+            ),
+            numpy_helper.from_array(np.array([32.0], dtype=np.float32), "stride"),
+        ],
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+    model.ir_version = 8
+    onnx.save(model, str(path))
+
+
+def test_float16_mantem_es_e_decodificacao_em_fp32_e_o_resultado(tmp_path):
+    pytest.importorskip("onnxconverter_common")
+    import numpy as np
+    import onnx
+    import onnxruntime as ort
+
+    from app.ml.browser_model import float16_onnx
+
+    source, target = tmp_path / "m.onnx", tmp_path / "m-fp16.onnx"
+    _yolox_like_onnx(source)
+    float16_onnx(source, target)
+    model = onnx.load(str(target))
+    dtypes = {init.name: init.data_type for init in model.graph.initializer}
+    assert dtypes["w"] == onnx.TensorProto.FLOAT16  # corpo em FP16
+    assert dtypes["stride"] == onnx.TensorProto.FLOAT  # decodificação em FP32
+    for value in (*model.graph.input, *model.graph.output):
+        assert value.type.tensor_type.elem_type == onnx.TensorProto.FLOAT
+    images = np.random.default_rng(1).uniform(0, 255, (1, 3, 8, 8)).astype(np.float32) / 255
+    run = lambda p: ort.InferenceSession(str(p), providers=["CPUExecutionProvider"]).run(
+        None, {"images": images}
+    )[0]
+    np.testing.assert_allclose(run(target), run(source), rtol=2e-3)
+
+
+def test_manifesto_float16_troca_o_onnx_e_o_perfil(project, tmp_path):
+    pytest.importorskip("onnxconverter_common")
+    from app.ml.browser_model import inference_profile_sha256, with_float16
+
+    manifest, _ = _build(project)
+    source = tmp_path / "real.onnx"
+    _yolox_like_onnx(source)
+    converted, onnx_path = with_float16(manifest, source, tmp_path / "out")
+    assert converted["onnx"]["sha256"] == _sha(onnx_path)
+    assert converted["onnx"]["source_sha256"] == manifest["onnx"]["sha256"]
+    assert converted["onnx"]["precision"] == "float16"
+    assert converted["onnx"]["path"] == f"/models/{onnx_path.name}"
+    assert onnx_path.name.startswith(f"{manifest['model_version']}-fp16-")
+    assert converted["model_version"] == manifest["model_version"]
+    assert converted["inference_profile"]["sha256"] == inference_profile_sha256(converted)
+    assert converted["inference_profile"]["sha256"] != manifest["inference_profile"]["sha256"]
+    assert manifest["onnx"]["sha256"] != converted["onnx"]["sha256"]  # original intacto

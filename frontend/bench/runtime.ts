@@ -60,6 +60,7 @@ async function run(): Promise<void> {
         runs: Number(params.get('runs') ?? 15),
         power: params.get('power') ?? '',
         gpuProfile: params.get('gpuProfile') === '1',
+        manifest: params.get('manifest') ?? '/models/live-detection.json',
         slicing,
       },
       [bitmap],

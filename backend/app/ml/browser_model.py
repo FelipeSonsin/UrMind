@@ -286,6 +286,84 @@ def _calibrated_postprocess(
     }
 
 
+FLOAT16_DIR = PROJECT_ROOT / "models" / "serving"
+
+
+def float16_onnx(source: Path, target: Path) -> None:
+    """Corpo da rede em FP16 para o WebGPU do navegador (mesmos pesos, sem treino).
+
+    Entrada e saída continuam FP32 (o contrato do manifesto não muda) e a decodificação
+    final da cabeça YOLOX (do Transpose em diante: grade, exp e stride) fica em FP32,
+    porque coordenadas até 640 px perderiam resolução em FP16.
+    """
+    import onnx
+    from onnxconverter_common import float16  # type: ignore[import-untyped]
+
+    model = onnx.load(str(source))
+    nodes = list(model.graph.node)
+    heads = [node for node in nodes if node.op_type == "Transpose"]
+    if len(heads) != 1:
+        raise BrowserPublishError("grafo sem o Transpose único da cabeça YOLOX")
+    tainted = set(heads[0].output)
+    keep = {heads[0].name}
+    for node in nodes:  # nós do ONNX estão em ordem topológica
+        if node.op_type == "Cast" or tainted.intersection(node.input):
+            keep.add(node.name)
+            tainted.update(node.output)
+    converted = float16.convert_float_to_float16(
+        model, keep_io_types=True, node_block_list=sorted(keep)
+    )
+    # O conversor pode deixar a saída do grafo em FP16 mesmo com keep_io_types; o
+    # navegador lê Float32Array, então a saída volta a FP32 por um Cast final.
+    for value in converted.graph.output:
+        tensor_type = value.type.tensor_type
+        if tensor_type.elem_type != onnx.TensorProto.FLOAT16:
+            continue
+        internal = f"{value.name}_fp16"
+        for node in converted.graph.node:
+            node.output[:] = [internal if name == value.name else name for name in node.output]
+            node.input[:] = [internal if name == value.name else name for name in node.input]
+        converted.graph.node.append(
+            onnx.helper.make_node(
+                "Cast",
+                [internal],
+                [value.name],
+                name=f"{value.name}_to_fp32",
+                to=onnx.TensorProto.FLOAT,
+            )
+        )
+        tensor_type.elem_type = onnx.TensorProto.FLOAT
+    onnx.checker.check_model(converted)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = target.with_suffix(".onnx.part")
+    onnx.save(converted, str(staging))
+    os.replace(staging, target)
+
+
+def with_float16(
+    manifest: dict[str, Any], onnx: Path, output_dir: Path = FLOAT16_DIR
+) -> tuple[dict[str, Any], Path]:
+    """Troca o ONNX do manifesto pela versão FP16; o perfil é recalculado (o hash muda)."""
+    staging = output_dir / f"{manifest['model_version']}-fp16-staging.onnx"
+    float16_onnx(onnx, staging)
+    sha256 = sha256_file(staging)
+    target = output_dir / f"{manifest['model_version']}-fp16-{sha256[:12]}.onnx"
+    os.replace(staging, target)
+    converted = json.loads(json.dumps(manifest))
+    converted["onnx"] = {
+        "path": f"/models/{target.name}",
+        "sha256": sha256,
+        "size_bytes": target.stat().st_size,
+        "precision": "float16",
+        "source_sha256": manifest["onnx"]["sha256"],
+    }
+    converted["inference_profile"] = {
+        **manifest["inference_profile"],
+        "sha256": inference_profile_sha256(converted),
+    }
+    return converted, target
+
+
 def publish(manifest: dict[str, Any], onnx: Path, output_dir: Path) -> Path:
     """Cópia atômica do ONNX, conferida por hash, e só então o manifesto."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -432,6 +510,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-detections", type=int, default=100)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--dry-run", action="store_true", help="valida sem copiar nada")
+    parser.add_argument(
+        "--float16",
+        action="store_true",
+        help="publica o corpo da rede em FP16 (WebGPU mais rápido; E/S e decodificação FP32)",
+    )
     args = parser.parse_args(argv)
     try:
         manifest, onnx = build_browser_manifest(
@@ -444,6 +527,8 @@ def main(argv: list[str] | None = None) -> int:
             closure_path=args.closure,
             calibration_path=args.calibration,
         )
+        if args.float16:
+            manifest, onnx = with_float16(manifest, onnx)
     except BrowserPublishError as exc:
         raise SystemExit(f"BROWSER_MODEL_PUBLISH_BLOCKED: {exc}") from exc
     if not args.dry_run:

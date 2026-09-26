@@ -11,6 +11,19 @@
 > no bucket público `models` (Storage DEV, caminho imutável por hash) e chega ao build pela
 > `LIVE_MODEL_ONNX_URL` da Vercel; o perfil `d2b6e1ab` fica como histórico/rollback.
 
+> **FP16 no navegador (26/09/2026, sem treino, pronto e não publicado).**
+> `browser_model --float16` gera o mesmo modelo com o corpo em FP16 (entrada, saída e
+> decodificação da cabeça em FP32): ONNX `1f07a874…`, 18,0 MB. WebGPU (iGPU Intel):
+> `session.run` 292 → 204 ms (−30 %). Detecções iguais no navegador em 3/3 imagens reais
+> (Δcaixa ≤ 3 px, Δscore ≤ 0,005); VALIDATION mAP50 0,1596 → 0,1593, F1 0,2804 → 0,2817.
+> O build baixa o ONNX fixado no manifesto do mesmo bucket endereçado por conteúdo
+> (`<versão>/<sha256>/<arquivo>`), sem trocar a `LIVE_MODEL_ONNX_URL`. Para publicar
+> (ação do proprietário): gerar o manifesto com `--float16`, rodar
+> `python -m app.ml.browser_model publish-storage` e commitar `live-detection.json`.
+> O Worker continua em FP32. Evidência e a candidata "escala por classe" (passou na regra,
+> não implementada, 2 inferências por quadro):
+> `datasets/reports/visual_sprint/no_training_optimization_20260926.json`.
+
 Rota `#/deteccao-ao-vivo`, item "Detecção ao vivo" da navegação principal. A câmera é a
 do aparelho que abriu o navegador; os quadros são analisados localmente por ONNX
 Runtime Web num Web Worker dedicado. Nada é enviado ao servidor até a pessoa tocar em

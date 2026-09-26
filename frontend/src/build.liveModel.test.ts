@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { deliverLiveModel } from '../build/liveModel';
+import { deliverLiveModel, modelDownloadUrl } from '../build/liveModel';
 
 const weights = new TextEncoder().encode('onnx-sintetico');
 const sha = createHash('sha256').update(weights).digest('hex');
@@ -61,6 +61,37 @@ describe('entrega reproduzível do ONNX ao vivo', () => {
       deliverLiveModel(dir, 'https://example.test/m.onnx', serve(weights)),
     ).resolves.toEqual({ status: 'downloaded_verified' });
     expect(new Uint8Array(readFileSync(join(dir, 'models', 'm.onnx')))).toEqual(weights);
+  });
+
+  it('segue o bucket endereçado por conteúdo até o ONNX fixado no manifesto', async () => {
+    const dir = outDir();
+    writeFileSync(
+      join(dir, 'models', 'live-detection.json'),
+      JSON.stringify({
+        model_version: 'm-v2',
+        onnx: { path: '/models/m-fp16.onnx', sha256: sha, size_bytes: weights.byteLength },
+      }),
+    );
+    const requested: string[] = [];
+    const fetchImpl = async (url: string) => {
+      requested.push(url);
+      return serve(weights)();
+    };
+    const old = `https://example.test/object/public/models/m-v2/${'a'.repeat(64)}/m.onnx`;
+    await expect(deliverLiveModel(dir, old, fetchImpl)).resolves.toEqual({
+      status: 'downloaded_verified',
+    });
+    expect(requested).toEqual([
+      `https://example.test/object/public/models/m-v2/${sha}/m-fp16.onnx`,
+    ]);
+    expect(new Uint8Array(readFileSync(join(dir, 'models', 'm-fp16.onnx')))).toEqual(weights);
+  });
+
+  it('usa a URL como está fora do layout endereçado por conteúdo', () => {
+    const manifest = { model_version: 'v', onnx: { path: '/models/x.onnx', sha256: sha } };
+    expect(modelDownloadUrl('https://example.test/m.onnx', manifest)).toBe(
+      'https://example.test/m.onnx',
+    );
   });
 
   it.each([
