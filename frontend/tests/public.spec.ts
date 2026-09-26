@@ -9,17 +9,18 @@ import {
   stubPublicApi,
 } from './fixtures';
 
-test('public primary navigation has four citizen actions and keeps legacy routes', async ({
+test('public primary navigation has five citizen actions and keeps legacy routes', async ({
   page,
 }) => {
   await stubPublicApi(page);
   await page.goto('/');
   const links = page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link');
-  await expect(links).toHaveCount(4);
+  await expect(links).toHaveCount(5);
   await expect(links.nth(0)).toHaveText(/Início/);
   await expect(links.nth(1)).toHaveText(/Registrar/);
-  await expect(links.nth(2)).toHaveText(/Meus relatos/);
-  await expect(links.nth(3)).toHaveText(/Mapa/);
+  await expect(links.nth(2)).toHaveText(/Detecção ao vivo/);
+  await expect(links.nth(3)).toHaveText(/Meus relatos/);
+  await expect(links.nth(4)).toHaveText(/Mapa/);
   await expect(page.getByRole('link', { name: 'Sobre e privacidade' })).toBeVisible();
   await page.goto('/#/transparency');
   await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
@@ -74,7 +75,8 @@ test('o fluxo móvel não consulta Scout nem oferece transmissão ativa', async 
   await expect(
     page
       .getByRole('navigation', { name: 'Navegação principal' })
-      .getByRole('link', { name: 'Ao vivo' }),
+      // A página Scout de transmissão; a detecção ao vivo local não transmite nada.
+      .getByRole('link', { name: 'Ao vivo', exact: true }),
   ).toHaveCount(0);
   expect(scoutRequests).toBe(0);
 });
@@ -203,7 +205,8 @@ test('mapa mostra pontos reais, legenda com forma e nome, e abre a análise', as
   const legend = page.getByLabel('Legenda de severidade');
   await expect(legend).toContainText('Crítica');
   await expect(legend).toContainText('Não determinada');
-  await expect(legend).toContainText('▲');
+  // Cada nível traz a forma de placa que o mapa desenha, não só uma cor.
+  await expect(legend.locator('svg.map-sign')).toHaveCount(5);
   await page
     .getByRole('button', { name: /Buraco/ })
     .first()

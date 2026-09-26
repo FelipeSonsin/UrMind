@@ -4,6 +4,8 @@ import { classes, statuses, type UrbanEvent } from '../domain/contracts';
 import { labelFor } from '../domain/public';
 
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
+// Estados ainda sem decisão humana (EventStatus no backend).
+const awaitingDecision = new Set<string>(['detected', 'review', 'triage_required']);
 export function EventsPage({
   events,
   loading,
@@ -135,9 +137,12 @@ export function EventsPage({
                     </td>
                     <td>{new Date(event.occurred_at).toLocaleString('pt-BR')}</td>
                     <td>
-                      {event.visual_confidence == null
-                        ? 'Não disponível'
-                        : `${(event.visual_confidence * 100).toFixed(1)}%`}
+                      {/* Protocolo de revisão: sem score do modelo antes da decisão humana. */}
+                      {awaitingDecision.has(event.status)
+                        ? 'Oculto até a revisão'
+                        : event.visual_confidence == null
+                          ? 'Não disponível'
+                          : `${(event.visual_confidence * 100).toFixed(1)}%`}
                     </td>
                     <td>
                       {linkDetails ? (

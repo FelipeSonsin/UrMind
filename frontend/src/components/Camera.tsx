@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { frameToJpeg, openCamera, stopStream } from '../services/cameraStream';
 
 export function Camera({
   onCapture,
@@ -15,14 +16,9 @@ export function Camera({
     let stream: MediaStream | undefined;
     async function open() {
       try {
-        if (!navigator.mediaDevices?.getUserMedia)
-          throw new Error('A câmera exige HTTPS ou localhost e um navegador compatível.');
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false,
-        });
+        stream = await openCamera();
         if (disposed) {
-          stream.getTracks().forEach((track) => track.stop());
+          stopStream(stream);
           return;
         }
         if (video.current) {
@@ -38,23 +34,21 @@ export function Camera({
     void open();
     return () => {
       disposed = true;
-      stream?.getTracks().forEach((track) => track.stop());
+      stopStream(stream);
     };
   }, []);
   function capture() {
     const frame = video.current;
     if (!frame?.videoWidth) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = frame.videoWidth;
-    canvas.height = frame.videoHeight;
-    canvas.getContext('2d')?.drawImage(frame, 0, 0);
-    canvas.toBlob(
-      (blob) => {
-        if (blob) onCapture(new File([blob], 'captura.jpg', { type: 'image/jpeg' }));
-        else setError('Não foi possível capturar a imagem.');
-      },
-      'image/jpeg',
-      0.92,
+    if (Math.min(frame.videoWidth, frame.videoHeight) < 640) {
+      setError(
+        `esta câmera entrega só ${frame.videoWidth}×${frame.videoHeight}. Use "Tirar foto" para abrir a câmera do aparelho.`,
+      );
+      return;
+    }
+    frameToJpeg(frame, frame.videoWidth, frame.videoHeight, 'captura.jpg', Date.now()).then(
+      onCapture,
+      (reason: Error) => setError(reason.message),
     );
   }
   return (

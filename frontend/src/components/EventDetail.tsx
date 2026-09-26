@@ -13,6 +13,14 @@ import {
 } from '../domain/contracts';
 
 const na = 'Não disponível';
+// Mesmos códigos de backend/app/ml/tabular.py (REJECTION_REASONS): só erro visual
+// vira rótulo negativo de review_confirmed.
+const rejectionReasons = {
+  erro_visual: 'Erro visual: a imagem não mostra o dano proposto',
+  duplicidade: 'Duplicidade (administrativo)',
+  localizacao: 'Localização ausente ou incorreta',
+  imagem_inconclusiva: 'Imagem insuficiente para decidir',
+} as const;
 
 export function OwnerReportTimeline({ id, revision }: { id: string; revision: number }) {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof api.captureTimeline>> | null>(null);
@@ -356,6 +364,8 @@ export function EventDetail({
   const [canReview, setCanReview] = useState(false);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [rejectReason, setRejectReason] = useState<keyof typeof rejectionReasons | ''>('');
+  const [rejectNotes, setRejectNotes] = useState('');
 
   useEffect(() => {
     // Papel decidido no servidor (JWT app_metadata); a tela só respeita.
@@ -400,6 +410,10 @@ export function EventDetail({
     }
   }
 
+  // Protocolo de revisão: antes da primeira decisão humana, quem revisa não vê
+  // score do modelo, severidade, prioridade nem relatório gerado a partir deles.
+  const blind = canReview && (detail?.reviews.length ?? 0) === 0;
+  const hidden = 'Oculto até a decisão humana';
   const responsibility = detail?.responsibility;
   const context = Object.fromEntries((detail?.context ?? []).map((item) => [item.source, item]));
   const address = context.nominatim_reverse;
@@ -436,7 +450,11 @@ export function EventDetail({
                       width: `${d.bbox.width * 100}%`,
                       height: `${d.bbox.height * 100}%`,
                     }}
-                    title={`${d.urmind_class} ${(d.confidence * 100).toFixed(1)}%`}
+                    title={
+                      blind
+                        ? labelFor(d.urmind_class)
+                        : `${d.urmind_class} ${(d.confidence * 100).toFixed(1)}%`
+                    }
                   />
                 ))}
               </div>
@@ -452,9 +470,14 @@ export function EventDetail({
             <dd>
               {detail.detections.length
                 ? detail.detections
-                    .map((d) => `${d.urmind_class} · ${(d.confidence * 100).toFixed(1)}%`)
+                    .map((d) =>
+                      blind
+                        ? labelFor(d.urmind_class)
+                        : `${d.urmind_class} · ${(d.confidence * 100).toFixed(1)}%`,
+                    )
                     .join('; ')
                 : na}
+              {blind && detail.detections.length > 0 && ` (score: ${hidden.toLowerCase()})`}
             </dd>
             <dt>Coordenada original</dt>
             <dd>
@@ -469,11 +492,22 @@ export function EventDetail({
                 : na}
             </dd>
             <dt>Severidade</dt>
-            <dd>{detail.risk ? severities[detail.risk.severity] || detail.risk.severity : na}</dd>
+            <dd>
+              {blind
+                ? hidden
+                : detail.risk
+                  ? severities[detail.risk.severity] || detail.risk.severity
+                  : na}
+            </dd>
             <dt>Prioridade</dt>
             <dd>
-              {detail.risk?.priority_score == null ? na : detail.risk.priority_score.toFixed(2)}
-              {detail.risk?.uncertainty != null &&
+              {blind
+                ? hidden
+                : detail.risk?.priority_score == null
+                  ? na
+                  : detail.risk.priority_score.toFixed(2)}
+              {!blind &&
+                detail.risk?.uncertainty != null &&
                 ` · incerteza ${detail.risk.uncertainty.toFixed(2)}`}
             </dd>
             <dt>Responsável sugerido</dt>
@@ -517,7 +551,7 @@ export function EventDetail({
                   : na}
             </dd>
           </dl>
-          {detail.report && (
+          {detail.report && !blind && (
             <details open>
               <summary>Relatório</summary>
               <pre className="report">{detail.report}</pre>
@@ -556,14 +590,46 @@ export function EventDetail({
               >
                 Corrigir classe
               </button>
+            </div>
+            <div className="actions" hidden={!canReview}>
+              <select
+                aria-label="Motivo da rejeição"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value as keyof typeof rejectionReasons)}
+              >
+                <option value="">Motivo da rejeição…</option>
+                {Object.entries(rejectionReasons).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label="Observação da rejeição"
+                placeholder="Observação (opcional)"
+                maxLength={1900}
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+              />
               <button
                 className="text-button danger"
-                disabled={busy}
-                onClick={() => void review({ decision: 'reject' })}
+                disabled={busy || !rejectReason}
+                onClick={() =>
+                  void review({
+                    decision: 'reject',
+                    notes: `[motivo:${rejectReason}] ${rejectNotes}`.trim(),
+                  })
+                }
               >
                 Rejeitar
               </button>
             </div>
+            {blind && (
+              <p className="muted">
+                Decida pela evidência. Na dúvida, não decida: o caso fica pendente e não vira
+                rótulo.
+              </p>
+            )}
             <div className="actions" hidden={!canReview}>
               <input
                 aria-label="Latitude corrigida"

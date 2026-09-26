@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BRAZIL_MAP_BOUNDS, isInBrazilMapViewport, resolveMapProvider } from './mapConfig';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  BRAZIL_MAP_BOUNDS,
+  BRAZIL_OUTLINE_BOUNDS,
+  isInBrazilMapViewport,
+  isInsidePolygons,
+  outlinePolygons,
+  outsideMask,
+  resolveMapProvider,
+  type Polygon,
+} from './mapConfig';
 
 describe('Brazil operational map viewport', () => {
   it('frames Brazil instead of the whole world', () => {
@@ -57,5 +68,64 @@ describe('resolveMapProvider', () => {
       'carto',
     );
     expect(`${fallback.name} ${fallback.attribution}`).not.toContain('public-secret-looking');
+  });
+});
+
+describe('Brazil outline geometry', () => {
+  const outline = JSON.parse(
+    readFileSync(resolve(__dirname, '../public/geo/brasil.geojson'), 'utf-8'),
+  ) as Parameters<typeof outlinePolygons>[0];
+  const polygons = outlinePolygons(outline);
+
+  it('accepts points inside the IBGE outline, including Fernando de Noronha', () => {
+    expect(isInsidePolygons(polygons, -23.55, -46.63)).toBe(true); // São Paulo
+    expect(isInsidePolygons(polygons, -3.12, -60.02)).toBe(true); // Manaus
+    expect(isInsidePolygons(polygons, -30.03, -51.23)).toBe(true); // Porto Alegre
+    expect(isInsidePolygons(polygons, -3.856, -32.429)).toBe(true); // Noronha
+  });
+
+  it('rejects neighbours and ocean that the viewport rectangle lets through', () => {
+    const asuncion = [-25.28, -57.63] as const;
+    const santaCruz = [-17.78, -63.18] as const;
+    const atlantic = [-20, -35] as const;
+    for (const [lat, lng] of [asuncion, santaCruz, atlantic]) {
+      expect(isInBrazilMapViewport(lat, lng)).toBe(true);
+      expect(isInsidePolygons(polygons, lat, lng)).toBe(false);
+    }
+  });
+
+  it('frames every outline vertex', () => {
+    const [west, south, east, north] = BRAZIL_OUTLINE_BOUNDS;
+    for (const [shell] of polygons)
+      for (const [lng, lat] of shell) {
+        expect(lng).toBeGreaterThanOrEqual(west);
+        expect(lng).toBeLessThanOrEqual(east);
+        expect(lat).toBeGreaterThanOrEqual(south);
+        expect(lat).toBeLessThanOrEqual(north);
+      }
+  });
+
+  it('honours holes and builds a mask that cuts every shell out of the world', () => {
+    const square: Polygon = [
+      [
+        [0, 0],
+        [10, 0],
+        [10, 10],
+        [0, 10],
+        [0, 0],
+      ],
+      [
+        [4, 4],
+        [6, 4],
+        [6, 6],
+        [4, 6],
+        [4, 4],
+      ],
+    ];
+    expect(isInsidePolygons([square], 2, 2)).toBe(true);
+    expect(isInsidePolygons([square], 5, 5)).toBe(false);
+    const mask = outsideMask([square]);
+    expect(mask.coordinates[0]).toHaveLength(2);
+    expect(mask.coordinates[1]).toEqual([square[1]]);
   });
 });

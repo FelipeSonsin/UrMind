@@ -54,6 +54,9 @@ kaggle.json
 # manter um unico .gitignore autoritativo na raiz. node_modules/, .env e
 # .env.local ja estavam cobertos pelas regras globais acima.
 /frontend/dist/
+# Pesos da detecção ao vivo (35 MB) não são versionados; o build os obtém e confere o SHA-256.
+/frontend/public/models/*.onnx
+# O manifesto do navegador é versionado: fixa o ONNX por SHA-256 (frontend/build/liveModel.ts).
 /frontend/test-results/
 /frontend/playwright-report/
 *.tsbuildinfo

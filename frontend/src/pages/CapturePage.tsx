@@ -3,12 +3,30 @@ import { Camera as CameraIcon, Upload, LocateFixed, Save } from 'lucide-react';
 import { Camera } from '../components/Camera';
 import { Photo } from '../components/Photo';
 import { parseCoordinate, coordinateSchema } from '../domain/contracts';
-import { defaultPhotoPolicy, drafts, validatePhoto, type CaptureDraft } from '../services/drafts';
+import {
+  defaultPhotoPolicy,
+  drafts,
+  fitCameraPhoto,
+  validatePhoto,
+  type CaptureDraft,
+} from '../services/drafts';
+import { currentFix, stopWarmUp, warmUp, warmUpIfAllowed } from '../services/deviceLocation';
 import { publicApi } from '../services/publicApi';
 import { gps } from 'exifr';
 const UrbanMap = lazy(() => import('../components/UrbanMap'));
 
 const NO_EVENTS: [] = [];
+
+/** Some Android cameras hand back a file without extension; name it by its type. */
+function cameraFile(file: File): File {
+  if (/\.(jpe?g|png|webp)$/i.test(file.name)) return file;
+  const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
+  if (!extension) return file;
+  return new File([file], `foto-${Date.now()}.${extension}`, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
 
 function newDraft(): CaptureDraft {
   return {
@@ -41,6 +59,7 @@ export function CapturePage({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const [pickedLocation, setPickedLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -70,16 +89,23 @@ export function CapturePage({
       });
     return () => controller.abort();
   }, []);
+  // With permission already granted, GPS starts settling while the person
+  // frames the photo; otherwise it starts on the "Tirar foto" tap.
+  useEffect(() => {
+    void warmUpIfAllowed();
+    return stopWarmUp;
+  }, []);
   const candidateCenter = coordinateSchema.safeParse({
     latitude: Number(latitude),
     longitude: Number(longitude),
     accuracy_m: null,
   });
-  async function select(file: File, fromCamera = false) {
+  async function select(picked: File, fromCamera = false) {
     const version = ++selectionVersion.current;
     setBusy(true);
     setError('');
     try {
+      const file = fromCamera ? await fitCameraPhoto(cameraFile(picked)) : picked;
       await validatePhoto(file, photoPolicy);
       if (version !== selectionVersion.current) return;
       // Browser EXIF is a preview only. The backend re-reads the original bytes
@@ -120,57 +146,52 @@ export function CapturePage({
       setPickedLocation(null);
       setShowMap(!fromCamera && !exifCoordinate);
       setCamera(false);
-      if (fromCamera) locate();
+      setLocationError('');
+      // A photo taken now is located by the phone itself, no map or typing.
+      if (fromCamera) void locate();
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  function locate() {
+  async function locate() {
     const version = selectionVersion.current;
-    if (!navigator.geolocation) {
-      setError('Geolocalização indisponível neste navegador.');
-      return;
-    }
     setLocating(true);
-    setError('');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (version !== selectionVersion.current) return;
-        const result = coordinateSchema.safeParse({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy_m: position.coords.accuracy,
-        });
-        if (!result.success) {
-          setError('O dispositivo retornou uma localização inválida.');
-          setLocating(false);
-          return;
-        }
-        setLatitude(String(result.data.latitude));
-        setLongitude(String(result.data.longitude));
-        setDraft((value) => ({
-          ...value,
-          coordinate: result.data,
-          source_location: 'gps_device',
-          location_timestamp: new Date(position.timestamp).toISOString(),
-          heading_deg: position.coords.heading,
-          speed_mps: position.coords.speed,
-        }));
-        setShowMap(false);
-        setLocating(false);
-      },
-      () => {
-        if (version !== selectionVersion.current) return;
-        setError(
-          'Não foi possível obter a localização. Verifique a permissão ou informe as coordenadas.',
-        );
+    setLocationError('');
+    try {
+      const position = await currentFix();
+      if (version !== selectionVersion.current) return;
+      const result = coordinateSchema.safeParse({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy_m: position.coords.accuracy,
+      });
+      if (!result.success) {
+        setLocationError('O aparelho devolveu uma posição inválida. Marque o local no mapa.');
         setShowMap(true);
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+        return;
+      }
+      setLatitude(String(result.data.latitude));
+      setLongitude(String(result.data.longitude));
+      setDraft((value) => ({
+        ...value,
+        coordinate: result.data,
+        source_location: 'gps_device',
+        location_timestamp: new Date(position.timestamp).toISOString(),
+        heading_deg: position.coords.heading,
+        speed_mps: position.coords.speed,
+      }));
+      setShowMap(false);
+    } catch (reason) {
+      if (version !== selectionVersion.current) return;
+      setLocationError(
+        reason instanceof Error ? reason.message : 'Não foi possível obter a localização.',
+      );
+      setShowMap(true);
+    } finally {
+      if (version === selectionVersion.current) setLocating(false);
+    }
   }
   function manual() {
     // A confirmed/edited manual point wins over a pending Geolocation callback.
@@ -270,6 +291,25 @@ export function CapturePage({
             )}
           </div>
           <div className="actions">
+            {/* The phone's own camera app: full resolution, and the tap also
+                starts GPS so the position is ready when the photo returns. */}
+            <label className="button">
+              <CameraIcon size={17} /> Tirar foto
+              <input
+                aria-label="Tirar foto"
+                className="file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                disabled={busy || locating}
+                onClick={() => warmUp()}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void select(file, true);
+                  event.target.value = '';
+                }}
+              />
+            </label>
             <label className="button secondary">
               Escolher foto
               <input
@@ -287,9 +327,12 @@ export function CapturePage({
             </label>
             <button
               type="button"
-              className="secondary"
+              className="secondary desktop-camera"
               disabled={busy || locating}
-              onClick={() => setCamera(true)}
+              onClick={() => {
+                warmUp();
+                setCamera(true);
+              }}
             >
               <CameraIcon size={17} /> Abrir câmera
             </button>
@@ -307,7 +350,8 @@ export function CapturePage({
             <span className="step">02</span> Localização e contexto
           </h2>
           <p>
-            Informe o local em que a foto foi tirada. Sem localização, o rascunho fica pendente.
+            Foto tirada agora recebe o local do GPS do aparelho automaticamente. Foto da galeria usa
+            o GPS gravado nela ou o ponto que você marcar no mapa.
           </p>
           {draft.source === 'exif_upload' && (
             <p className="notice">
@@ -370,19 +414,25 @@ export function CapturePage({
           )}
           {draft.source === 'pwa_photo' && (
             <>
-              <button
-                type="button"
-                className="secondary"
-                disabled={locating || busy}
-                onClick={locate}
-              >
-                <LocateFixed size={16} />
-                {locating ? 'Obtendo posição…' : 'Obter posição do dispositivo'}
-              </button>
-              <p className="muted">
-                Use enquanto ainda estiver no local da foto. O horário da posição é registrado
-                separadamente.
+              <p role="status" className={locationError ? 'error' : 'notice'}>
+                {locating
+                  ? 'Localizando pelo GPS do aparelho…'
+                  : locationError ||
+                    (draft.source_location === 'gps_device'
+                      ? 'Local registrado automaticamente pelo GPS do aparelho.'
+                      : 'A foto ainda não tem local.')}
               </p>
+              {(locationError || draft.source_location !== 'gps_device') && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={locating || busy}
+                  onClick={() => void locate()}
+                >
+                  <LocateFixed size={16} />
+                  {locating ? 'Obtendo posição…' : 'Tentar localizar de novo'}
+                </button>
+              )}
             </>
           )}
           {draft.source === 'exif_upload' && draft.photo.size > 0 && (
@@ -397,7 +447,7 @@ export function CapturePage({
                       'A posição atual do celular corresponde ao local onde esta foto foi tirada? Ela será registrada como declaração sua.',
                     )
                   )
-                    locate();
+                    void locate();
                 }}
               >
                 <LocateFixed size={16} /> Usar GPS atual para esta foto
@@ -406,6 +456,11 @@ export function CapturePage({
                 Use apenas se estiver no local da foto. O GPS atual não comprova onde uma foto
                 antiga foi tirada.
               </p>
+              {locationError && (
+                <p className="error" role="alert">
+                  {locationError}
+                </p>
+              )}
             </>
           )}
           <p className="muted">

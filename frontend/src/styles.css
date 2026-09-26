@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Inter, 'Segoe UI', Arial, sans-serif;
+  font-family: 'Public Sans Variable', 'Segoe UI', Arial, sans-serif;
   color: #203a34;
   background: #f5f6f2;
   font-synthesis: none;
@@ -859,7 +859,8 @@ pre {
   margin-bottom: 20px;
 }
 .map {
-  height: 400px;
+  /* Height comes from MAP_DESIGN.slot.height (src/mapDesign.ts). */
+  background: #f4f6f2;
 }
 .map-caption {
   padding: 13px 20px;
@@ -1818,15 +1819,24 @@ strong.risk-unknown {
 .map-wrap {
   position: relative;
 }
+/* A pill above the country, clear of the zoom controls and the attribution. */
 .map-empty {
   position: absolute;
-  inset: auto 0 0;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 128px);
   margin: 0;
-  padding: 14px 18px;
+  padding: 8px 14px;
   background: rgba(255, 255, 255, 0.94);
-  border-top: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px #182c2514;
   font-size: 12px;
+  line-height: 1.35;
   text-align: center;
+  pointer-events: none;
 }
 
 /* Taxonomia canônica e exemplos revisados */
@@ -1952,6 +1962,9 @@ strong.risk-unknown {
   .panel,
   .sidebar,
   .status-bar,
+  .map {
+    background: #1c302a;
+  }
   .map-detail,
   .map-empty,
   .skip-link {
@@ -1997,5 +2010,452 @@ strong.risk-unknown {
   .notice {
     color: #efe3b3;
     background: #353824;
+  }
+}
+
+/* ---- Map panel: the map is the protagonist; controls frame it quietly. ---- */
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.map-toolbar label {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.map-toolbar select,
+.map-toolbar input {
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.map-count {
+  margin: 0 0 0 auto;
+  align-self: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #e7f2d6;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.map-legends {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  max-width: 220px;
+}
+.map-legends .map-legend {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px #182c2514;
+  font-size: 12px;
+  color: #203a34;
+}
+.map-legends .map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.map-sign {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.map-footer {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+}
+.map-footer .map-caption {
+  max-width: 80ch;
+  padding: 0;
+  color: var(--muted);
+}
+.map-point-list summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+.map-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.map-export > div {
+  display: flex;
+  gap: 8px;
+}
+.map-export small {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 699px) {
+  /* One scrollable row keeps the filters from pushing the map off screen. */
+  .map-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding: 12px;
+  }
+  .map-toolbar label {
+    flex: 0 0 150px;
+    scroll-snap-align: start;
+  }
+  .map-count {
+    order: -1;
+    margin: 0;
+  }
+  .map-legends {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    max-width: none;
+    padding: 10px 12px 0;
+  }
+  .map-legends .map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .map-count {
+    background: #2a4a3f;
+    color: #d0ed9e;
+  }
+  .map-legends .map-legend {
+    background: rgba(28, 48, 42, 0.94);
+    color: #edf3ee;
+  }
+  .map-point-list summary {
+    color: #d0ed9e;
+  }
+}
+@media (prefers-color-scheme: dark) and (max-width: 699px) {
+  .map-legends .map-legend {
+    background: none;
+  }
+}
+.map-footer .map-point-list {
+  margin: 0;
+}
+.map-footer .map-point-list summary {
+  min-height: 0;
+  padding-block: 6px;
+}
+
+/* ---- Public home: the map leads; the diagnosis reads beside it. ---- */
+.home-lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr);
+  gap: var(--space);
+  align-items: start;
+}
+.home-lead .map-panel {
+  margin-bottom: 0;
+}
+.home-lead .diagnosis {
+  position: sticky;
+  top: var(--space);
+}
+.scout-offline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: var(--space);
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.scout-offline strong {
+  color: #203a34;
+  font-size: 14px;
+}
+.scout-offline a {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+/* Section labels in sentence case: they name the block, they do not shout. */
+.section-label,
+.action-panel .section-label,
+.prediction-panel .section-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.scout-head h2,
+.scout-meta dt,
+.quick-grid span,
+.explanation-columns h4,
+.data-list dt {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.scout-meta dt,
+.quick-grid span,
+.data-list dt {
+  font-size: 12px;
+}
+@media (max-width: 1099px) {
+  .home-lead {
+    grid-template-columns: 1fr;
+  }
+  .home-lead .diagnosis {
+    position: static;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .scout-offline strong {
+    color: #edf3ee;
+  }
+  .scout-offline a {
+    color: #d0ed9e;
+  }
+}
+/* Touch devices get the phone's own camera ("Tirar foto"); the in-app
+   webcam view is for computers. */
+@media (pointer: coarse) {
+  .desktop-camera {
+    display: none;
+  }
+}
+
+/* Detecção ao vivo: o palco é o visor; o resto fica quieto. */
+.live-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.live-side {
+  display: grid;
+  gap: 16px;
+}
+.live-stage-panel {
+  background: #0d2a24;
+  border-radius: 11px;
+  overflow: hidden;
+}
+.live-stage {
+  position: relative;
+  width: 100%;
+  max-height: 72vh;
+  margin: 0 auto;
+}
+.live-frame {
+  position: absolute;
+  inset: 0;
+}
+.live-video,
+.live-analyzed,
+.live-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.live-analyzed[hidden] {
+  display: none;
+}
+.mirrored {
+  transform: scaleX(-1);
+}
+.live-overlay {
+  pointer-events: none;
+}
+/* Durante a análise, a imagem ao vivo vira um recorte no canto e o palco mostra o quadro analisado. */
+.live-stage.is-analyzed .live-video {
+  inset: auto 12px 12px auto;
+  width: 22%;
+  height: auto;
+  border: 1px solid rgba(208, 237, 158, 0.6);
+  border-radius: 6px;
+  z-index: 2;
+}
+.live-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  color: #c1d6c5;
+  text-align: center;
+}
+.live-placeholder p {
+  color: inherit;
+  max-width: 36ch;
+  margin: 0;
+}
+.live-stage-tag {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: rgba(13, 42, 36, 0.82);
+  color: #d0ed9e;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.live-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid #24463d;
+}
+.live-readout div {
+  padding: 12px 14px;
+  border-left: 1px solid #24463d;
+}
+.live-readout div:first-child,
+.live-readout div:nth-child(5) {
+  border-left: 0;
+}
+.live-readout div:nth-child(n + 5) {
+  border-top: 1px solid #24463d;
+}
+.live-quality {
+  margin: 0;
+  padding: 10px 14px 12px 30px;
+  border-top: 1px solid #24463d;
+  color: #f3d58a;
+  font-size: 13px;
+}
+.live-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.live-readout dt {
+  font-size: 11px;
+  color: #9fb8a9;
+}
+.live-readout dd {
+  margin: 2px 0 0;
+  color: #f1f6ec;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live-actions {
+  margin-top: 10px;
+}
+.live-hints {
+  margin: 12px 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.live-model {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.live-model dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.live-model dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.live-detections {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.live-detections li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.live-detections i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.live-detections strong {
+  display: block;
+  font-size: 13px;
+}
+.live-detections small {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.live-detections b {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 1150px) {
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 699px) {
+  .live-readout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .live-readout div:nth-child(5) {
+    border-left: 1px solid #24463d;
+  }
+  .live-readout div:nth-child(3n + 1) {
+    border-left: 0;
+  }
+  .live-readout div:nth-child(n + 4) {
+    border-top: 1px solid #24463d;
+  }
+  .live-readout dd {
+    font-size: 15px;
+  }
+  .live-stage {
+    max-height: 60vh;
   }
 }

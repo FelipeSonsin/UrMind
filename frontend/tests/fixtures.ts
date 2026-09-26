@@ -1,5 +1,42 @@
+import { readFileSync } from 'node:fs';
 import type { Page, Route } from '@playwright/test';
 import taxonomyFixture from './taxonomy.fixture.json' with { type: 'json' };
+
+// Sessão Supabase simulada SÓ no navegador de teste: a chave de armazenamento é a
+// do projeto configurado no build (frontend/.env.local), e a API é interceptada.
+export function supabaseStorageKey(): string {
+  const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
+  const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1]?.trim();
+  if (!url) throw new Error('VITE_SUPABASE_URL ausente em frontend/.env.local');
+  return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+}
+export async function signedIn(page: Page) {
+  const session = {
+    access_token: 'token-de-teste',
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    refresh_token: 'refresh-de-teste',
+    user: {
+      id: '0b0e4c7e-1111-4222-8333-944445555666',
+      aud: 'authenticated',
+      role: 'authenticated',
+    },
+  };
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key, value),
+    [supabaseStorageKey(), JSON.stringify(session)],
+  );
+}
+/** Logout como o Supabase propaga entre abas. */
+export async function signOut(page: Page) {
+  await page.evaluate((key) => {
+    localStorage.removeItem(key);
+    const channel = new BroadcastChannel(key);
+    channel.postMessage({ event: 'SIGNED_OUT', session: null });
+    channel.close();
+  }, supabaseStorageKey());
+}
 
 /** Synthetic texture for upload mechanics only; never a scientific or real E2E photo. */
 export async function syntheticReportPhoto(page: Page): Promise<string> {

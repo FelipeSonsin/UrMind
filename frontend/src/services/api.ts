@@ -148,6 +148,13 @@ export const api = {
         reviewed_events: z.number(),
         eligible_events: z.number(),
         counts_by_class: z.record(z.string(), z.number()),
+        // Optional: older API deployments report only the totals above.
+        confirmed: z.number().optional(),
+        rejected: z.number().optional(),
+        corrected: z.number().optional(),
+        conflicts: z.number().optional(),
+        independent_groups: z.number().optional(),
+        ineligible_reasons: z.record(z.string(), z.number()).optional(),
         training_authorized: z.literal(false),
       }),
       { signal },

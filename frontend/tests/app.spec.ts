@@ -1,33 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
-import { stubPublicApi, syntheticReportPhoto } from './fixtures';
-
-// Sessão Supabase simulada SÓ no navegador de teste: a chave de armazenamento é a
-// do projeto configurado no build (frontend/.env.local), e a API é interceptada.
-function supabaseStorageKey(): string {
-  const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8');
-  const url = /VITE_SUPABASE_URL=(.+)/.exec(env)?.[1]?.trim();
-  if (!url) throw new Error('VITE_SUPABASE_URL ausente em frontend/.env.local');
-  return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
-}
-async function signedIn(page: Page) {
-  const session = {
-    access_token: 'token-de-teste',
-    token_type: 'bearer',
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
-    refresh_token: 'refresh-de-teste',
-    user: {
-      id: '0b0e4c7e-1111-4222-8333-944445555666',
-      aud: 'authenticated',
-      role: 'authenticated',
-    },
-  };
-  await page.addInitScript(
-    ([key, value]) => localStorage.setItem(key, value),
-    [supabaseStorageKey(), JSON.stringify(session)],
-  );
-}
+import { expect, test } from '@playwright/test';
+import { signedIn, stubPublicApi, supabaseStorageKey, syntheticReportPhoto } from './fixtures';
 
 test.beforeEach(async ({ page }) => {
   // Fixtures exclusivamente de teste. Nenhuma ocorrência fictícia entra no produto.
@@ -52,6 +24,44 @@ test('gallery uses current GPS only after confirmation', async ({ page }) => {
   await useCurrent.click();
   await expect(page.getByText(/GPS do dispositivo/)).toBeVisible();
   await expect(page.getByText(/12\.0 m/)).toBeVisible();
+});
+
+test('foto tirada agora recebe o local do GPS do aparelho sem mapa', async ({ page }) => {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: -23.55, longitude: -46.63, accuracy: 12 });
+  await page.goto('/#/registrar');
+  await page.getByLabel('Tirar foto').setInputFiles({
+    name: 'camera.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
+  });
+  await expect(
+    page.getByText('Local registrado automaticamente pelo GPS do aparelho.'),
+  ).toBeVisible();
+  await expect(page.getByText(/Origem:.*GPS do dispositivo/)).toBeVisible();
+  await expect(page.getByText(/12\.0 m/)).toBeVisible();
+  await expect(page.locator('.map canvas')).toHaveCount(0);
+});
+
+test('sem permissão de localização, a foto tirada agora explica e oferece o mapa', async ({
+  page,
+}) => {
+  await page.context().clearPermissions();
+  await page.goto('/#/registrar');
+  await page.evaluate(() => {
+    const denied = (_ok: unknown, fail: (error: { code: number }) => void) => fail({ code: 1 });
+    Object.defineProperty(navigator, 'geolocation', {
+      value: { getCurrentPosition: denied, watchPosition: () => 1, clearWatch: () => undefined },
+    });
+  });
+  await page.getByLabel('Tirar foto').setInputFiles({
+    name: 'camera.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
+  });
+  await expect(page.getByText(/Localização bloqueada para este site/).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tentar localizar de novo' })).toBeVisible();
+  await expect(page.locator('.map canvas')).toBeVisible();
 });
 
 test('captura respeita tema do dispositivo e alvos de toque em 320px', async ({ page }) => {
@@ -149,7 +159,9 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
   await expect.poll(() => uploaded).toBe(true);
   await expect(page).toHaveURL(new RegExp(`processando/${id}`));
   await expect(page.getByText('Etapa: location_required')).toBeVisible();
-  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  // O mapa enquadra o Brasil inteiro; o centro do quadro fica em território
+  // brasileiro, enquanto os cantos caem na máscara e são recusados.
+  await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização do relato' }).click();
   await expect(page.getByText('Etapa: model_not_available')).toBeVisible();
   await expect(page.getByText(description, { exact: true })).toBeVisible();
@@ -215,7 +227,7 @@ test('confirma relato próximo e envia evidência adicional com aceite', async (
     mimeType: 'image/png',
     buffer: Buffer.from(await syntheticReportPhoto(page), 'base64'),
   });
-  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
@@ -356,7 +368,7 @@ test('bloqueia signup público se frontend e backend apontam para projetos difer
     mimeType: 'image/png',
     buffer: Buffer.from(png, 'base64'),
   });
-  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
@@ -404,7 +416,7 @@ test('logout durante upload cancela resposta tardia sem navegar para captura ant
     mimeType: 'image/png',
     buffer: Buffer.from(png, 'base64'),
   });
-  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
@@ -531,7 +543,7 @@ for (const boundary of ['origin', 'signup'] as const) {
         mimeType: 'image/png',
         buffer: Buffer.from(png, 'base64'),
       });
-      await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+      await page.locator('.map canvas').click();
       await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
       await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
       await page.getByRole('button', { name: 'Salvar e enviar' }).click();
@@ -654,7 +666,7 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
   await expect(page.getByRole('alert')).toContainText('Selecione e confirme a localização no mapa');
   await page.getByRole('button', { name: 'Selecionar localização no mapa' }).click();
-  await page.locator('.map canvas').click({ position: { x: 120, y: 100 } });
+  await page.locator('.map canvas').click();
   await page.getByRole('button', { name: 'Confirmar localização no mapa' }).click();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Salvar e enviar' }).click();
@@ -737,9 +749,18 @@ test('a revisão exibe dados da API, filtra e mantém zero de confiança', async
   );
   await signedIn(page);
   await page.goto('/#/review');
-  await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+  // Evento ainda em revisão: o score do modelo não aparece antes da decisão humana.
+  await expect(page.getByText('Oculto até a revisão', { exact: true })).toBeVisible();
+  await expect(page.getByText('0.0%', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Ver registro' }).click();
   await expect(page.getByText('-23.5, -46.6', { exact: true })).toBeVisible();
+  // Severidade e prioridade ficam ocultas até a primeira decisão humana.
+  await expect(page.getByText('Oculto até a decisão humana')).toHaveCount(2);
+  // Rejeitar exige motivo; só "erro visual" vira rótulo negativo no export.
+  await expect(page.getByRole('button', { name: 'Rejeitar' })).toBeDisabled();
+  await page.getByLabel('Motivo da rejeição').selectOption('duplicidade');
+  await expect(page.getByRole('button', { name: 'Rejeitar' })).toBeEnabled();
+  await expect(page.getByText(/Na dúvida, não decida/)).toBeVisible();
   await expect(page.getByText('-23.501, -46.601 (3.0 m)', { exact: true })).toBeVisible();
   await page.getByLabel('Estado', { exact: true }).selectOption('confirmed');
   await expect(

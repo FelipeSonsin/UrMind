@@ -68,6 +68,15 @@ export function GroundTruthPage() {
               exportação. A exportação não autoriza treinamento.
             </p>
           )}
+          {summary?.confirmed !== undefined && (
+            <ul aria-label="Resumo das revisões">
+              <li>Confirmados: {summary.confirmed}</li>
+              <li>Rejeitados: {summary.rejected}</li>
+              <li>Corrigidos: {summary.corrected}</li>
+              <li>Conflitos sem adjudicação: {summary.conflicts}</li>
+              <li>Grupos independentes entre elegíveis: {summary.independent_groups}</li>
+            </ul>
+          )}
           {data.entries.length === 0 && <p>Nenhuma revisão de ocorrência disponível.</p>}
           <ul>
             {data.entries.map((entry) => (

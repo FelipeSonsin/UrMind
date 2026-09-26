@@ -11,7 +11,7 @@ import {
   RiskExplanation,
 } from '../../components/public/Diagnosis';
 import { EventFeed } from '../../components/public/EventFeed';
-import { ScoutLivePanel } from '../../components/public/ScoutLivePanel';
+import { ScoutLivePanel, adapterFor } from '../../components/public/ScoutLivePanel';
 import { SystemStatusBar } from '../../components/public/SystemStatusBar';
 import {
   filterableClasses,
@@ -126,11 +126,14 @@ export function PublicHome({
   const [selected, setSelected] = useState<string | null>(null);
   const current = selected ?? events[0]?.id ?? null;
   const { data: detail } = useEventDetail(current, revision);
+  // Without a camera the Scout frame is an empty box; the map answers "where"
+  // and leads the page instead, and Scout shrinks to one line of status.
+  const cameraConnected = Boolean(adapterFor(scout));
+  const scoutReason = scout?.camera.reason ?? 'Nenhuma fonte de vídeo conectada a este ambiente.';
   return (
     <>
       <div className="page-heading public">
         <div>
-          <p className="eyebrow">CENTRO PÚBLICO DE INTELIGÊNCIA URBANA</p>
           <h1>O que o UrMind está vendo na cidade</h1>
           <p>
             Cada ocorrência abaixo foi detectada por visão computacional, situada na malha viária e
@@ -140,8 +143,10 @@ export function PublicHome({
         </div>
       </div>
       <SystemStatusBar status={status} error={error} />
-      <div className="command-grid">
-        <ScoutLivePanel scout={scout} latest={detail} />
+      <div className="home-lead">
+        <Suspense fallback={<p role="status">Carregando mapa…</p>}>
+          <UrbanMap events={events} selectedId={current} onSelect={setSelected} />
+        </Suspense>
         <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
           {loading && !detail ? (
             <Skeleton lines={5} />
@@ -167,9 +172,7 @@ export function PublicHome({
           )}
         </section>
       </div>
-      <Suspense fallback={<p role="status">Carregando mapa…</p>}>
-        <UrbanMap events={events} selectedId={current} onSelect={setSelected} />
-      </Suspense>
+      {cameraConnected && <ScoutLivePanel scout={scout} latest={detail} />}
       <div className="command-bottom">
         <EventFeed
           events={events}
@@ -187,6 +190,13 @@ export function PublicHome({
           )}
         </section>
       </div>
+      {!cameraConnected && (
+        <section className="panel scout-offline" aria-label="Câmera do Scout">
+          <strong>Câmera do Scout indisponível</strong>
+          <span>{scoutReason} As ocorrências acima continuam sendo publicadas.</span>
+          <a href="#/live">Ver estado do Scout</a>
+        </section>
+      )}
     </>
   );
 }

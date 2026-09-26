@@ -83,7 +83,7 @@ export function QuickDiagnosis({ event }: { event: PublicEventDetail }) {
   const severity = severityOf(event.risk?.severity);
   return (
     <div className="quick-diagnosis">
-      <p className="eyebrow">PROBLEMA DETECTADO</p>
+      <h3 className="section-label">Problema detectado</h3>
       <ExperimentalBadge stage={event.model_stage} />
       <h2>{labelFor(event.urmind_class)}</h2>
       <UrbanAnalysis event={event} />
@@ -170,7 +170,7 @@ export function RiskExplanation({ event }: { event: PublicEventDetail }) {
   return (
     <div className="explanation">
       <UrbanAnalysis event={event} />
-      <p className="eyebrow">POR QUE ESTA PRIORIDADE</p>
+      <h3 className="section-label">Por que esta prioridade</h3>
       <p className="explanation-head">
         Prioridade <strong>{priorityBand(risk.priority_score)}</strong>
         {risk.priority_score != null && <> ({risk.priority_score.toFixed(2)} de 1,00)</>} ·
@@ -246,7 +246,7 @@ export function RecommendedAction({ event }: { event: PublicEventDetail }) {
   const responsibility = event.responsibility;
   return (
     <div className="action-panel">
-      <p className="eyebrow">O QUE FAZER AGORA</p>
+      <h3 className="section-label">O que fazer agora</h3>
       <h3>{event.action ? event.action.label : 'Ação ainda não sugerida'}</h3>
       <dl className="data-list">
         <div>
@@ -282,7 +282,7 @@ export function PredictionPanel({ event }: { event: PublicEventDetail }) {
   const prediction = event.prediction;
   return (
     <div className="prediction-panel">
-      <p className="eyebrow">PREVISÃO</p>
+      <h3 className="section-label">Previsão</h3>
       {prediction.available ? (
         <>
           <h3>{prediction.task}</h3>

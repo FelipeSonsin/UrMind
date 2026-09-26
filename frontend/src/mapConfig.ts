@@ -13,9 +13,84 @@ export interface MapProvider {
 // authoritative country geometry in the backend, not this rectangle.
 export const BRAZIL_MAP_BOUNDS = [-75, -35, -28, 6] as const;
 
+// Bounding box of the IBGE country outline (public/geo/brasil.geojson, malha
+// "máxima"), including Fernando de Noronha; frames the whole country inside
+// the map slot at the minimum zoom.
+export const BRAZIL_OUTLINE_BOUNDS = [-74, -33.75, -32.4, 5.28] as const;
+export const BRAZIL_OUTLINE_URL = '/geo/brasil.geojson';
+export const BRAZIL_STATES_URL = '/geo/brasil-uf.geojson';
+
 export function isInBrazilMapViewport(latitude: number, longitude: number): boolean {
   const [west, south, east, north] = BRAZIL_MAP_BOUNDS;
   return latitude >= south && latitude <= north && longitude >= west && longitude <= east;
+}
+
+/** [lng, lat] ring; the first ring of a polygon is its shell, the rest are holes. */
+export type Ring = [number, number][];
+export type Polygon = Ring[];
+
+interface OutlineGeometry {
+  type: string;
+  coordinates?: unknown;
+}
+
+/** Flattens a GeoJSON FeatureCollection of (Multi)Polygons into polygons. */
+export function outlinePolygons(collection: {
+  features?: { geometry?: OutlineGeometry | null }[];
+}): Polygon[] {
+  return (collection.features ?? []).flatMap(({ geometry }): Polygon[] => {
+    if (geometry?.type === 'Polygon') return [geometry.coordinates as Polygon];
+    if (geometry?.type === 'MultiPolygon') return geometry.coordinates as Polygon[];
+    return [];
+  });
+}
+
+function ringContains(ring: Ring, longitude: number, latitude: number): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (
+      yi > latitude !== yj > latitude &&
+      longitude < ((xj - xi) * (latitude - yi)) / (yj - yi) + xi
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+/** Point-in-territory test that honours holes. */
+export function isInsidePolygons(
+  polygons: Polygon[],
+  latitude: number,
+  longitude: number,
+): boolean {
+  return polygons.some(
+    ([shell, ...holes]) =>
+      ringContains(shell, longitude, latitude) &&
+      !holes.some((hole) => ringContains(hole, longitude, latitude)),
+  );
+}
+
+/**
+ * Geometry covering everything outside the territory: the world with every
+ * shell cut out, plus each interior hole filled back in.
+ */
+export function outsideMask(polygons: Polygon[]) {
+  const world: Ring = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  return {
+    type: 'MultiPolygon' as const,
+    coordinates: [
+      [world, ...polygons.map(([shell]) => shell)],
+      ...polygons.flatMap(([, ...holes]) => holes.map((hole) => [hole])),
+    ],
+  };
 }
 
 const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';

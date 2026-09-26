@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
+import { liveModelDelivery } from './build/liveModel';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -16,6 +17,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       ...(devHttps ? [basicSsl()] : []),
       react(),
+      liveModelDelivery(env.LIVE_MODEL_ONNX_URL),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
@@ -32,11 +34,15 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
-          navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+          // ONNX Runtime (worker + .wasm) e pesos só descem quando a detecção ao vivo é usada.
+          globIgnores: ['**/liveDetection.worker-*.js'],
+          navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/models\//],
           // Somente o app shell: nunca guardar API, fotos privadas ou tiles no cache HTTP.
         },
       }),
     ],
+    // O bundle do ONNX Runtime resolve o .wasm por import.meta.url: worker precisa ser ES module.
+    worker: { format: 'es' },
     server: { proxy },
     preview: { proxy },
   };

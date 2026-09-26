@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "model_id": "yolox-s-model-v2",
+  "model_version": "yolox-s-model-v2-d429bde8a9bd",
+  "scientific_status": "EXPERIMENTAL",
+  "use_authorized": true,
+  "distribution_authorized": true,
+  "authorization_ref": "docs/LIVE_DETECTION.md#autorizacao-de-uso-e-distribuicao-25092026",
+  "onnx": {
+    "path": "/models/yolox-s-model-v2-d429bde8a9bd.onnx",
+    "sha256": "d429bde8a9bd76ced404124d6fdb733914ed74688e14836200ef183f82a510e9",
+    "size_bytes": 35855173
+  },
+  "input": {
+    "name": "images",
+    "size": [
+      640,
+      640
+    ],
+    "layout": "NCHW",
+    "dtype": "float32",
+    "color": "BGR",
+    "range": "0..255",
+    "normalization": "none",
+    "letterbox": {
+      "pad_value": 114,
+      "anchor": "top-left",
+      "upscale": false
+    }
+  },
+  "output": {
+    "name": "output",
+    "format": "yolox_decoded_cxcywh_obj_cls"
+  },
+  "class_names": [
+    "URMIND_ROAD_D00",
+    "URMIND_ROAD_D10",
+    "URMIND_ROAD_D20",
+    "URMIND_ROAD_D40"
+  ],
+  "postprocess": {
+    "score_threshold": 0.03,
+    "nms_threshold": 0.45,
+    "nms": "per_class",
+    "max_detections": 100,
+    "class_score_thresholds": [
+      0.03,
+      0.2,
+      0.07,
+      0.2
+    ]
+  },
+  "provenance": {
+    "registration_manifest_sha256": "99ebb69ec69b163987a11d3a4027f3c90c28eec00da01c6406cbda455eb20667",
+    "closure_manifest_sha256": null,
+    "contract_sha256": "d39999a2a94ea3ebe40bc19da92bf7ff94d98865191b1c8ac2a657d10d6d1d2c"
+  },
+  "inference_profile": {
+    "sha256": "2702eb15a291ec6b6a87b5fa2091d95d68bfd8a29dedc211f525f7eab458c2a0",
+    "calibration_sha256": "b4cf9bf6013bba8b7842128aa826a770be6b86faee2591e4d3d16e2f461cb0a9"
+  }
+}

@@ -115,3 +115,48 @@ export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Pr
     bitmap.close();
   }
 }
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_PIXELS = 40_000_000;
+const CAMERA_MAX_SIDE = 4032;
+
+/**
+ * Phone cameras can exceed the 10 MB / 40 MP upload limits. A photo taken now
+ * is re-encoded to fit: its location comes from the device GPS, so the EXIF
+ * lost on re-encoding carries nothing the report needs. Gallery photos are
+ * never resized here, because their EXIF GPS is the evidence of where they were taken.
+ */
+export async function fitCameraPhoto(file: File): Promise<File> {
+  if (file.size <= MAX_UPLOAD_BYTES * 0.95) {
+    let bitmap: ImageBitmap | null = null;
+    try {
+      bitmap = await createImageBitmap(file);
+      if (bitmap.width * bitmap.height <= MAX_UPLOAD_PIXELS) return file;
+    } catch {
+      return file; // validatePhoto reports unreadable images with its own message.
+    } finally {
+      bitmap?.close();
+    }
+  }
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return file;
+  }
+  try {
+    const scale = Math.min(1, CAMERA_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.88),
+    );
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, '') || 'foto';
+    return new File([blob], `${name}.jpg`, { type: 'image/jpeg', lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+}

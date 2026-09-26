@@ -338,10 +338,12 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
   await expect(page.getByText('private-fixture')).toBeVisible();
   await page.getByRole('link', { name: 'Ver registro' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/eventos/${EVENT_ID}$`));
-  await expect(page.getByText('Relatório interno de teste')).toBeVisible();
+  // Sem revisão humana ainda: relatório, severidade e prioridade ficam ocultos ao revisor.
+  await expect(page.getByText('Oculto até a decisão humana').first()).toBeVisible();
+  await expect(page.getByText('Relatório interno de teste')).toHaveCount(0);
   await expect(page.getByText('ANÁLISE EXPERIMENTAL', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('Relatório interno de teste')).toBeVisible();
+  await expect(page.getByText('Oculto até a decisão humana').first()).toBeVisible();
   for (const [path, heading] of [
     ['dashboard', 'Painel interno'],
     ['reviews', 'Ocorrências urbanas'],

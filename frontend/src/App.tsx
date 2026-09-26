@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Map,
   Radio,
+  ScanEye,
   ScanLine,
   Settings2,
 } from 'lucide-react';
@@ -47,6 +48,9 @@ import { publicApi } from './services/publicApi';
 
 const CapturePage = lazy(() =>
   import('./pages/CapturePage').then((m) => ({ default: m.CapturePage })),
+);
+const LiveDetectionPage = lazy(() =>
+  import('./pages/LiveDetectionPage').then((m) => ({ default: m.LiveDetectionPage })),
 );
 const UrbanMap = lazy(() => import('./components/UrbanMap'));
 const EventsPage = lazy(() =>
@@ -112,6 +116,13 @@ const navigation = [
     label: 'Registrar evidência',
     icon: Camera,
     href: '#/capture',
+    section: 'operação',
+  },
+  {
+    id: 'live-detection',
+    label: 'Detecção ao vivo',
+    icon: ScanEye,
+    href: '#/deteccao-ao-vivo',
     section: 'operação',
   },
   {
@@ -761,7 +772,7 @@ export default function App() {
           ESPAÇO DE TRABALHO <span>V1</span>
         </div>
         <nav aria-label="Navegação principal">
-          {(['overview', 'capture', 'my-reports', 'map'] as const)
+          {(['overview', 'capture', 'live-detection', 'my-reports', 'map'] as const)
             .map((id) => navigation.find((item) => item.id === id))
             .filter((item): item is NonNullable<typeof item> => item != null)
             .map((item) => (
@@ -1243,6 +1254,17 @@ export default function App() {
                   navigate('drafts');
                   await reloadDrafts();
                   await send(saved);
+                }}
+              />
+            )}
+            {page === 'live-detection' && (
+              // Remontada por sessão: logout ou troca de conta encerra câmera e modelo.
+              <LiveDetectionPage
+                key={session?.user.id ?? 'no-session'}
+                onOpenDraft={async (draft) => {
+                  setEditing(draft);
+                  navigate('capture');
+                  await reloadDrafts();
                 }}
               />
             )}
