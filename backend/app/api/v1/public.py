@@ -40,6 +40,8 @@ from app.repositories.core import (
 from app.schemas.issue_taxonomy import taxonomy_payload
 from app.schemas.public import (
     ActionPublic,
+    AddressSearchPublic,
+    AddressSearchRequest,
     DetectionPublic,
     EventDetailPublic,
     EventSummaryPublic,
@@ -51,7 +53,9 @@ from app.schemas.public import (
     TransparencyPublic,
 )
 from app.services import public_view
+from app.services.context import STATUS_OK, NominatimSearch
 from app.services.core import CoreService, EventNotFoundError
+from app.services.external_sources.http import ExternalHttpClient
 from app.services.report import build_urban_analysis
 from app.services.storage import (
     MAX_BYTES,
@@ -463,6 +467,43 @@ async def public_event_image(
         media_type="image/jpeg",
         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+async def address_search_provider(request: Request) -> AsyncIterator[NominatimSearch]:
+    database = getattr(request.app.state, "database", None)
+    if database is None:
+        raise HTTPException(status_code=503, detail="Busca de endereço indisponível")
+    async with ExternalHttpClient(
+        user_agent=get_settings().external_http_user_agent, timeout_seconds=4, max_attempts=1
+    ) as client:
+        yield NominatimSearch(client, sessions=database.sessionmaker)
+
+
+@router.post("/geocode", response_model=AddressSearchPublic)
+async def search_address(
+    payload: AddressSearchRequest,
+    provider: Annotated[NominatimSearch, Depends(address_search_provider)],
+    response: Response,
+) -> AddressSearchPublic:
+    """Rua, número, bairro ou CEP → lugares sugeridos no Brasil (Nominatim/OSM).
+
+    Uma busca por pedido explícito, sob o mesmo limite de 1 req/s do reverse; nunca
+    grava nem registra o texto digitado.
+    """
+    try:
+        result = await provider.search(payload.query)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Digite rua, número, bairro ou CEP.") from None
+    if result.status != STATUS_OK:
+        if result.error == "address_pending":
+            raise HTTPException(
+                status_code=429,
+                detail="Busca ocupada. Tente de novo em instantes.",
+                headers={"Retry-After": "2"},
+            )
+        raise HTTPException(status_code=503, detail="Busca de endereço indisponível no momento.")
+    response.headers["Cache-Control"] = "private, no-store"
+    return AddressSearchPublic.model_validate(result.data)
 
 
 @router.get("/taxonomy", response_model=IssueTaxonomyPublic)

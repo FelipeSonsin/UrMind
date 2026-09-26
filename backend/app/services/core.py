@@ -1179,12 +1179,49 @@ class CoreService:
             after=after,
             event_hash=digest,
         )
+        if event.status == EventStatus.CONFIRMED.value:
+            await self._publish_confirmed_marker(event, review_id=review.id, reviewer=reviewer)
         return {
             "review_id": review.id,
             "event_id": event_id,
             "status": event.status,
             "ground_truth_status": resolution["status"],
         }
+
+    async def _publish_confirmed_marker(
+        self, event: Any, *, review_id: uuid.UUID, reviewer: str
+    ) -> None:
+        """Ocorrência confirmada pela Review aparece no mapa público, na mesma transação.
+
+        Publica só o marcador (tipo, gravidade, local). A foto pública continua exigindo
+        a publicação explícita com inspeção de privacidade (`POST /events/{id}/publication`):
+        nenhuma cópia é criada aqui e uma cópia de Review anterior deixa de valer. Uma
+        retirada explícita feita por revisor não é desfeita automaticamente. Detecção de
+        modelo nunca publica nada: só a Review confirmada chega aqui.
+        """
+        assert self.decisions is not None
+        factors = getattr(event, "factors", None) or {}
+        before = dict(factors.get("publication") or {})
+        if before.get("status") == "withdrawn":
+            return
+        publication = {
+            "policy_version": "urmind-publication-v1",
+            "status": "published",
+            "reviewer": reviewer,
+            "review_id": str(review_id),
+            "published_at": datetime.now(UTC).isoformat(),
+            "trigger": "review_confirmed",
+        }
+        event.factors = {**factors, "publication": publication}
+        await self.decisions.add_audit(
+            operation="auto_publish_marker",
+            entity_type="event",
+            entity_id=event.id,
+            actor=reviewer,
+            before=before,
+            after=publication,
+            event_hash=f"publication-{uuid.uuid4()}",
+        )
 
     async def event_location(self, event_id: uuid.UUID) -> dict[str, Any] | None:
         """Coordenada original e instante: o que os providers de contexto precisam."""

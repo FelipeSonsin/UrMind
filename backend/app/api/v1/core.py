@@ -1124,6 +1124,8 @@ async def capture_review_detail(
         "human_review": (capture.quality or {}).get("human_review"),
         "additional_evidence": (capture.quality or {}).get("additional_evidence"),
         "location_conflict": (capture.quality or {}).get("location_conflict", False),
+        # Sugestão zero-shot não calibrada; só a revisão vê e só o revisor decide a classe.
+        "urban_auxiliary": ((capture.quality or {}).get("inference") or {}).get("urban_auxiliary"),
         "events": [
             {
                 "id": e.id,

@@ -242,7 +242,7 @@ TEMPLATE_NAME = "event_report_pt_br.j2"
 CLASS_LABELS: dict[UrmindClass, str] = {
     UrmindClass.ROAD_D00: "trinca longitudinal no pavimento",
     UrmindClass.ROAD_D10: "trinca transversal no pavimento",
-    UrmindClass.ROAD_D20: "trinca em malha (couro de jacaré) no pavimento",
+    UrmindClass.ROAD_D20: "trinca em malha no pavimento",
     UrmindClass.ROAD_D40: "buraco no pavimento",
     UrmindClass.MANHOLE: "tampa de poço de visita",
     UrmindClass.SIDEWALK: "calçada danificada",

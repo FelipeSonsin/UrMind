@@ -816,3 +816,56 @@ def test_api_analysis_evidence_requires_persisted_identity_and_time(client, with
     else:
         assert analysis["severity"] is None
         assert analysis["potential_consequences"] == []
+
+
+def test_address_search_posts_query_and_maps_busy_and_invalid(client):
+    from app.api.v1 import public as public_api
+    from app.services.context import STATUS_OK, STATUS_UNAVAILABLE, ContextResult
+
+    outcomes = iter(
+        [
+            ContextResult(
+                "nominatim_search",
+                STATUS_OK,
+                NOW.isoformat(),
+                {},
+                data={
+                    "results": [
+                        {
+                            "label": "Rua Galvão Bueno, 868",
+                            "detail": "Liberdade, São Paulo - São Paulo",
+                            "latitude": -23.5605,
+                            "longitude": -46.6356,
+                        }
+                    ],
+                    "attribution": "© OpenStreetMap contributors (ODbL 1.0)",
+                },
+            ),
+            ContextResult(
+                "nominatim_search", STATUS_UNAVAILABLE, NOW.isoformat(), {}, error="address_pending"
+            ),
+        ]
+    )
+    seen: list[str] = []
+
+    class Provider:
+        async def search(self, text: str):
+            seen.append(text)
+            if text == "ab!":
+                raise ValueError("endereço inválido")
+            return next(outcomes)
+
+    client.app.dependency_overrides[public_api.address_search_provider] = lambda: Provider()
+    try:
+        found = client.post("/api/v1/public/geocode", json={"query": "Rua Galvão Bueno 868"})
+        assert found.status_code == 200
+        assert found.headers["cache-control"] == "private, no-store"
+        assert found.json()["results"][0]["label"] == "Rua Galvão Bueno, 868"
+        busy = client.post("/api/v1/public/geocode", json={"query": "Rua Galvão Bueno 868"})
+        assert (busy.status_code, busy.headers["retry-after"]) == (429, "2")
+        assert client.post("/api/v1/public/geocode", json={"query": "ab!"}).status_code == 422
+        # O texto digitado nunca vai na URL (fica fora dos logs de acesso).
+        assert client.get("/api/v1/public/geocode?query=Rua").status_code == 405
+        assert seen == ["Rua Galvão Bueno 868", "Rua Galvão Bueno 868", "ab!"]
+    finally:
+        client.app.dependency_overrides.pop(public_api.address_search_provider)

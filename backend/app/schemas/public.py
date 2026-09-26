@@ -317,3 +317,24 @@ class IssueTaxonomyEntryPublic(PublicModel):
 class IssueTaxonomyPublic(PublicModel):
     taxonomy_version: str
     issues: list[IssueTaxonomyEntryPublic]
+
+
+class AddressSearchRequest(BaseModel):
+    """Endereço digitado; vai no corpo para não aparecer em logs de acesso."""
+
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=3, max_length=200)
+
+
+class AddressResultPublic(PublicModel):
+    label: str
+    detail: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class AddressSearchPublic(PublicModel):
+    """Sugestões de lugar; a coordenada do relato é o ponto que a pessoa confirma."""
+
+    results: list[AddressResultPublic]
+    attribution: str

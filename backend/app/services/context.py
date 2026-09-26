@@ -158,7 +158,15 @@ class ContextProvider:
     async def fetch(
         self, latitude: float, longitude: float, occurred_at: datetime
     ) -> ContextResult:
-        key = self.cache_key(latitude, longitude, occurred_at)
+        return await self._cached(
+            self.cache_key(latitude, longitude, occurred_at),
+            lambda: self.query(latitude, longitude, occurred_at),
+        )
+
+    async def _cached(
+        self, key: Any, call: Callable[[], Awaitable[dict[str, Any]]]
+    ) -> ContextResult:
+        """Cache em processo + proveniência; falha nunca entra no cache."""
         cached = self.cache.get(key)
         if cached is not None:
             return ContextResult(
@@ -178,7 +186,7 @@ class ContextProvider:
             "cache": "miss",
         }
         try:
-            data = await self.query(latitude, longitude, occurred_at)
+            data = await call()
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             if correlation_id := self.client.correlation_id:
                 provenance["correlation_id"] = correlation_id
@@ -235,9 +243,18 @@ class NominatimReverse(ContextProvider):
     ) -> ContextResult:
         if self.sessions is None:
             return await super().fetch(latitude, longitude, occurred_at)
-        key = hashlib.sha256(
-            repr(self.cache_key(latitude, longitude, occurred_at)).encode()
-        ).hexdigest()
+        return await self._shared(
+            hashlib.sha256(
+                repr(self.cache_key(latitude, longitude, occurred_at)).encode()
+            ).hexdigest(),
+            lambda: ContextProvider.fetch(self, latitude, longitude, occurred_at),
+        )
+
+    async def _shared(
+        self, key: str, call: Callable[[], Awaitable[ContextResult]]
+    ) -> ContextResult:
+        """Cache no banco e um único lease Nominatim para API e Worker juntos."""
+        assert self.sessions is not None
         token = uuid.uuid4()
         repository = GeocodingRepository(self.sessions)
         try:
@@ -257,7 +274,7 @@ class NominatimReverse(ContextProvider):
             try:
                 # No retries inside the lease: each network attempt needs its own slot.
                 async with asyncio.timeout(10):
-                    result = await super().fetch(latitude, longitude, occurred_at)
+                    result = await call()
                 if result.status == STATUS_OK:
                     payload = {"source": result.source, **result.as_payload()}
                     await repository.cache(key, payload)
@@ -278,28 +295,32 @@ class NominatimReverse(ContextProvider):
     def _lock(cls) -> asyncio.Lock:
         # Uma trava por event loop: asyncio.Lock não pode ser compartilhado entre loops.
         loop_id = id(asyncio.get_running_loop())
-        return cls._locks.setdefault(loop_id, asyncio.Lock())
+        return NominatimReverse._locks.setdefault(loop_id, asyncio.Lock())
 
-    async def query(
-        self, latitude: float, longitude: float, occurred_at: datetime
-    ) -> dict[str, Any]:
+    async def _throttled_get(self, url: str, params: dict[str, Any]) -> Any:
+        """No máximo 1 requisição por segundo ao Nominatim, reverse e busca somados."""
         async with NominatimReverse._lock():
             wait = 1.0 - (time.monotonic() - NominatimReverse._last_request)
             if wait > 0:
                 await asyncio.sleep(wait)
             NominatimReverse._last_request = time.monotonic()
-            body = await self._get_json(
-                self.url,
-                params={
-                    "lat": latitude,
-                    "lon": longitude,
-                    "format": "jsonv2",
-                    "zoom": 18,
-                    "addressdetails": 1,
-                },
-                headers={"Accept-Language": "pt-BR"},
-                attempts=1,
+            return await self._get_json(
+                url, params=params, headers={"Accept-Language": "pt-BR"}, attempts=1
             )
+
+    async def query(
+        self, latitude: float, longitude: float, occurred_at: datetime
+    ) -> dict[str, Any]:
+        body = await self._throttled_get(
+            self.url,
+            {
+                "lat": latitude,
+                "lon": longitude,
+                "format": "jsonv2",
+                "zoom": 18,
+                "addressdetails": 1,
+            },
+        )
         if "error" in body:
             raise ValueError("nominatim sem resultado")
         address = body.get("address") or {}
@@ -315,6 +336,87 @@ class NominatimReverse(ContextProvider):
             "attribution": OSM_ATTRIBUTION,
             "is_coordinate_source": False,
         }
+
+
+_CEP = re.compile(r"\d{5}-?\d{3}")
+
+
+def address_query(text: str) -> str:
+    """Endereço digitado pela pessoa, normalizado; vazio, curto ou sem letras/números é recusado."""
+    query = " ".join((text or "").split()).strip(" ,;")
+    if not 3 <= len(query) <= 200 or not re.search(r"[0-9A-Za-zÀ-ÿ]{2}", query):
+        raise ValueError("endereço inválido")
+    return query
+
+
+class NominatimSearch(NominatimReverse):
+    """Busca de rua, número, bairro ou CEP digitados — só no Brasil.
+
+    Mesmo Nominatim, User-Agent, cache no banco, lease e trava de 1 req/s do reverse
+    (os dois somados). A política pública do Nominatim proíbe autocompletar a cada
+    tecla: o cliente só chama esta busca quando a pessoa pede. O resultado é sugestão
+    de lugar; a coordenada da Capture continua sendo o ponto que a pessoa confirma.
+    """
+
+    source = "nominatim_search"
+    cache = TTLCache(ttl_s=24 * 3600)
+
+    def __init__(
+        self,
+        client: httpx.AsyncClient | ExternalHttpClient,
+        *,
+        base_url: str | None = None,
+        sessions: async_sessionmaker[AsyncSession] | None = None,
+    ) -> None:
+        super().__init__(client, base_url=base_url, sessions=sessions)
+        self.url = self.url.removesuffix("/reverse") + "/search"
+
+    async def search(self, text: str) -> ContextResult:
+        query = address_query(text)
+        key = (self.url, "search", query.casefold())
+
+        async def cached() -> ContextResult:
+            return await self._cached(key, lambda: self._search(query))
+
+        if self.sessions is None:
+            return await cached()
+        return await self._shared(hashlib.sha256(repr(key).encode()).hexdigest(), cached)
+
+    async def _search(self, query: str) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "format": "jsonv2",
+            "countrycodes": "br",
+            "limit": 5,
+            "addressdetails": 1,
+        }
+        if _CEP.fullmatch(query):
+            digits = query.replace("-", "")
+            params["postalcode"] = f"{digits[:5]}-{digits[5:]}"
+        else:
+            params["q"] = query
+        body = await self._throttled_get(self.url, params)
+        if not isinstance(body, list):
+            raise TypeError("nominatim search sem lista")
+        return {
+            "results": [_search_result(item) for item in body[:5]],
+            "attribution": OSM_ATTRIBUTION,
+        }
+
+
+def _search_result(item: dict[str, Any]) -> dict[str, Any]:
+    address = item.get("address") or {}
+    road = address.get("road") or address.get("pedestrian") or address.get("neighbourhood")
+    label = ", ".join(part for part in (road, address.get("house_number")) if part)
+    area = address.get("suburb") or address.get("neighbourhood") or address.get("quarter")
+    city = address.get("city") or address.get("town") or address.get("municipality")
+    place = " - ".join(part for part in (city, address.get("state")) if part)
+    detail = ", ".join(part for part in (area if area != road else None, place) if part)
+    return {
+        "label": label or str(item["display_name"]).split(",")[0],
+        "detail": detail,
+        "latitude": float(item["lat"]),
+        "longitude": float(item["lon"]),
+    }
 
 
 class OverpassPois(ContextProvider):

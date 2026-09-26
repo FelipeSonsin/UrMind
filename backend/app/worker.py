@@ -21,6 +21,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -40,6 +41,7 @@ from app.services.context import NominatimReverse, OpenMeteoRain, gather_context
 from app.services.core import CoreService
 from app.services.external_sources.http import ExternalHttpClient
 from app.services.external_sources.sidra import municipal_population_query
+from app.services.photo_reference import urban_auxiliary_safe
 from app.services.storage import StorageClient, StorageError
 
 log = structlog.get_logger()
@@ -326,6 +328,7 @@ class Worker:
                         detector = self._detector_for(model)
                     except ImportError as exc:
                         raise ModelNotAvailableError("runtime ONNX indisponível") from exc
+                    auxiliary: dict[str, Any] | None = None
                     if not await queue.has_detections_from(capture_id, model.id):
                         if not capture.storage_path:
                             raise ValueError("captura sem storage_path")
@@ -340,6 +343,9 @@ class Worker:
                             )
                         except ImportError as exc:
                             raise ModelNotAvailableError("runtime YOLOX indisponível") from exc
+                        # Categorias urbanas fora do YOLOX: só sugestão interna para a
+                        # revisão (nunca Detection, Event ou publicação); falha não para nada.
+                        auxiliary = await asyncio.to_thread(urban_auxiliary_safe, image)
                         if self._max_detections is not None:
                             # Same cap as the browser profile, highest scores first.
                             found = sorted(found, key=lambda d: -d.confidence)[
@@ -399,6 +405,7 @@ class Worker:
                             "event_ids": [str(item) for item in event_ids],
                             "context_done_event_ids": [],
                             "latency_ms": round((time.perf_counter() - started) * 1000),
+                            **({"urban_auxiliary": auxiliary} if auxiliary else {}),
                             "detection_completed_at": datetime.now(UTC).isoformat(),
                         },
                     )

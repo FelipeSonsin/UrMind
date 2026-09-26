@@ -240,7 +240,7 @@ ISSUES: tuple[IssueDefinition, ...] = (
     ),
     _road(
         UrmindClass.ROAD_D20,
-        "Trinca em malha (couro de jacaré)",
+        "Trinca em malha",
         "Alligator crack",
         "Rede de fissuras interligadas formando blocos pequenos.",
         ("área de fissuras em malha",),

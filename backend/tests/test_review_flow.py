@@ -358,6 +358,105 @@ async def test_service_preserves_inference_and_audits_conflict() -> None:
     assert audit[0]["after"]["ground_truth_status"] == "conflicted"
 
 
+def _publication_service(event, audit):
+    class Events:
+        async def get_for_review(self, event_id):
+            return event
+
+        async def coordinates(self, event_id):
+            return {"latitude": -23.5, "longitude": -46.6}
+
+        async def set_status(self, item, status):
+            item.status = status
+
+    class Decisions:
+        async def review_votes(self, event_id):
+            return []
+
+        async def add_review(self, **kwargs):
+            return SimpleNamespace(
+                id=uuid4(),
+                decision=kwargs["decision"],
+                corrected_class=kwargs["corrected_class"],
+                order_source="serialized_commit_order",
+            )
+
+        async def add_audit(self, **kwargs):
+            audit.append(kwargs)
+
+    return CoreService(SimpleNamespace(), Events(), Decisions())
+
+
+@pytest.mark.asyncio
+async def test_confirmed_review_publishes_the_marker_without_the_photo() -> None:
+    old_photo = {"storage_path": "public-derived/x/old.jpg", "review_id": "old-review"}
+    event = SimpleNamespace(
+        id=uuid4(),
+        status="detected",
+        urmind_class="URMIND_ROAD_D40",
+        factors={
+            "risk": {"level": "high"},
+            "publication": {
+                "policy_version": "urmind-publication-v1",
+                "status": "published",
+                "review_id": "old-review",
+                "public_image": old_photo,
+            },
+        },
+    )
+    audit: list[dict] = []
+    result = await _publication_service(event, audit).review_event(
+        event.id,
+        ReviewCreate(decision=ReviewDecision.CONFIRM, adjudicate=True),
+        reviewer="admin-1",
+        reviewer_role="admin",
+    )
+    assert event.status == "confirmed"
+    publication = event.factors["publication"]
+    # Same rule the public map reads: confirmed Event + publication bound to the
+    # latest Review by the same reviewer. The photo needs its own privacy step.
+    assert publication["policy_version"] == "urmind-publication-v1"
+    assert publication["status"] == "published"
+    assert publication["review_id"] == str(result["review_id"])
+    assert publication["reviewer"] == "admin-1"
+    assert publication["trigger"] == "review_confirmed"
+    assert "public_image" not in publication
+    assert event.factors["risk"] == {"level": "high"}
+    assert [entry["operation"] for entry in audit] == ["review", "auto_publish_marker"]
+
+
+@pytest.mark.asyncio
+async def test_rejection_or_open_review_never_publishes_and_withdrawal_sticks() -> None:
+    rejected = SimpleNamespace(
+        id=uuid4(), status="detected", urmind_class="URMIND_ROAD_D00", factors={}
+    )
+    await _publication_service(rejected, []).review_event(
+        rejected.id,
+        ReviewCreate(decision=ReviewDecision.REJECT, adjudicate=True),
+        reviewer="admin-1",
+        reviewer_role="admin",
+    )
+    assert rejected.status == "rejected"
+    assert "publication" not in rejected.factors
+    # A reviewer who withdrew the marker keeps that decision; a new confirmation
+    # does not silently republish it.
+    withdrawn = {"policy_version": "urmind-publication-v1", "status": "withdrawn"}
+    kept = SimpleNamespace(
+        id=uuid4(),
+        status="detected",
+        urmind_class="URMIND_ROAD_D00",
+        factors={"publication": withdrawn},
+    )
+    await _publication_service(kept, []).review_event(
+        kept.id,
+        ReviewCreate(decision=ReviewDecision.CONFIRM, adjudicate=True),
+        reviewer="admin-1",
+        reviewer_role="admin",
+    )
+    assert kept.status == "confirmed"
+    assert kept.factors["publication"] == withdrawn
+
+
 def test_lote_tem_manifesto_com_hash_e_sem_retreino(tmp_path) -> None:
     manifest = write_batch([candidate_record(ROW)], tmp_path)
     data = (tmp_path / manifest["file"]).read_bytes()

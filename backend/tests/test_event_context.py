@@ -32,6 +32,7 @@ WHEN = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
 def fresh_caches(monkeypatch):
     for provider in (
         NominatimReverse,
+        context_module.NominatimSearch,
         OverpassPois,
         OpenMeteoRain,
         context_module.GeoSampaSidewalks,
@@ -568,3 +569,73 @@ async def test_worker_connects_configured_sidra_to_event_context(monkeypatch) ->
     assert captured["sidra_query"].territorial_id == "3550308"
     assert [result.source for result in applied] == ["ibge_sidra"]
     assert capture.quality["inference"]["context_done_event_ids"] == [str(event_id)]
+
+
+_SEARCH_HIT = [
+    {
+        "lat": "-23.5568",
+        "lon": "-46.6392",
+        "display_name": "Avenida da Liberdade, 532, Liberdade, São Paulo, SP, 01502-001, Brasil",
+        "address": {
+            "road": "Avenida da Liberdade",
+            "house_number": "532",
+            "suburb": "Liberdade",
+            "city": "São Paulo",
+            "state": "São Paulo",
+            "postcode": "01502-001",
+        },
+        "osm_type": "way",
+        "osm_id": 1,
+    }
+]
+
+
+@pytest.mark.asyncio
+async def test_busca_de_endereco_usa_nominatim_no_brasil_e_cache() -> None:
+    from app.services.context import NominatimSearch
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=_SEARCH_HIT)
+
+    async with _client(handler) as client:
+        provider = NominatimSearch(client)
+        first = await provider.search("  Av. da Liberdade,   532 ")
+        second = await provider.search("av. da liberdade, 532")
+    assert len(calls) == 1
+    params = calls[0].url.params
+    assert calls[0].url.path.endswith("/search")
+    assert params["q"] == "Av. da Liberdade, 532"
+    assert (params["countrycodes"], params["format"], params["limit"]) == ("br", "jsonv2", "5")
+    assert calls[0].headers["Accept-Language"].startswith("pt-BR")
+    assert first.status == STATUS_OK and second.provenance["cache"] == "hit"
+    [result] = first.data["results"]
+    assert result == {
+        "label": "Avenida da Liberdade, 532",
+        "detail": "Liberdade, São Paulo - São Paulo",
+        "latitude": -23.5568,
+        "longitude": -46.6392,
+    }
+    assert "OpenStreetMap" in first.data["attribution"]
+
+
+@pytest.mark.asyncio
+async def test_busca_por_cep_usa_campo_postal_e_consulta_invalida_e_recusada() -> None:
+    from app.services.context import NominatimSearch, address_query
+
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=[])
+
+    async with _client(handler) as client:
+        empty = await NominatimSearch(client).search("01502001")
+    assert calls[0].url.params["postalcode"] == "01502-001"
+    assert "q" not in calls[0].url.params
+    assert empty.status == STATUS_OK and empty.data["results"] == []
+    for bad in ("", "  ", "ab", "!!!", "x" * 201):
+        with pytest.raises(ValueError):
+            address_query(bad)
