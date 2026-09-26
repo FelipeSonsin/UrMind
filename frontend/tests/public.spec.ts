@@ -402,15 +402,12 @@ test('sem ocorrência publicada, a página inicial convida a registrar e não pa
     page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
   ).toBeVisible();
 
-  const diagnosis = page.getByLabel('Diagnóstico da ocorrência selecionada');
-  await expect(
-    diagnosis.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
-  ).toBeVisible();
-  await expect(
-    diagnosis.getByRole('link', { name: 'Registrar a primeira evidência' }),
-  ).toBeVisible();
-  await expect(page.getByText('Nenhuma ocorrência publicada ainda.')).toBeVisible();
-  await expect(page.getByLabel('Ocorrências recentes')).toContainText('0 registros');
+  // Um aviso só, sobre o mapa: sem painel lateral vazio nem lista vazia repetindo o mesmo.
+  await expect(page.getByText('Nenhuma ocorrência publicada ainda.')).toHaveCount(1);
+  await expect(page.getByLabel('Diagnóstico da ocorrência selecionada')).toHaveCount(0);
+  await expect(page.getByLabel('Ocorrências recentes')).toHaveCount(0);
+  await expect(page.locator('.map canvas')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Registrar evidência' }).first()).toBeVisible();
   await expect(page.locator('main')).not.toContainText('Scout');
   // Nenhum número aparece sem origem: zero é zero, não um traço decorativo.
   await expect(page.locator('body')).not.toContainText('NaN');

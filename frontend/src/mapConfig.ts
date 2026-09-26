@@ -107,9 +107,8 @@ export function localizedLabelField(textField: unknown): unknown[] | null {
   return JSON.stringify(textField ?? null).includes('"name_en"') ? LOCAL_LABEL_FIELD : null;
 }
 
-// Base escura, no tom do UrMind; o fallback CARTO segue a mesma escolha.
-const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/dark';
-const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const OPENFREE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const CARTO_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 const OPENFREE_ATTRIBUTION = 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap';
 const CARTO_ATTRIBUTION = '© OpenStreetMap contributors, © CARTO';
 

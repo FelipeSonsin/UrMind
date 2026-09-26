@@ -518,7 +518,6 @@ export default function UrbanMap({
   const primaryProvider = resolveMapProvider(mapEnvironment);
   const cartoFallback = resolveMapProvider(mapEnvironment, 'carto');
   const style = primaryProvider.styleUrl;
-  const [activeAttribution, setActiveAttribution] = useState(primaryProvider.attribution);
 
   // Points outside the IBGE outline would sit invisible under the mask while
   // still being counted as "visíveis"; they are left out of the map instead.
@@ -581,7 +580,8 @@ export default function UrbanMap({
             }
           : { bounds: BRAZIL_FIT, fitBoundsOptions: { padding: BRAZIL_PADDING } }),
         renderWorldCopies: false,
-        attributionControl: { compact: true },
+        // Crédito OSM/OpenFreeMap no canto do mapa; compacto em tela estreita.
+        attributionControl: {},
       });
       mapRef.current = map;
       // The minimum zoom always shows the whole country inside the slot, and
@@ -602,7 +602,6 @@ export default function UrbanMap({
       lockToBrazil();
       map.on('resize', lockToBrazil);
       basemapIsDark = isDarkBasemap(style);
-      setActiveAttribution(primaryProvider.attribution);
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
       map.addControl(
         new maplibregl.GeolocateControl({
@@ -621,7 +620,6 @@ export default function UrbanMap({
           fallbackUsed = true;
           basemapIsDark = isDarkBasemap(cartoFallback.styleUrl);
           map?.setStyle(cartoFallback.styleUrl);
-          setActiveAttribution(cartoFallback.attribution);
           setError(
             'Base cartográfica principal indisponível; usando o fallback CARTO configurado.',
           );
@@ -1064,7 +1062,8 @@ export default function UrbanMap({
           <small>Toque no local da foto ou mova o mapa até ele e marque o centro.</small>
         </div>
       )}
-      <div className="map-footer" hidden={pickMode}>
+      {/* Nada a listar nem exportar: sem rodapé vazio. */}
+      <div className="map-footer" hidden={pickMode || (!located.length && !allowExport)}>
         {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
         <details className="map-point-list">
           <summary>Lista acessível de pontos ({located.length})</summary>
@@ -1138,9 +1137,7 @@ export default function UrbanMap({
           </div>
         )}
         {/* Crédito da base cartográfica, compacto e sempre presente. */}
-        <p className="map-caption">{activeAttribution}</p>
       </div>
-      {pickMode && <p className="map-caption map-footer">{activeAttribution}</p>}
       {error && (
         <p role="alert" className="notice">
           {error}

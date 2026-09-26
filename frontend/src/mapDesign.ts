@@ -40,21 +40,20 @@ export const MAP_DESIGN = {
   },
 
   /**
-   * Cores do entorno e das linhas, pela base cartográfica: `dark` para base escura
-   * (padrão, igual ao tema do UrMind), `light` quando uma base clara é configurada.
-   * O entorno fora do Brasil é sempre a superfície do painel.
+   * Cores do entorno e das linhas, pela base cartográfica: `light` para a base colorida
+   * padrão (OpenFreeMap liberty), `dark` só quando uma base escura é configurada.
    */
   colors: {
     light: {
-      /** Tudo fora do Brasil — igual à superfície do painel. */
-      mask: '#121f1a',
+      /** Tudo fora do Brasil: cinza-claro neutro, sem competir com o mapa. */
+      mask: '#eef1ec',
       /** Fronteira nacional. */
-      border: '#2f7d61',
+      border: '#1f5f49',
       /** Divisas estaduais. */
-      states: '#2f7d61',
+      states: '#1f5f49',
       /** Nome e ponto das capitais. */
-      capitalText: '#0c1411',
-      capitalHalo: '#edf2ed',
+      capitalText: '#182c25',
+      capitalHalo: '#ffffff',
     },
     dark: {
       mask: '#121f1a',

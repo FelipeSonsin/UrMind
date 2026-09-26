@@ -21,6 +21,8 @@
   --danger: #d8645a;
   --info: #6fa6a0;
   --on-primary: #ffffff;
+  /* Fundo do mapa antes das peças carregarem: o cinza-claro do entorno do Brasil. */
+  --map-surface: #eef1ec;
   --on-status: #0c1411;
   /* Derivados: sempre das cores acima, nunca uma cor nova. */
   --hover: color-mix(in srgb, var(--text) 6%, transparent);
@@ -347,14 +349,12 @@ textarea {
   letter-spacing: -0.02em;
   text-decoration: none;
 }
-.brand img {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-}
-.brand-light {
-  font-weight: 400;
-  color: var(--text-secondary);
+/* Logo oficial (public/brand/urmind-logo.png): altura fixa, largura pela proporção. */
+.brand-logo {
+  display: block;
+  width: auto;
+  height: 38px;
+  max-width: 100%;
 }
 .sidebar-section {
   margin: 22px 8px 6px;
@@ -538,10 +538,14 @@ footer a {
 
 /* ---- Blocos: borda fina, sem preenchimento de cartão. ---- */
 .panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  border: 0;
   border-radius: var(--radius-l);
-  padding: 20px;
+  padding: 20px 22px;
+}
+.panel .panel {
+  background: transparent;
+  padding: 0;
 }
 .panel + .panel,
 .panel + section,
@@ -815,7 +819,6 @@ tbody tr:hover {
   gap: 2px;
   padding: 3px;
   margin-bottom: 14px;
-  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
 }
@@ -836,7 +839,6 @@ tbody tr:hover {
 .segmented label.active {
   background: var(--surface-elevated);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--border);
 }
 .segmented input {
   position: absolute;
@@ -855,9 +857,8 @@ tbody tr:hover {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px 32px;
-  padding: 8px 0 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 0 4px;
+  margin-bottom: 32px;
 }
 .home-hero h1 {
   max-width: 20ch;
@@ -899,6 +900,9 @@ tbody tr:hover {
 }
 .home-lead .map-panel {
   margin-bottom: 0;
+}
+.home-lead.is-empty {
+  grid-template-columns: minmax(0, 1fr);
 }
 .home-lead .diagnosis {
   position: sticky;
@@ -1182,8 +1186,8 @@ tbody tr:hover {
   display: grid;
   gap: 2px;
   padding: 12px;
-  border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface);
   counter-increment: pipeline;
 }
 .pipeline li::before {
@@ -1216,9 +1220,9 @@ tbody tr:hover {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
+  padding: 10px 12px;
   border-radius: var(--radius);
+  background: var(--surface);
 }
 .taxonomy-list li small {
   flex-basis: 100%;
@@ -1243,8 +1247,8 @@ tbody tr:hover {
   gap: 10px 22px;
   margin-bottom: var(--space);
   padding: 12px 16px;
-  border: 1px solid var(--border);
   border-radius: var(--radius-l);
+  background: var(--surface-elevated);
   font-size: 13px;
 }
 .status-bar.error {
@@ -1290,15 +1294,14 @@ tbody tr:hover {
 }
 .map {
   /* Altura em MAP_DESIGN.slot.height (src/mapDesign.ts). */
-  background: var(--bg);
+  background: var(--map-surface);
 }
 .map-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 10px 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
 }
 .map-toolbar label {
   display: grid;
@@ -1396,8 +1399,7 @@ tbody tr:hover {
 .map-footer {
   display: grid;
   gap: 8px;
-  padding: 10px 14px 12px;
-  border-top: 1px solid var(--border);
+  padding: 8px 16px 10px;
 }
 .map-footer .map-point-list {
   margin: 0;
@@ -1406,6 +1408,9 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   min-height: 32px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 .map-point-list button {
   min-height: 32px;
@@ -1751,7 +1756,6 @@ tbody tr:hover {
   margin: 0 0 12px;
   padding: 4px;
   list-style: none;
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
 }
@@ -1862,7 +1866,6 @@ tbody tr:hover {
 }
 .live-stage-panel {
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: var(--radius-l);
   background: var(--bg);
 }
@@ -1944,8 +1947,7 @@ tbody tr:hover {
   flex-wrap: wrap;
   gap: 6px;
   padding: 10px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-elevated);
 }
 .live-actions button {
   padding: 0 11px;
@@ -2175,7 +2177,6 @@ tbody tr:hover {
   gap: 2px;
   margin-bottom: 20px;
   padding: 4px;
-  border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
   font-size: 13px;
@@ -2207,7 +2208,6 @@ tbody tr:hover {
 .internal-navigation a[aria-current='page'] {
   background: var(--surface-elevated);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--border);
 }
 .internal-navigation details {
   position: relative;
@@ -2354,6 +2354,9 @@ tbody tr:hover {
   .sidebar-section,
   .sidebar-bottom {
     display: none;
+  }
+  .brand-logo {
+    height: 30px;
   }
   .sidebar nav {
     position: fixed;

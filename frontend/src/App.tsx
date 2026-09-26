@@ -830,10 +830,13 @@ export default function App() {
       </a>
       <aside className="sidebar">
         <a className="brand" href="#/">
-          <img src="/icon.svg" alt="" />
-          <span>
-            ur<span className="brand-light">mind</span>
-          </span>
+          <img
+            className="brand-logo"
+            src="/brand/urmind-logo.png"
+            alt="UrMind"
+            width={600}
+            height={168}
+          />
         </a>
         <nav aria-label="Navegação principal">
           {(['overview', 'capture', 'live-detection', 'robot-camera', 'my-reports', 'map'] as const)

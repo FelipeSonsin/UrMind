@@ -328,7 +328,8 @@ export function PublicHome({
           {error}
         </p>
       )}
-      <div className="home-lead">
+      {/* Sem ocorrência publicada, o mapa ocupa a linha toda e avisa uma vez só. */}
+      <div className={`home-lead${events.length ? '' : ' is-empty'}`}>
         <Suspense fallback={<p role="status">Carregando mapa…</p>}>
           <UrbanMap
             events={events}
@@ -339,32 +340,40 @@ export function PublicHome({
             emptyMessage="Nenhuma ocorrência publicada ainda."
           />
         </Suspense>
-        <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
-          {loading && !detail ? (
-            <Skeleton lines={5} />
-          ) : detail ? (
-            <>
-              <QuickDiagnosis event={detail} />
-              <RecommendedAction event={detail} />
-              <button className="secondary" onClick={() => openEvent(detail.id)}>
-                Ver análise completa
-              </button>
-            </>
-          ) : (
-            <div className="empty">
-              <h3>Nenhuma ocorrência publicada ainda</h3>
-              <p>
-                Depois da revisão da equipe, cada ocorrência aparece aqui com tipo, gravidade e o
-                que fazer.
-              </p>
-              <a className="text-button" href="#/registrar">
-                Registrar a primeira evidência
-              </a>
-            </div>
-          )}
-        </section>
+        {(events.length > 0 || loading) && (
+          <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
+            {loading && !detail ? (
+              <Skeleton lines={5} />
+            ) : detail ? (
+              <>
+                <QuickDiagnosis event={detail} />
+                <RecommendedAction event={detail} />
+                <button className="secondary" onClick={() => openEvent(detail.id)}>
+                  Ver análise completa
+                </button>
+              </>
+            ) : (
+              <div className="empty">
+                <h3>Nenhuma ocorrência publicada ainda</h3>
+                <p>
+                  Depois da revisão da equipe, cada ocorrência aparece aqui com tipo, gravidade e o
+                  que fazer.
+                </p>
+                <a className="text-button" href="#/registrar">
+                  Registrar a primeira evidência
+                </a>
+              </div>
+            )}
+          </section>
+        )}
       </div>
-      <EventFeed events={events} selectedId={current} onSelect={(event) => setSelected(event.id)} />
+      {events.length > 0 && (
+        <EventFeed
+          events={events}
+          selectedId={current}
+          onSelect={(event) => setSelected(event.id)}
+        />
+      )}
     </>
   );
 }
@@ -578,7 +587,7 @@ export function PublicMapPage({
           }
         />
       </Suspense>
-      {shownKind !== 'mine' && (
+      {shownKind !== 'mine' && events.length > 0 && (
         <EventFeed
           events={events}
           selectedId={selected}
