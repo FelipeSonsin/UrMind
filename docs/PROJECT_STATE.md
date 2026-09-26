@@ -1,5 +1,126 @@
 # Estado operacional do UrMind
 
+## Consolidação local das duas sessões de 26/09/2026 (sem commit, push ou deploy)
+
+Frontend/GPS/mapa/UX/ao vivo (seção "Experiência pública simplificada") e YOLO/inferência
+(seção "Sprint de melhoria visual") conferidos juntos na mesma árvore.
+
+- **Sistema visual ativo inalterado:** ONNX `d429bde8…`, perfil `2702eb15`; manifesto
+  publicado e worker do navegador idênticos ao HEAD; `OnnxDetector.detect` (Worker) no
+  caminho histórico. Fatiamento, TTA, escala 448, limiares alternativos, WBF/NMM/IOS,
+  graph capture e IO binding **não** estão ativos: existem só como avaliação
+  (`app/ml/sliced_inference.py`, `detect_frame`, `slicedInference.ts`, `frontend/bench/`).
+- **Correções:** `docs/ml/V3_GUARDRAILS.md` sem contradição (treino proibido por padrão,
+  só com autorização explícita e condições); seleção explícita no relatório da sprint
+  (`BEST_SYSTEM=A`, `THRESHOLD_CANDIDATE_REJECTED=true`); `tile_size` só inteiro (Python =
+  TS); IRD/RTK marcados como desenvolvimento; RTK descritivo; runtime do navegador marcado
+  como transcrição manual (a bancada agora exporta o próprio JSON); latência de CPU medida
+  e gravada no relatório; bloco antigo do Worker em `LIVE_DETECTION.md` marcado como
+  superado.
+- **Gates:** backend 1557 passed / 37 skipped / 0 failed; Ruff (`app` + `tests`) e mypy
+  (`app`, 77 arquivos) limpos; Vitest 138 passed; tsc; build; Playwright completo 172
+  passed / 2 skipped (E2E real sem foto/GPS revisados, por projeto) com 4 workers;
+  `git diff --check` limpo nos arquivos rastreados.
+- **Pendente:** teste físico de câmera/GPS; `prettier --check .` acusa 3 arquivos gerados
+  já presentes no HEAD (`public/geo/*.geojson` e o manifesto publicado, cujo hash está
+  congelado) — não reformatados.
+
+## Sprint de melhoria visual D00–D40 sem troca de modelo — 26/09/2026 (local)
+
+Detalhes, tabela de técnicas e reprodução: `docs/ml/VISUAL_SPRINT_2026-09-26.md`. Sem
+commit, push, deploy, promoção, Frozen Test, mudança no manifesto publicado, no Worker ou
+no `SHADOW_MODEL_VERSION_ID`.
+
+- **Baseline congelado:** `VS-BASELINE-60f9c748…` (ONNX `d429bde8…`, perfil `2702eb15`),
+  `datasets/reports/visual_sprint/baseline_freeze.json`.
+- **Conjuntos DEVELOPMENT_ONLY** (regras gravadas antes das métricas):
+  `datasets/metadata/visual_sprint_dev_sets.json` — IRD Dashcam 4K como CAMERA_DEV
+  (tune/check por índice), RTK (Brasil) como HARD_NEGATIVE_DEV, VALIDATION só como guarda.
+- **Harness:** `app.ml.camera_dev` reproduz exatamente o baseline registrado (mAP50
+  0,159632; F1 0,2804) e tem paridade exata com o `OnnxDetector`.
+- **Resultado:** FULL/TILED/HYBRID × NMS/IOS/NMM/WBF, limiar próprio nos tiles, limiares
+  por classe, NMS, TTA (espelho, escala 448) e escala 448 isolada: **nenhuma** melhora
+  recall e F1 juntos na câmera. HYBRID sobe o recall (0,248 → 0,311 no CHECK 1080p) mas
+  quadruplica os FP (F1 0,235 → 0,114). Limiar F1-ótimo sobe o F1 (0,250) mas baixa o
+  recall. Erro dominante: FN sem caixa (62 %); teto de recall no limiar mínimo 0,32.
+  No RTK, 74 dos 100 alarmes fora de dano são D20 sobre regiões `roadPaved` da máscara da
+  fonte (descritivo; "paralelepípedo" é interpretação não conferida, não Ground Truth).
+- **Seleção (no relatório):** `BEST_SYSTEM=A`, modelo `d429bde8…`, perfil `2702eb15…`,
+  `THRESHOLD_CANDIDATE_REJECTED=true` (limiares F1-ótimos baixam o recall e pioram a
+  VALIDATION). IRD/RTK só para desenvolvimento: não são avaliação oficial nem prova de
+  produção; IRD `human_validated_images=0`; RTK não volta como holdout brasileiro.
+- **Runtime (Edge, este notebook):** WebGPU roda na Intel integrada mesmo com
+  `high-performance` (RTX ociosa); `session.run` 292 ms, total 309 ms; IO binding e graph
+  capture funcionam mas ganham < 3 %; WASM 1.221 ms.
+- **Pesos:** `MODEL_WEIGHTS_BOTTLENECK=YES`; fine-tuning **não executado** — sem dado de
+  câmera revisado e autorizado para treino. `docs/ml/V3_GUARDRAILS.md` foi revisado em
+  26/09/2026: treino por agente proibido por padrão, só com autorização explícita,
+  dataset autorizado, labels revisadas, escopo e tempo aprovados; Frozen Test protegido.
+- **Código:** `app/ml/sliced_inference.py` + espelho TS (avaliado e rejeitado, sem uso no
+  produto), `OnnxDetector.detect_frame` (padrão = caminho histórico), histórico curto de
+  confiança no `TemporalTracker`, bancada `frontend/bench/` (só desenvolvimento).
+- **Pendente:** teste com câmera física (exige pessoa e aparelhos); conjunto de câmera
+  brasileiro revisado para treino/holdout.
+
+## Experiência pública simplificada — 26/09/2026 (local, ainda não publicada)
+
+Sem commit, push ou deploy nesta rodada. Nada muda em pesos, treinamento, Frozen Test,
+`.env`, credenciais, RLS ou publicação.
+
+- **GPS da foto tirada agora:** "Tirar foto", "Abrir câmera" e "Capturar e registrar"
+  (ao vivo) leem o GPS do aparelho automaticamente. Uma posição guardada só é
+  reaproveitada até 30 s (`FRESH_MS`); nenhuma leitura com mais de 60 s é aceita
+  (`MAX_FIX_AGE_MS`, também no fallback de baixa precisão, que antes aceitava 5 min); e
+  a posição só vale para a foto se foi lida a até 2 min do instante dela
+  (`fixMatchesPhoto`). Precisão, horário, rumo e velocidade seguem para o backend. Trocar
+  de foto invalida a resposta pendente do GPS.
+- **Galeria:** GPS do EXIF (sem precisão inventada, o servidor relê o original) ou ponto
+  no mapa. O GPS atual nunca é atribuído a foto da galeria (o botão "Usar GPS atual para
+  esta foto" saiu).
+- **Sem campos de latitude/longitude** na interface. Estados: "Obtendo localização…",
+  "Localização obtida" (com precisão), "Localização encontrada na foto", "Local marcado no
+  mapa", "Precisamos que você confirme onde a foto foi tirada", "Localização
+  indisponível". O fallback é visual (tocar no mapa → marcador → "Confirmar localização")
+  e tem alternativa por teclado: "Marcar o centro do mapa". Sem localização o relato ainda
+  pode ser enviado e fica "Necessita localização" (sem ocorrência geográfica).
+- **Relato do autor no mapa:** após o envio, a página do relato seleciona e enquadra o
+  ponto (Capture, nunca um Event artificial), com situação, precisão e, depois da análise,
+  o trecho de via associado separado do ponto informado. Continua após recarregar.
+  Início e Mapa mostram só os relatos da própria sessão (`only_mine`); a equipe vê todos
+  apenas na área interna. O mapa público segue mostrando só publicações.
+- **Situação do relato (backend `capture_markers`):** acrescentados `processing` (etapas
+  do Worker em andamento; `queued` continua "Recebido") e `published` (confirmado **e**
+  publicado pela regra `_PUBLISHED`). Ponto ajustado à via, distância e nome da via saem
+  só para relatos analisados e só na visão do dono/revisor. Deploy: o frontend novo aceita
+  o backend antigo; o backend novo com o frontend antigo quebraria a lista de relatos até
+  o Vercel publicar (publicar juntos, Vercel primeiro).
+- **Filtros do mapa:** opções reais (vocabulário completo de situação do tipo de ponto
+  exibido; famílias e classes presentes ou emitíveis pelo modelo, com a classe presa à
+  família; família em português), datas digitadas como dd/mm/aaaa no dia civil local,
+  "X pontos visíveis" com singular, estado vazio com "Limpar filtros", filtros ocultos
+  quando não há pontos. Mapa operacional com "Tudo / Meus relatos / Ocorrências
+  publicadas".
+- **Nomes no mapa:** o estilo do OpenFreeMap usa `name_en` ("New Fribourg", "Federal
+  District"); passa a usar o nome local do OSM (`name`). O `name:pt` dos blocos não serve
+  (rótulos da Wikidata como "Liberdade (bairro de São Paulo)"). As 27 capitais da visão
+  nacional são conferidas por teste contra a malha de UFs do IBGE; Rio de Janeiro caía na
+  água da baía da malha simplificada e foi corrigido para o Centro. Atribuição
+  OpenFreeMap/OpenStreetMap preservada.
+- **Início:** sem a barra técnica (API, banco, detector, Scout, trechos) e sem Scout;
+  chamada para registrar, "Seus relatos" com situação e mapa das ocorrências publicadas.
+  O diagnóstico técnico continua em `#/system`, fora da navegação; `#/live` leva à
+  detecção ao vivo. O componente do Scout foi removido do frontend ativo (histórico no Git).
+- **Detecção ao vivo:** ver `docs/LIVE_DETECTION.md` (FPS da câmera desacoplado, ritmo
+  adaptativo, "Detalhes técnicos" recolhido).
+- **Gates desta rodada:** Vitest 137 (árvore inteira, incluindo testes de outra sessão);
+  tsc; build; Prettier; Playwright 172 passed / 2 skipped com 4 workers (E2E real exige
+  foto/GPS revisados; com 10 workers e a máquina carregada houve 4 timeouts que passam
+  isolados); backend 1520 passed / 37 skipped; integração DEV dos marcadores 4 passed;
+  Ruff; mypy dos arquivos tocados; `git diff --check`.
+- **Limitações:** câmera/GPS físicos não testados (PHYSICAL_TEST_PENDING, matriz em
+  `FAIR_DEMO_CHECKLIST.md`); as caixas ao vivo refletem o quadro de uma latência atrás;
+  dispositivos que não entregam posição recente caem no mapa.
+
 ## Remediação da auditoria A25 — 26/09/2026 (vigente)
 
 Detalhes e evidências: `docs/audits/URMIND_REMEDIATION_REPORT.md` (topo) e

@@ -51,6 +51,8 @@ Isto usa câmera **simulada** com imagens reais; não é teste de webcam física
 | `frontend/src/workers/liveDetection.worker.ts` | Web Worker do navegador: download, checksum, sessão ONNX, pré/pós-processamento |
 | `frontend/src/domain/liveDetection.ts` | Contrato puro: manifesto, letterbox, tensor BGR, decode/NMS, mapeamento de tela, controle de fila |
 | `frontend/src/services/cameraStream.ts` | `getUserMedia`/`enumerateDevices` compartilhado (também usado por `components/Camera.tsx`) |
+| `frontend/src/domain/slicedInference.ts` | Fatiamento TILED/HYBRID e fusões, espelho do backend; **avaliado e rejeitado**, não importado pelo produto (só testes e bancada) |
+| `frontend/bench/runtime.html` | Bancada de runtime só para desenvolvimento, fora do build de produção |
 
 ## Contrato do modelo (espelho de `backend/app/ml/serving.py`)
 
@@ -140,13 +142,12 @@ imagens de VALIDATION: 82/82 detecções, mesma classe, |Δscore| ≤ 5×10⁻�
 0,00004 px. A diferença de pré-processamento (canvas × `cv2`) é a medida na seção de
 paridade acima.
 
-**Pendente (DEV, exige autorização):** o Worker ainda resolve o ModelVersion
-`yolox-s-quality-rebuild` (ONNX `7d91f7f6…`, agnóstico 0,65, limiar 0,25); o ONNX
-`d429bde8…` do navegador não está registrado no Supabase. Alinhar exige registrar esse
-ONNX como ModelVersion (shadow/DEV) com `serving.nms = "per_class"`,
-`serving.nms_threshold = 0.45`, `serving.class_score_thresholds = [0.03, 0.2, 0.07,
-0.2]`, `serving.letterbox_upscale = false` e `serving.inference_profile_sha256` do
-manifesto (`2702eb15…`). Nada foi registrado ou promovido.
+**[Superado em 26/09/2026 — ver o cabeçalho deste arquivo]** Histórico de 25/09: o
+Worker ainda resolvia o ModelVersion `yolox-s-quality-rebuild` (ONNX `7d91f7f6…`,
+agnóstico 0,65, limiar 0,25) e o ONNX `d429bde8…` não estava registrado. Depois da
+autorização shadow do proprietário, o Worker passou a resolver o ModelVersion
+`a3ff07ea` (ONNX `d429bde8…`) com o mesmo perfil `2702eb15` do navegador; nada foi
+promovido.
 
 ### Camada temporal, qualidade e desempenho (apresentação)
 
@@ -250,15 +251,33 @@ reconhecidas automaticamente.
   ficam fora do precache do PWA e do chunk inicial.
 - Uma sessão por aba, batch 1, canvas e tensor reutilizados, `ImageBitmap` e tensores de
   saída liberados a cada quadro; `session.release()` + `terminate()` ao sair.
-- No máximo **uma** inferência em voo e nenhuma fila. Teto inicial de 5 análises/s
-  (intervalo mínimo 200 ms), com folga de 25% da latência — configuração, não promessa.
+- **FPS da câmera desacoplado da inferência (26/09/2026).** O `<video>` fica sempre no
+  palco e toca no ritmo da câmera; as caixas vêm por um canvas de overlay que só é
+  redesenhado quando chega um resultado novo. Antes, durante a análise o palco mostrava o
+  quadro analisado (atualizado só na taxa do modelo, 2–5/s) e o vídeo virava miniatura:
+  era essa a causa da imagem "travada". O canvas do quadro analisado agora só aparece
+  para uma imagem avulsa ("Analisar imagem").
+- No máximo **uma** inferência em voo e nenhuma fila. O próximo quadro é pedido ao vídeo
+  com `requestVideoFrameCallback` (o mais novo apresentado; sem a API, `currentTime`), e
+  `FrameFreshness` impede enviar duas vezes o mesmo `mediaTime`. Quadros intermediários
+  são descartados.
+- **Ritmo adaptativo** (`AdaptiveCadence`, `domain/liveDetection.ts`): teto de 5
+  análises/s (200 ms), modelo ocupado no máximo 75% do tempo; latência maior que a média
+  recua na hora (aparelho aquecendo, outra aba pesada), latência menor encurta o intervalo
+  no máximo 15% por resultado até o teto. Não há FPS de inferência prometido.
 - Cada quadro leva `frame_id`, timestamp, largura e altura; a resposta só é aceita se for
   da execução atual e do quadro em voo. Pausa, troca de câmera, saída da rota e logout
-  invalidam respostas pendentes. O palco mostra **o próprio quadro analisado** com suas
-  caixas (a imagem ao vivo vira um recorte no canto).
-- Taxas exibidas são medidas: FPS da câmera por `requestVideoFrameCallback` (sem ele,
-  aparece o valor declarado pelo dispositivo, rotulado assim), análises/s e latência de
-  ida e volta do último quadro.
+  invalidam respostas pendentes. Pausar tira as caixas da tela (caixas antigas sobre um
+  vídeo que continua andando enganariam).
+- Consequência declarada: as caixas refletem o quadro de uma latência atrás (centenas de
+  ms). Com a câmera parada coincidem; com a câmera em movimento podem ficar ligeiramente
+  deslocadas até o próximo resultado.
+- Taxas medidas separadamente, em "Detalhes técnicos" (recolhido): FPS da câmera por
+  `requestVideoFrameCallback` (sem ele, o valor declarado pelo dispositivo, rotulado
+  assim), análises/s, intervalo atual do ritmo, latência do último quadro e p50/p95.
+- Medição **simulada** (26/09/2026, Edge headless, câmera de canvas a 15 fps, modelo real
+  d429bde8, WebGPU): câmera 14,1 fps; análises 1,4/s; intervalo 489 ms; latência
+  p50/p95 371/380 ms; pré·modelo·pós 10·344·0 ms. Não vale como medida de aparelho real.
 
 ## Câmera e privacidade
 
@@ -273,21 +292,32 @@ reconhecidas automaticamente.
 - Página oculta: a câmera é **desligada** e não volta sozinha.
 - Nenhum vídeo, áudio ou quadro é gravado ou enviado continuamente.
 
+## Interface (26/09/2026)
+
+A tela mostra só o que a pessoa usa: câmera, seletor de câmera (quando há mais de uma),
+Iniciar/Encerrar câmera, Iniciar/Pausar detecção, Capturar e registrar, Analisar imagem,
+caixas com o nome da classe e a confiança (0 a 1, explicada como "não é gravidade nem
+confirmação"). O estado aparece como "Detecção pronta", "Preparando a detecção…" ou
+"Detecção indisponível" com o motivo. Versão, status científico, perfil de inferência,
+provedor (WebGPU/WASM), taxas e latências ficam em "Detalhes técnicos", recolhido.
+
 ## Capturar e registrar
 
-Grava o quadro exibido **sem** caixas nem textos (o overlay é outro canvas), preserva o
-instante do quadro em `captured_at`, valida com `validatePhoto`, salva como rascunho
-local (`source: pwa_photo`, sem localização) e abre o registro normal (`#/capture`). A
-localização só é pedida ali, com GPS ou confirmação no mapa. O envio usa o caminho
-canônico de Capture; o backend refaz a análise oficial. A prévia nunca cria Detection
-nem Event, e não chama clima/histórico/risco.
+Grava o quadro do `<video>` que está na tela, na resolução da câmera, **sem** caixas nem
+textos (o overlay é outro canvas), com `captured_at` do instante da captura; valida com
+`validatePhoto`, salva como rascunho local (`source: pwa_photo`) e abre o registro normal
+(`#/capture`). O registro pede na hora o GPS do aparelho (o aquecimento do GPS já começa
+na página ao vivo, se houver permissão) e só o aceita se a leitura for de até 2 minutos
+do instante da foto; sem permissão ou sem sinal, pede o ponto no mapa. O envio usa o
+caminho canônico de Capture; o backend refaz a análise oficial. A prévia nunca cria
+Detection nem Event, e não chama clima/histórico/risco.
 
 ## Analisar imagem do aparelho
 
 "Analisar imagem" encerra a câmera, decodifica a imagem escolhida (orientação EXIF
 aplicada) e envia um único quadro ao mesmo worker ONNX, com o mesmo overlay. É só
-prévia visual: nada é enviado, a etiqueta mostra "Localização não informada", não há
-marcador e o EXIF não é lido como local. "Capturar e registrar" fica desabilitado nesse
+prévia visual: nada é enviado, a etiqueta mostra "Imagem do aparelho · prévia sem
+localização", não há marcador e o EXIF não é lido como local. "Capturar e registrar" fica desabilitado nesse
 modo, porque regravaria a foto como câmera (`pwa_photo`, horário atual, sem EXIF);
 registrar uma imagem da galeria continua sendo em `#/registrar`, que preserva o original
 para o servidor. Abrir a câmera descarta a prévia. Uma imagem de dataset analisada aqui
@@ -307,7 +337,8 @@ passar a enviar CSP; hoje o repositório não define CSP para ele.
 - Redimensionamento do canvas (bilinear do navegador) não é bit a bit igual ao
   `cv2.INTER_LINEAR`; a tolerância de paridade só pode ser medida com o ONNX real.
 - WASM em 1 thread é lento para YOLOX-S 640×640 em CPU fraca; o ritmo se ajusta, mas
-  latência de centenas de ms é esperada. Não há medição real ainda.
+  latência de centenas de ms é esperada. Não há medição em aparelho real ainda
+  (PHYSICAL_TEST_PENDING); a única medida é a simulada acima.
 - WebGPU em workers depende do navegador; Safari/iOS tende a cair em WASM.
 - O `.wasm` custa ~6,7 MB comprimidos no primeiro uso, mais o ONNX.
 - Com o YOLOX treinando na mesma máquina, não rodar benchmark de inferência contínua.
@@ -317,14 +348,39 @@ passar a enviar CSP; hoje o repositório não define CSP para ele.
 - `frontend/src/domain/liveDetection.test.ts` (Vitest): manifesto/autorização/URL,
   checksum e download incompleto, letterbox paisagem/retrato, tensor BGR, score,
   restauração de coordenadas, NMS, limiar, recorte, classe desconhecida, `contain`,
-  espelhamento, devicePixelRatio, fila, respostas atrasadas, taxa medida, erros de câmera.
+  espelhamento, devicePixelRatio, fila, respostas atrasadas, taxa medida, erros de câmera,
+  ritmo adaptativo (recuo imediato, subida de no máximo 15% por resultado, teto) e quadro
+  repetido nunca reenviado.
 - `frontend/tests/live-detection.spec.ts` (Playwright, desktop e mobile): rota e
   navegação, sem pedido de câmera antes do toque, sem microfone, permissão negada,
   ocupada, ausente, troca de câmera, encerrar, sair da rota, página oculta, desconexão,
-  modelo ausente, download 404, checksum divergente, captura para rascunho sem upload.
+  modelo ausente, download 404, checksum divergente, captura com GPS do instante (com e
+  sem permissão) sem upload, e — com o modelo real local, em série — o vídeo continua no
+  palco em tamanho cheio e apresenta muito mais quadros do que o modelo analisa no mesmo
+  intervalo (a contagem absoluta varia com a carga da máquina e não é critério).
 
 Fixtures provam interface e contratos. **Não** são teste de câmera física nem de
 detecção real.
+
+## Sprint de melhoria visual (26/09/2026)
+
+Medido em conjuntos de desenvolvimento de câmera (IRD Dashcam 4K, RTK Brasil) contra o
+baseline congelado `VS-BASELINE-60f9c748…`; detalhes em
+`docs/ml/VISUAL_SPRINT_2026-09-26.md`. **Nada mudou no perfil publicado.**
+
+- Fatiamento (TILED/HYBRID, tile 640, overlap 20 %, fusões NMS/IOS/NMM/WBF) e TTA
+  (espelho, escala 448) foram **rejeitados**: sobem o recall e multiplicam os alarmes
+  falsos; CLAHE não foi retestado. O worker do navegador segue com uma vista por quadro.
+- O perfil por etapa confirma o gargalo na GPU (`session.run` ~292 ms de ~309 ms no
+  iGPU); IO binding e graph capture funcionam, mas ganham < 3 % e não foram adotados.
+  Neste notebook o navegador usa a GPU integrada mesmo pedindo `high-performance`.
+- `TemporalTracker` passou a guardar um histórico curto de confiança por observação
+  (`recentScores`, `meanScore`, 5 amostras). Continua sem filtrar nem confirmar nada.
+- `frontend/bench/runtime.html` (fora do build) mede WASM, WebGPU, IO binding, graph
+  capture e o custo de uma passada fatiada no navegador real; o resultado pode ser
+  exportado pela própria página ("Baixar resultado (JSON)").
+- Resultados de câmera vêm de conjuntos só de desenvolvimento (IRD sem revisão humana do
+  UrMind; RTK sem revisão registrada): não são avaliação oficial nem prova de produção.
 
 ## Pendências
 
@@ -334,7 +390,9 @@ detecção real.
    deploy a partir do repositório precisa receber esses dois arquivos como artefato,
    senão a aba mostra "Modelo de detecção indisponível".
 3. Qualidade: o modelo é fraco (mAP50 0,108); melhorar exige novo treino/dados, fora
-   deste escopo.
+   deste escopo. A sprint visual de 26/09 confirmou que só pós-processamento não resolve
+   (pesos são o gargalo) e que treino exige dados de câmera revisados e autorizados
+   (`docs/ml/V3_GUARDRAILS.md` §1).
 
 Resolvido em 25/09/2026: gerador do manifesto (`backend/tests/test_browser_model.py`,
 14 testes), E2E de logout com a câmera aberta, autorização registrada, export e

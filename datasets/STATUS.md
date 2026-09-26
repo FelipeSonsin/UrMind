@@ -6,6 +6,23 @@ abaixo foram acrescentadas depois, cada uma com a própria data, e não foram
 regeneradas. O gerador reescreve o arquivo inteiro: não executá-lo sem antes mover
 essas seções para `docs/ml/DATA_READINESS.md`.
 
+## Conjuntos de desenvolvimento da sprint visual — 26/09/2026
+
+Registro: `datasets/metadata/visual_sprint_dev_sets.json` (gravado antes das métricas).
+Uso exclusivamente de desenvolvimento (inferência do ONNX `d429bde8…`, sem treino):
+
+- **IRD Dashcam (439):** CAMERA_DEV, `tune` = índice ≤ 560, `check` = > 560. Já estava
+  excluído de treino e de holdout; continua assim. Caixas da fonte, não revisadas
+  (`human_validated_images=0` em `ird_dashcam_candidate_audit.json`): os números de câmera
+  são de desenvolvimento, não avaliação oficial nem prova de produção.
+- **RTK (701):** HARD_NEGATIVE_DEV; máscaras da fonte (sem revisão humana registrada)
+  usadas só para descrever o que está sob cada alarme. **Estado novo: exposto ao
+  desenvolvimento** — não usar depois como avaliação brasileira independente.
+- **VALIDATION RDD2022 (3858):** guarda de regressão (já usada no ajuste anterior).
+- TEST, Frozen Test, EXTERNAL_TEST e holdout UNIVALI **não foram lidos**. Nenhum rótulo,
+  split, manifesto ou arquivo bruto foi alterado. Cache derivado (saída bruta do ONNX,
+  ~42 MB com as vistas TTA, ignorado pelo Git): `datasets/reports/cache/visual_sprint/d429bde8a9bd/`.
+
 ## Run YOLOX-S com limite de 10 horas — 25/09/2026
 
 O usuário limitou o treinamento a 10 horas. O run anterior de 50 épocas foi encerrado após cerca de 2.500 iterações da primeira época; preservou logs e smoke, mas ainda não tinha checkpoint principal. Uma primeira tentativa de contrato reduzido falhou antes de treinar por campo de metadata não aceito; a cópia do contrato falho está no diretório da tentativa. O contrato corrigido `datasets/metadata/yolox_model_experimental_20260925_10h.json` mantém o mesmo TRAIN/VALIDATION, D00/D10/D20/D40, YOLOX-S, pesos oficiais COCO, batch 1, resolução 640×640 e zero workers. Define 6 épocas, warmup 1, no-aug 1 e validação ao final. O launcher tem corte automático aos 35.100 segundos (9h45), incluindo preparação e smoke, antes do limite de 36.000 segundos.
