@@ -267,8 +267,8 @@ def _scene_embedding(image: Image.Image) -> tuple[np.ndarray, dict[str, Any], di
 
 # --- Sinal auxiliar de categorias urbanas (zero-shot, sem treino) -------------------
 #
-# O YOLOX só reconhece D00/D10/D20/D40. Para árvore caída, galho, entulho, lixo,
-# bueiro aberto, boca de lobo obstruída e alagamento, o mesmo encoder OpenCLIP
+# Para árvore caída, galho, entulho, lixo, bueiro aberto, boca de lobo
+# obstruída e alagamento, o encoder OpenCLIP
 # registrado compara a foto com descrições em texto. É SUGESTÃO para a revisão
 # humana (sem caixa, sem calibração, sem Detection, sem Event, sem publicação): o
 # revisor escolhe a classe e só a Review confirmada chega ao mapa.

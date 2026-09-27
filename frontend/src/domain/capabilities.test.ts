@@ -2,24 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { activeCapabilities, automaticClasses, robotCameraReady } from './capabilities';
 
 describe('registro de capacidades', () => {
-  it('a detecção automática reconhece só as quatro classes de pavimento', () => {
-    expect([...activeCapabilities.supportedAutomaticClasses].sort()).toEqual([
-      'URMIND_ROAD_D00',
-      'URMIND_ROAD_D10',
-      'URMIND_ROAD_D20',
-      'URMIND_ROAD_D40',
-    ]);
-    for (const future of ['URMIND_FALLEN_TREE', 'URMIND_ROAD_DEBRIS', 'URMIND_FLOODED_ROAD'])
-      expect(activeCapabilities.supportedAutomaticClasses).not.toContain(future);
+  it('não anuncia classes automáticas sem modelo registrado', () => {
+    expect(activeCapabilities.supportedAutomaticClasses).toEqual([]);
   });
 
-  it('usa a taxonomia servida quando existe e o registro só como reserva', () => {
+  it('usa somente as classes autorizadas pela taxonomia servida', () => {
     expect(automaticClasses(['URMIND_ROAD_D40'])).toEqual(['URMIND_ROAD_D40']);
     expect(automaticClasses(['URMIND_ROAD_D00', 'URMIND_ROAD_D40'])).toEqual([
       'URMIND_ROAD_D40',
       'URMIND_ROAD_D00',
     ]);
-    expect(automaticClasses([])).toBe(activeCapabilities.supportedAutomaticClasses);
+    expect(automaticClasses([])).toEqual([]);
   });
 });
 

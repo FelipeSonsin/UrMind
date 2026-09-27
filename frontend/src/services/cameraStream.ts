@@ -1,4 +1,63 @@
-import { describeCameraError } from '../domain/liveDetection';
+export type CameraErrorCode =
+  | 'insecure_context'
+  | 'unsupported'
+  | 'permission_denied'
+  | 'not_found'
+  | 'busy'
+  | 'constraints'
+  | 'disconnected'
+  | 'unknown';
+
+export function describeCameraError(
+  reason: unknown,
+  environment: { secure: boolean; supported: boolean },
+): { code: CameraErrorCode; message: string } {
+  if (!environment.secure)
+    return {
+      code: 'insecure_context',
+      message: 'A câmera só abre em HTTPS ou em localhost. Abra o UrMind por um endereço seguro.',
+    };
+  if (!environment.supported)
+    return {
+      code: 'unsupported',
+      message:
+        'Este navegador não oferece acesso à câmera. Use Chrome, Edge, Firefox ou Safari atuais.',
+    };
+  const name = (reason as { name?: string } | null)?.name ?? '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return {
+        code: 'permission_denied',
+        message:
+          'O acesso à câmera foi negado. Libere a câmera nas permissões do site e tente de novo.',
+      };
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return { code: 'not_found', message: 'Nenhuma câmera foi encontrada neste dispositivo.' };
+    case 'NotReadableError':
+    case 'TrackStartError':
+    case 'AbortError':
+      return {
+        code: 'busy',
+        message: 'A câmera está em uso por outro aplicativo ou aba. Feche-o e tente de novo.',
+      };
+    case 'OverconstrainedError':
+    case 'ConstraintNotSatisfiedError':
+      return {
+        code: 'constraints',
+        message: 'A câmera escolhida não atende a esta configuração. Selecione outra câmera.',
+      };
+    case 'SecurityError':
+      return {
+        code: 'insecure_context',
+        message: 'O navegador bloqueou a câmera nesta página por política de segurança.',
+      };
+    default:
+      return { code: 'unknown', message: 'Não foi possível abrir a câmera.' };
+  }
+}
+
 
 /** A câmera é sempre a do aparelho que abriu o navegador; nada passa pelo servidor. */
 export function cameraEnvironment() {

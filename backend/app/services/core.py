@@ -10,21 +10,10 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from collections import Counter
 from copy import deepcopy
-from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.ml.tabular import (
-    NEGATIVE_REJECTION_REASON,
-    TabularExportError,
-    build_example,
-    build_tabular_dataset_version,
-    configured_tabular_runtime,
-    predict_review_confirmed,
-    rejection_reason,
-)
 from app.repositories.core import CaptureRepository, DecisionRepository, EventRepository
 from app.schemas.core import (
     CaptureCreate,
@@ -49,7 +38,7 @@ from app.services.report import (
     ResponsibilitySuggestion,
     render_event_report,
 )
-from app.services.review_export import REVIEW_SCHEMA_VERSION, review_resolution
+from app.services.review_resolution import REVIEW_SCHEMA_VERSION, review_resolution
 from app.services.risk import ContextInput, RiskResult, Severity, assess_features, replay_features
 
 # PROVISÓRIO: limiar ainda não medido contra a malha viária real do piloto.
@@ -697,11 +686,6 @@ class CoreService:
             "dataset_version_id": str(dataset_version_id) if dataset_version_id else None,
             "assessed_at": persisted["factors"]["phase4_snapshot"]["collected_at"],
             "provenance": features["provenance"],
-            # Advisory estimate over the same frozen snapshot. It is recorded, never
-            # applied: severity, risk, priority, Review and publication stay rule/human.
-            "review_confirmed_advisory": predict_review_confirmed(
-                configured_tabular_runtime(), features
-            ),
         }
         assessment = await self.decisions.add_risk(
             event.id,
@@ -903,88 +887,6 @@ class CoreService:
                 }
                 for r in await self.decisions.reviews(event_id)
             ],
-        }
-
-    async def tabular_ground_truth(
-        self, event_ids: list[uuid.UUID] | None = None
-    ) -> dict[str, Any]:
-        if self.decisions is None:
-            raise RuntimeError("Ground Truth indisponível")
-        grouped: dict[str, list[dict[str, Any]]] = {}
-        candidates = (
-            await self.decisions.dataset_candidates(event_ids=event_ids)
-            if event_ids is not None
-            else await self.decisions.dataset_candidates()
-        )
-        for row in candidates:
-            grouped.setdefault(str(row["event_id"]), []).append(row)
-        examples = []
-        entries = []
-        counts: Counter[str] = Counter()
-        for event_id, votes in grouped.items():
-            resolution = review_resolution(votes)
-            selected = resolution["selected"]
-            entry = {
-                "event_id": event_id,
-                "status": resolution["status"],
-                "decision": selected["decision"] if selected is not None else None,
-                "issue_code": None,
-                "eligible": False,
-                "reason": "consenso pendente",
-            }
-            if selected is not None:
-                entry["issue_code"] = selected.get("corrected_class") or selected.get(
-                    "inferred_class"
-                )
-                counts[str(entry["issue_code"])] += 1
-                # Never use an assessment collected after any reviewer started
-                # labeling this event, even if final adjudication came later.
-                cutoff = min(row["reviewed_at"] for row in votes)
-                assessment = await self.decisions.snapshot_before_review(
-                    uuid.UUID(event_id), cutoff
-                )
-                review = await self.decisions.persisted_review(selected["review_id"])
-                snapshot = (assessment.factors or {}).get("phase4_snapshot") if assessment else None
-                if selected["decision"] not in {"confirm", "reject"}:
-                    entry["reason"] = "correção de classe não é rótulo binário do pipeline tabular"
-                elif (
-                    selected["decision"] == "reject"
-                    and rejection_reason(selected.get("notes")) != NEGATIVE_REJECTION_REASON
-                ):
-                    entry["reason"] = "rejeição sem motivo visual não é rótulo negativo"
-                elif assessment is None or not snapshot or review is None:
-                    entry["reason"] = "snapshot anterior ao início da revisão indisponível"
-                else:
-                    try:
-                        if snapshot.get("assessment_id") != str(assessment.id):
-                            raise TabularExportError("snapshot não pertence à avaliação persistida")
-                        collected_at = datetime.fromisoformat(snapshot["collected_at"])
-                        if collected_at >= cutoff:
-                            raise TabularExportError("snapshot posterior ao início da revisão")
-                        example = build_example(
-                            snapshot["features"],
-                            snapshot_collected_at=collected_at,
-                            label_at=review.created_at,
-                            review_confirmed=review.decision == "confirm",
-                            capture_ids=(selected.get("evidence") or {}).get("capture_ids") or (),
-                            review=review,
-                            snapshot_id=str(snapshot["assessment_id"]),
-                            knowledge_cutoff=collected_at,
-                            review_status=resolution["status"],
-                            detector_origin="persisted_detection",
-                        )
-                        examples.append(example)
-                        entry.update(eligible=True, reason=None)
-                    except (TabularExportError, KeyError, ValueError, TypeError):
-                        entry["reason"] = "contrato temporal ou de features não elegível"
-            entries.append(entry)
-        version = build_tabular_dataset_version("review-export", examples)
-        return {
-            "entries": entries,
-            "counts_by_class": dict(counts),
-            "dataset": asdict(version),
-            "rows": [asdict(row) for row in examples],
-            "training_authorized": False,
         }
 
     async def review_capture(
@@ -1250,45 +1152,6 @@ class CoreService:
         contexts = await self.events.contexts(event_id)
         history, history_status = await self.events.previous_event_times(event)
         detections = await self.events.evidence_detections(event)
-        vision_lineage = None
-        model_reader = getattr(self.decisions, "model_version", None)
-        if (
-            event.model_version_id
-            and detections
-            and all(d.model_version_id == event.model_version_id for d in detections)
-            and callable(model_reader)
-        ):
-            model = await model_reader(event.model_version_id)
-            serving = (model.metrics or {}).get("serving") if model else None
-            candidate_detection_times = [getattr(d, "created_at", None) for d in detections]
-            detection_times = [
-                stamp
-                for stamp in candidate_detection_times
-                if isinstance(stamp, datetime)
-                and stamp.tzinfo is not None
-                and stamp.utcoffset() is not None
-            ]
-            if (
-                isinstance(serving, dict)
-                and detection_times
-                and len(detection_times) == len(candidate_detection_times)
-            ):
-                contract_hash = serving.get("model_contract_sha256")
-                contract_version = (
-                    f"model-contract-sha256:{contract_hash}" if contract_hash else None
-                )
-                vision_lineage = {
-                    "source": "model_versions.metrics.serving@assessment",
-                    "available_at": datetime.now(UTC).isoformat(),
-                    "latest_detection_at": max(detection_times).isoformat(),
-                    "model_version_id": str(event.model_version_id),
-                    "checkpoint_sha256": serving.get("checkpoint_sha256"),
-                    "class_order": serving.get("class_names"),
-                    "model_contract_sha256": contract_hash,
-                    "preprocessing_version": contract_version,
-                    "postprocessing_version": contract_version,
-                    "model_status": model.operational_status,
-                }
         features = build_features(
             FeatureInput(
                 event=event,
@@ -1300,7 +1163,6 @@ class CoreService:
                 history_status=history_status,
                 has_original_location=coords["latitude"] is not None,
                 has_snapped_point=coords["snapped_latitude"] is not None,
-                vision_lineage=vision_lineage,
             )
         )
         records = [

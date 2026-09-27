@@ -15,15 +15,7 @@ __pycache__/
 # Dados grandes e temporários; documentação, metadata e manifestos permanecem versionáveis.
 /datasets/raw/*
 
-# Dois artefatos REQUIRED do artifact_registry vivem sob raw/ e sao texto puro
-# (indice de populacao do CRDDC e rotulos da selecao), nao imagem. Sem eles a
-# cadeia de proveniencia nao fecha num clone limpo. O git nao reinclui arquivo
-# dentro de diretorio excluido, entao cada nivel do caminho e reaberto e
-# re-excluido com /* antes da excecao final.
-!/datasets/raw/rdd2022/
-/datasets/raw/rdd2022/*
-!/datasets/raw/rdd2022/File_List_CRDDC_RDD2022.txt
-
+# Registro de rótulos de uma fonte bruta mantida no catálogo.
 !/datasets/raw/global_streetscapes/
 /datasets/raw/global_streetscapes/*
 !/datasets/raw/global_streetscapes/labels/

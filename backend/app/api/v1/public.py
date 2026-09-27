@@ -31,7 +31,6 @@ from app.repositories.core import (
     CaptureRepository,
     DecisionRepository,
     EventRepository,
-    InferenceRepository,
     PublicImageQuota,
     PublicRepository,
     QuotaExceededError,
@@ -121,7 +120,6 @@ async def repositories(request: Request) -> AsyncIterator[dict[str, Any]]:
         yield {
             "public": PublicRepository(session),
             "decisions": DecisionRepository(session),
-            "inference": InferenceRepository(session),
             "service": CoreService(
                 CaptureRepository(session), EventRepository(session), DecisionRepository(session)
             ),
@@ -220,15 +218,12 @@ def camera_state(settings: Settings) -> ScoutCameraPublic:
 async def public_status(repos: Repos, response: Response) -> StatusPublic:
     settings = get_settings()
     overview = await repos["public"].overview()
-    model = await repos["inference"].configured_vision_model(
-        settings.vision_execution_mode, settings.shadow_model_version_id
-    )
     device = await repos["public"].scout_device()
     response.headers["Cache-Control"] = CACHE_SHORT
     return public_view.status_public(
         overview=overview,
         database_ok=True,
-        detector=({"version": model.version, "stage": model.operational_status} if model else None),
+        detector=None,
         scout=public_view.scout_public(device, camera_state(settings)),
     )
 
@@ -342,15 +337,6 @@ async def public_event(
             risk_row.factors if risk_row else None, current_context
         )
     )
-    # Event lineage is immutable; the currently selected model may have changed.
-    model_id = row.get("model_version_id")
-    model = await repos["inference"].model_version(model_id) if model_id else None
-    inference = (quality or {}).get("inference") or {}
-    historical_model_stage = (
-        inference.get("model_status")
-        if model_id and inference.get("model_version_id") == str(model_id)
-        else None
-    )
     base = public_view.summary(row)
     response.headers["Cache-Control"] = "private, no-store" if user else "no-store"
     response.headers["Vary"] = "Authorization"
@@ -382,11 +368,11 @@ async def public_event(
             risk=risk,
             responsibility=responsibility,
             action=action,
-            model_version=model.version if model else None,
+            model_version=None,
             event=base,
         ),
-        model_version=model.version if model else None,
-        model_stage=historical_model_stage,
+        model_version=None,
+        model_stage=None,
         dataset_version=None,
         reviewed=bool(dossier.get("reviews")),
     )
@@ -515,35 +501,8 @@ async def public_taxonomy(response: Response) -> IssueTaxonomyPublic:
 
 @router.get("/transparency", response_model=TransparencyPublic)
 async def public_transparency(repos: Repos, response: Response) -> TransparencyPublic:
-    settings = get_settings()
-    model = await repos["inference"].configured_vision_model(
-        settings.vision_execution_mode, settings.shadow_model_version_id
-    )
-    dataset = None
-    if model is not None and model.dataset_version_id is not None:
-        dataset_row = await repos["inference"].dataset_version(model.dataset_version_id)
-        dataset = (
-            {
-                "name": dataset_row.name,
-                "version": dataset_row.version,
-                "license": dataset_row.license,
-                "source": dataset_row.source,
-            }
-            if dataset_row
-            else None
-        )
     response.headers["Cache-Control"] = CACHE_MEDIUM
-    return public_view.transparency_public(
-        {
-            "name": model.name,
-            "version": model.version,
-            "metrics": model.metrics,
-            "operational_status": model.operational_status,
-        }
-        if model
-        else None,
-        dataset,
-    )
+    return public_view.transparency_public()
 
 
 @router.get("/scout/frame")

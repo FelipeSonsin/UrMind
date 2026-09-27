@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Camera, ScanEye, Webcam } from 'lucide-react';
+import { Camera, Webcam } from 'lucide-react';
 import { activeCapabilities } from '../../domain/capabilities';
 import {
   ContextPanel,
@@ -240,7 +240,6 @@ export function PublicHome({
   const [selected, setSelected] = useState<string | null>(null);
   const current = selected ?? events[0]?.id ?? null;
   const { data: detail } = useEventDetail(current, revision);
-  const automatic = automaticClassCodes().map(labelFor);
   return (
     <>
       <section className="home-hero" aria-labelledby="home-title">
@@ -263,27 +262,10 @@ export function PublicHome({
             A localização vem do aparelho ou da própria foto. A equipe revisa cada relato antes de
             ele aparecer no mapa público.
           </p>
-          {activeCapabilities.liveDetection && (
-            <div className="home-capabilities">
-              <span>Reconhece automaticamente:</span>
-              <ul aria-label="Reconhecidos automaticamente">
-                {automatic.map((label) => (
-                  <li key={label} className="badge">
-                    {label}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           <div className="actions">
             <a className="button" href="#/registrar">
               <Camera size={16} aria-hidden="true" /> Registrar evidência
             </a>
-            {activeCapabilities.liveDetection && (
-              <a className="button secondary" href="#/deteccao-ao-vivo">
-                <ScanEye size={16} aria-hidden="true" /> Detecção ao vivo
-              </a>
-            )}
             {activeCapabilities.robotCamera && (
               <a className="button secondary" href="#/camera-robo">
                 <Webcam size={16} aria-hidden="true" /> Câmera do robô
@@ -804,24 +786,23 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
       </p>
     );
   if (!data) return null;
-  const metrics = data.metrics;
   return (
     <>
       <div className="page-heading public">
         <div>
           <h1>Como o UrMind analisou</h1>
-          <p>Modelo, dados, métricas medidas e limites declarados. Sem número estimado.</p>
+          <p>Relatos, revisão humana, contexto urbano e regras de publicação.</p>
         </div>
       </div>
       <section className="panel" aria-label="Pipeline de análise">
         <ol className="pipeline">
           <li>
             <strong>Imagem</strong>
-            <span>foto enviada pelo celular ou capturada na detecção ao vivo</span>
+            <span>foto enviada pelo celular ou pela câmera remota</span>
           </li>
           <li>
-            <strong>YOLOX</strong>
-            <span>{data.model_version ?? 'nenhum modelo autorizado neste modo'}</span>
+            <strong>Revisão humana</strong>
+            <span>relatos analisados pela equipe</span>
           </li>
           <li>
             <strong>Contexto urbano</strong>
@@ -842,114 +823,6 @@ export function PublicTransparencyPage({ revision }: { revision: number }) {
         </p>
       </section>
       <TaxonomyPanel revision={revision} />
-      <div className="detail-grid">
-        <section className="panel" aria-label="Modelo">
-          <div className="section-heading">
-            <h2>Modelo de visão</h2>
-            {data.stage && <span className="risk-tag risk-medium">{data.stage}</span>}
-          </div>
-          <dl className="data-list">
-            <div>
-              <dt>Nome e versão</dt>
-              <dd>
-                {data.model_name ?? 'não disponível'}
-                <small>{data.model_version}</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Classes</dt>
-              <dd>
-                {data.classes.length ? data.classes.map(labelFor).join(', ') : 'não disponível'}
-              </dd>
-            </div>
-            <div>
-              <dt>Entrada</dt>
-              <dd>{data.input_size.length ? data.input_size.join(' × ') : 'não disponível'}</dd>
-            </div>
-            <div>
-              <dt>Limiar de publicação</dt>
-              <dd>{data.score_threshold ?? 'não disponível'}</dd>
-            </div>
-          </dl>
-          {data.stage_note && <p className="notice">{data.stage_note}</p>}
-        </section>
-        <section className="panel" aria-label="Métricas medidas">
-          <div className="section-heading">
-            <h2>Métricas medidas</h2>
-            {metrics.samples != null && <span className="muted">{metrics.samples} imagens</span>}
-          </div>
-          <dl className="data-list">
-            <div>
-              <dt>mAP50</dt>
-              <dd>{metrics.map50?.toFixed(4) ?? 'não disponível'}</dd>
-            </div>
-            <div>
-              <dt>mAP50-95</dt>
-              <dd>{metrics.map50_95?.toFixed(4) ?? 'não disponível'}</dd>
-            </div>
-            <div>
-              <dt>Precisão / recall</dt>
-              <dd>
-                {metrics.precision?.toFixed(3) ?? '—'} / {metrics.recall?.toFixed(3) ?? '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>F1</dt>
-              <dd>{metrics.f1?.toFixed(3) ?? 'não disponível'}</dd>
-            </div>
-          </dl>
-          {metrics.not_computed.length > 0 && (
-            <p className="muted">Não calculadas: {metrics.not_computed.join(', ')}.</p>
-          )}
-        </section>
-        <section className="panel" aria-label="Desempenho">
-          <div className="section-heading">
-            <h2>Latência</h2>
-          </div>
-          <dl className="data-list">
-            <div>
-              <dt>Média / p50 / p95</dt>
-              <dd>
-                {data.latency.mean_ms ?? '—'} / {data.latency.p50_ms ?? '—'} /{' '}
-                {data.latency.p95_ms ?? '—'} ms
-              </dd>
-            </div>
-            <div>
-              <dt>Quadros por segundo</dt>
-              <dd>{data.latency.fps_approx ?? 'não disponível'}</dd>
-            </div>
-            <div>
-              <dt>Execução</dt>
-              <dd>
-                {data.latency.execution_provider ?? 'não disponível'}
-                <small>{data.latency.hardware}</small>
-              </dd>
-            </div>
-          </dl>
-        </section>
-        <section className="panel" aria-label="Dados de treino">
-          <div className="section-heading">
-            <h2>Dados de treino</h2>
-          </div>
-          <dl className="data-list">
-            <div>
-              <dt>Conjunto</dt>
-              <dd>
-                {data.dataset_name ?? 'não disponível'}
-                <small>{data.dataset_version}</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Licença</dt>
-              <dd>{data.dataset_license ?? 'não disponível'}</dd>
-            </div>
-            <div>
-              <dt>Origem</dt>
-              <dd className="break">{data.dataset_source ?? 'não disponível'}</dd>
-            </div>
-          </dl>
-        </section>
-      </div>
       <section className="panel" aria-label="Fontes e limites">
         <div className="section-heading">
           <h2>Fontes externas e limites</h2>
@@ -1073,8 +946,9 @@ export function TaxonomyPanel({
         <span className="muted">{data.taxonomy_version}</span>
       </div>
       <p className="muted">
-        A detecção automática reconhece só os tipos abaixo. Outros problemas podem ser relatados com
-        foto e são avaliados pela equipe.
+        {automatic.length > 0
+          ? 'A detecção automática reconhece só os tipos abaixo. Outros problemas podem ser relatados com foto e são avaliados pela equipe.'
+          : 'Não há detector automático publicado. Relatos com foto são avaliados pela equipe.'}
       </p>
       <ul className="taxonomy-list">{automatic.map(item)}</ul>
       {includeDevelopment && others.length > 0 && (

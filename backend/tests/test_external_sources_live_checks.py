@@ -25,8 +25,6 @@ async def test_live_checks_use_only_small_requests_and_skip_optional_auth() -> N
             return httpx.Response(200, json={"version": 8, "sources": {}, "layers": []})
         if host == "geofabrik.example":
             return httpx.Response(200, text="0123456789abcdef0123456789abcdef  sudeste.osm.pbf")
-        if host == "huggingface.co":
-            return httpx.Response(200, json=[{"id": "public/example"}])
         return httpx.Response(404)
 
     settings = Settings(
@@ -51,10 +49,8 @@ async def test_live_checks_use_only_small_requests_and_skip_optional_auth() -> N
     assert "runtime territory not configured" in by_name["IBGE SIDRA"].detail
     assert by_name["OpenFreeMap"].status == "OK"
     assert by_name["Geofabrik"].status == "AVAILABLE"
-    assert by_name["Hugging Face"].status == "OK_PUBLIC"
     assert by_name["CARTO"].status == "FRONTEND_CONFIG_UNKNOWN"
     assert by_name["CARTO"].detail == "frontend configuration is not observable from backend"
-    assert by_name["Kaggle"].status == "KAGGLE_AUTH_REQUIRED"
     assert set(by_name) >= {
         "Supabase",
         "Nominatim",
@@ -146,4 +142,4 @@ async def test_runtime_health_degrades_without_inventing_success(failure):
     ):
         assert by_name[name].status == "UNAVAILABLE"
     lease.release.assert_awaited_once()
-    assert len(by_name) == 20
+    assert len(by_name) == 13

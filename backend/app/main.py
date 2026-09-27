@@ -135,8 +135,7 @@ def content_security_policy() -> str:
             "object-src 'none'",
             "frame-ancestors 'none'",
             "form-action 'self'",
-            # Só compilação WebAssembly (ONNX Runtime da detecção ao vivo); eval de JS segue proibido.
-            "script-src 'self' 'wasm-unsafe-eval'",
+            "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",  # MapLibre positioning and evidence boxes
             "worker-src 'self' blob:",
             "font-src 'self'",

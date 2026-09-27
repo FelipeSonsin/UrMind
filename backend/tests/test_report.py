@@ -46,7 +46,7 @@ def relatorio_completo(**kwargs) -> str:
         "urmind_class": UrmindClass.ROAD_D40,
         "risk": risco(),
         "visual_confidence": 0.87,
-        "model_version": "yolox-s@1.0.0",
+        "model_version": "synthetic-detector",
         "latitude": -23.5613,
         "longitude": -46.6560,
         "location_accuracy_m": 6.0,
@@ -109,7 +109,7 @@ def test_valores_aparecem_como_foram_informados():
     assert "-23.561300, -46.656000" in texto
     assert "±6 m" in texto
     assert "Avenida Paulista" in texto
-    assert "yolox-s@1.0.0" in texto
+    assert "synthetic-detector" in texto
 
 
 def test_acao_sai_sempre_como_sugestao():
@@ -367,7 +367,7 @@ def test_analysis_uses_catalog_action_and_responsibility_without_inference():
     result = build_urban_analysis(detail)
     assert result.action is None
     assert result.responsibility.status == "requires_triage"
-    assert "experimental" in " ".join(result.limitations)
+    assert "não comprova detecção visual" in " ".join(result.limitations).lower()
     assert "não mede profundidade" in " ".join(result.limitations)
 
 
@@ -389,7 +389,7 @@ def test_public_description_has_field_evidence_and_does_not_attribute_human_labe
     from app.services.report import build_urban_analysis
 
     result = build_urban_analysis(public_detail(reviewed=True))
-    assert "relatada" in result.description
+    assert "Categoria registrada" in result.description
     assert result.statement_evidence["description"]["kind"] == "reported"
     assert result.statement_evidence["description"]["field"] == "Event.urmind_class"
 

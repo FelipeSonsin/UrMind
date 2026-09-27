@@ -405,48 +405,6 @@ def test_trace_marca_etapa_sem_dado_como_indisponivel() -> None:
     assert {step.status for step in trace} == {"unavailable"}
 
 
-def test_transparencia_declara_estagio_do_baseline() -> None:
-    model = {
-        "name": "yolox-s-model-v1",
-        "version": "baseline_early-epoch9-abc",
-        "metrics": {
-            "stage": "baseline_early",
-            "stage_note": "treino interrompido antes do contrato",
-            "metrics_not_computed": ["ap75"],
-            "serving": {
-                "class_names": ["URMIND_ROAD_D00"],
-                "input_size": [640, 640],
-                "score_threshold": 0.25,
-            },
-            "evaluation_full": {
-                "map50": 0.11,
-                "map50_95": 0.036,
-                "precision": 0.05,
-                "recall": 0.46,
-                "f1": 0.09,
-                "samples": 3858,
-                "per_class": {},
-            },
-            "benchmark": {
-                "latency_ms": {"mean": 45.6, "p50": 45.5, "p95": 47.4},
-                "fps_approx": 21.9,
-                "execution_provider": "CPUExecutionProvider",
-                "hardware": {"cpu": "Intel64"},
-            },
-        },
-    }
-    transparency = public_view.transparency_public(
-        model, {"name": "rdd2022", "version": "abc", "license": "CC BY 4.0", "source": "figshare"}
-    )
-    assert transparency.stage == "baseline_early"
-    assert transparency.metrics.not_computed == ["ap75"]
-    assert transparency.latency.p95_ms == 47.4
-    assert any(
-        "não é o modelo final" in item or "interrompido" in item
-        for item in transparency.limitations
-    )
-
-
 def test_rotas_publicas_nao_exigem_autenticacao(client) -> None:
     for path in ("/api/v1/public/status", "/api/v1/public/events", "/api/v1/public/transparency"):
         assert client.get(path).status_code in (200, 503), path

@@ -17,7 +17,6 @@ import {
   parsePairingHash,
   readSignal,
   robotIceServers,
-  visionStatus,
 } from './robotCamera';
 
 describe('pareamento da câmera do robô', () => {
@@ -87,7 +86,7 @@ describe('configuração do STUN', () => {
     );
   });
 
-  it('câmera traseira em 720p, microfone desligado e envio até 60 fps', () => {
+  it('câmera traseira em 720p, microfone desligado e envio até 60 fps com banda para detalhe', () => {
     expect(ROBOT_PHONE_CONSTRAINTS.audio).toBe(false);
     expect(ROBOT_PHONE_CONSTRAINTS.video).toEqual({
       facingMode: 'environment',
@@ -95,8 +94,8 @@ describe('configuração do STUN', () => {
       height: { ideal: 720 },
     });
     expect(ROBOT_SEND_MAX_FPS).toBe(60);
-    // 720p a 60 fps nítido pede alguns megabits; abaixo de ~3 Mbps a imagem borra.
-    expect(ROBOT_SEND_MAX_BITRATE).toBeGreaterThanOrEqual(3_000_000);
+    // Bits por quadro para a visão computacional: mais que o dobro de 4,5 Mbps a 60 fps.
+    expect(ROBOT_SEND_MAX_BITRATE / ROBOT_SEND_MAX_FPS).toBeGreaterThanOrEqual(150_000);
   });
 });
 
@@ -151,47 +150,5 @@ describe('queda e reconexão', () => {
   it('as tentativas automáticas têm limite: nada de laço infinito', () => {
     expect(MAX_ICE_RESTARTS).toBeGreaterThan(0);
     expect(MAX_ICE_RESTARTS).toBeLessThanOrEqual(3);
-  });
-});
-
-describe('estado da visão computacional no vídeo remoto', () => {
-  const base = {
-    model: 'ready' as const,
-    connected: true,
-    videoReady: true,
-    detecting: false,
-    paused: false,
-  };
-
-  it('"Analisando" só com o worker pronto e a detecção ligada', () => {
-    expect(visionStatus({ ...base, detecting: true })).toEqual({
-      label: 'Analisando vídeo em tempo real',
-      tone: 'active',
-    });
-    // Modelo ainda carregando: nunca "pronta" nem "analisando" antes da hora.
-    expect(visionStatus({ ...base, model: 'loading', detecting: true })).toEqual({
-      label: 'Preparando detecção…',
-      tone: 'idle',
-    });
-    expect(visionStatus({ ...base, model: 'available', detecting: true }).label).toBe(
-      'Preparando detecção…',
-    );
-  });
-
-  it('sem imagem no vídeo, aguarda o vídeo; modelo indisponível é dito com clareza', () => {
-    expect(visionStatus({ ...base, videoReady: false, detecting: true }).label).toBe(
-      'Aguardando vídeo',
-    );
-    for (const model of ['unavailable', 'failed'] as const)
-      expect(visionStatus({ ...base, model, detecting: true })).toEqual({
-        label: 'Detecção indisponível',
-        tone: 'error',
-      });
-  });
-
-  it('pausado e pronto são estados distintos', () => {
-    expect(visionStatus({ ...base, paused: true }).label).toBe('Pausado');
-    expect(visionStatus(base).label).toBe('Detecção pronta');
-    expect(visionStatus({ ...base, model: 'checking' }).label).toBe('Verificando a detecção…');
   });
 });

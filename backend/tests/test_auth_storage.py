@@ -237,12 +237,10 @@ def test_photo_gate_uses_configured_resolution_and_reports_effective_threshold()
 @pytest.mark.parametrize(
     "endpoint",
     [
-        "operational_models",
         "operational_audit",
         "read_photo_gate",
         "operational_reports",
         "integration_health",
-        "operational_ground_truth",
     ],
 )
 async def test_operational_reads_deny_customer_before_repository_access(endpoint):
@@ -1453,117 +1451,6 @@ def test_papel_de_revisor_vem_de_app_metadata() -> None:
     assert not AuthenticatedUser(
         id="u", email=None, role="authenticated", urmind_role="viewer"
     ).can_review
-
-
-def test_registro_de_modelo_recusa_export_sem_metrica(tmp_path) -> None:
-    import asyncio
-    import json
-
-    from app.ml.serving import register_model
-
-    manifest = tmp_path / "export.json"
-    manifest.write_text(json.dumps({"validation_metrics": None, "parity": {"passed": True}}))
-    with pytest.raises(ValueError, match="VALIDATION"):
-        asyncio.run(register_model(manifest, promote=True))
-
-
-def test_gate_de_promocao_exige_fechamento_completo_do_modelo() -> None:
-    from app.ml.serving import validate_registration_manifest
-
-    record = {
-        "stage": "baseline_early",
-        "checkpoint_sha256": "a" * 64,
-        "onnx_sha256": "b" * 64,
-        "validation_metrics": {"map50_95": 0.1},
-        "parity": {"passed": True},
-        "training": {"completed_epochs": 30, "contract_max_epoch": 300},
-    }
-
-    with pytest.raises(ValueError, match="TRAINING_NOT_COMPLETE"):
-        validate_registration_manifest(record, promote=True)
-
-
-def test_gate_de_promocao_exige_selecao_calibracao_e_test() -> None:
-    from app.ml.serving import validate_registration_manifest
-
-    record = {
-        "stage": "final",
-        "checkpoint": "best",
-        "checkpoint_sha256": "a" * 64,
-        "onnx_sha256": "b" * 64,
-        "validation_metrics": {"map50_95": 0.1},
-        "parity": {"passed": True},
-        "training": {"completed_epochs": 300, "contract_max_epoch": 300},
-    }
-
-    with pytest.raises(ValueError, match="PROMOTION_GATE_FAIL"):
-        validate_registration_manifest(record, promote=True)
-
-
-def test_gate_de_promocao_recusa_json_legado_sem_closure_canonico() -> None:
-    from app.ml.serving import validate_registration_manifest
-
-    checkpoint_hash = "a" * 64
-    per_class = {label: {"ap50_95": 0.1} for label in ("D00", "D10", "D20", "D40")}
-    record = {
-        "stage": "final",
-        "checkpoint": "best",
-        "checkpoint_sha256": checkpoint_hash,
-        "onnx_sha256": "b" * 64,
-        "model_contract_sha256": "c" * 64,
-        "config_fingerprint": "d" * 64,
-        "dataset_fingerprint": "e" * 64,
-        "split_fingerprint": "f" * 64,
-        "class_mapping_fingerprint": "1" * 64,
-        "onnx_path": "models/serving/model.onnx",
-        "opset": 17,
-        "input_size": [640, 640],
-        "class_names": [
-            "URMIND_ROAD_D00",
-            "URMIND_ROAD_D10",
-            "URMIND_ROAD_D20",
-            "URMIND_ROAD_D40",
-        ],
-        "validation_metrics": {"map50_95": 0.1, "per_class": per_class},
-        "final_test_metrics": {"map50_95": 0.09, "per_class": per_class},
-        "parity": {"passed": True},
-        "training": {
-            "completed_epochs": 300,
-            "contract_max_epoch": 300,
-            "run": {
-                "mlflow_run_id": "run-1",
-                "status": "FINISHED",
-                "latest_train_epoch": 299.0,
-            },
-        },
-        "checkpoint_selection": {
-            "source": "VALIDATION",
-            "primary_metric": "map50_95",
-            "checkpoint_sha256": checkpoint_hash,
-            "value": 0.1,
-            "epoch": 29,
-            "global_step": 89370,
-        },
-        "operating_point": {
-            "source": "VALIDATION",
-            "confidence_threshold": 0.2,
-            "nms_threshold": 0.65,
-        },
-        "serving_score_threshold": 0.2,
-    }
-
-    with pytest.raises(ValueError, match="TRAINING_CONTRACT_MISMATCH|OPERATING_POINT_LOCK_INVALID"):
-        validate_registration_manifest(record, promote=True)
-
-
-def test_stage_final_depende_do_run_completo_nao_da_epoca_do_best() -> None:
-    from app.ml.serving import training_contract_complete
-
-    finished = {"status": "FINISHED", "latest_train_epoch": 299.0}
-    running = {"status": "RUNNING", "latest_train_epoch": 299.0}
-
-    assert training_contract_complete(finished, max_epoch=300)
-    assert not training_contract_complete(running, max_epoch=300)
 
 
 @pytest.mark.asyncio

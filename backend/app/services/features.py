@@ -2,105 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 SCHEMA_VERSION = "urmind-features-v1"
-VISUAL_LINEAGE_VERSION = "urmind-visual-lineage-v1"
 RECENT_WINDOW_DAYS = 30
-SEVERITY_DETECTION_SCHEMA_VERSION = "urmind-pavement-visual-severity-v1"
-SEVERITY_DETECTION_FEATURE_ORDER = (
-    "detected_class_D20",
-    "detected_class_D40",
-    "bbox_width_ratio",
-    "bbox_height_ratio",
-    "bbox_area_ratio",
-    "bbox_center_y_ratio",
-    "crop_brightness_mean",
-    "crop_brightness_std",
-    "crop_dark_fraction",
-    "crop_edge_mean",
-    "crop_color_range_mean",
-)
-
-
-def severity_detection_schema_sha256() -> str:
-    """Identity of the shared per-detection visual severity feature contract."""
-    payload = [SEVERITY_DETECTION_SCHEMA_VERSION, SEVERITY_DETECTION_FEATURE_ORDER, 32]
-    return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
-
-
-def build_severity_detection_features(
-    urmind_class: str, bbox: dict[str, float], image: Any
-) -> dict[str, float]:
-    """Extract only image/box facts available both in Attain and detector inference.
-
-    ``image`` must be in the same oriented pixel frame as ``bbox``. The label,
-    reviewer, source filename, detector confidence and post-review context never
-    enter this function. It predicts visual pavement distress level only.
-    """
-    if urmind_class not in {"URMIND_ROAD_D20", "URMIND_ROAD_D40"}:
-        raise ValueError("visual severity unsupported for this detector class")
-    if not isinstance(bbox, dict) or set(bbox) != {"x", "y", "width", "height"}:
-        raise ValueError("visual severity bbox contract invalid")
-    if any(
-        type(bbox[key]) not in {int, float} or not math.isfinite(bbox[key])
-        for key in ("x", "y", "width", "height")
-    ):
-        raise ValueError("visual severity bbox must be finite numeric")
-    x, y, width, height = (float(bbox[key]) for key in ("x", "y", "width", "height"))
-    if not (
-        0 <= x < 1
-        and 0 <= y < 1
-        and 0 < width <= 1
-        and 0 < height <= 1
-        and x + width <= 1.000001
-        and y + height <= 1.000001
-    ):
-        raise ValueError("visual severity bbox outside frame")
-    from PIL import Image  # Imported only when this optional model path is used.
-
-    if not isinstance(image, Image.Image) or image.width <= 0 or image.height <= 0:
-        raise ValueError("visual severity requires a decoded image")
-    left = max(0, min(image.width - 1, int(x * image.width)))
-    top = max(0, min(image.height - 1, int(y * image.height)))
-    right = max(left + 1, min(image.width, math.ceil((x + width) * image.width)))
-    bottom = max(top + 1, min(image.height, math.ceil((y + height) * image.height)))
-    crop = image.crop((left, top, right, bottom)).convert("RGB").resize(
-        (32, 32), Image.Resampling.BILINEAR
-    )
-    pixels = list(crop.getdata())
-    luma = [(0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255 for red, green, blue in pixels]
-    mean = sum(luma) / len(luma)
-    variance = sum((value - mean) ** 2 for value in luma) / len(luma)
-    edges = 0.0
-    for row in range(32):
-        for column in range(32):
-            index = row * 32 + column
-            if column < 31:
-                edges += abs(luma[index] - luma[index + 1])
-            if row < 31:
-                edges += abs(luma[index] - luma[index + 32])
-    values = {
-        "detected_class_D20": float(urmind_class == "URMIND_ROAD_D20"),
-        "detected_class_D40": float(urmind_class == "URMIND_ROAD_D40"),
-        "bbox_width_ratio": width,
-        "bbox_height_ratio": height,
-        "bbox_area_ratio": width * height,
-        "bbox_center_y_ratio": y + height / 2,
-        "crop_brightness_mean": mean,
-        "crop_brightness_std": math.sqrt(variance),
-        "crop_dark_fraction": sum(value < 0.25 for value in luma) / len(luma),
-        "crop_edge_mean": edges / (2 * 32 * 31),
-        "crop_color_range_mean": sum(max(pixel) - min(pixel) for pixel in pixels)
-        / (len(pixels) * 255),
-    }
-    return {name: values[name] for name in SEVERITY_DETECTION_FEATURE_ORDER}
 
 
 @dataclass(frozen=True)
@@ -116,7 +24,6 @@ class FeatureInput:
     history_status: str | None = None
     has_original_location: bool | None = None
     has_snapped_point: bool | None = None
-    vision_lineage: dict[str, Any] | None = None
 
 
 def _aware_timestamp(value: Any) -> datetime | None:
@@ -203,12 +110,6 @@ def build_features(source: FeatureInput) -> dict[str, Any]:
         ],
         "bounding_boxes": [d.bbox for d in detections],
         "capture_quality": source.capture.quality if source.capture else None,
-        "preprocessing_version": (source.vision_lineage or {}).get("preprocessing_version"),
-        "postprocessing_version": (source.vision_lineage or {}).get("postprocessing_version"),
-        "checkpoint_sha256": (source.vision_lineage or {}).get("checkpoint_sha256"),
-        "class_order": (source.vision_lineage or {}).get("class_order"),
-        "feature_version": VISUAL_LINEAGE_VERSION,
-        "model_contract_sha256": (source.vision_lineage or {}).get("model_contract_sha256"),
     }
     location = {
         "has_original_location": source.has_original_location,
@@ -273,9 +174,6 @@ def build_features(source: FeatureInput) -> dict[str, Any]:
         "provenance": {
             "visual": "detections linked to the event's primary Capture; capture.quality; "
             "other deduplicated Captures do not determine visual severity",
-            "visual_lineage": (
-                (source.vision_lineage or {}) | {"feature_version": VISUAL_LINEAGE_VERSION}
-            ),
             "location": "event location and snap; capture.source_location; road_segments",
             "event": "events; capture.source",
             "context": {

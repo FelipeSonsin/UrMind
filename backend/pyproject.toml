@@ -1,11 +1,9 @@
 [project]
 name = "urmind"
 version = "0.1.0"
-description = "UrMind — detecção rastreável de problemas urbanos em vias públicas"
+description = "UrMind — relatos de problemas urbanos com revisão humana"
 requires-python = ">=3.12,<3.13"
-# Somente o que o código usa hoje. Cada nova dependência do MASTER_PLAN §28
-# (PyTorch, YOLOX, ONNX Runtime, OpenCV, Pillow, XGBoost...) entra no passo que
-# realmente a exercita, nunca antes.
+# Dependências do serviço de relatos e revisão.
 dependencies = [
   "alembic>=1.13,<2",
   "fastapi>=0.115,<1",
@@ -15,11 +13,6 @@ dependencies = [
   "numpy>=2.3,<3",
   "pillow>=10.4,<12",
   "psycopg[binary,pool]>=3.2,<4",
-  # Project Sidewalk e RampNet publicam Parquet com a imagem dentro da linha;
-  # sem isto a camada de dataset não lê essas duas fontes. A faixa acompanha
-  # `scripts/datasets/requirements.txt`, que fixa 25.0.1: as duas listas
-  # descrevem o mesmo ambiente e não podem divergir.
-  "pyarrow>=17,<26",
   "pydantic>=2.8,<3",
   "pyjwt[crypto]>=2.10,<3",  # validação ES256 dos JWT do Supabase Auth
   "python-dotenv>=1.0,<2",
@@ -45,36 +38,6 @@ dev = [
   "pytest-asyncio>=0.24,<1",
   "ruff>=0.8,<1",
 ]
-ml = [
-  "loguru==0.7.3",
-  "onnx==1.19.1",  # export do modelo promovido (§9)
-  "onnxruntime==1.23.2",  # inferência do Worker (§9)
-  "onnxconverter-common==1.16.0",  # ONNX FP16 do navegador (browser_model --float16)
-  "opencv-python==4.14.0.94",
-  "packaging==26.3",
-  "psutil==7.1.0",
-  "pycocotools==2.0.11",
-  "torch==2.11.0+cu128",
-  "torchvision==0.26.0+cu128",
-]
-mlops = [
-  "dvc==3.67.1",
-  "mlflow-skinny==3.16.0",
-]
-tabular-ml = [
-  # Local/offline XGBoost preparation only. Never install with the web service.
-  "xgboost==3.4.1",
-  "psutil==7.1.0",
-  "scikit-learn==1.9.1",
-  "shap==0.52.0",
-]
-data-platforms = [
-  "huggingface-hub>=0.27,<2",
-]
-future-vision = [
-  # Metadado opcional apenas; não instalar durante o treino YOLOX ativo.
-  "timm>=1,<2",
-]
 
 [build-system]
 requires = ["setuptools>=75"]
@@ -84,8 +47,8 @@ build-backend = "setuptools.build_meta"
 app = ["templates/*.j2"]
 
 [tool.setuptools.packages.find]
-where = [".", "third_party/YOLOX"]
-include = ["app*", "yolox*"]
+where = ["."]
+include = ["app*"]
 exclude = ["alembic*", "tests*"]
 
 [tool.pytest.ini_options]

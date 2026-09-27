@@ -259,7 +259,7 @@ def decision_trace(
             step="detection",
             status="done" if detections else "unavailable",
             title="Detecção visual",
-            source=f"YOLOX · {model_version}" if model_version else "YOLOX",
+            source=f"Modelo histórico · {model_version}" if model_version else None,
             detail={
                 "classe": class_label(event.urmind_class),
                 "detecções": len(detections),
@@ -373,61 +373,21 @@ def scout_public(device: dict[str, Any] | None, camera: ScoutCameraPublic) -> Sc
     )
 
 
-def transparency_public(
-    model: dict[str, Any] | None, dataset: dict[str, Any] | None
-) -> TransparencyPublic:
-    metrics = (model or {}).get("metrics") or {}
-    evaluation = metrics.get("evaluation_full") or metrics.get("validation") or {}
-    benchmark = metrics.get("benchmark") or {}
-    serving = metrics.get("serving") or {}
-    latency = benchmark.get("latency_ms") or {}
-    limitations = [
-        "modelo em estágio inicial: as métricas abaixo são as medidas, sem arredondamento para cima",
-        "limiares de risco ainda não calibrados com eventos revisados em campo",
-        "o sistema não mede profundidade em centímetros nem afirma gravidade física",
-    ]
-    if metrics.get("stage_note"):
-        limitations.insert(0, str(metrics["stage_note"]))
+def transparency_public() -> TransparencyPublic:
     return TransparencyPublic(
-        model_name=(model or {}).get("name"),
-        model_version=(model or {}).get("version"),
-        stage=(model or {}).get("operational_status") or metrics.get("stage"),
-        stage_note=(
-            "Análise experimental; rejeitado para produção no Frozen Test."
-            if (model or {}).get("operational_status") == "EXPERIMENTAL_SHADOW"
-            and metrics.get("quality_classification") == "REJECTED"
-            else metrics.get("stage_note")
-        ),
-        classes=list(serving.get("class_names") or []),
-        input_size=list(serving.get("input_size") or []),
-        score_threshold=serving.get("score_threshold"),
-        metrics=ModelMetricsPublic(
-            map50=evaluation.get("map50"),
-            map50_95=evaluation.get("map50_95"),
-            precision=evaluation.get("precision"),
-            recall=evaluation.get("recall"),
-            f1=evaluation.get("f1"),
-            per_class={
-                label: {
-                    key: values.get(key) for key in ("precision", "recall", "f1", "ap50", "ap50_95")
-                }
-                for label, values in (evaluation.get("per_class") or {}).items()
-            },
-            not_computed=list(metrics.get("metrics_not_computed") or []),
-            samples=evaluation.get("samples"),
-        ),
-        latency=ModelLatencyPublic(
-            mean_ms=latency.get("mean"),
-            p50_ms=latency.get("p50"),
-            p95_ms=latency.get("p95"),
-            fps_approx=benchmark.get("fps_approx"),
-            execution_provider=benchmark.get("execution_provider"),
-            hardware=(benchmark.get("hardware") or {}).get("cpu"),
-        ),
-        dataset_name=(dataset or {}).get("name"),
-        dataset_version=(dataset or {}).get("version"),
-        dataset_license=(dataset or {}).get("license"),
-        dataset_source=(dataset or {}).get("source"),
+        model_name=None,
+        model_version=None,
+        stage=None,
+        stage_note=None,
+        classes=[],
+        input_size=[],
+        score_threshold=None,
+        metrics=ModelMetricsPublic(),
+        latency=ModelLatencyPublic(),
+        dataset_name=None,
+        dataset_version=None,
+        dataset_license=None,
+        dataset_source=None,
         context_sources=[
             {"source": "OpenStreetMap / Overpass", "use": "malha viária e equipamentos próximos"},
             {"source": "Nominatim", "use": "endereço aproximado (contexto, não é a coordenada)"},
@@ -438,5 +398,5 @@ def transparency_public(
             "responsável": "tabela de competência com fundamento legal; sem regra, requer triagem",
             "ação": "catálogo versionado de ações; sempre sugestão",
         },
-        limitations=limitations,
+        limitations=["Sem detector automático ativo.", "A publicação exige revisão humana."],
     )

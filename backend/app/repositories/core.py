@@ -44,20 +44,6 @@ GEOM_CAST = Geometry(geometry_type=None, srid=-1)
 logger = logging.getLogger(__name__)
 
 
-def _promotion_quality_approved(model: ModelVersion) -> bool:
-    metrics = model.metrics if isinstance(model.metrics, dict) else {}
-    return (
-        metrics.get("quality_classification") == "APPROVED"
-        and isinstance(metrics.get("frozen_test_quality"), dict)
-        and metrics["frozen_test_quality"].get("passed") is True
-        and isinstance(metrics.get("benchmark"), dict)
-        and metrics["benchmark"].get("passed") is True
-        and isinstance(metrics.get("closure_artifact"), dict)
-        and bool(metrics["closure_artifact"].get("path"))
-        and bool(metrics["closure_artifact"].get("sha256"))
-    )
-
-
 def _point(coordinate: Coordinate):
     """Coordenada → geography(Point,4326). Ordem PostGIS é (lon, lat)."""
     return func.ST_SetSRID(func.ST_MakePoint(coordinate.longitude, coordinate.latitude), 4326).cast(
@@ -1052,27 +1038,6 @@ class DecisionRepository:
             {"payload": policy.model_dump_json()},
         )
 
-    async def operational_models(
-        self, *, after: tuple[datetime, uuid.UUID] | None = None, limit: int = 50
-    ) -> list[dict[str, Any]]:
-        query = select(ModelVersion)
-        if after is not None:
-            query = query.where(tuple_(ModelVersion.created_at, ModelVersion.id) < after)
-        result = await self.session.execute(
-            query.order_by(ModelVersion.created_at.desc(), ModelVersion.id.desc()).limit(limit)
-        )
-        return [
-            {
-                "id": model.id,
-                "name": model.name,
-                "version": model.version,
-                "kind": model.kind,
-                "status": model.operational_status,
-                "created_at": model.created_at,
-            }
-            for model in result.scalars()
-        ]
-
     async def report_totals(self, days: int = 30) -> dict[str, Any]:
         if not 1 <= days <= 365:
             raise ValueError("period must be 1..365 days")
@@ -1308,73 +1273,6 @@ class DecisionRepository:
         )
         return result.scalar_one_or_none()
 
-    async def reviewed_event_ids(self, after: uuid.UUID | None, limit: int) -> list[uuid.UUID]:
-        rows = await self.session.execute(
-            text("""select distinct event_id from public.reviews
-            where event_id is not null and decision in ('confirm','correct','reject')
-            and (cast(:after as uuid) is null or event_id < cast(:after as uuid))
-            order by event_id desc limit :limit"""),
-            {"after": after, "limit": limit},
-        )
-        return list(rows.scalars())
-
-    async def dataset_candidates(
-        self, event_ids: list[uuid.UUID] | None = None
-    ) -> list[dict[str, Any]]:
-        """Revisões confirmadas/corrigidas com toda a linhagem da inferência original."""
-        result = await self.session.execute(
-            text(
-                "select r.id as review_id, r.decision, r.corrected_class, r.reviewer, r.notes, "
-                "r.created_at as reviewed_at, r.review_sequence, r.order_source, r.commit_order, "
-                "a.after_data->>'reviewer_role' as reviewer_role, "
-                "a.after_data->>'review_schema_version' as review_schema_version, "
-                "coalesce(a.after_data->>'adjudicated', 'false') = 'true' as adjudicated, "
-                "ST_Y(r.corrected_point::geometry) as corrected_latitude, "
-                "ST_X(r.corrected_point::geometry) as corrected_longitude, "
-                "e.id as event_id, e.event_key, e.urmind_class as inferred_class, "
-                "e.visual_confidence, e.factors->'evidence' as evidence, "
-                "ST_Y(e.point::geometry) as latitude, ST_X(e.point::geometry) as longitude, "
-                "c.id as capture_id, c.capture_key, c.storage_path, c.source, c.source_location, "
-                "c.captured_at, c.quality->>'sha256' as image_sha256, "
-                "m.id as model_version_id, m.name as model_name, m.version as model_version, "
-                "m.checksum as model_checksum, d.id as dataset_version_id, "
-                "d.name as dataset_name, d.version as dataset_version "
-                "from public.reviews r "
-                "left join public.audit_log a on a.after_data->>'review_id' = r.id::text "
-                "and a.operation = 'review' "
-                "join public.events e on e.id = r.event_id "
-                "left join public.captures c on c.id = e.capture_id "
-                "left join public.model_versions m on m.id = e.model_version_id "
-                "left join public.dataset_versions d on d.id = m.dataset_version_id "
-                "where (cast(:event_ids as uuid[]) is null or e.id=any(cast(:event_ids as uuid[]))) "
-                "order by r.commit_order nulls first, r.review_sequence"
-            ),
-            {"event_ids": event_ids},
-        )
-        rows = [dict(row) for row in result.mappings()]
-        all_ids = {
-            uuid.UUID(i)
-            for row in rows
-            for i in (row.get("evidence") or {}).get("detection_ids", [])
-        }
-        detections = await self.session.execute(select(Detection).where(Detection.id.in_(all_ids)))
-        by_id = {str(d.id): d for d in detections.scalars()}
-        for row in rows:
-            ids = (row.get("evidence") or {}).get("detection_ids", [])
-            row["original_detections"] = [
-                {
-                    "id": str(d.id),
-                    "capture_id": str(d.capture_id),
-                    "urmind_class": d.urmind_class,
-                    "confidence": d.confidence,
-                    "bbox": d.bbox,
-                    "model_version_id": str(d.model_version_id) if d.model_version_id else None,
-                }
-                for value in ids
-                if (d := by_id.get(value)) is not None
-            ]
-        return rows
-
     async def snapshot_before_review(
         self, event_id: uuid.UUID, cutoff: datetime
     ) -> RiskAssessment | None:
@@ -1546,93 +1444,8 @@ class InferenceRepository:
             "captures_rejected": "not_persisted; see API log event capture_rejected",
         }
 
-    async def merge_model_metrics(self, model_version_id: uuid.UUID, key: str, value: Any) -> None:
-        """Acrescenta um relatório (avaliação, benchmark) sem apagar as métricas de registro."""
-        model = await self.session.get(ModelVersion, model_version_id)
-        if model is None:
-            raise ValueError("model_version inexistente")
-        model.metrics = {**(model.metrics or {}), key: value}
-        await self.session.flush()
-
-    async def dataset_version(self, dataset_version_id: uuid.UUID) -> DatasetVersion | None:
-        return await self.session.get(DatasetVersion, dataset_version_id)
-
     async def model_version(self, model_version_id: uuid.UUID) -> ModelVersion | None:
         return await self.session.get(ModelVersion, model_version_id)
-
-    async def shadow_vision_model(self, model_version_id: uuid.UUID) -> ModelVersion | None:
-        model = await self.session.get(ModelVersion, model_version_id)
-        if model is None or model.kind != "vision" or model.promoted_at is not None:
-            return None
-        if model.operational_status != "EXPERIMENTAL_SHADOW":
-            return None
-        metrics = model.metrics if isinstance(model.metrics, dict) else {}
-        from app.config import URMIND_DEV_SHADOW_REF
-
-        if (
-            metrics.get("shadow_scope") != "URMIND_DEV_ONLY"
-            or metrics.get("shadow_project_ref") != URMIND_DEV_SHADOW_REF
-        ):
-            return None
-        from app.ml.serving import shadow_authorization_current
-
-        # Revoking or editing the artifact-bound authorization takes effect here.
-        if not shadow_authorization_current(metrics):
-            logger.error("shadow_authorization_invalid: %s", model_version_id)
-            return None
-        if model.dataset_version_id is None or not model.checksum:
-            return None
-        if await self.session.get(DatasetVersion, model.dataset_version_id) is None:
-            return None
-        return model
-
-    async def configured_vision_model(
-        self, mode: str, shadow_model_version_id: uuid.UUID | None
-    ) -> ModelVersion | None:
-        if mode == "shadow" and shadow_model_version_id is not None:
-            return await self.shadow_vision_model(shadow_model_version_id)
-        if mode == "production":
-            try:
-                return await self.promoted_vision_model()
-            except RuntimeError as exc:
-                logger.error("production_model_unavailable: %s", exc)
-                return None
-        return None
-
-    async def model_version_for_update(self, model_version_id: uuid.UUID) -> ModelVersion | None:
-        result = await self.session.execute(
-            select(ModelVersion).where(ModelVersion.id == model_version_id).with_for_update()
-        )
-        return result.scalar_one_or_none()
-
-    async def promoted_vision_model(self) -> ModelVersion | None:
-        result = await self.session.execute(
-            select(ModelVersion)
-            .where(ModelVersion.kind == "vision", ModelVersion.promoted_at.is_not(None))
-            .order_by(ModelVersion.promoted_at.desc())
-            .limit(2)
-        )
-        models = result.scalars().all()
-        if len(models) > 1:
-            raise RuntimeError("múltiplos modelos vision promovidos")
-        if models and not _promotion_quality_approved(models[0]):
-            raise RuntimeError("modelo vision promovido sem quality gate aprovado")
-        if models and models[0].operational_status != "PRODUCTION_APPROVED":
-            raise RuntimeError("modelo vision promovido está arquivado ou em quarentena")
-        if models:
-            from app.ml.serving import validate_registered_model_evidence
-
-            model = models[0]
-            dataset = (
-                await self.session.get(DatasetVersion, model.dataset_version_id)
-                if model.dataset_version_id is not None
-                else None
-            )
-            try:
-                validate_registered_model_evidence(model, dataset)
-            except (OSError, TypeError, ValueError, KeyError) as exc:
-                raise RuntimeError("modelo vision promovido sem closure íntegro") from exc
-        return models[0] if models else None
 
     async def has_detections_from(self, capture_id: uuid.UUID, model_version_id: uuid.UUID) -> bool:
         result = await self.session.execute(
@@ -1659,70 +1472,6 @@ class InferenceRepository:
             )
         await self.session.flush()
 
-    async def upsert_dataset_version(self, **fields: Any) -> DatasetVersion:
-        result = await self.session.execute(
-            select(DatasetVersion).where(
-                DatasetVersion.name == fields["name"], DatasetVersion.version == fields["version"]
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing is not None:
-            return existing
-        dataset = DatasetVersion(**fields)
-        self.session.add(dataset)
-        await self.session.flush()
-        return dataset
-
-    async def register_model(
-        self, *, refresh_unpromoted: bool = False, **fields: Any
-    ) -> ModelVersion:
-        result = await self.session.execute(
-            select(ModelVersion).where(
-                ModelVersion.name == fields["name"], ModelVersion.version == fields["version"]
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing is not None:
-            if refresh_unpromoted:
-                if (
-                    existing.promoted_at is not None
-                    or existing.checksum != fields["checksum"]
-                    or existing.kind != fields["kind"]
-                    or existing.dataset_version_id != fields["dataset_version_id"]
-                ):
-                    raise ValueError("ModelVersion existente diverge do fechamento validado")
-                existing.metrics = fields["metrics"]
-                await self.session.flush()
-            return existing
-        model = ModelVersion(**fields)
-        self.session.add(model)
-        await self.session.flush()
-        return model
-
-    async def promote_exclusive(self, model: ModelVersion, *, promoted_at: datetime) -> None:
-        """Promove uma versão e despromove qualquer outra da mesma função."""
-        if model.kind == "vision" and not _promotion_quality_approved(model):
-            raise ValueError("ModelVersion sem quality gate aprovado")
-        if model.kind == "vision":
-            from app.ml.serving import validate_registered_model_evidence
-
-            dataset = (
-                await self.session.get(DatasetVersion, model.dataset_version_id)
-                if model.dataset_version_id is not None
-                else None
-            )
-            validate_registered_model_evidence(model, dataset)
-        await self.session.execute(
-            text("select pg_advisory_xact_lock(hashtext(:lock_key))"),
-            {"lock_key": f"urmind:model-promotion:{model.kind}"},
-        )
-        await self.session.execute(
-            update(ModelVersion)
-            .where(ModelVersion.kind == model.kind, ModelVersion.id != model.id)
-            .values(promoted_at=None)
-        )
-        model.promoted_at = promoted_at
-        await self.session.flush()
 
 
 class PublicRepository:

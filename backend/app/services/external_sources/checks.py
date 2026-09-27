@@ -17,7 +17,6 @@ from app.services.external_sources.registry import integration_registry
 from app.services.external_sources.sidra import IbgeSidraProvider, municipal_population_query
 
 OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
-HF_PUBLIC_DATASETS_API = "https://huggingface.co/api/datasets?limit=1&sort=downloads"
 
 
 @dataclass(frozen=True)
@@ -192,21 +191,6 @@ async def _run_live_checks(
         statuses["Geofabrik"] = ("AVAILABLE", f"metadata HTTP {response.status_code}")
     except (httpx.HTTPError, TypeError, ValueError) as exc:
         statuses["Geofabrik"] = ("UNAVAILABLE", type(exc).__name__)
-
-    try:
-        response = await http.get(HF_PUBLIC_DATASETS_API, provider="hugging_face")
-        response.raise_for_status()
-        payload = response.json()
-        if (
-            not isinstance(payload, list)
-            or not payload
-            or not isinstance(payload[0], dict)
-            or not isinstance(payload[0].get("id"), str)
-        ):
-            raise TypeError("catalogo publico Hugging Face sem id")
-        statuses["Hugging Face"] = ("OK_PUBLIC", f"HTTP {response.status_code}; token not used")
-    except (httpx.HTTPError, TypeError, ValueError) as exc:
-        statuses["Hugging Face"] = ("UNAVAILABLE", type(exc).__name__)
 
     return tuple(
         LiveCheck(

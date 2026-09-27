@@ -142,47 +142,6 @@ export const api = {
       params.set('end', new Date(localDayStart(filters.to) + 86_400_000 - 1).toISOString());
     return authenticatedDownload(`/captures/export?${params}`, signal);
   },
-  exportGroundTruth: (signal: AbortSignal) =>
-    authenticatedDownload('/ops/ground-truth/export', signal),
-  groundTruthSummary: (signal?: AbortSignal) =>
-    request(
-      '/ops/ground-truth/summary',
-      z.object({
-        reviewed_events: z.number(),
-        eligible_events: z.number(),
-        counts_by_class: z.record(z.string(), z.number()),
-        // Optional: older API deployments report only the totals above.
-        confirmed: z.number().optional(),
-        rejected: z.number().optional(),
-        corrected: z.number().optional(),
-        conflicts: z.number().optional(),
-        independent_groups: z.number().optional(),
-        ineligible_reasons: z.record(z.string(), z.number()).optional(),
-        training_authorized: z.literal(false),
-      }),
-      { signal },
-    ),
-  groundTruth: (signal?: AbortSignal, cursor: string | null = null) =>
-    request(
-      `/ops/ground-truth${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
-      z.object({
-        entries: z.array(
-          z.object({
-            event_id: z.string(),
-            status: z.string(),
-            issue_code: z.string().nullable(),
-            eligible: z.boolean(),
-            reason: z.string().nullable(),
-          }),
-        ),
-        counts_by_class: z.record(z.string(), z.number()),
-        dataset: z.record(z.string(), z.unknown()),
-        rows: z.array(z.record(z.string(), z.unknown())),
-        training_authorized: z.literal(false),
-        next_cursor: z.string().nullable().optional(),
-      }),
-      { signal },
-    ),
   reportTotals: (signal?: AbortSignal, days = 30) =>
     request(
       `/ops/reports?days=${days}`,
@@ -221,21 +180,6 @@ export const api = {
           latency_ms: z.number().nullable(),
           last_success: z.string().nullable(),
           last_failure: z.string().nullable(),
-        }),
-      ),
-      { signal },
-    ),
-  operationalModels: (cursor: string | null, signal?: AbortSignal) =>
-    request(
-      `/ops/models?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
-      z.array(
-        z.object({
-          id: z.string(),
-          name: z.string(),
-          version: z.string(),
-          kind: z.string(),
-          status: z.string(),
-          created_at: z.string(),
         }),
       ),
       { signal },

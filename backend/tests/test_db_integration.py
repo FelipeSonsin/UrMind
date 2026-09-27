@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import exc, text
 
+from app.auth import AuthenticatedUser
 from app.config import get_settings
 from app.db.migrate import current_revision, head_revision, pending, upgrade
 from app.db.session import Database
@@ -57,7 +58,6 @@ LAT, LON = -23.5613, -46.6560
 @pytest.mark.asyncio
 async def test_manual_location_schedules_address_and_stale_result_is_ignored(database):
     from app.api.v1.core import capture_location
-    from app.auth import AuthenticatedUser
     from app.repositories.core import DecisionRepository
     from app.services.context import pending_address
 
@@ -284,7 +284,6 @@ async def test_human_report_real_storage_publication_and_cleanup(database):
     from PIL import Image
 
     from app.api.v1.core import publish_event, review_capture, upload_photo
-    from app.auth import AuthenticatedUser
     from app.repositories.core import DecisionRepository, PublicRepository
     from app.schemas.core import CaptureReviewCreate, PublicationRequest
     from tests.test_exif import build_jpeg, gps_block
@@ -741,7 +740,6 @@ async def test_report_identity_retries_forced_collisions_in_isolated_temp_tables
 @pytest.mark.asyncio
 async def test_additional_evidence_has_one_point_and_can_be_detached(database):
     from app.api.v1.core import detach_evidence
-    from app.auth import AuthenticatedUser
     from app.repositories.core import DecisionRepository
 
     owner = str(uuid.uuid4())
@@ -888,10 +886,7 @@ async def test_photo_admission_lease_is_shared_and_expiring(database):
 
 @pytest.mark.asyncio
 async def test_operational_policy_persistence_and_rls(database):
-    from fastapi import Response
 
-    from app.api.v1.core import export_ground_truth, ground_truth_summary
-    from app.auth import AuthenticatedUser
     from app.repositories.core import DecisionRepository
     from app.schemas.core import PhotoGatePolicy
 
@@ -908,26 +903,8 @@ async def test_operational_policy_persistence_and_rls(database):
         assert "actor" not in json.dumps(totals["gate_metrics"])
         with pytest.raises(ValueError):
             await repo.report_totals(0)
-        models = await repo.operational_models()
-        assert all("metrics" not in row and "checksum" not in row for row in models)
-        if models:
-            last = models[-1]
-            next_models = await repo.operational_models(
-                after=(last["created_at"], last["id"]), limit=50
-            )
-            assert not ({row["id"] for row in models} & {row["id"] for row in next_models})
         rows = await repo.audit_page(operation=None, after=None, limit=3)
         assert len(rows) <= 3 and all("actor" not in row for row in rows)
-        service = CoreService(CaptureRepository(session), EventRepository(session), repo)
-        assert (await service.tabular_ground_truth())["training_authorized"] is False
-        reviewer = AuthenticatedUser("test-reviewer", None, "authenticated", urmind_role="reviewer")
-        summary = await ground_truth_summary(reviewer, service, Response())
-        assert summary["training_authorized"] is False
-        assert summary["eligible_events"] <= summary["reviewed_events"]
-        export = await export_ground_truth(reviewer, service)
-        lines = [json.loads(line) async for line in export.body_iterator]
-        assert lines[0]["training_authorized"] is False
-        assert len(lines) - 1 == summary["eligible_events"]
         assert await session.scalar(
             text(
                 "select relrowsecurity from pg_class where oid='public.operational_configuration'::regclass"
@@ -1211,7 +1188,6 @@ async def test_photo_report_marker_exif_storage_owner_and_missing_location(datab
     from PIL import Image
 
     from app.api.v1.core import upload_photo
-    from app.auth import AuthenticatedUser
     from tests.test_exif import build_jpeg, gps_block
 
     owner = str(uuid.uuid4())
@@ -1634,7 +1610,6 @@ async def test_storage_compensates_real_db_constraint_failure(database):
     from PIL import Image
 
     from app.api.v1.core import upload_photo
-    from app.auth import AuthenticatedUser
     from app.services.storage import StorageError
 
     buffer = io.BytesIO()
@@ -2369,135 +2344,6 @@ async def test_deteccoes_viram_evento_deduplicado_com_risco_revisao_e_auditoria(
             assert after["corrected_class"] == "URMIND_ROAD_D20"
         finally:
             await session.rollback()
-
-
-@pytest.mark.asyncio
-async def test_ground_truth_consensus_export_with_real_storage(database, tmp_path):
-    from PIL import Image
-
-    from app.repositories.core import DecisionRepository
-    from app.schemas.core import DetectionCreate, ReviewCreate, ReviewDecision
-    from app.services.review_export import (
-        eligible_candidates,
-        verify_candidate_objects,
-        write_batch,
-    )
-
-    buffer = io.BytesIO()
-    Image.new("RGB", (8, 8), (90, 20, 10)).save(buffer, format="JPEG")
-    image = validate_image(buffer.getvalue())
-    path = object_path("integration-fixture", image, datetime.now(UTC), upload_id=uuid.uuid4().hex)
-    storage = StorageClient(get_settings())
-    uploaded = await storage.upload(path, image)
-    assert uploaded
-    async with database.sessionmaker() as session:
-        try:
-            suffix = uuid.uuid4().hex
-            dataset_id = await session.scalar(
-                text(
-                    "insert into public.dataset_versions(name, version, source) "
-                    "values (:name, 'integration', 'test_fixture') returning id"
-                ),
-                {"name": f"test-dataset-{suffix}"},
-            )
-            model_id = await session.scalar(
-                text(
-                    "insert into public.model_versions(name, kind, version, dataset_version_id) "
-                    "values (:name, 'vision', 'integration', :dataset_id) returning id"
-                ),
-                {"name": f"test-model-{suffix}", "dataset_id": dataset_id},
-            )
-            service = CoreService(
-                CaptureRepository(session), EventRepository(session), DecisionRepository(session)
-            )
-            capture = await service.register_capture(
-                CaptureCreate(
-                    capture_key=f"integration-gt-{suffix}",
-                    source=CaptureSource.PWA_PHOTO,
-                    source_location=LocationSource.GPS_DEVICE,
-                    captured_at=NOW,
-                    storage_path=path,
-                    coordinate=Coordinate(latitude=LAT, longitude=LON, accuracy_m=5),
-                    quality={"sha256": image.sha256, "integration_fixture": True},
-                    detections=[
-                        DetectionCreate(
-                            urmind_class=UrmindClass.ROAD_D40,
-                            confidence=0.91,
-                            bbox={"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.2},
-                            model_version_id=model_id,
-                        )
-                    ],
-                )
-            )
-            detection_id = await session.scalar(
-                text("select id from public.detections where capture_id=:capture_id"),
-                {"capture_id": capture["id"]},
-            )
-            event = await service.register_event(
-                EventCreate(
-                    event_key=f"integration-gt-event-{suffix}",
-                    capture_id=capture["id"],
-                    urmind_class=UrmindClass.ROAD_D40,
-                    evidence_mode=EvidenceMode.PHOTO,
-                    occurred_at=NOW,
-                    coordinate=Coordinate(latitude=LAT, longitude=LON, accuracy_m=5),
-                    visual_confidence=0.91,
-                    model_version_id=model_id,
-                    factors={
-                        "evidence": {
-                            "capture_ids": [str(capture["id"])],
-                            "detection_ids": [str(detection_id)],
-                        }
-                    },
-                )
-            )
-            first = await service.review_event(
-                event["id"],
-                ReviewCreate(decision=ReviewDecision.CONFIRM),
-                reviewer=f"integration-reviewer-1-{suffix}",
-                reviewer_role="reviewer",
-            )
-            assert first["ground_truth_status"] == "requires_second_review"
-            assert eligible_candidates(await service.decisions.dataset_candidates()) == []
-            second = await service.review_event(
-                event["id"],
-                ReviewCreate(decision=ReviewDecision.CONFIRM),
-                reviewer=f"integration-reviewer-2-{suffix}",
-                reviewer_role="reviewer",
-            )
-            assert second["ground_truth_status"] == "consensus"
-            records = eligible_candidates(await service.decisions.dataset_candidates())
-            assert len(records) == 1
-            assert records[0]["label"]["inferred_class"] == UrmindClass.ROAD_D40.value
-            assert records[0]["inference_lineage"]["model_version_id"] == model_id
-            assert records[0]["inference_lineage"]["dataset_version_id"] == dataset_id
-            await verify_candidate_objects(records, storage)
-            manifest = write_batch(records, tmp_path)
-            assert manifest["records"] == 1
-            assert manifest["retraining_triggered"] is False
-            assert (tmp_path / manifest["file"]).is_file()
-            conflicting = await service.review_event(
-                event["id"],
-                ReviewCreate(
-                    decision=ReviewDecision.CORRECT,
-                    corrected_class=UrmindClass.ROAD_D20,
-                ),
-                reviewer=f"integration-reviewer-3-{suffix}",
-                reviewer_role="reviewer",
-            )
-            assert conflicting["ground_truth_status"] == "conflicted"
-            assert eligible_candidates(await service.decisions.dataset_candidates()) == []
-            adjudicated = await service.review_event(
-                event["id"],
-                ReviewCreate(decision=ReviewDecision.CONFIRM, adjudicate=True),
-                reviewer=f"integration-admin-{suffix}",
-                reviewer_role="admin",
-            )
-            assert adjudicated["ground_truth_status"] == "adjudicated"
-            assert len(eligible_candidates(await service.decisions.dataset_candidates())) == 1
-        finally:
-            await session.rollback()
-            await storage.delete(path)
 
 
 @pytest.mark.asyncio

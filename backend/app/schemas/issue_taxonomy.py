@@ -1,20 +1,16 @@
-"""Registro canônico `urmind-issue-taxonomy-v3` (candidatas, sem ativação visual).
+"""Registro canônico de problemas urbanos, sem detector visual ativo.
 
 Este módulo declara *o que o UrMind pretende reconhecer*, não o que ele já
 reconhece. A diferença é o campo `model_support_status`:
 
-- D00/D10/D20/D40 continuam as únicas classes com modelo, e o único modelo
-  existente é `EXPERIMENTAL_SHADOW` rejeitado no Frozen Test. Por isso elas são
-  `EXPERIMENTAL_MODEL`, nunca `ACTIVE_MODEL`.
-- Toda classe nova nasce `DATA_REQUIRED`: sem dataset curado, protocolo de
+- Toda classe nasce `DATA_REQUIRED`: sem dataset curado, protocolo de
   anotação e validação, nenhum detector pode emiti-la (`model_may_emit`).
 
 Exemplos reais enviados por usuários (por exemplo, a foto de árvore caída) só
 podem virar `candidate_real_world_example` depois de revisão humana. Isso não
 cria Ground Truth, autorização de treino nem prova de capacidade do modelo.
 
-O `UrmindClass` do V1 fica intacto. Eventos históricos D00–D40 não são
-reclassificados por esta taxonomia.
+Eventos históricos preservam seus códigos de classe registrados.
 """
 
 from __future__ import annotations
@@ -164,12 +160,12 @@ def _road(
         family=IssueFamily.ROAD_SURFACE,
         display_name_pt=pt,
         display_name_en=en,
-        description=f"Categoria RDD2022 preservada da taxonomia V1 ({code.value}).",
+        description=f"Categoria de dano viário ({code.value}).",
         visual_definition=visual,
         included_examples=inc,
         excluded_examples=exc,
-        model_support_status=ModelSupportStatus.EXPERIMENTAL_MODEL,
-        dataset_status=DatasetReadiness.CURATED_IN_USE,
+        model_support_status=ModelSupportStatus.DATA_REQUIRED,
+        dataset_status=DatasetReadiness.NEEDS_MORE_DATA,
         review_status=TaxonomyReviewStatus.REVIEWED,
         responsibility_domain=ResponsibilityDomain.ROAD_MAINTENANCE,
         legacy_responsibility_domain="pavement",

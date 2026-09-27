@@ -2115,6 +2115,36 @@ tbody tr:hover {
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
+/* Número do quadro analisado, no canto oposto ao estado. */
+.live-stage-tag.is-count {
+  top: 10px;
+  bottom: auto;
+  color: var(--text-secondary);
+}
+/* Visão computacional trabalhando: uma linha de varredura percorre o vídeo enquanto o
+   modelo analisa. Só transform (compositor); some com "reduzir movimento". */
+.live-stage.is-analyzing .live-frame {
+  overflow: hidden;
+}
+.live-stage.is-analyzing .live-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0 84%,
+    color-mix(in srgb, var(--neon-hot) 18%, transparent) 98%,
+    var(--neon-hot) 100%
+  );
+  transform: translateY(-100%);
+  animation: cv-scan 2.8s linear infinite;
+}
+@keyframes cv-scan {
+  to {
+    transform: translateY(0);
+  }
+}
 /* Estado da visão computacional sobre o vídeo: ponto verde pulsando só quando analisa. */
 .cv-state.is-idle::before {
   background: var(--text-secondary);

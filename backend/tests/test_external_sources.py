@@ -11,11 +11,6 @@ from structlog.testing import capture_logs
 
 from app.config import Settings
 from app.services.external_sources import sidra as sidra_module
-from app.services.external_sources.auth import (
-    ExternalAuthError,
-    require_hf_token,
-    require_kaggle_token,
-)
 from app.services.external_sources.bulk import (
     BulkSelectionError,
     CnefeSelection,
@@ -33,13 +28,6 @@ EXPECTED_NAMES = {
     "CARTO",
     "IBGE SIDRA",
     "IBGE CNEFE",
-    "RDD2022",
-    "UNIVALI",
-    "timm",
-    "YOLOX",
-    "SAM2",
-    "Hugging Face",
-    "Kaggle",
     "Webots",
 }
 
@@ -51,8 +39,6 @@ def test_settings_external_integrations_are_optional_and_canonical() -> None:
     assert settings.geofabrik_sudeste_pbf_url.endswith("/sudeste-latest.osm.pbf")
     assert settings.ibge_sidra_base_url == "https://apisidra.ibge.gov.br"
     assert settings.ibge_sidra_municipality_code is None
-    assert settings.hf_token is None
-    assert settings.kaggle_api_token is None
     assert settings.external_http_timeout_seconds == 15
     assert not hasattr(settings, "vite_carto_basemaps_api_key")
 
@@ -153,15 +139,10 @@ def test_registry_keeps_optional_auth_and_future_tools_non_blocking(repo_root: P
     assert entries["CARTO"].provenance == "browser_map; frontend_config_not_observable"
     assert entries["IBGE SIDRA"].status == "TERRITORY_CONFIG_REQUIRED"
     assert entries["IBGE SIDRA"].configured is False
-    assert entries["Kaggle"].status == "KAGGLE_AUTH_REQUIRED"
-    assert entries["SAM2"].status == "PREPARED_FOR_V2"
     assert entries["Webots"].status in {"PREPARED", "NOT_INSTALLED_PREPARED"}
     assert entries["Geofabrik"].tool_status in {"AVAILABLE", "TOOL_NOT_INSTALLED"}
-    assert entries["Kaggle"].tool_status in {"AVAILABLE", "TOOL_NOT_INSTALLED"}
     assert entries["Webots"].tool_status in {"AVAILABLE", "TOOL_NOT_INSTALLED"}
-    assert entries["RDD2022"].status == "DONE"
-    assert entries["UNIVALI"].status == "PARTIAL"
-    assert entries["UNIVALI"].configured is True
+    assert "RDD2022" not in entries
 
     configured = {
         entry.name: entry
@@ -178,75 +159,15 @@ def test_registry_does_not_promote_empty_manifests(tmp_path: Path) -> None:
     (tmp_path / "datasets/manifests").mkdir(parents=True)
     (tmp_path / "datasets/splits").mkdir(parents=True)
     (tmp_path / "datasets/metadata").mkdir(parents=True)
-    (tmp_path / "backend/third_party/YOLOX").mkdir(parents=True)
-    (tmp_path / "datasets/manifests/rdd2022.json").write_text("{}", encoding="utf-8")
     (tmp_path / "datasets/manifests/univali_br.json").write_text("{}", encoding="utf-8")
     (tmp_path / "datasets/splits/univali_br_external_test_splits.json").write_text(
         "{}", encoding="utf-8"
     )
-    (tmp_path / "datasets/metadata/yolox_model_v1.json").write_text("{}", encoding="utf-8")
 
     entries = {
         entry.name: entry for entry in integration_registry(Settings(), project_root=tmp_path)
     }
 
-    assert entries["RDD2022"].status != "DONE"
-    assert entries["UNIVALI"].status != "READY"
-    assert entries["YOLOX"].status != "DONE"
-
-
-def test_registry_rejects_tampered_rdd_authorization(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "datasets/manifests/rdd2022.json"
-    authorization_path = tmp_path / "datasets/reports/rdd2022_split_authorization_status.json"
-    registry_path = tmp_path / "datasets/metadata/artifact_registry.json"
-    manifest_path.parent.mkdir(parents=True)
-    authorization_path.parent.mkdir(parents=True)
-    registry_path.parent.mkdir(parents=True)
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "name": "rdd2022",
-                "license": "CC BY 4.0",
-                "classes": [
-                    "URMIND_ROAD_D00",
-                    "URMIND_ROAD_D10",
-                    "URMIND_ROAD_D20",
-                    "URMIND_ROAD_D40",
-                ],
-                "split": {"inventory": {"checksums_verified": True, "state": "ready"}},
-            }
-        ),
-        encoding="utf-8",
-    )
-    authorization_path.write_text(
-        json.dumps({"status": "AUTHORIZED_FOR_MODEL_V1"}), encoding="utf-8"
-    )
-    registry_path.write_text(
-        json.dumps(
-            {
-                "artifacts": [
-                    {
-                        "path": "datasets/manifests/rdd2022.json",
-                        "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
-                    },
-                    {
-                        "path": "datasets/reports/rdd2022_split_authorization_status.json",
-                        "sha256": hashlib.sha256(authorization_path.read_bytes()).hexdigest(),
-                    },
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    authorization_path.write_text(
-        json.dumps({"status": "AUTHORIZED_FOR_MODEL_V1", "tampered": True}), encoding="utf-8"
-    )
-
-    entries = {
-        entry.name: entry for entry in integration_registry(Settings(), project_root=tmp_path)
-    }
-
-    assert entries["RDD2022"].status == "INVALID_OR_MISSING"
 
 
 @pytest.mark.asyncio
@@ -597,15 +518,6 @@ async def test_cnefe_download_resolves_only_the_selected_municipality(tmp_path: 
     metadata = json.loads(result.provenance_path.read_text(encoding="utf-8"))
     assert metadata["selection"] == {"uf": "SP", "municipality_code": "3550308"}
     assert metadata["sha256_local"] == hashlib.sha256(archive).hexdigest()
-
-
-def test_private_platform_operations_return_explicit_auth_errors() -> None:
-    with pytest.raises(ExternalAuthError, match="HF_AUTH_REQUIRED"):
-        require_hf_token(Settings())
-    with pytest.raises(ExternalAuthError, match="KAGGLE_AUTH_REQUIRED"):
-        require_kaggle_token(Settings())
-    assert require_hf_token(Settings(HF_TOKEN="hf_test")) == "hf_test"
-    assert require_kaggle_token(Settings(KAGGLE_API_TOKEN="kg_test")) == "kg_test"
 
 
 @pytest.mark.asyncio

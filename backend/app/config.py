@@ -2,9 +2,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
 from urllib.parse import urlsplit
-from uuid import UUID
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,32 +21,6 @@ if os.environ.get("ENVIRONMENT") != "test":
 
 JWKS_PATH = "/auth/v1/.well-known/jwks.json"
 
-# Dados brutos de dataset (§10.2). O padrão fica em datasets/ dentro do projeto,
-# mas URMIND_DATASETS_DIR permite apontar para fora — disco externo ou pasta que
-# não seja sincronizada em nuvem. Nenhum código abaixo assume que a pasta existe.
-DEFAULT_DATASETS_DIR = PROJECT_DIR / "datasets"
-
-
-def datasets_dir() -> Path:
-    """Raiz de datasets, com override por ambiente. Não cria a pasta."""
-    override = os.environ.get("URMIND_DATASETS_DIR")
-    return Path(override).expanduser().resolve() if override else DEFAULT_DATASETS_DIR
-
-
-def datasets_raw_dir() -> Path:
-    """Arquivos originais, jamais alterados (datasets/README.md)."""
-    return datasets_dir() / "raw"
-
-
-def datasets_manifests_dir() -> Path:
-    """Manifestos derivados. Ficam sempre no projeto, mesmo com raw/ fora dele.
-
-    São arquivos pequenos e são a linhagem do que foi registrado: o §10.2 quer
-    exatamente isso versionado no Git, enquanto o dado bruto fica fora dele.
-    """
-    return DEFAULT_DATASETS_DIR / "manifests"
-
-
 class Settings(BaseModel):
     # hide_input_in_errors: um ValidationError nunca ecoa o valor recebido, então
     # connection string e chave não vazam em exceção nem em log.
@@ -62,15 +34,6 @@ class Settings(BaseModel):
     location_conflict_distance_m: float = Field(
         default=500, gt=0, alias="LOCATION_CONFLICT_DISTANCE_M"
     )
-    # Phase 3 is BLOCKED_DATA. Vision execution is fail-closed until a specific
-    # ModelVersion is explicitly authorized for shadow use.
-    vision_execution_mode: Literal["disabled", "shadow", "production"] = Field(
-        default="disabled", alias="VISION_EXECUTION_MODE"
-    )
-    shadow_model_version_id: UUID | None = Field(default=None, alias="SHADOW_MODEL_VERSION_ID")
-    # Directory of a promoted review_confirmed XGBoost run (report/model/calibration/
-    # promotion). Unset = DISABLED: rules decide alone and nothing is estimated.
-    tabular_model_dir: Path | None = Field(default=None, alias="TABULAR_MODEL_DIR")
     # PostgreSQL/PostGIS do Supabase (SQLAlchemy 2 + psycopg 3) é o único acesso a
     # dados do backend (§4.3): nada de PostgREST com secret key. São conexões com
     # papéis separados e sem fallback entre runtime e migrations:
@@ -173,8 +136,6 @@ class Settings(BaseModel):
         ),
         alias="IBGE_CNEFE_2022_BASE_URL",
     )
-    hf_token: str | None = Field(default=None, alias="HF_TOKEN", repr=False)
-    kaggle_api_token: str | None = Field(default=None, alias="KAGGLE_API_TOKEN", repr=False)
     external_http_timeout_seconds: float = Field(
         default=15.0, alias="URMIND_EXTERNAL_HTTP_TIMEOUT_SECONDS", gt=0, le=300
     )
@@ -289,22 +250,6 @@ class Settings(BaseModel):
                 raise ValueError(
                     "SUPABASE_URL e DATABASE_POOLER_URL apontam para projetos diferentes"
                 )
-        if self.vision_execution_mode == "shadow" and self.shadow_model_version_id is None:
-            raise ValueError("SHADOW_MODEL_VERSION_ID obrigatório em modo shadow")
-        if self.vision_execution_mode == "shadow" and self.app_env.lower() not in {
-            "development",
-            "dev",
-            "demo",
-        }:
-            raise ValueError("modo shadow permitido somente em DEV/DEMO")
-        if self.vision_execution_mode == "shadow" and (
-            urlsplit(self.supabase_url or "").hostname != f"{URMIND_DEV_SHADOW_REF}.supabase.co"
-            # Least-privilege runtime (urmind_runtime) or the legacy admin identity,
-            # always on the single authorized DEV project.
-            or urlsplit(self.database_pooler_url or "").username
-            not in {f"urmind_runtime.{URMIND_DEV_SHADOW_REF}", f"postgres.{URMIND_DEV_SHADOW_REF}"}
-        ):
-            raise ValueError("modo shadow permitido somente no Urmind DEV confirmado")
         if (
             self.supabase_url
             and self.supabase_jwks_url

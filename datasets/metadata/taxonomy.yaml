@@ -9,29 +9,25 @@ updated: 2026-09-08
 source_of_truth: docs/Planinng/MASTER_PLAN.md
 source_sections: ["8.2", "31.8"]
 
-# ---------------------------------------------------------------- classes V1
-# Estas quatro são as ÚNICAS classes treináveis da V1.
+# --------------------------------------------------------- classes de dano viário
+# Classes canônicas; nenhum modelo treinado está configurado.
 classes:
   - id: URMIND_ROAD_D00
     label_pt: trinca longitudinal
     label_en: longitudinal crack
-    origin: RDD2022 D00
-    trainable_v1: true
+    trainable: true
   - id: URMIND_ROAD_D10
     label_pt: trinca transversal
     label_en: transverse crack
-    origin: RDD2022 D10
-    trainable_v1: true
+    trainable: true
   - id: URMIND_ROAD_D20
     label_pt: trinca tipo malha / alligator
     label_en: alligator crack
-    origin: RDD2022 D20
-    trainable_v1: true
+    trainable: true
   - id: URMIND_ROAD_D40
     label_pt: buraco / pothole
     label_en: pothole
-    origin: RDD2022 D40
-    trainable_v1: true
+    trainable: true
 
 # ------------------------------------------------------- estado de aplicação
 # URMIND_UNKNOWN NÃO é classe de treino. Ele é o estado que o sistema assume
@@ -40,10 +36,10 @@ classes:
 application_states:
   - id: URMIND_UNKNOWN
     label_pt: desconhecido / inconclusivo
-    trainable_v1: false
+    trainable: false
     is_training_class: false
     note: >-
-      Estado do sistema, nunca classe YOLOX da V1. Só viraria classe treinada se
+      Estado do sistema, nunca classe do detector. Só viraria classe treinada se
       um dataset futuro definisse explicitamente o que "unknown" significa.
 
 # ----------------------------------------- distinção que não pode ser perdida

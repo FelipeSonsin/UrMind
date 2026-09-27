@@ -8,14 +8,13 @@ import {
   stubPublicApi,
 } from './fixtures';
 
-test('public primary navigation has six actions and keeps legacy routes', async ({ page }) => {
+test('public primary navigation has current actions and keeps legacy routes', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/');
   const links = page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link');
   await expect(links).toHaveText([
     /Início/,
     /Registrar/,
-    /Detecção ao vivo/,
     /Câmera do robô/,
     /Meus relatos/,
     /Mapa/,
@@ -76,14 +75,7 @@ test('a página inicial leva a registrar, acompanhar relatos e ver o mapa', asyn
   await expect(diagnosis).toContainText('Grave');
   await expect(diagnosis).toContainText('Média');
   await expect(diagnosis).not.toContainText('61.0%');
-  // Só as classes que a detecção automática reconhece aparecem como automáticas.
-  const automatic = page.getByRole('list', { name: 'Reconhecidos automaticamente' });
-  await expect(automatic.getByRole('listitem')).toHaveText([
-    'Buraco',
-    'Trinca longitudinal',
-    'Trinca transversal',
-    'Trinca em malha',
-  ]);
+  await expect(page.getByRole('list', { name: 'Reconhecidos automaticamente' })).toHaveCount(0);
   await expect(page.locator('main')).not.toContainText('Árvore caída');
   await expect(diagnosis).toContainText('Tapar buraco');
   await expect(diagnosis).toContainText('Prefeitura — zeladoria viária');
@@ -170,7 +162,7 @@ test('a análise completa mostra explicação, ação, previsão ausente e rastr
   await expect(trace.getByText('Captura')).toBeVisible();
   await expect(trace.getByText('sem dado')).toBeVisible();
   await trace.getByText('Detecção').click();
-  await expect(trace).toContainText('baseline_early');
+  await expect(trace).toContainText('synthetic-detector');
 });
 
 test('ocorrência sem avaliação não recebe severidade nem prioridade plausível', async ({
@@ -341,19 +333,15 @@ test('a lista pública filtra por classe e declara quando nada corresponde', asy
   await expect(page.getByText('Nenhuma ocorrência corresponde a este filtro.')).toBeVisible();
 });
 
-test('a transparência publica métricas medidas e o que não foi calculado', async ({ page }) => {
+test('a transparência declara revisão humana e fontes', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/transparency');
   await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
-  const metrics = page.getByLabel('Métricas medidas');
-  await expect(metrics).toContainText('mAP');
-  await expect(metrics).toContainText('precision');
-  await expect(page.getByLabel('Dados de treino')).toContainText('RDD2022');
-  await expect(page.getByLabel('Desempenho')).toContainText('CPUExecutionProvider');
+  await expect(page.getByLabel('Pipeline de análise')).toContainText('Revisão humana');
+  await expect(page.getByLabel('Dados de treino')).toHaveCount(0);
   const sources = page.getByLabel('Fontes e limites');
   await expect(sources).toContainText('OpenStreetMap / Overpass');
   await expect(sources).toContainText('sem LLM');
-  await expect(sources).toContainText('limiares ainda não calibrados');
 });
 
 test('falha da API aparece como aviso, não como painel vazio silencioso', async ({ page }) => {
@@ -445,19 +433,15 @@ test('o antigo endereço de exemplos abre o mapa nas ocorrências confirmadas', 
   await expect(page.getByText('EXEMPLO REVISADO')).toHaveCount(0);
 });
 
-test('transparência mostra só as classes da detecção automática, sem categorias futuras', async ({
+test('transparência informa a ausência de detector publicado', async ({
   page,
 }) => {
   await stubPublicApi(page);
   for (const route of ['/#/transparency', '/#/sobre']) {
     await page.goto(route);
     const taxonomy = page.getByLabel('Classes de problemas urbanos');
-    await expect(taxonomy.locator('li')).toHaveText([
-      /Buraco/,
-      /Trinca longitudinal/,
-      /Trinca transversal/,
-      /Trinca em malha/,
-    ]);
+    await expect(taxonomy.locator('li')).toHaveCount(0);
+    await expect(taxonomy).toContainText('Não há detector automático publicado');
     await expect(taxonomy).not.toContainText('Árvore caída');
     await expect(taxonomy).not.toContainText('Em desenvolvimento');
     await expect(taxonomy).not.toContainText('Reconhecida por modelo aprovado');
@@ -470,7 +454,6 @@ test('a Home leva a cada função pública que ela mostra', async ({ page }) => 
   await stubPublicApi(page);
   const targets: Array<[string, RegExp, string]> = [
     ['Registrar evidência', /#\/registrar$/, 'Registrar evidência'],
-    ['Detecção ao vivo', /#\/deteccao-ao-vivo$/, 'Detecção ao vivo'],
     ['Câmera do robô', /#\/camera-robo$/, 'Câmera do robô'],
   ];
   for (const [name, url, heading] of targets) {

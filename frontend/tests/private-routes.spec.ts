@@ -33,7 +33,7 @@ test('navegação interna dedicada cabe em 320px e usa menu inferior', async ({ 
   await page.goto('/admin/#/app/dashboard');
   const nav = page.getByRole('navigation', { name: 'Navegação interna' });
   await expect(nav.getByText('Área interna')).toBeVisible();
-  await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa', 'Relatos/GT']);
+  await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa']);
   const box = await nav.boundingBox();
   expect(box!.y + box!.height).toBeLessThanOrEqual(740);
   expect(box!.y).toBeGreaterThan(600);
@@ -349,7 +349,6 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
     ['dashboard', 'Painel interno'],
     ['reviews', 'Ocorrências urbanas'],
     ['mapa', 'Gêmeo digital 2D'],
-    ['ground-truth', 'Ground truth'],
     ['admin', 'Acesso restrito'],
   ]) {
     await page.goto(`/admin/#/app/${path}`);
@@ -433,26 +432,12 @@ test('falha de métricas não vira contagem zero', async ({ page }) => {
   await expect(page.getByText('Pendentes', { exact: true })).toHaveCount(0);
 });
 
-test('modelos e auditoria interna carregam dados e filtros sem identidades', async ({ page }) => {
+test('auditoria interna carrega filtros sem identidades', async ({ page }) => {
   await session(page);
   await page.route('**/api/v1/me', (route) =>
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.route('**/api/v1/ops/models?*', (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: EVENT_ID,
-          name: 'Registro histórico',
-          version: '1',
-          kind: 'visual',
-          status: 'ARCHIVED',
-          created_at: '2026-09-24T12:00:00Z',
-        },
-      ],
-    }),
-  );
   await page.route('**/api/v1/ops/audit?*', (route) =>
     route.fulfill({
       json: [
@@ -467,58 +452,9 @@ test('modelos e auditoria interna carregam dados e filtros sem identidades', asy
       ],
     }),
   );
-  await page.goto('/admin/#/app/modelos');
-  await expect(page.getByRole('heading', { name: 'Modelos registrados' })).toBeVisible();
-  await expect(page.getByText('ARCHIVED · visual')).toBeVisible();
   await page.goto('/admin/#/app/auditoria');
   await expect(page.getByRole('heading', { name: 'Auditoria operacional' })).toBeVisible();
   await page.getByLabel('Operação', { exact: true }).fill('photo_gate_configuration');
   await expect(page.getByText('photo_gate_configuration', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Anterior' })).toBeDisabled();
-});
-
-test('ground truth vazio não habilita exportação científica', async ({ page }) => {
-  await session(page);
-  await page.route('**/api/v1/me', (route) =>
-    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
-  );
-  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
-  await page.goto('/admin/#/app/ground-truth');
-  await expect(page.getByText('Nenhuma revisão de ocorrência disponível.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Exportar rótulos elegíveis (0)' })).toBeDisabled();
-  await page.goto('/admin/#/app');
-  await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
-  await expect(page.getByText('Dia civil em UTC; semana = últimos sete dias.')).toBeVisible();
-  await expect(page.getByText('blur: 2')).toBeVisible();
-});
-
-test('ground truth agrega todas as páginas e exporta em lotes autenticados', async ({ page }) => {
-  await session(page);
-  await page.route('**/api/v1/me', (route) =>
-    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
-  );
-  await page.route('**/api/v1/ops/ground-truth/summary', (route) =>
-    route.fulfill({
-      json: {
-        reviewed_events: 1200,
-        eligible_events: 1190,
-        counts_by_class: { D40: 1200 },
-        training_authorized: false,
-      },
-    }),
-  );
-  await page.route('**/api/v1/ops/ground-truth/export', (route) => {
-    expect(route.request().headers().authorization).toMatch(/^Bearer /);
-    return route.fulfill({
-      body: '{"schema":"urmind-ground-truth-export-v1","training_authorized":false}\n',
-      contentType: 'application/x-ndjson',
-      headers: { 'Content-Disposition': 'attachment; filename="urmind-ground-truth.ndjson"' },
-    });
-  });
-  await page.goto('/admin/#/app/ground-truth');
-  await expect(page.getByText('1200 Events revisados')).toBeVisible();
-  await expect(page.getByText('D40: 1200')).toBeVisible();
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Exportar rótulos elegíveis (1190)' }).click();
-  expect((await download).suggestedFilename()).toBe('urmind-ground-truth.ndjson');
 });

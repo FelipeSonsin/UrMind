@@ -7,7 +7,6 @@ import {
   FileImage,
   House,
   Map,
-  ScanEye,
   Webcam,
   ScanLine,
   Settings2,
@@ -61,9 +60,6 @@ const RobotCameraPage = lazy(() =>
 const RobotPhonePage = lazy(() =>
   import('./pages/RobotCameraPage').then((m) => ({ default: m.RobotPhonePage })),
 );
-const LiveDetectionPage = lazy(() =>
-  import('./pages/LiveDetectionPage').then((m) => ({ default: m.LiveDetectionPage })),
-);
 const UrbanMap = lazy(() => import('./components/UrbanMap'));
 const EventsPage = lazy(() =>
   import('./pages/EventsPage').then((m) => ({ default: m.EventsPage })),
@@ -87,9 +83,6 @@ const OperationalRegistryPage = lazy(() =>
 const ReportIndicators = lazy(() =>
   import('./pages/OperationsPage').then((m) => ({ default: m.ReportIndicators })),
 );
-const GroundTruthPage = lazy(() =>
-  import('./pages/OperationsPage').then((m) => ({ default: m.GroundTruthPage })),
-);
 
 /** Releitura do painel público: curta o bastante para parecer vivo, longa o bastante
  * para não pesar na API. */
@@ -98,7 +91,6 @@ const PUBLIC_REFRESH_MS = 30_000;
 /** Páginas públicas que dependem de uma capacidade real do registro. */
 function pageAvailable(id: string): boolean {
   if (id === 'capture') return activeCapabilities.capture;
-  if (id === 'live-detection') return activeCapabilities.liveDetection;
   if (id === 'robot-camera') return activeCapabilities.robotCamera;
   if (id === 'map') return activeCapabilities.map;
   return true;
@@ -152,13 +144,6 @@ const navigation = [
     section: 'operação',
   },
   {
-    id: 'live-detection',
-    label: 'Detecção ao vivo',
-    icon: ScanEye,
-    href: '#/deteccao-ao-vivo',
-    section: 'operação',
-  },
-  {
     id: 'robot-camera',
     label: 'Câmera do robô',
     icon: Webcam,
@@ -178,17 +163,14 @@ const privateNavigation = [
   { id: 'dashboard', label: 'Painel interno', href: '#/app/dashboard' },
   { id: 'private-events', label: 'Ocorrências internas', href: '#/app/eventos' },
   { id: 'review', label: 'Revisões', href: '#/app/reviews' },
-  { id: 'ground-truth', label: 'Ground truth', href: '#/app/ground-truth' },
   { id: 'private-map', label: 'Mapa interno', href: '#/app/mapa' },
   { id: 'admin', label: 'Administração', href: '#/app/admin' },
-  { id: 'models', label: 'Modelos', href: '#/app/modelos' },
   { id: 'audit', label: 'Auditoria', href: '#/app/auditoria' },
 ] as const;
 const internalTabs = [
   { id: 'dashboard', label: 'Painel' },
   { id: 'review', label: 'Fila' },
   { id: 'private-map', label: 'Mapa' },
-  { id: 'ground-truth', label: 'Relatos/GT' },
 ] as const;
 type Page =
   | (typeof navigation)[number]['id']
@@ -237,7 +219,7 @@ function parseHash(): Route {
   if (first === 'relato' && second) return { page: 'processing', protocol: second };
   if (first === 'registrar') return { page: 'capture' };
   // A antiga página do Scout (hardware fora do escopo) leva à detecção no próprio aparelho.
-  if (first === 'live') return { page: 'live-detection' };
+  if (first === 'live') return { page: 'capture' };
   // O celular abre pelo QR da Câmera do robô; o notebook fica na rota principal.
   if (first === 'camera-robo' && second === 'celular') return { page: 'robot-phone' };
   if (first === 'mapa') return { page: 'map' };
@@ -866,7 +848,6 @@ export default function App() {
               [
                 'overview',
                 'capture',
-                'live-detection',
                 'robot-camera',
                 'my-reports',
                 'map',
@@ -966,7 +947,7 @@ export default function App() {
                     {privateNavigation
                       .filter(
                         (item) =>
-                          !['dashboard', 'review', 'private-map', 'ground-truth'].includes(
+                          !['dashboard', 'review', 'private-map'].includes(
                             item.id,
                           ) &&
                           (item.id !== 'admin' || canAdmin),
@@ -1438,9 +1419,8 @@ export default function App() {
                     plano ou placas de veículos.
                   </p>
                   <p>
-                    A detecção automática reconhece buraco e trincas no asfalto (longitudinal,
-                    transversal e em malha). Qualquer outro problema pode ser relatado com foto e é
-                    avaliado pela equipe. Um relato recebido ainda não é um problema confirmado.
+                    Não há detector automático publicado. Problemas podem ser relatados com foto e
+                    são avaliados pela equipe. Um relato recebido ainda não é um problema confirmado.
                   </p>
                 </section>
                 <TaxonomyPanel revision={publicRevision} />
@@ -1465,24 +1445,10 @@ export default function App() {
                 }}
               />
             )}
-            {page === 'live-detection' && (
-              // Remontada por sessão: logout ou troca de conta encerra câmera e modelo.
-              <LiveDetectionPage
-                key={session?.user.id ?? 'no-session'}
-                onOpenDraft={async (draft) => {
-                  setEditing(draft);
-                  navigate('capture');
-                  await reloadDrafts();
-                }}
-              />
-            )}
             {page === 'robot-camera' && !pageAvailable('robot-camera') && (
               <section className="panel">
                 <h1>Câmera do robô</h1>
                 <p>Esta função não está habilitada neste ambiente.</p>
-                <a className="button" href="#/deteccao-ao-vivo">
-                  Abrir Detecção ao vivo
-                </a>
               </section>
             )}
             {page === 'robot-camera' && pageAvailable('robot-camera') && (
@@ -1672,9 +1638,8 @@ export default function App() {
                     <TaxonomyPanel revision={revision} includeDevelopment />
                   </>
                 )}
-                {page === 'ground-truth' && <GroundTruthPage key={session?.access_token} />}
-                {(page === 'models' || page === 'audit') && (
-                  <OperationalRegistryPage key={`${session?.access_token}:${page}`} mode={page} />
+                {page === 'audit' && (
+                  <OperationalRegistryPage key={session?.access_token} />
                 )}
                 {page === 'admin' &&
                   (canAdmin ? (

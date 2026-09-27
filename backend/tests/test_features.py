@@ -12,7 +12,6 @@ import pytest
 from app.services.core import CoreService
 from app.services.features import (
     SCHEMA_VERSION,
-    VISUAL_LINEAGE_VERSION,
     FeatureInput,
     build_features,
 )
@@ -90,55 +89,6 @@ def fixture(*, segment=True, context=True, history=True, detection=True):
         has_original_location=True,
         has_snapped_point=segment,
     )
-
-
-@pytest.mark.asyncio
-async def test_assessment_snapshot_freezes_serving_lineage_without_loading_detector():
-    from app.ml.tabular import flatten_snapshot
-
-    source = fixture(context=False, history=False)
-    model_id = uuid4()
-    source.event.model_version_id = model_id
-    source.detections[0].model_version_id = model_id
-    source.detections[0].created_at = WHEN
-    source.detections[0].bbox = {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2}
-    model = Row(
-        metrics={
-            "serving": {
-                "checkpoint_sha256": "b" * 64,
-                "class_names": ["URMIND_ROAD_D00"],
-                "model_contract_sha256": "a" * 64,
-            }
-        },
-        operational_status="EXPERIMENTAL_SHADOW",
-    )
-    captures = Row(get=AsyncMock(return_value=source.capture))
-    events = Row(
-        get=AsyncMock(return_value=source.event),
-        segment=AsyncMock(return_value=source.road_segment),
-        coordinates=AsyncMock(return_value={"latitude": 1.0, "snapped_latitude": 1.0}),
-        contexts=AsyncMock(return_value=[]),
-        previous_event_times=AsyncMock(return_value=(None, "unknown")),
-        evidence_detections=AsyncMock(return_value=source.detections),
-    )
-    decisions = Row(model_version=AsyncMock(return_value=model))
-    service = CoreService(captures, events, decisions)
-
-    features, _ = await service._feature_snapshot(source.event.id)
-    assert features["visual"]["checkpoint_sha256"] == "b" * 64
-    assert features["visual"]["class_order"] == ["URMIND_ROAD_D00"]
-    assert features["visual"]["feature_version"] == VISUAL_LINEAGE_VERSION
-    assert features["provenance"]["visual_lineage"]["model_status"] == "EXPERIMENTAL_SHADOW"
-    assert flatten_snapshot(features, knowledge_cutoff=datetime.now(UTC))
-
-    source.detections[0].model_version_id = uuid4()
-    unbound, _ = await service._feature_snapshot(source.event.id)
-    assert unbound["visual"]["checkpoint_sha256"] is None
-
-    source.detections[0].model_version_id = model_id
-    source.detections[0].created_at = None
-    without_detection_time, _ = await service._feature_snapshot(source.event.id)
-    assert without_detection_time["visual"]["checkpoint_sha256"] is None
 
 
 def test_complete_snapshot_is_reproducible_and_versioned():
@@ -416,107 +366,3 @@ async def test_assessment_persists_phase7_trace_with_same_snapshot_and_lineage(m
     assert trace["evaluated_rules"] == stored["phase5"]["decision_trace"]["evaluated_rules"]
     assert trace["priority"] != trace["risk"]
     assert trace["context_snapshot_key"] == "phase4_snapshot.context_records"
-
-
-async def _assess_with_tabular_runtime(monkeypatch, runtime):
-    source = fixture(segment=False, context=False, history=False)
-    event = source.event
-    event.model_version_id = source.detections[0].model_version_id
-    features = build_features(source)
-    persisted_rows = []
-
-    async def add_risk(event_id, payload, **refs):
-        persisted_rows.append(payload)
-        return Row(
-            id=refs["id"],
-            severity=payload["severity"],
-            priority_score=payload["priority_score"],
-            uncertainty=payload["uncertainty"],
-        )
-
-    decisions = Row(
-        latest_risk=AsyncMock(return_value=None),
-        dataset_version_for_model=AsyncMock(return_value=None),
-        responsibility=AsyncMock(return_value=None),
-        action=AsyncMock(return_value=None),
-        add_risk=add_risk,
-    )
-    events = Row(get=AsyncMock(return_value=event), set_status=AsyncMock())
-    service = CoreService(Row(), events, decisions)
-    monkeypatch.setattr(service, "_feature_snapshot", AsyncMock(return_value=(features, [])))
-    if runtime is not None:
-        monkeypatch.setattr("app.services.core.configured_tabular_runtime", lambda: runtime)
-    result = await service.assess_event(event.id)
-    return result, persisted_rows[0]
-
-
-def _decisions(payload):
-    trace = payload["factors"]["decision_trace"]
-    return (
-        payload["severity"],
-        trace["risk"],
-        trace["priority"],
-        trace["severity_source"],
-        trace["risk_source"],
-        trace["priority_source"],
-        trace["action"],
-        trace["responsibility"],
-    )
-
-
-@pytest.mark.asyncio
-async def test_review_confirmed_advisory_is_disabled_without_promoted_model(monkeypatch):
-    monkeypatch.delenv("TABULAR_MODEL_DIR", raising=False)
-    from app.config import get_settings
-    from app.ml import tabular
-
-    get_settings.cache_clear()
-    tabular._runtime_for.cache_clear()
-    _, payload = await _assess_with_tabular_runtime(monkeypatch, None)
-    advisory = payload["factors"]["decision_trace"]["review_confirmed_advisory"]
-    assert advisory == {
-        "target": "review_confirmed",
-        "status": "DISABLED",
-        "probability": None,
-        "reason": "nenhum modelo tabular configurado",
-        "advisory_only": True,
-    }
-
-
-@pytest.mark.asyncio
-async def test_review_confirmed_advisory_is_recorded_but_never_changes_decisions(monkeypatch):
-    class Model:
-        report_sha256 = "c" * 64
-
-        def predict_snapshot(self, snapshot):
-            assert snapshot["feature_schema_version"]
-            return 0.93
-
-    available = {"status": "AVAILABLE", "reason": None, "model": Model()}
-    disabled = {"status": "DISABLED", "reason": "nenhum modelo tabular configurado", "model": None}
-    _, with_model = await _assess_with_tabular_runtime(monkeypatch, available)
-    _, without = await _assess_with_tabular_runtime(monkeypatch, disabled)
-    advisory = with_model["factors"]["decision_trace"]["review_confirmed_advisory"]
-    assert advisory["status"] == "AVAILABLE"
-    assert advisory["probability"] == 0.93
-    assert advisory["advisory_only"] is True
-    assert advisory["report_sha256"] == "c" * 64
-    assert _decisions(with_model) == _decisions(without)
-
-
-@pytest.mark.asyncio
-async def test_review_confirmed_advisory_failure_does_not_block_assessment(monkeypatch):
-    class Broken:
-        report_sha256 = "d" * 64
-
-        def predict_snapshot(self, snapshot):
-            raise ValueError("schema drift")
-
-    result, payload = await _assess_with_tabular_runtime(
-        monkeypatch, {"status": "AVAILABLE", "reason": None, "model": Broken()}
-    )
-    advisory = payload["factors"]["decision_trace"]["review_confirmed_advisory"]
-    assert advisory["status"] == "ERROR"
-    assert advisory["probability"] is None
-    assert "ValueError" in advisory["reason"]
-    assert result["assessment_id"]

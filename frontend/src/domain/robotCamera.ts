@@ -29,9 +29,13 @@ export const ROBOT_PHONE_CONSTRAINTS = {
   },
   audio: false,
 } as const satisfies MediaStreamConstraints;
-/** Teto de envio do vídeo: 60 quadros por segundo com banda para 720p nítido. */
+/**
+ * Teto de envio do vídeo: até 60 quadros por segundo (vídeo fluido, sem travar) e banda
+ * para cada quadro chegar com detalhe ao modelo: ≈167 kbit por quadro a 60 quadros/s,
+ * mais que o dobro do teto anterior de 4,5 Mbps, preservando trincas e textura do asfalto.
+ */
 export const ROBOT_SEND_MAX_FPS = 60;
-export const ROBOT_SEND_MAX_BITRATE = 4_500_000;
+export const ROBOT_SEND_MAX_BITRATE = 10_000_000;
 
 export interface Pairing {
   sessionId: string;
@@ -53,7 +57,7 @@ function base64url(bytes: Uint8Array): string {
 /** Sessão e token aleatórios (Web Crypto), válidos por cinco minutos. */
 export function createPairing(
   now = Date.now(),
-  random: { randomUUID(): string; getRandomValues<T extends ArrayBufferView>(a: T): T } = crypto,
+  random: Pick<Crypto, 'randomUUID' | 'getRandomValues'> = crypto,
 ): Pairing {
   return {
     sessionId: random.randomUUID(),
@@ -212,35 +216,4 @@ export function linkVerdict(
   return disconnectedForMs != null && disconnectedForMs >= RECONNECT_GRACE_MS
     ? 'lost'
     : 'reconnecting';
-}
-
-// ---------------------------------------------------------------- visão computacional
-
-export type VisionTone = 'active' | 'idle' | 'error';
-export type VisionModelStatus =
-  'checking' | 'unavailable' | 'available' | 'loading' | 'ready' | 'failed';
-
-/**
- * O que a tela diz sobre a detecção no vídeo remoto, na ordem que importa para quem
- * opera: modelo indisponível, vídeo ainda sem imagem, analisando, preparando, pausado.
- * "Analisando" só aparece com o worker pronto e a detecção ligada.
- */
-export function visionStatus(state: {
-  model: VisionModelStatus;
-  connected: boolean;
-  videoReady: boolean;
-  detecting: boolean;
-  paused: boolean;
-}): { label: string; tone: VisionTone } {
-  if (state.model === 'unavailable' || state.model === 'failed')
-    return { label: 'Detecção indisponível', tone: 'error' };
-  if (state.connected && !state.videoReady) return { label: 'Aguardando vídeo', tone: 'idle' };
-  if (state.detecting && state.model === 'ready')
-    return { label: 'Analisando vídeo em tempo real', tone: 'active' };
-  if (state.detecting || state.model === 'loading')
-    return { label: 'Preparando detecção…', tone: 'idle' };
-  if (state.paused) return { label: 'Pausado', tone: 'idle' };
-  if (state.model === 'ready') return { label: 'Detecção pronta', tone: 'idle' };
-  if (state.model === 'checking') return { label: 'Verificando a detecção…', tone: 'idle' };
-  return { label: 'Detecção disponível', tone: 'idle' };
 }

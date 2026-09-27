@@ -329,7 +329,7 @@ export const eventDetail = {
       step: 'detection',
       status: 'done',
       title: 'Detecção',
-      source: 'baseline_early',
+      source: 'synthetic-detector',
       detail: { confiança: '0.61' },
       at: '2026-09-17T12:00:20+00:00',
     },
@@ -350,9 +350,9 @@ export const eventDetail = {
       at: null,
     },
   ],
-  model_version: 'baseline_early',
-  model_stage: 'Staging',
-  dataset_version: 'rdd2022-v1',
+  model_version: 'synthetic-detector',
+  model_stage: 'Fixture',
+  dataset_version: 'synthetic-dataset',
   reviewed: false,
 };
 
@@ -386,8 +386,8 @@ export const urbanAnalysis = {
   context: [],
   limitations: ['A fotografia não permite medir a profundidade do dano.'],
   provenance: {
-    taxonomy_version: 'urmind-issue-taxonomy-v2',
-    model_version: 'baseline_early',
+    taxonomy_version: 'urmind-issue-taxonomy-v3',
+    model_version: 'synthetic-detector',
     model_stage: 'EXPERIMENTAL_SHADOW',
     dataset_version: null,
     ruleset_version: 'risk-v1',
@@ -398,8 +398,8 @@ export const urbanAnalysis = {
 };
 
 export const transparency = {
-  model_name: 'urmind-yolox-s',
-  model_version: 'baseline_early',
+  model_name: 'synthetic-detector',
+  model_version: 'synthetic-detector',
   stage: 'Staging',
   stage_note: 'modelo inicial: métricas ainda em evolução',
   classes: ['URMIND_ROAD_D00', 'URMIND_ROAD_D10', 'URMIND_ROAD_D20', 'URMIND_ROAD_D40'],
@@ -423,10 +423,10 @@ export const transparency = {
     execution_provider: 'CPUExecutionProvider',
     hardware: 'CPU local',
   },
-  dataset_name: 'RDD2022',
-  dataset_version: 'rdd2022-v1',
-  dataset_license: 'CC BY-SA 4.0',
-  dataset_source: 'https://github.com/sekilab/RoadDamageDetector',
+  dataset_name: 'Conjunto sintético',
+  dataset_version: 'synthetic-dataset',
+  dataset_license: 'N/A',
+  dataset_source: 'fixture local',
   context_sources: [
     { source: 'OpenStreetMap / Overpass', use: 'malha viária e equipamentos próximos' },
     { source: 'Nominatim', use: 'endereço aproximado (contexto, não é a coordenada)' },
@@ -589,38 +589,3 @@ export const camera = (page: Page) =>
       live: s.tracks.filter((t) => t.readyState === 'live').length,
     };
   });
-
-/** Manifesto de modelo do navegador só para teste de contrato (checksum/tamanho). */
-export const liveModelManifest = (sha256: string, size: number) => ({
-  schema_version: 1,
-  model_id: 'yolox-s-model-v2',
-  model_version: 'contrato-de-teste',
-  scientific_status: 'EXPERIMENTAL',
-  use_authorized: true,
-  distribution_authorized: true,
-  authorization_ref: 'tests/live-detection.spec.ts',
-  onnx: { path: '/models/teste.onnx', sha256, size_bytes: size },
-  input: {
-    name: 'images',
-    size: [640, 640],
-    layout: 'NCHW',
-    dtype: 'float32',
-    color: 'BGR',
-    range: '0..255',
-    normalization: 'none',
-    letterbox: { pad_value: 114, anchor: 'top-left' },
-  },
-  output: { name: 'output', format: 'yolox_decoded_cxcywh_obj_cls' },
-  class_names: ['URMIND_ROAD_D00', 'URMIND_ROAD_D10', 'URMIND_ROAD_D20', 'URMIND_ROAD_D40'],
-  postprocess: {
-    score_threshold: 0.25,
-    nms_threshold: 0.65,
-    nms: 'class_agnostic',
-    max_detections: 50,
-  },
-  provenance: {
-    registration_manifest_sha256: 'd'.repeat(64),
-    closure_manifest_sha256: null,
-    contract_sha256: 'c'.repeat(64),
-  },
-});

@@ -3,15 +3,12 @@ import {
   Camera as CameraIcon,
   CircleStop,
   Copy,
-  Pause,
-  Play,
+  Flashlight,
   Send,
   Smartphone,
   Unplug,
 } from 'lucide-react';
 import { encode } from 'uqr';
-import { classColor, qualityHintText } from '../domain/liveDetection';
-import { labelFor } from '../domain/public';
 import {
   MAX_ICE_RESTARTS,
   RECONNECT_GRACE_MS,
@@ -29,15 +26,12 @@ import {
   pairingLink,
   parsePairingHash,
   robotIceServers,
-  visionStatus,
   type Pairing,
   type SignalMessage,
 } from '../domain/robotCamera';
-import { DetectionReadout } from '../components/DetectionReadout';
 import { CameraError, frameToJpeg, openCamera, stopStream } from '../services/cameraStream';
 import { drafts, validatePhoto, type CaptureDraft } from '../services/drafts';
 import { openSignaling, type SignalingLink } from '../services/robotSignaling';
-import { useDetectionOverlay, useElementSize, useVideoDetection } from './useVideoDetection';
 
 /** STUN só do ambiente; sem ele a câmera do robô não inicia (ver robotIceServers). */
 function iceServers(): RTCIceServer[] {
@@ -50,13 +44,17 @@ function configMessage(reason: unknown): string {
     : 'Não foi possível preparar a conexão da câmera do robô.';
 }
 
-/** Preferência de manter resolução no envio, quando o navegador aceita. */
-async function keepResolution(sender: RTCRtpSender) {
+/**
+ * Ajuste do envio, quando o navegador aceita: até 60 quadros/s com banda para detalhe.
+ * Em rede fraca, `balanced` reduz um pouco a resolução e um pouco o ritmo juntos, em vez
+ * de derrubar só os quadros (vídeo travando) para manter a resolução.
+ */
+async function tuneSender(sender: RTCRtpSender) {
   try {
     const parameters = sender.getParameters() as RTCRtpSendParameters & {
       degradationPreference?: 'maintain-resolution' | 'maintain-framerate' | 'balanced';
     };
-    parameters.degradationPreference = 'maintain-resolution';
+    parameters.degradationPreference = 'balanced';
     for (const encoding of parameters.encodings ?? []) {
       encoding.scaleResolutionDownBy = 1;
       encoding.maxFramerate = ROBOT_SEND_MAX_FPS;
@@ -147,8 +145,6 @@ export function RobotCameraPage({
   const [remoteSize, setRemoteSize] = useState<{ width: number; height: number } | null>(null);
 
   const video = useRef<HTMLVideoElement>(null);
-  const overlay = useRef<HTMLCanvasElement>(null);
-  const stage = useRef<HTMLDivElement>(null);
   const phaseRef = useRef<ReceiverPhase>(phase);
   const signaling = useRef<SignalingLink | null>(null);
   const pc = useRef<RTCPeerConnection | null>(null);
@@ -157,10 +153,6 @@ export function RobotCameraPage({
   const lockedPeer = useRef<string | null>(null);
   const expiryTimer = useRef<number | undefined>(undefined);
   const graceTimer = useRef<number | undefined>(undefined);
-  const resumeDetection = useRef(false);
-  // Primeira conexão da sessão: a detecção começa sozinha quando o vídeo chega.
-  const autoStart = useRef(false);
-  const [paused, setPaused] = useState(false);
   const generation = useRef(0);
 
   function updatePhase(next: ReceiverPhase) {
@@ -168,47 +160,11 @@ export function RobotCameraPage({
     setPhase(next);
   }
 
-  const detection = useVideoDetection({
-    video,
-    source: () => ({ live: phaseRef.current.kind === 'connected', mirrored: false }),
-    measureCamera: phase.kind === 'connected',
-  });
-  const { model, detecting, analyzed, metrics, inferenceError, stopDetection } = detection;
-  const stageSize = useElementSize(stage);
-  // Vídeo sempre no palco; o canvas por cima só com caixas, que expiram sem resultado novo.
-  useDetectionOverlay(overlay, stageSize, detection.stale ? null : analyzed, model, true);
-
-  function startDetection() {
-    setPaused(false);
-    detection.startDetection();
-  }
-
-  /** Início automático (celular conectou ou voltou): não repete um modelo que já falhou. */
-  function autoStartDetection() {
-    setPaused(false);
-    detection.startDetection({ retryFailed: false });
-  }
-
-  function pauseDetection() {
-    stopDetection();
-    setPaused(true);
-  }
-
-  /**
-   * Encerra tudo o que a sessão abriu: detecção, caixas, conexão, vídeo remoto,
-   * canal de sinalização e temporizadores. Nada fica gravado.
-   */
   function teardown(next: ReceiverPhase, notifyPhone: boolean) {
     generation.current += 1;
     window.clearTimeout(expiryTimer.current);
     window.clearTimeout(graceTimer.current);
     graceTimer.current = undefined;
-    resumeDetection.current = false;
-    autoStart.current = false;
-    setPaused(false);
-    stopDetection();
-    detection.clear();
-    detection.resetMetrics();
     const connection = pc.current;
     pc.current = null;
     if (connection) {
@@ -242,14 +198,6 @@ export function RobotCameraPage({
     teardown({ kind: 'disconnected', message }, false);
   }
 
-  // Enquanto o celular pareia (QR, permissão da câmera), o modelo já baixa e inicia em
-  // segundo plano: quando o vídeo chega, a detecção começa na hora, sem vídeo sem caixas.
-  const pairingPhone = phase.kind === 'waiting' || phase.kind === 'connecting';
-  useEffect(() => {
-    if (pairingPhone && detection.model.status === 'available') detection.prepareModel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pairingPhone, detection.model.status]);
-
   function connectPhone() {
     teardown({ kind: 'idle' }, true);
     setCaptureError('');
@@ -262,7 +210,6 @@ export function RobotCameraPage({
     }
     const pairing = createPairing();
     const run = generation.current;
-    autoStart.current = true;
     updatePhase({ kind: 'waiting', pairing });
     setNow(Date.now());
     signaling.current = openSignaling(
@@ -401,16 +348,9 @@ export function RobotCameraPage({
         window.clearTimeout(graceTimer.current);
         graceTimer.current = undefined;
         updatePhase({ kind: 'connected', pairing });
-        if (resumeDetection.current || autoStart.current) {
-          resumeDetection.current = false;
-          autoStart.current = false;
-          autoStartDetection();
-        }
       } else if (state === 'disconnected' || state === 'failed') {
         // Queda de rede: segura a sessão por pouco tempo enquanto o celular tenta voltar.
         if (phaseRef.current.kind === 'connected') {
-          resumeDetection.current = detectingRef();
-          stopDetection();
           updatePhase({ kind: 'reconnecting', pairing });
         }
         if (graceTimer.current === undefined)
@@ -421,12 +361,6 @@ export function RobotCameraPage({
           }, RECONNECT_GRACE_MS);
       } else if (state === 'closed') lost('Câmera desconectada');
     };
-  }
-
-  const detectingNow = useRef(detecting);
-  detectingNow.current = detecting;
-  function detectingRef() {
-    return detectingNow.current;
   }
 
   async function captureEvidence() {
@@ -515,28 +449,7 @@ export function RobotCameraPage({
   );
 
   const showVideo = phase.kind === 'connected' || phase.kind === 'reconnecting';
-  const hasManifest = 'manifest' in model;
-  const limit = hasManifest ? model.manifest.postprocess.max_detections : 0;
   const link = 'pairing' in phase ? pairingLink(window.location.origin, phase.pairing) : '';
-  const videoReady = Boolean(remoteSize);
-  const cvState = visionStatus({
-    model: model.status,
-    connected: phase.kind === 'connected',
-    videoReady,
-    detecting,
-    paused,
-  });
-  const detectionStatus =
-    cvState.tone === 'error'
-      ? `Detecção indisponível. ${
-          model.status === 'unavailable'
-            ? model.reason
-            : model.status === 'failed'
-              ? model.message
-              : ''
-        }`
-      : cvState.label;
-
   return (
     <>
       <div className="page-heading">
@@ -573,7 +486,7 @@ export function RobotCameraPage({
           )}
           <p>
             O celular mostra a câmera traseira e transmite direto para este notebook, sem gravar
-            vídeo. A detecção roda aqui, com o mesmo modelo da Detecção ao vivo.
+            vídeo. Você pode capturar um quadro para revisão humana.
           </p>
           <button type="button" onClick={connectPhone}>
             <Smartphone size={16} aria-hidden="true" />
@@ -627,132 +540,28 @@ export function RobotCameraPage({
 
       <div className="live-grid" hidden={!showVideo}>
         <section className="live-stage-panel" aria-label="Vídeo da câmera do robô">
-          <div
-            className="live-stage"
-            style={{
-              // Mesma proporção do vídeo recebido (celular em pé ou deitado).
-              aspectRatio: remoteSize ? `${remoteSize.width} / ${remoteSize.height}` : '16 / 9',
-            }}
-          >
-            <div className="live-frame" ref={stage}>
-              <video
-                ref={video}
-                className="live-video"
-                playsInline
-                muted
-                autoPlay
-                aria-label="Vídeo remoto da câmera do robô"
-              />
-              <canvas ref={overlay} className="live-overlay" aria-hidden="true" />
+          <div className="live-stage" style={{ aspectRatio: remoteSize ? `${remoteSize.width} / ${remoteSize.height}` : '16 / 9' }}>
+            <div className="live-frame">
+              <video ref={video} className="live-video" playsInline muted autoPlay aria-label="Vídeo remoto da câmera do robô" />
             </div>
-            {phase.kind === 'reconnecting' ? (
-              <span className="live-stage-tag">Reconectando…</span>
-            ) : (
-              <span
-                className={`live-stage-tag cv-state is-${cvState.tone}`}
-                role="status"
-                aria-label="Estado da visão computacional"
-              >
-                {cvState.label}
-              </span>
-            )}
+            <span className="live-stage-tag" role="status">
+              {phase.kind === 'reconnecting' ? 'Reconectando…' : 'Câmera conectada'}
+            </span>
           </div>
-          {analyzed && analyzed.hints.length > 0 && (
-            <ul className="live-quality" aria-label="Qualidade da imagem">
-              {analyzed.hints.map((hint) => (
-                <li key={hint}>{qualityHintText[hint]}</li>
-              ))}
-            </ul>
-          )}
           <div className="live-actions" role="toolbar" aria-label="Controles da câmera do robô">
-            <button
-              type="button"
-              disabled={phase.kind !== 'connected' || !hasManifest || detecting}
-              onClick={startDetection}
-            >
-              <Play size={16} aria-hidden="true" /> Iniciar detecção
+            <button type="button" className="secondary" disabled={phase.kind !== 'connected' || capturing} onClick={() => void captureEvidence()}>
+              <Send size={16} aria-hidden="true" />{' '}{capturing ? 'Capturando…' : 'Capturar evidência'}
             </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={!detecting}
-              onClick={pauseDetection}
-            >
-              <Pause size={16} aria-hidden="true" /> Pausar
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={phase.kind !== 'connected' || capturing}
-              onClick={() => void captureEvidence()}
-            >
-              <Send size={16} aria-hidden="true" />{' '}
-              {capturing ? 'Capturando…' : 'Capturar evidência'}
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() =>
-                teardown({ kind: 'disconnected', message: 'Câmera desconectada' }, true)
-              }
-            >
+            <button type="button" className="ghost" onClick={() => teardown({ kind: 'disconnected', message: 'Câmera desconectada' }, true)}>
               <Unplug size={16} aria-hidden="true" /> Desconectar celular
             </button>
           </div>
         </section>
-        <div className="live-side">
-          <section className="panel" aria-label="Detecções do vídeo remoto" aria-live="polite">
-            <p
-              role="status"
-              className={`live-status${model.status === 'ready' ? ' is-ready' : ''}${
-                model.status === 'failed' || model.status === 'unavailable' ? ' is-error' : ''
-              }`}
-            >
-              {detectionStatus}
-            </p>
-            <h2>O que a detecção encontrou</h2>
-            {!analyzed ? (
-              <p className="muted">As detecções aparecem aqui quando a análise começar.</p>
-            ) : analyzed.detections.length === 0 ? (
-              <p>Nenhum problema suportado identificado neste quadro.</p>
-            ) : (
-              <ol className="live-detections">
-                {analyzed.detections.slice(0, limit).map((item, index) => (
-                  <li key={index}>
-                    <i style={{ background: classColor(item.classIndex) }} aria-hidden="true" />
-                    <span>
-                      <strong>{labelFor(item.className)}</strong>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {inferenceError && (
-              <p className="error" role="alert">
-                {inferenceError}
-              </p>
-            )}
-            {captureError && (
-              <p className="error" role="alert">
-                {captureError}
-              </p>
-            )}
-            <p className="muted">
-              Capturar evidência grava só o quadro original do vídeo, sem as marcações, e abre o
-              registro para você marcar o local no mapa ou pela busca de endereço.
-            </p>
-          </section>
-          <details className="panel live-technical">
-            <summary>Detalhes técnicos</summary>
-            <DetectionReadout
-              metrics={metrics}
-              live={phase.kind === 'connected'}
-              resolution={remoteSize ? `${remoteSize.width}×${remoteSize.height}` : null}
-              frameId={analyzed?.frameId ?? null}
-              videoLabel="Vídeo recebido"
-            />
-          </details>
-        </div>
+        <section className="panel" aria-label="Registro de evidência">
+          {captureError && <p className="error" role="alert">{captureError}</p>}
+          <p className="muted">A foto abre como rascunho para marcar o local. A equipe revisa o relato.</p>
+          {remoteSize && <p>Vídeo recebido: {remoteSize.width}×{remoteSize.height}</p>}
+        </section>
       </div>
     </>
   );
@@ -774,6 +583,8 @@ type SenderPhase =
 export function RobotPhonePage() {
   const pairing = useMemo(() => parsePairingHash(location.hash), []);
   const [phase, setPhase] = useState<SenderPhase>(pairing ? { kind: 'idle' } : { kind: 'invalid' });
+  // Lanterna opcional para melhorar a iluminação da captura.
+  const [torch, setTorch] = useState({ supported: false, on: false });
   const preview = useRef<HTMLVideoElement>(null);
   const phaseRef = useRef<SenderPhase>(phase);
   const camera = useRef<MediaStream | null>(null);
@@ -794,6 +605,18 @@ export function RobotPhonePage() {
   }
 
   /** Para a transmissão: câmera, conexão, canal e temporizadores. Nada é gravado. */
+  async function toggleTorch() {
+    const track = camera.current?.getVideoTracks()[0];
+    if (!track) return;
+    const on = !torch.on;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+      setTorch({ supported: true, on });
+    } catch {
+      setTorch({ supported: false, on: false });
+    }
+  }
+
   function stop(next: SenderPhase, notifyNotebook: boolean) {
     generation.current += 1;
     window.clearInterval(readyTimer.current);
@@ -810,6 +633,7 @@ export function RobotPhonePage() {
     stopStream(camera.current);
     camera.current = null;
     if (preview.current) preview.current.srcObject = null;
+    setTorch({ supported: false, on: false });
     pending.current = [];
     void wakeLock.current?.release().catch(() => undefined);
     wakeLock.current = null;
@@ -861,6 +685,9 @@ export function RobotPhonePage() {
       return;
     }
     camera.current = stream;
+    const capabilities = stream.getVideoTracks()[0]?.getCapabilities?.() as
+      (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+    setTorch({ supported: Boolean(capabilities?.torch), on: false });
     stream.getVideoTracks()[0]?.addEventListener('ended', () => {
       if (run === generation.current)
         stop({ kind: 'ended', message: 'A câmera do celular foi desligada.' }, true);
@@ -977,7 +804,7 @@ export function RobotPhonePage() {
         // com rede fraca, reduz quadros por segundo em vez de encolher a imagem.
         track.contentHint = 'detail';
         const sender = connection.addTrack(track, camera.current!);
-        void keepResolution(sender);
+        void tuneSender(sender);
       }
       wirePeer(connection, servers);
     }
@@ -1095,6 +922,17 @@ export function RobotPhonePage() {
       {pairing && !cameraOn && (
         <button type="button" onClick={() => void activate()}>
           <CameraIcon size={16} aria-hidden="true" /> Ativar câmera
+        </button>
+      )}
+      {cameraOn && torch.supported && (
+        <button
+          type="button"
+          className="secondary"
+          aria-pressed={torch.on}
+          onClick={() => void toggleTorch()}
+        >
+          <Flashlight size={16} aria-hidden="true" />
+          {torch.on ? 'Desligar lanterna' : 'Ligar lanterna'}
         </button>
       )}
       {cameraOn && (

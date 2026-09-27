@@ -8,13 +8,7 @@ from typing import Any
 import pytest
 
 from app.logging import configure_logging
-from app.observability import (
-    MIN_SAMPLES_FOR_DRIFT,
-    NOT_ENOUGH_DATA,
-    drift_status,
-    model_lineage,
-    slow_queries,
-)
+from app.observability import slow_queries
 
 
 class FakeResult:
@@ -69,83 +63,6 @@ async def test_sql_caro_vem_da_extensao_sem_infraestrutura_nova() -> None:
     report = await slow_queries(FakeSession(scalars=[1], results=[rows]))
     assert report["available"] is True
     assert report["queries"][0]["mean_ms"] == 120.5
-
-
-@pytest.mark.asyncio
-async def test_sem_amostra_o_sistema_nao_afirma_drift() -> None:
-    counts = [{"detections": 12, "events": 4, "reviews": 0, "models": 1}]
-    report = await drift_status(FakeSession(results=[counts]))
-    assert report["status"] == NOT_ENOUGH_DATA
-    assert report["missing"] == MIN_SAMPLES_FOR_DRIFT - 12
-    # Nenhuma distribuição é publicada enquanto a amostra não existir.
-    assert "by_class" not in report
-
-
-@pytest.mark.asyncio
-async def test_com_amostra_suficiente_a_distribuicao_real_e_publicada() -> None:
-    counts = [{"detections": MIN_SAMPLES_FOR_DRIFT, "events": 90, "reviews": 30, "models": 2}]
-    by_class = [{"urmind_class": "URMIND_ROAD_D40", "total": 120, "mean_confidence": 0.61}]
-    report = await drift_status(FakeSession(results=[counts, by_class]))
-    assert report["status"] == "DRIFT_BASELINE_READY"
-    assert report["by_class"][0]["total"] == 120
-
-
-@pytest.mark.asyncio
-async def test_lineage_aponta_o_elo_que_falta_em_vez_de_presumir() -> None:
-    row = [
-        {
-            "id": "11111111-1111-4111-8111-111111111111",
-            "name": "yolox-s",
-            "version": "baseline_early",
-            "checksum": "abc",
-            "promoted_at": "2026-09-17",
-            "dataset_name": "rdd2022",
-            "dataset_version": "v1",
-            "metrics": {
-                "stage": "baseline_early",
-                "code": {"git_commit": "deadbeef"},
-                "fingerprints": {"split_fingerprint": "fp"},
-                "training": {"run": {}},  # sem run do MLflow
-                "serving": {
-                    "checkpoint_sha256": "ckpt",
-                    "onnx_path": "models/serving/x.onnx",
-                    "parity": {"passed": True},
-                },
-            },
-        }
-    ]
-    report = await model_lineage(FakeSession(results=[row], scalars=[0]))
-    assert report["complete"] is False
-    assert report["missing_links"] == ["training_run"]
-    assert report["promoted"] is False
-    assert report["chain"]["stage"] == "QUARANTINED"
-
-
-@pytest.mark.asyncio
-async def test_shadow_lineage_never_claims_production():
-    row = {
-        "id": "fixture",
-        "name": "shadow",
-        "version": "demo",
-        "checksum": "abc",
-        "promoted_at": None,
-        "dataset_name": None,
-        "dataset_version": None,
-        "metrics": {
-            "shadow_authorized": True,
-            "serving_status": "EXPERIMENTAL_SHADOW",
-            "quality_classification": "REJECTED",
-        },
-    }
-    report = await model_lineage(FakeSession(results=[[row]], scalars=[0]))
-    assert report["promoted"] is False
-    assert report["chain"]["stage"] == "EXPERIMENTAL_SHADOW"
-
-
-@pytest.mark.asyncio
-async def test_sem_modelo_promovido_nao_ha_cadeia_inventada() -> None:
-    report = await model_lineage(FakeSession(results=[[]]))
-    assert report["promoted"] is False
 
 
 @pytest.mark.asyncio
