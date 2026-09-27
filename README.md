@@ -23,3 +23,7 @@ npm run build
 ```
 
 A câmera remota pode enviar um quadro como rascunho. A análise e a publicação dependem de revisão humana.
+
+## Planejamento de IA
+
+O próximo ciclo prevê **YOLO11 com treinamento e avaliação no Roboflow** para candidatos visuais e **XGBoost** para análise tabular de severidade ou risco. Esses modelos ainda não foram treinados nem ativados no UrMind. O fluxo atual continua com revisão humana. O escopo e os critérios de ativação estão no [Master Plan](docs/Planinng/MASTER_PLAN.md).
