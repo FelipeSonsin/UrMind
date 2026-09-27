@@ -87,17 +87,16 @@ async def test_captura_sem_evento_para_na_etapa_certa() -> None:
             "source_location": "gps_device",
             "captured_at": "2026-09-18T12:00:00Z",
             "storage_path": "user/2026/09/abc.jpg",
-            "quality": {"inference": {"status": "inference_completed", "latency_ms": 310}},
+            "quality": {"human_review": {}},
             "tem_ponto": True,
         }
     ]
     session = FakeSession(
-        results=[capture, [{"urmind_class": "URMIND_ROAD_D40", "confidence": 0.61}], []],
-        scalars=[0, 1],
+        results=[capture, []],
     )
     report = await inspect(session, None)
     assert report["pronto"] is False
     etapas = {step["etapa"]: step["status"] for step in report["etapas"]}
-    assert etapas["captura"] == "ok" and etapas["storage"] == "ok" and etapas["worker"] == "ok"
-    assert etapas["detecção"] == "ok"
+    assert etapas["captura"] == "ok" and etapas["storage"] == "ok"
+    assert etapas["revisão humana"] == "pendente"
     assert etapas["evento"] == "pendente"

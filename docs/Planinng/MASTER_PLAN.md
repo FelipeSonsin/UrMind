@@ -23,10 +23,10 @@ Os treinos anteriores de YOLOX e XGBoost não integram este plano. Arquivos hist
 
 1. O usuário envia uma foto com localização do aparelho ou EXIF; quando falta localização confiável, confirma o ponto no mapa.
 2. A API valida o arquivo e registra a captura. A câmera remota do robô pode fornecer um quadro para o mesmo fluxo de registro.
-3. A fila encaminha a captura para revisão humana. Ela não executa YOLOX, YOLO11 nem XGBoost.
+3. A API registra a captura diretamente como pendente de revisão humana. Quando falta localização, o relato solicita o ponto antes da revisão. Não há inferência ativa de YOLOX, YOLO11 ou XGBoost.
 4. Revisores verificam evidência, classe, localização, privacidade e decisão. Ocorrências confirmadas podem aparecer no mapa público.
 
-O frontend React é publicado separadamente da API FastAPI. Supabase mantém autenticação, banco geográfico, fila e armazenamento; Render hospeda a API. A interface e a API devem informar claramente quando uma análise automática não está disponível. Nenhum resultado antigo deve ser apresentado como capacidade atual.
+O frontend React é publicado separadamente da API FastAPI. Supabase mantém autenticação, banco geográfico e armazenamento; Render hospeda a API. A antiga fila de inferência não recebe novas capturas. A interface e a API devem informar claramente quando uma análise automática não está disponível. Nenhum resultado antigo deve ser apresentado como capacidade atual.
 
 ## 3. Escopo funcional que permanece
 

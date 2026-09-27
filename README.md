@@ -4,7 +4,7 @@ Aplicação para registrar problemas urbanos com foto e localização, revisar r
 
 ## Estrutura
 
-- `backend/`: API FastAPI, trabalhador da fila de capturas e migrações.
+- `backend/`: API FastAPI, revisão humana de capturas e migrações.
 - `frontend/`: aplicação React para registro, revisão e consulta pública.
 - `supabase/`: configuração e migrações do banco e armazenamento.
 

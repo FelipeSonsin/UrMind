@@ -1017,7 +1017,11 @@ async def detach_evidence(
     link = quality.pop("additional_evidence", None)
     if link is None:
         return {"detached": False}
-    quality["inference"] = {"status": "queued"}
+    quality["inference"] = {
+        "status": "needs_review",
+        "reason": "evidence_detached",
+        "at": datetime.now(UTC).isoformat(),
+    }
     capture.quality = quality
     await service.captures.notify_evidence_change(uuid.UUID(link["capture_id"]))
     await service.decisions.add_review(
@@ -1039,7 +1043,6 @@ async def detach_evidence(
             f"detach:{capture_id}:{datetime.now(UTC).isoformat()}".encode()
         ).hexdigest(),
     )
-    await InferenceRepository(service.captures.session).enqueue_capture(capture_id)
     await service.captures.session.commit()
     return {"detached": True}
 

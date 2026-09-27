@@ -23,7 +23,6 @@ from app.models.core import (
     ActionCatalog,
     AuditLog,
     Capture,
-    DatasetVersion,
     Detection,
     Event,
     EventContext,
@@ -361,7 +360,7 @@ class CaptureRepository:
     async def fill_missing_location(
         self, capture_id: uuid.UUID, actor: str, coordinate: Coordinate
     ) -> bool:
-        """Atomic first location only. Updates trigger the existing inference queue."""
+        """Atomic first location only; review status is already stored with the photo."""
         result = await self.session.execute(
             update(Capture)
             .where(
@@ -1471,7 +1470,6 @@ class InferenceRepository:
                 event_hash=f"inference-{uuid.uuid4()}",
             )
         await self.session.flush()
-
 
 
 class PublicRepository:

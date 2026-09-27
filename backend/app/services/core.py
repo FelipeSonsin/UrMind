@@ -131,6 +131,23 @@ class CoreService:
                 "protocol_code": existing.protocol_code,
                 "created": False,
             }
+        if (
+            payload.source in {CaptureSource.PWA_PHOTO, CaptureSource.EXIF_UPLOAD}
+            and payload.storage_path is not None
+            and not payload.quality.get("inference")
+        ):
+            payload = payload.model_copy(
+                update={
+                    "quality": {
+                        **payload.quality,
+                        "inference": {
+                            "status": "needs_review",
+                            "reason": "manual_review_required",
+                            "at": datetime.now(UTC).isoformat(),
+                        },
+                    }
+                }
+            )
         capture = await self.captures.create(payload)
         return {
             "id": capture.id,

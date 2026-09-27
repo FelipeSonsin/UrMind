@@ -271,13 +271,16 @@ class FakeCaptureRepo:
     def __init__(self, existing=None) -> None:
         self.existing = existing
         self.created = None
+        self.created_payload = None
 
     async def get_by_key(self, _key):
         return self.existing
 
     async def create(self, payload):
+        self.created_payload = payload
         self.created = FakeEventRow()
         self.created.capture_key = payload.capture_key
+        self.created.protocol_code = "URM-7K3Q9XYZ"
         return self.created
 
 
@@ -299,6 +302,30 @@ async def test_capture_reenvio_e_idempotente():
     service = CoreService(FakeCaptureRepo(existing=existing), FakeEventRepo())
     result = await service.register_capture(capture())
     assert result["created"] is False
+
+
+@pytest.mark.asyncio
+async def test_new_photo_goes_directly_to_manual_review_without_mutating_input():
+    repo = FakeCaptureRepo()
+    payload = capture().model_copy(update={"storage_path": "private/photo.jpg"})
+    result = await CoreService(repo, FakeEventRepo()).register_capture(payload)
+    assert result["created"] is True
+    assert payload.quality == {}
+    assert repo.created_payload.quality["inference"]["status"] == "needs_review"
+    assert repo.created_payload.quality["inference"]["reason"] == "manual_review_required"
+
+
+@pytest.mark.asyncio
+async def test_linked_evidence_keeps_its_existing_review_reason():
+    repo = FakeCaptureRepo()
+    payload = capture().model_copy(
+        update={
+            "storage_path": "private/photo.jpg",
+            "quality": {"inference": {"status": "needs_review", "reason": "additional_evidence"}},
+        }
+    )
+    await CoreService(repo, FakeEventRepo()).register_capture(payload)
+    assert repo.created_payload.quality["inference"]["reason"] == "additional_evidence"
 
 
 @pytest.mark.asyncio

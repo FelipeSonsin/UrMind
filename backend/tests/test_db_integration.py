@@ -273,7 +273,7 @@ async def test_capture_cursor_walks_1200_tied_records_without_loss(database):
             assert len(identifiers) == len(set(identifiers)) == 1200
             assert not await repository.report_markers(str(uuid.uuid4()), include_unlocated=True)
         finally:
-            # Capture triggers and queue writes are in the same uncommitted transaction.
+            # All fixture inserts remain in the same uncommitted transaction.
             await session.rollback()
 
 
@@ -798,6 +798,9 @@ async def test_additional_evidence_has_one_point_and_can_be_detached(database):
                     service,
                 )
             )["detached"]
+            detached = await service.captures.get(child.id)
+            assert detached.quality["inference"]["status"] == "needs_review"
+            assert detached.quality["inference"]["reason"] == "evidence_detached"
             assert len(await service.capture_markers(owner)) == 2
             reviews = await service.decisions.capture_review_history(child.id)
             assert reviews[0]["decision"] == "detach_evidence"
@@ -1037,12 +1040,16 @@ async def test_brazil_operational_territory_is_installed_and_private(database):
         pytest.skip("pinned operational territory is provisioned only in Urmind DEV")
     async with database.sessionmaker() as session:
         privileges = (
-            await session.execute(
-                text("""select
+            (
+                await session.execute(
+                    text("""select
                     has_table_privilege('anon','public.operational_territory','SELECT') as anon_read,
                     has_table_privilege('authenticated','public.operational_territory','SELECT') as user_read""")
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
         assert not privileges["anon_read"]
         assert not privileges["user_read"]
         inside, source_sha = await assess_brazil_location(
@@ -1259,7 +1266,7 @@ async def test_photo_report_marker_exif_storage_owner_and_missing_location(datab
                         ),
                         {"id": str(capture_id)},
                     )
-                    == 1
+                    == 0
                 )
                 # Realtime SELECT authorization uses the same RLS as Data API.
                 await session.execute(text("set local role authenticated"))
@@ -1695,9 +1702,7 @@ async def test_storage_compensates_real_db_constraint_failure(database):
 
 
 @pytest.mark.asyncio
-async def test_capture_trigger_queue_read_archive_and_transaction_rollback(database):
-    from app.repositories.core import InferenceRepository
-
+async def test_photo_insert_does_not_enqueue_automatic_inference(database):
     async with database.sessionmaker() as session:
         try:
             capture_id = await session.scalar(
@@ -1711,17 +1716,16 @@ async def test_capture_trigger_queue_read_archive_and_transaction_rollback(datab
                     "path": f"integration-fixture/{uuid.uuid4().hex}.jpg",
                 },
             )
-            queue = InferenceRepository(session)
-            job = await queue.read_job(visibility_timeout_s=2)
-            assert job is not None
-            assert job["message"]["capture_id"] == str(capture_id)
-            assert job["read_ct"] == 1
-            await queue.archive_job(job["msg_id"])
-            archived = await session.scalar(
-                text("select count(*) from pgmq.a_inference_jobs where msg_id = :id"),
-                {"id": job["msg_id"]},
+            assert (
+                await session.scalar(
+                    text(
+                        "select count(*) from pgmq.q_inference_jobs "
+                        "where message->>'capture_id' = :id"
+                    ),
+                    {"id": str(capture_id)},
+                )
+                == 0
             )
-            assert archived == 1
         finally:
             await session.rollback()
 
