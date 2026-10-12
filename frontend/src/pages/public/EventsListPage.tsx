@@ -1,5 +1,6 @@
+import { Camera, MapPin } from 'lucide-react';
 import { EventFeed } from '../../components/public/EventFeed';
-import { PageHeader, Skeleton } from '../../components/ui';
+import { EmptyState, PageHeader, Skeleton } from '../../components/ui';
 import { labelFor, type PublicEvent } from '../../domain/public';
 
 /** Ocorrências confirmadas em lista, com o filtro por tipo de problema no cabeçalho. */
@@ -64,10 +65,25 @@ export function PublicEventsPage({
         <EventFeed
           events={events}
           toolbar={filter}
-          emptyHint={
-            filters.urmind_class
-              ? 'Nenhuma ocorrência corresponde a este filtro.'
-              : 'Nenhuma ocorrência publicada ainda.'
+          empty={
+            filters.urmind_class ? (
+              <p className="muted feed-empty" role="status">
+                Nenhuma ocorrência corresponde a este filtro.
+              </p>
+            ) : (
+              // Mesmo desenho do vazio de "Meus relatos": o que é e o que fazer.
+              <EmptyState
+                icon={<MapPin size={22} strokeWidth={1.8} />}
+                title="Nenhuma ocorrência publicada ainda"
+                action={
+                  <a className="button" href="#/registrar">
+                    <Camera size={17} aria-hidden="true" /> Registrar relato
+                  </a>
+                }
+              >
+                Depois da revisão da equipe, cada relato confirmado aparece aqui e no mapa.
+              </EmptyState>
+            )
           }
         />
       )}

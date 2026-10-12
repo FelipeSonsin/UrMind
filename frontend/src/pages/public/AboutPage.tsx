@@ -31,7 +31,15 @@ export function AboutPage({ revision }: { revision: number }) {
           </p>
           <p>
             O UrMind não avisa a prefeitura: ele organiza os relatos e publica o que foi confirmado.
-            Para pedir o conserto, registre também no SP156, o canal oficial da cidade de São Paulo.
+            Para pedir o conserto, registre também no{' '}
+            <a
+              href="https://sp156.prefeitura.sp.gov.br/portal"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              SP156
+            </a>
+            , o canal oficial da cidade de São Paulo.
           </p>
           <a className="text-button" href="#/transparency">
             Como o UrMind funciona

@@ -12,28 +12,31 @@ export function EventFeed({
   events,
   label = 'Ocorrências',
   toolbar,
-  emptyHint,
+  empty,
 }: {
   events: PublicEvent[];
   /** Nome acessível da lista. */
   label?: string;
   /** Filtros no cabeçalho da lista, ao lado da contagem. */
   toolbar?: ReactNode;
-  emptyHint?: string;
+  /** Lista vazia: só este aviso, sem uma contagem "0 ocorrências" dizendo o mesmo. */
+  empty: ReactNode;
 }) {
   const count = events.length === 1 ? '1 ocorrência' : `${events.length} ocorrências`;
   return (
     <section className="panel feed" aria-label={label}>
-      <div className="feed-head">
-        <p className="feed-count" role="status">
-          {count}
-        </p>
-        {toolbar}
-      </div>
+      {(events.length > 0 || toolbar) && (
+        <div className="feed-head">
+          {events.length > 0 && (
+            <p className="feed-count" role="status">
+              {count}
+            </p>
+          )}
+          {toolbar}
+        </div>
+      )}
       {events.length === 0 ? (
-        <p className="muted feed-empty">
-          {emptyHint ?? 'Nenhuma ocorrência publicada ainda para esta área piloto.'}
-        </p>
+        empty
       ) : (
         <ul className="feed-list">
           {events.map((event) => {

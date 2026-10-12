@@ -473,6 +473,19 @@ test('sem ocorrência publicada, a página inicial convida a registrar e não pa
   await page.goto('/#/mapa');
   await expect(page.getByText('Nenhuma ocorrência publicada ainda.').first()).toBeVisible();
   await expect(page.getByRole('group', { name: 'Filtros do mapa' })).toHaveCount(0);
+  // Na lista, o aviso vazio explica e convida, sem "0 ocorrências" repetindo o mesmo.
+  await page.goto('/#/events');
+  await expect(
+    page.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
+  ).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('0 ocorrências');
+  await expect(page.locator('main').getByRole('link', { name: 'Registrar relato' })).toBeVisible();
+  // O SP156 é link em todo lugar onde aparece, inclusive em "Sobre e privacidade".
+  await page.goto('/#/sobre');
+  await expect(page.getByRole('link', { name: 'SP156' })).toHaveAttribute(
+    'href',
+    'https://sp156.prefeitura.sp.gov.br/portal',
+  );
 });
 
 test('o antigo endereço de exemplos abre o mapa nas ocorrências confirmadas', async ({ page }) => {
