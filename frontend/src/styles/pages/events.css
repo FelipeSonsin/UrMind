@@ -1,0 +1,584 @@
+/* Ocorrências: lista, detalhe, evidência e diagnóstico. */
+.quick-diagnosis h2 {
+  margin: 2px 0 2px;
+  font-size: var(--text-xl);
+  letter-spacing: var(--track-tight);
+}
+.quick-place {
+  margin: 0 0 var(--s-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.quick-diagnosis .risk-tag {
+  margin: 0 0 var(--s-4);
+}
+/* Detalhe da ocorrência: leitura principal à esquerda, ação e local à direita. */
+.event-where {
+  margin: var(--s-2) 0 0;
+  font-size: var(--text-sm);
+}
+.event-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  align-items: start;
+  gap: var(--space);
+}
+.event-main,
+.event-side {
+  display: grid;
+  gap: var(--space);
+  min-width: 0;
+}
+.event-layout :is(.panel, section) + :is(.panel, section) {
+  margin-top: 0;
+}
+.event-layout .panel > h2 {
+  margin-bottom: var(--s-2);
+}
+.event-layout .panel > p:last-child {
+  margin-bottom: 0;
+}
+.action-panel h2,
+.action-panel h3 {
+  margin-bottom: var(--s-2);
+}
+.action-title {
+  margin: 0 0 var(--s-1);
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.35;
+}
+.action-owner {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.action-owner strong {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+.location-line {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--s-2);
+}
+.location-line strong {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+.location-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-5);
+  margin: 0;
+}
+/* Foto ainda não publicada: o espaço da foto, com cadeado e o motivo. */
+.photo-placeholder {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-1);
+  padding: var(--s-8) var(--s-5);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.photo-placeholder strong {
+  color: var(--text);
+}
+.photo-placeholder small {
+  max-width: 46ch;
+  font-size: var(--text-sm);
+}
+.urban-analysis h3 {
+  margin-top: var(--s-4);
+}
+.urban-analysis ul {
+  margin: 0;
+  padding-left: var(--s-5);
+  color: var(--text-secondary);
+}
+/* Detalhes técnicos: uma faixa discreta, fechada por padrão, no fim da página. */
+.technical {
+  margin-top: var(--space);
+  padding-block: 0;
+}
+.technical > details {
+  margin: 0;
+}
+.technical > details > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+/* A seta mostra que o bloco abre; gira quando está aberto. */
+.technical > details > summary::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 2px 0 4px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.technical > details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.technical > details > summary small {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+}
+.technical > details[open] > summary {
+  margin-bottom: var(--s-2);
+}
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: var(--s-6) var(--s-8);
+  margin-bottom: var(--s-6);
+}
+.tech-group h3 {
+  margin-bottom: var(--s-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.tech-group .data-list dd {
+  font-size: var(--text-sm);
+}
+.technical > details > .tech-group {
+  padding-bottom: var(--s-6);
+}
+@media (max-width: 1023px) {
+  .event-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Celular e tablet: o que será feito e onde vêm antes da foto. */
+  .event-side {
+    order: -1;
+  }
+}
+.tech-summary {
+  margin: 0 0 var(--s-3);
+  font-size: var(--text-sm);
+}
+.feed {
+  margin-top: var(--space);
+}
+.feed-list,
+.explanation-columns ul,
+.context-list,
+.limitations {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.feed-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+.feed-count {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.feed-head label {
+  display: grid;
+  gap: 4px;
+  min-width: min(100%, 240px);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.feed-head select {
+  min-height: 36px;
+  margin: 0;
+}
+.feed-empty {
+  margin: var(--s-4) 0;
+}
+.feed-list {
+  display: grid;
+  gap: 2px;
+  margin: 0 calc(-1 * var(--s-3));
+}
+.feed-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+}
+.feed-chevron {
+  color: var(--text-muted);
+}
+.feed-item .risk-tag {
+  justify-self: end;
+}
+.feed-item:hover {
+  background: var(--surface-2);
+}
+.feed-main strong {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.feed-main {
+  min-width: 0;
+}
+.feed-main small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+.feed-main small > :not(:first-child)::before {
+  content: '·';
+  margin-right: var(--s-2);
+}
+.explanation-head {
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.explanation-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-4);
+}
+.explanation-columns h3 {
+  margin-bottom: var(--s-1);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.explanation-columns li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.explanation-columns small {
+  color: var(--text-secondary);
+}
+.prediction-panel p {
+  max-width: 62ch;
+}
+.context-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--s-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.context-list small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.limitations {
+  display: grid;
+  gap: 6px;
+  margin-top: var(--s-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+/* Caminho da análise: um ponto por etapa, cheio quando há registro, vazado quando não. */
+.decision-trace {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.decision-trace li {
+  position: relative;
+  padding-left: 22px;
+}
+.decision-trace li::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--primary);
+  border-radius: 50%;
+  background: var(--primary);
+}
+.decision-trace li.unavailable::before {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.decision-trace details {
+  margin: 0;
+}
+.decision-trace summary,
+.trace-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: auto;
+  margin: 0;
+  padding: 8px 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.decision-trace summary::before {
+  content: none;
+}
+.decision-trace summary::after {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1.75px solid var(--text-secondary);
+  border-bottom: 1.75px solid var(--text-secondary);
+  transform: rotate(45deg);
+}
+.decision-trace details[open] > summary::after {
+  transform: rotate(-135deg);
+}
+.decision-trace li.unavailable .trace-title {
+  color: var(--text-secondary);
+}
+.trace-state {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.decision-trace .data-list {
+  margin: 0 0 var(--s-3);
+}
+.evidence-figure {
+  margin: 0 0 var(--s-4);
+}
+.evidence-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.evidence-frame img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+.evidence-figure figcaption {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.bbox {
+  position: absolute;
+  border: 2px solid var(--brand-lime);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--brand-deep);
+  pointer-events: auto;
+}
+.report {
+  white-space: pre-wrap;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.taxonomy-list,
+.demo-list {
+  display: grid;
+  gap: 6px;
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.taxonomy-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+.taxonomy-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: 10px var(--s-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.taxonomy-list li small {
+  flex-basis: 100%;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.taxonomy-list li[data-support='DATA_REQUIRED'] strong {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.demo-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.demo-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Situação do serviço: uma linha por parte, com o estado alinhado à direita. */
+.service-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.service-list li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+.service-list li:first-child {
+  border-top: 0;
+}
+.service-dot {
+  align-self: start;
+  margin-top: calc(0.75em - 4.5px);
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+.is-ok .service-dot {
+  background: var(--success);
+}
+.is-degraded .service-dot {
+  background: var(--warning);
+}
+.is-unavailable .service-dot {
+  background: var(--danger);
+}
+/* Parte desligada: ponto cinza cheio (o tracejado parecia "carregando"). */
+.is-off .service-dot {
+  background: var(--text-muted);
+}
+.service-name {
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}
+.service-state {
+  display: grid;
+  justify-items: end;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-align: right;
+}
+.is-ok .service-state {
+  color: var(--success);
+}
+.is-unavailable .service-state {
+  color: var(--danger);
+}
+/* Instável: o texto na mesma cor do ponto, como nos outros estados. */
+.is-degraded .service-state {
+  color: var(--warning);
+}
+.service-state small {
+  color: var(--text-secondary);
+  font-weight: var(--weight-regular);
+}
+.service-checked {
+  margin: var(--s-2) 0 0;
+}
+.coverage-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+/* Celular: o tipo em cima, rua e data embaixo, a gravidade logo abaixo; a seta à direita. */
+@media (max-width: 700px) {
+  .feed-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'main chevron'
+      'tag chevron';
+    row-gap: 6px;
+  }
+  .feed-main {
+    grid-area: main;
+  }
+  .feed-item .risk-tag {
+    grid-area: tag;
+    justify-self: start;
+  }
+  .feed-chevron {
+    grid-area: chevron;
+  }
+}
+
+/* Celular: o estado de cada parte do serviço vai abaixo do nome, sem espremer o texto. */
+@media (max-width: 599px) {
+  .service-list li {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+  .service-list .service-state {
+    grid-column: 2;
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+/* Ocorrência sem foto publicada: uma linha com o motivo, no lugar do quadro da foto. */
+.photo-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-bottom: var(--space);
+  margin-top: var(--space);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.photo-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+.photo-note p {
+  margin: 0;
+}
+.photo-note strong {
+  color: var(--text);
+}
+
+/* Sem foto nem análise: os cartões (solução, local, previsão) lado a lado, na largura toda. */
+.event-layout.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.event-layout.is-single .event-side {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  align-items: stretch;
+}
+/* Situação do serviço: os valores alinhados pelo topo, mesmo quando a região quebra a linha. */
+.coverage-list > div {
+  align-content: start;
+}

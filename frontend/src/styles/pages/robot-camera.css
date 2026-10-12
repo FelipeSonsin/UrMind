@@ -1,0 +1,132 @@
+/* Câmera do robô: pareamento e transmissão. */
+.robot-start {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-5);
+  max-width: 720px;
+}
+.robot-start > h2,
+.robot-start > .error {
+  margin: 0;
+}
+/* Passos direto no cartão (sem caixa dentro da caixa). */
+.robot-steps {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+/* Aviso só em celular e tablet: no computador ele não faz sentido. */
+/* Celular: receber o vídeo aqui fica recolhido numa linha. */
+.robot-here > summary {
+  margin-bottom: var(--s-3);
+  font-weight: var(--weight-semibold);
+}
+.robot-pairing {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-8);
+  max-width: 900px;
+}
+.robot-pairing input {
+  font-size: var(--text-sm);
+}
+.robot-qr {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: #fff;
+}
+.robot-code {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.robot-code strong {
+  margin-left: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: 0.14em;
+}
+.robot-link-state,
+.robot-phone-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.robot-link-state::before,
+.robot-phone-state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.robot-link-state.is-connected,
+.robot-phone-state.is-connected {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: var(--success-soft);
+  color: var(--success);
+}
+.robot-link-state.is-connected::before,
+.robot-phone-state.is-connected::before {
+  background: var(--success);
+}
+.robot-phone-state:empty {
+  display: none;
+}
+.robot-phone {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-3);
+  max-width: 520px;
+}
+.robot-phone h1,
+.robot-phone p {
+  margin: 0;
+}
+.robot-phone > button {
+  width: 100%;
+}
+.robot-phone-preview {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-l);
+  background: var(--stage);
+}
+.robot-phone-preview video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+@media (max-width: 1000px) {
+  .robot-start {
+    gap: var(--s-4);
+  }
+}
+
+@media (max-width: 699px) {
+  .robot-pairing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .robot-qr {
+    max-width: 240px;
+  }
+}

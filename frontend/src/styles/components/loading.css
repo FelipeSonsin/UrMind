@@ -1,0 +1,23 @@
+/* Carregamento: esqueleto. */
+.skeleton {
+  display: grid;
+  gap: 10px;
+  margin: var(--s-4) 0;
+}
+.skeleton span {
+  height: 14px;
+  border-radius: 7px;
+  background: var(--surface-3);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.skeleton span:nth-child(3n + 2) {
+  width: 82%;
+}
+.skeleton span:nth-child(3n) {
+  width: 64%;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}

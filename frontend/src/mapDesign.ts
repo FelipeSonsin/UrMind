@@ -5,6 +5,8 @@
  * Dica: altere um valor, salve e o Vite recarrega o mapa na hora (`npm run dev`).
  */
 
+import { KEYLINE, SEVERITY_SIGNS } from './components/signShapes';
+
 export const MAP_DESIGN = {
   /** Espaço que o mapa ocupa na página. */
   slot: {
@@ -67,11 +69,11 @@ export const MAP_DESIGN = {
      * em branco-gelo com halo escuro, como no mapa Sentinel de referência.
      */
     satellite: {
-      mask: '#050507',
+      mask: '#e9edf0',
       border: '#dce9ff',
       states: '#dce9ff',
       capitalText: '#dce9ff',
-      capitalHalo: '#050507',
+      capitalHalo: '#17212b',
     },
   },
 
@@ -123,31 +125,37 @@ export const MAP_DESIGN = {
     size: 24,
     selectedScale: 1.3,
     severity: {
-      critical: { shape: 'warning', fill: '#d8645a', glyph: '#0c1411' },
-      high: { shape: 'triangle', fill: '#dd874f', glyph: '#0c1411' },
-      medium: { shape: 'square', fill: '#e3b341', glyph: '#0c1411' },
-      low: { shape: 'circle', fill: '#55b685', glyph: '#0c1411' },
-      unknown: { shape: 'ring', fill: '#a8b5ae', glyph: '#a8b5ae' },
+      critical: { shape: 'warning', fill: SEVERITY_SIGNS.critical.fill, glyph: KEYLINE },
+      high: { shape: 'triangle', fill: SEVERITY_SIGNS.high.fill, glyph: KEYLINE },
+      medium: { shape: 'square', fill: SEVERITY_SIGNS.medium.fill, glyph: KEYLINE },
+      low: { shape: 'circle', fill: SEVERITY_SIGNS.low.fill, glyph: KEYLINE },
+      unknown: {
+        shape: 'ring',
+        fill: SEVERITY_SIGNS.unknown.fill,
+        glyph: SEVERITY_SIGNS.unknown.fill,
+      },
     },
     /**
-     * Relatos de cidadãos (sem gravidade): círculo na cor da situação pública —
-     * recebido, em análise, confirmado, precisa de localização, não confirmado.
+     * Relatos de cidadãos: círculo vazado (forma própria, nunca confundida com as placas
+     * de gravidade), na cor da situação. As cores não repetem as da gravidade: recebido
+     * cinza, em análise azul, confirmado verde-escuro, falta o local âmbar, não
+     * confirmado grafite.
      */
     reportStatus: {
-      location_required: '#e3b341',
+      location_required: '#e0a12e',
       received: '#a8b5ae',
-      processing: '#6fa6a0',
-      model_not_available: '#6fa6a0',
-      experimental: '#6fa6a0',
-      no_supported_detection: '#6fa6a0',
-      human_confirmed: '#55b685',
-      published: '#55b685',
-      confirmed: '#55b685',
+      processing: '#4f86d1',
+      model_not_available: '#4f86d1',
+      experimental: '#4f86d1',
+      no_supported_detection: '#4f86d1',
+      human_confirmed: '#2f9a68',
+      published: '#2f9a68',
+      confirmed: '#2f9a68',
       rejected: '#68746f',
       duplicate: '#68746f',
     },
     /** Contorno de todo marcador e ícone interno dos relatos: separa de qualquer base. */
-    keyline: '#0c1411',
+    keyline: KEYLINE,
     reportGlyph: '#0c1411',
     /** Ponto marcado pela pessoa ao escolher o local da foto. */
     picked: '#b7e36b',
@@ -156,7 +164,7 @@ export const MAP_DESIGN = {
   },
 } as const;
 
-export type MarkerShape = 'warning' | 'triangle' | 'square' | 'circle' | 'ring';
+export type MarkerShape = 'warning' | 'triangle' | 'square' | 'circle' | 'ring' | 'report';
 
 export type MapColors = Record<keyof (typeof MAP_DESIGN.colors)['light'], string>;
 

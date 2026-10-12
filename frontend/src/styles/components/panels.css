@@ -1,0 +1,62 @@
+/* Blocos: painel, grades de painéis e larguras. */
+.panel {
+  padding: var(--s-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+}
+.panel .panel {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+.panel + .panel,
+.panel + section,
+section + .panel,
+.detail-grid + .panel,
+.detail-grid + section,
+.about-grid + section,
+.stat-row + section,
+.notice + .draft-grid,
+.notice + .panel {
+  margin-top: var(--space);
+}
+.panel > h2:not(:first-child),
+.panel > h3:not(:first-child) {
+  margin-top: var(--s-6);
+}
+.panel.narrow,
+.narrow {
+  max-width: 560px;
+}
+/* Um link de continuação depois do bloco principal da página. */
+.page-footnote {
+  margin: var(--s-4) 0 0;
+}
+.crash {
+  margin: var(--s-12) auto;
+}
+:is(.capture-grid, .detail-grid, .live-grid, .live-side, .home-lead, .draft-grid, .about-grid)
+  > :is(.panel, section) {
+  margin-top: 0;
+}
+.detail-grid,
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: var(--space);
+  margin-top: var(--space);
+}
+.about-grid {
+  margin-top: 0;
+}
+.about-grid p:last-of-type {
+  margin-bottom: var(--s-3);
+}
+
+@media (max-width: 899px) {
+  .panel {
+    padding: var(--s-5);
+  }
+}

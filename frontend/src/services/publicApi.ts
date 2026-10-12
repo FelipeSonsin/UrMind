@@ -27,7 +27,7 @@ function get<T>(
     messages: {
       network: 'Não foi possível conectar ao UrMind.',
       timeout: 'O UrMind demorou a responder.',
-      contract: 'A resposta da API não corresponde ao contrato público.',
+      contract: 'O UrMind respondeu de um jeito inesperado. Tente de novo em instantes.',
     },
   });
 }

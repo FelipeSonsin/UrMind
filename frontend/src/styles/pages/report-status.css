@@ -1,0 +1,119 @@
+/* Acompanhamento do relato (página "Seu relato"): situação e mapa, na largura das outras páginas. */
+.report-status + .reports-panel {
+  margin-top: var(--space);
+}
+.reports-panel .confirm-location {
+  margin-top: var(--s-4);
+}
+.report-status-track {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-5);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.report-status-track .stage {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.report-status-track .next-step {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+/* Histórico do relato: cada etapa com a data logo abaixo. */
+.report-timeline ol {
+  display: grid;
+  gap: var(--s-3);
+  margin: var(--s-3) 0 0;
+  padding-left: var(--s-5);
+}
+.report-timeline li {
+  font-size: var(--text-sm);
+}
+.report-timeline li small {
+  display: block;
+  color: var(--text-secondary);
+}
+.report-timeline li p {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+}
+.protocol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  margin: 0 0 var(--s-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.protocol-code {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.report-status > .actions {
+  margin-top: var(--s-5);
+}
+
+/* Qual relato: a foto enviada e o endereço, no topo do cartão. */
+.report-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.report-summary img {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.report-summary p {
+  margin: 0;
+}
+.report-summary p + p {
+  margin-top: 2px;
+}
+
+/* "Atualizar" (sem fundo) alinhado à borda do texto, sem degrau em relação ao resto. */
+.report-status > .actions > button.ghost:first-child {
+  margin-inline-start: calc(-1 * var(--s-3));
+}
+
+/* Sem local: o mapa para marcar vem logo depois da situação, dentro do mesmo cartão. */
+.report-pick {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-5);
+}
+.report-pick > h2,
+.report-pick > p {
+  margin: 0;
+}
+.report-pick .confirm-location {
+  justify-self: start;
+}
+@media (max-width: 599px) {
+  .report-pick .confirm-location {
+    justify-self: stretch;
+  }
+}
+
+/* Depois do envio: o UrMind não avisa a prefeitura (linha discreta, sob a situação). */
+.report-channel {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}

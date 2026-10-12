@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { eventDetail, urbanAnalysis } from '../../tests/fixtures';
+import taxonomyFixture from '../../tests/taxonomy.fixture.json' with { type: 'json' };
 import {
   filterableClasses,
   exportMapRecords,
   filterMapRecords,
   filterPublicMap,
   issueHeadline,
+  issueMatchesSearch,
   publicMapFilterOptions,
   publicSituation,
   situationLabel,
@@ -115,7 +117,7 @@ describe('apresentação pública sem inventar dado', () => {
 
   it('gravidade ausente ou desconhecida vira "ainda não avaliada", nunca "leve"', () => {
     expect(severityOf(null).level).toBe('unknown');
-    expect(severityOf(undefined).label).toBe('Ainda não avaliada');
+    expect(severityOf(undefined).label).toBe('Gravidade a definir');
     expect(severityOf('inexistente').level).toBe('unknown');
   });
 
@@ -130,8 +132,9 @@ describe('apresentação pública sem inventar dado', () => {
 
   it('tipo e gravidade aparecem separados; sem avaliação, só o tipo', () => {
     expect(issueHeadline('URMIND_ROAD_D40', 'high')).toBe('Buraco · Grave');
-    expect(issueHeadline('URMIND_ROAD_D00', null)).toBe('Trinca longitudinal');
-    expect(issueHeadline('URMIND_ROAD_D20', 'unknown')).toBe('Trinca em malha');
+    // No site do cidadão, o termo de engenharia vira o nome do dia a dia.
+    expect(issueHeadline('URMIND_ROAD_D00', null)).toBe('Rachadura ao longo da rua');
+    expect(issueHeadline('URMIND_ROAD_D20', 'unknown')).toBe('Asfalto com muitas rachaduras');
     expect(labelFor('URMIND_ROAD_D20')).not.toContain('jacaré');
   });
 
@@ -146,7 +149,7 @@ describe('apresentação pública sem inventar dado', () => {
       expect(situationLabel(status)).toBe('Em análise');
     expect(situationLabel('human_confirmed')).toBe('Confirmado');
     expect(situationLabel('published')).toBe('Confirmado');
-    expect(situationLabel('location_required')).toBe('Precisa de localização');
+    expect(situationLabel('location_required')).toBe('Falta o local');
     expect(publicSituation('rejected')).toBe('declined');
     expect(situationLabel('duplicate')).toBe('Não confirmado');
     expect(situationLabel('confirmed')).toBe('Confirmado');
@@ -265,6 +268,23 @@ describe('contrato público espelha o backend', () => {
 });
 
 describe('taxonomia canônica', () => {
+  it('encontra nomes simples, sinônimos e chaves sem acento sem ativar classes novas', () => {
+    const catalog = issueTaxonomySchema.parse(taxonomyFixture);
+    const find = (query: string) => catalog.issues.filter((row) => issueMatchesSearch(row, query));
+    expect(find('FIACAO CAOTICA').map((row) => row.issue_code)).toEqual([
+      'URMIND_DISORDERED_WIRING',
+    ]);
+    expect(find('rua_sem_asfalto').map((row) => row.issue_code)).toEqual(['URMIND_UNPAVED_ROAD']);
+    expect(find('linhas insuficientes').map((row) => row.issue_code)).toEqual([
+      'URMIND_INSUFFICIENT_BUS_SERVICE',
+    ]);
+    expect(find('falta de rampa').map((row) => row.issue_code)).toEqual([
+      'URMIND_MISSING_CURB_RAMP',
+    ]);
+    expect(find('problema inexistente')).toEqual([]);
+    expect(find('')).toHaveLength(catalog.issues.length);
+    expect(catalog.issues.every((row) => !row.model_may_emit)).toBe(true);
+  });
   const issue = (code: string, status: IssueDefinition['model_support_status'], may: boolean) => ({
     issue_code: code,
     taxonomy_version: 'urmind-issue-taxonomy-v2',
@@ -385,7 +405,7 @@ describe('filtros do mapa público', () => {
     ]);
     expect(options.severities).toEqual([
       ['high', 'Grave'],
-      ['unknown', 'Ainda não avaliada'],
+      ['unknown', 'Gravidade a definir'],
     ]);
     expect(publicMapFilterOptions([]).issues).toEqual([]);
     // Períodos: só os que separam pontos e dão resultado diferente do anterior.

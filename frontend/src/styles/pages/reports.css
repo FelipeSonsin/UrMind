@@ -1,0 +1,208 @@
+/* Lista de relatos e página Meus relatos. */
+.report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.report-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-2) var(--s-5);
+  padding: var(--s-3) var(--s-3);
+  margin: 0 calc(-1 * var(--s-3));
+  position: relative;
+  border-radius: var(--radius);
+}
+.report-list li + li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--s-3);
+  right: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+/* Lista larga: situação e ação em colunas fixas, alinhadas de linha a linha. */
+@media (min-width: 700px) {
+  .reports-panel .report-list li,
+  .home-reports .report-list li {
+    grid-template-columns: minmax(0, 1fr) 220px 150px;
+  }
+  .report-list .report-action {
+    justify-self: end;
+  }
+}
+.report-list li.is-selected {
+  background: var(--primary-soft);
+}
+.report-list li.is-selected::before,
+.report-list li.is-selected + li::before {
+  border-top-color: transparent;
+}
+.report-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.report-title {
+  justify-self: start;
+  min-height: 0;
+  /* Linha de 21 px + 3 px em cima e embaixo: área de toque acima de 24 px. */
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+  box-shadow: none;
+}
+/* Antes da revisão o título é a descrição de quem enviou: duas linhas no máximo. */
+.report-list .report-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+button.report-title:hover,
+a.report-title:hover {
+  background: none;
+  color: var(--primary-strong);
+  text-decoration: underline;
+}
+.report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.report-place {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.report-meta time {
+  color: var(--text-muted);
+}
+.report-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--primary-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.report-action:hover {
+  text-decoration: underline;
+}
+.report-note {
+  margin: var(--s-3) 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.report-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3) var(--s-4);
+  margin: var(--s-4) 0;
+}
+.report-facts dd {
+  font-size: var(--text-sm);
+}
+/* Meus relatos: lista à esquerda, mapa à direita no computador. */
+.my-reports {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.my-reports > * {
+  min-width: 0;
+}
+.my-reports > .segmented {
+  justify-self: start;
+}
+@media (min-width: 1100px) {
+  .my-reports:has(> .report-list li) {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: var(--space);
+    align-items: start;
+  }
+  .my-reports:has(> .report-list li) > * {
+    grid-column: 1 / -1;
+  }
+  .my-reports:has(> .report-list li) > .report-list {
+    grid-column: 1;
+    grid-row: span 1;
+    align-self: start;
+    padding: var(--s-2) var(--s-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-l);
+    background: var(--surface);
+    box-shadow: var(--shadow-s);
+  }
+  .my-reports:has(> .report-list li) > .map-panel {
+    grid-column: 2;
+    grid-row: var(--map-row, 3);
+    position: sticky;
+    top: var(--s-6);
+  }
+  .my-reports:not(:has(> .segmented)) {
+    --map-row: 2;
+  }
+  .my-reports:has(> .report-list li) > .report-list {
+    grid-row: var(--map-row, 3);
+  }
+  .my-reports .report-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .my-reports .report-list .situation-track {
+    grid-column: 1;
+  }
+  .my-reports .report-list .report-action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+@media (max-width: 1099px) {
+  .my-reports > .report-list {
+    order: -1;
+    margin-bottom: var(--space);
+    padding: var(--s-2) var(--s-5);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-l);
+    background: var(--surface);
+  }
+  .my-reports > .page-heading {
+    order: -3;
+  }
+  .my-reports > .segmented {
+    order: -2;
+  }
+}
+.reports-panel > .map-panel {
+  margin-top: var(--s-4);
+}
+
+@media (max-width: 699px) {
+  /* Situação e ação dividem a linha quando cabem; senão, a ação desce. */
+  .report-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-4);
+  }
+  .report-list li .report-main {
+    flex: 1 1 100%;
+  }
+  .report-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

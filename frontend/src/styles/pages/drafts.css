@@ -1,0 +1,48 @@
+/* Rascunhos guardados neste aparelho. */
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space);
+}
+.draft-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.draft-card .photo {
+  display: block;
+  height: 180px;
+  border-radius: 0;
+  object-fit: cover;
+}
+.draft-card > div {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+}
+.draft-card h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+.draft-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.draft-card .actions {
+  margin-top: var(--s-2);
+}
+
+@media (max-width: 899px) {
+  .draft-card {
+    padding: 0;
+  }
+}
+.draft-card .photo.is-loading {
+  background: var(--surface-2);
+}

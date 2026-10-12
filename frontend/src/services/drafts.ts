@@ -23,8 +23,43 @@ export interface CaptureDraft {
   camera_origin?: 'robot_remote';
   status: 'local_draft';
 }
+/**
+ * No banco local a foto vai como texto (base64): é o formato que todo navegador guarda
+ * sem falhar. O WebKit recusa Blob no banco e às vezes derruba a página com bytes crus.
+ * Rascunhos antigos, guardados como Blob ou bytes, ainda abrem.
+ */
+interface StoredDraft extends Omit<CaptureDraft, 'photo'> {
+  photo: Blob | { bytes: ArrayBuffer; type: string } | { base64: string; type: string };
+}
 interface DraftDatabase extends DBSchema {
-  drafts: { key: string; value: CaptureDraft };
+  drafts: { key: string; value: StoredDraft };
+}
+const STORAGE_ERROR =
+  'Não foi possível guardar a foto neste aparelho. Verifique se há espaço livre e tente de novo.';
+
+/** Bytes em base64, em pedaços (uma foto grande não estoura a pilha). */
+function toBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let start = 0; start < bytes.length; start += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+  return btoa(binary);
+}
+function fromBase64(text: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+function fromStored(stored: StoredDraft): CaptureDraft {
+  const { photo } = stored;
+  const blob =
+    photo instanceof Blob
+      ? photo
+      : 'base64' in photo
+        ? new Blob([fromBase64(photo.base64)], { type: photo.type })
+        : new Blob([photo.bytes], { type: photo.type });
+  return { ...stored, photo: blob };
 }
 function database() {
   return openDB<DraftDatabase>('urmind-local-drafts', 1, {
@@ -37,15 +72,30 @@ export const drafts = {
   async list() {
     const db = await database();
     try {
-      return (await db.getAll('drafts')).sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return (await db.getAll('drafts'))
+        .map(fromStored)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
     } finally {
       db.close();
     }
   },
   async save(draft: CaptureDraft) {
-    const db = await database();
+    let stored: StoredDraft;
     try {
-      await db.put('drafts', draft);
+      stored = {
+        ...draft,
+        photo: { base64: toBase64(await draft.photo.arrayBuffer()), type: draft.photo.type },
+      };
+    } catch {
+      throw new Error(STORAGE_ERROR);
+    }
+    const db = await database().catch(() => {
+      throw new Error(STORAGE_ERROR);
+    });
+    try {
+      await db.put('drafts', stored);
+    } catch {
+      throw new Error(STORAGE_ERROR);
     } finally {
       db.close();
     }
@@ -65,7 +115,48 @@ export const defaultPhotoPolicy = {
   brightness_max: 240,
   laplacian_min: 25,
 };
-export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Promise<void> {
+export type PhotoPolicy = typeof defaultPhotoPolicy;
+
+/** O que a checagem técnica mediu na foto (mesmo cálculo que o servidor repete). */
+export interface PhotoMeasure {
+  width: number;
+  height: number;
+  bytes: number;
+  type: string;
+  /** Brilho médio, de 0 (preto) a 255 (branco). */
+  brightness: number;
+  /** Variância do laplaciano: quanto maior, mais nítida. */
+  sharpness: number;
+}
+
+/**
+ * Regras de qualidade, na ordem em que a pessoa deve corrigir: tamanho, luz e foco.
+ * Devolve a primeira mensagem que falha, ou `null` quando a foto passa.
+ */
+export function photoProblem(measure: PhotoMeasure, policy: PhotoPolicy): string | null {
+  if (Math.min(measure.width, measure.height) < policy.min_side)
+    return `Foto pequena: use pelo menos ${policy.min_side} pixels em cada lado.`;
+  if (measure.brightness < policy.brightness_min) return 'Foto muito escura: tente com mais luz.';
+  if (measure.brightness > policy.brightness_max)
+    return 'Foto muito clara: evite luz direta na câmera.';
+  if (measure.sharpness < policy.laplacian_min)
+    return 'Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.';
+  return null;
+}
+
+/** Confere a foto antes de guardar; devolve as medidas para a pessoa ver. */
+export async function validatePhoto(
+  file: File,
+  policy: PhotoPolicy = defaultPhotoPolicy,
+): Promise<PhotoMeasure> {
+  const measure = await measurePhoto(file);
+  const problem = photoProblem(measure, policy);
+  if (problem) throw new Error(problem);
+  return measure;
+}
+
+/** Formato, tamanho e leitura da imagem; depois mede dimensões, brilho e nitidez. */
+export async function measurePhoto(file: File): Promise<PhotoMeasure> {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
     throw new Error('Use uma imagem JPEG, PNG ou WebP.');
   if (!/\.(jpe?g|png|webp)$/i.test(file.name))
@@ -81,8 +172,6 @@ export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Pr
   try {
     if (bitmap.width * bitmap.height > 40_000_000)
       throw new Error('Imagem com dimensões acima do limite.');
-    if (Math.min(bitmap.width, bitmap.height) < policy.min_side)
-      throw new Error(`Foto pequena: use pelo menos ${policy.min_side} pixels em cada lado.`);
     const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
@@ -98,10 +187,6 @@ export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Pr
       sum += gray[i];
     }
     const brightness = sum / gray.length;
-    if (brightness < policy.brightness_min)
-      throw new Error('Foto muito escura: tente com mais luz.');
-    if (brightness > policy.brightness_max)
-      throw new Error('Foto muito clara: evite luz direta na câmera.');
     let lapSum = 0,
       lapSquares = 0,
       count = 0;
@@ -114,8 +199,14 @@ export async function validatePhoto(file: File, policy = defaultPhotoPolicy): Pr
         lapSquares += lap * lap;
         count++;
       }
-    if (!count || lapSquares / count - (lapSum / count) ** 2 < policy.laplacian_min)
-      throw new Error('Foto tremida ou desfocada: estabilize a câmera e ajuste o foco.');
+    return {
+      width: bitmap.width,
+      height: bitmap.height,
+      bytes: file.size,
+      type: file.type,
+      brightness,
+      sharpness: count ? lapSquares / count - (lapSum / count) ** 2 : 0,
+    };
   } finally {
     bitmap.close();
   }

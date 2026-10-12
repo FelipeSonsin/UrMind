@@ -37,7 +37,8 @@ function checkVisitor(operation: VisitorOperation) {
 }
 
 function supabase(): SupabaseClient {
-  if (!authConfigured) throw new Error('Autenticação não configurada neste build.');
+  if (!authConfigured)
+    throw new Error('Entrar com conta não está disponível nesta versão do site.');
   if (client) return client;
   client = createClient(url as string, publishableKey as string, {
     auth: {
@@ -154,11 +155,13 @@ export const auth = {
         origin = new URL(payload.auth_origin ?? '').origin;
         visitorUploadEnabled = payload.visitor_upload_enabled === true;
       } catch {
-        throw new Error('Registro público indisponível: projeto de autenticação não confirmado.');
+        throw new Error(
+          'Não foi possível enviar agora: o site não conseguiu confirmar o acesso. Tente de novo em instantes.',
+        );
       }
       if (origin !== new URL(url as string).origin)
         throw new Error(
-          'Registro público bloqueado: frontend e backend apontam para projetos diferentes.',
+          'O envio está bloqueado: o site e o servidor estão ligados a projetos diferentes. Avise a equipe do UrMind.',
         );
       signal?.throwIfAborted();
       const existing = await this.session();
@@ -167,13 +170,13 @@ export const auth = {
         throw new DOMException('A sessão mudou. Envie novamente.', 'AbortError');
       if (!visitorUploadEnabled && (!existing || existing.user.is_anonymous))
         throw new Error(
-          'Registro público temporariamente indisponível. Entre com uma conta autorizada.',
+          'O envio sem conta está pausado no momento. Quem tem conta autorizada pode entrar e enviar.',
         );
       if (existing) return existing;
       const { data, error } = await supabase().auth.signInAnonymously();
       signal?.throwIfAborted();
       if (error || !data.session) {
-        throw new Error('Registro público indisponível: não foi possível criar uma sessão segura.');
+        throw new Error('Não foi possível preparar o envio agora. Tente de novo em instantes.');
       }
       return data.session;
     } finally {

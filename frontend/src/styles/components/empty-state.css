@@ -1,0 +1,51 @@
+/* Estado vazio (EmptyState). */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-10) var(--s-5);
+  text-align: center;
+}
+.empty h2,
+.empty h3 {
+  margin: 0 0 4px;
+}
+.empty p {
+  max-width: 52ch;
+  margin: 0 auto;
+}
+.empty > svg {
+  color: var(--text-muted);
+}
+.empty-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.empty-action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+@media (max-width: 599px) {
+  .empty-action {
+    flex-direction: column;
+    align-self: stretch;
+  }
+  .empty-action > * {
+    justify-content: center;
+  }
+}
+.empty.is-compact {
+  flex-direction: row;
+  justify-content: flex-start;
+  padding: var(--s-4) 0;
+  text-align: left;
+}

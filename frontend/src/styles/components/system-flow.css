@@ -1,0 +1,190 @@
+/* Caminho de um relato (SystemFlow): trilha de etapas e o painel da etapa escolhida.
+   Etapa ativa: nó cheio e ligação contínua. Etapa planejada: nó e ligação tracejados. */
+.system-flow {
+  --flow-pad: var(--s-3);
+  --flow-node: 28px;
+  container-type: inline-size;
+  display: grid;
+  gap: var(--s-4);
+}
+
+/* Estreito: as etapas em lista, uma por linha, ligadas por um fio vertical. */
+.flow-track {
+  display: grid;
+  margin: 0 calc(-1 * var(--flow-pad));
+}
+.flow-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--flow-node) minmax(0, 1fr);
+  justify-items: start;
+  align-content: start;
+  gap: 1px var(--s-3);
+  min-height: 0;
+  padding: var(--s-2) var(--flow-pad);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  white-space: normal;
+}
+.flow-step > :not(.flow-node) {
+  grid-column: 2;
+}
+.flow-step:hover {
+  background: var(--hover);
+}
+.flow-step[aria-selected='true'] {
+  background: var(--primary-softer);
+}
+
+/* Ligação até a próxima etapa: vertical na lista, horizontal na trilha larga. */
+.flow-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--s-2) + var(--flow-node) + 4px);
+  bottom: calc(-1 * var(--s-2) + 4px);
+  left: calc(var(--flow-pad) + var(--flow-node) / 2 - 1px);
+  border-left: 2px solid var(--primary);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.flow-step.is-planned::after,
+.flow-step:has(+ .is-planned)::after {
+  border-left: 2px dashed var(--border-strong);
+  opacity: 1;
+}
+
+/* Largo: as sete etapas lado a lado, numa trilha horizontal. */
+@container (min-width: 880px) {
+  .flow-track {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .flow-step {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    padding: var(--flow-pad);
+  }
+  .flow-step > :not(.flow-node) {
+    grid-column: 1;
+  }
+  .flow-step:not(:last-child)::after {
+    top: calc(var(--flow-pad) + var(--flow-node) / 2 - 1px);
+    bottom: auto;
+    left: calc(var(--flow-pad) + var(--flow-node) + 6px);
+    right: calc(-1 * var(--flow-pad) + 6px);
+    border-left: 0;
+    border-top: 2px solid var(--primary);
+  }
+  .flow-step.is-planned::after,
+  .flow-step:has(+ .is-planned)::after {
+    border-left: 0;
+    border-top: 2px dashed var(--border-strong);
+  }
+  .flow-node {
+    grid-row: auto;
+    margin-bottom: var(--s-2);
+  }
+}
+
+.flow-node {
+  grid-row: span 3;
+  display: grid;
+  place-items: center;
+  width: var(--flow-node);
+  height: var(--flow-node);
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  transition: box-shadow var(--dur-base) var(--ease-out);
+}
+.is-planned .flow-node {
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.flow-step[aria-selected='true'] .flow-node {
+  box-shadow: 0 0 0 4px var(--focus);
+}
+.flow-title {
+  font-size: 14.5px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+}
+.flow-summary {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+/* Só a etapa planejada leva rótulo; as outras funcionam hoje. */
+.flow-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--s-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.is-planned .flow-title {
+  color: var(--text-secondary);
+}
+
+/* Painel da etapa escolhida: o que acontece, o que é plano e quem faz. */
+.flow-panel {
+  display: grid;
+  gap: var(--s-2);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+  animation: flow-in var(--dur-base) var(--ease-out) both;
+}
+.flow-panel h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.flow-panel p {
+  max-width: 76ch;
+  margin: 0;
+}
+.flow-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.flow-planned {
+  padding: var(--s-3) var(--s-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.flow-who {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.flow-who strong {
+  color: var(--text);
+}
+@keyframes flow-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -1,0 +1,127 @@
+/* Tokens: cor, tipografia, espaço, forma, interação e estrutura.
+   Mudar um token muda todas as páginas. */
+:root {
+  color-scheme: light;
+
+  /* ---- Cor: base ---- */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f4f6;
+  --surface-3: #e8edf0;
+  --text: #17212b;
+  --text-secondary: #536171;
+  /* Texto de apoio: 4,5:1 até sobre --surface-3 (contraste WCAG AA). */
+  --text-muted: #5d6976;
+  --border: #dce2e7;
+  --border-strong: #c3ccd4;
+
+  /* ---- Cor: ação e seleção ---- */
+  --primary: #0f766e;
+  --primary-strong: #115e59;
+  --primary-soft: #e3f1ef;
+  --primary-softer: #f0f7f6;
+  --on-primary: #ffffff;
+  --focus: color-mix(in srgb, var(--primary) 30%, transparent);
+
+  /* ---- Cor: estados ---- */
+  --success: #15803d;
+  --success-soft: #e9f5ec;
+  --warning: #b45309;
+  --warning-soft: #fdf2e5;
+  --danger: #b42318;
+  --danger-strong: #912018;
+  --on-danger: #ffffff;
+  --danger-soft: #fdeeec;
+  --info: var(--primary);
+  /* Situação em andamento (relato em análise): azul, o mesmo tom do mapa. */
+  --progress: #2b5fa0;
+  --severe: #c2410c;
+
+  /* ---- Cor: marca (só no símbolo) e mapa ---- */
+  --brand-deep: #123f36;
+  --brand-lime: #c9f17d;
+  --map-surface: #e9edf0;
+  --stage: #17212b;
+
+  /* ---- Tipografia ---- */
+  --font: 'Public Sans Variable', 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 12.5px;
+  --text-sm: 13.5px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 21px;
+  --text-2xl: 28px;
+  --text-3xl: clamp(30px, 3.3vw, 44px);
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --track-tight: -0.02em;
+
+  /* ---- Espaço (base 4) ---- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 56px;
+  --space: var(--s-5);
+
+  /* ---- Forma ---- */
+  --radius-s: 6px;
+  --radius: 10px;
+  --radius-l: 14px;
+  --radius-full: 999px;
+  --shadow-s: 0 1px 2px rgb(23 33 43 / 0.05);
+  --shadow-m: 0 1px 2px rgb(23 33 43 / 0.04), 0 4px 14px rgb(23 33 43 / 0.07);
+  --shadow-l: 0 2px 6px rgb(23 33 43 / 0.06), 0 16px 40px rgb(23 33 43 / 0.14);
+
+  /* ---- Interação ---- */
+  --hover: color-mix(in srgb, var(--text) 5%, transparent);
+  --selected: var(--primary-soft);
+  --control-h: 40px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ---- Camadas (do mais baixo ao mais alto) ---- */
+  --z-sidebar: 40;
+  --z-topbar: 45;
+  --z-tabbar: 50;
+  --z-sheet: 100;
+  --z-skip: 200;
+
+  /* ---- Estrutura ---- */
+  --sidebar: 248px;
+  --tabbar: 64px;
+  --content: 1200px;
+
+  font-family: var(--font);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  font-weight: var(--weight-regular);
+  font-synthesis: none;
+  font-feature-settings: 'ss01' off;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (max-width: 1199px) {
+  :root {
+    --sidebar: 224px;
+  }
+}
+
+@media (max-width: 899px) {
+  :root {
+    --control-h: 44px;
+  }
+}

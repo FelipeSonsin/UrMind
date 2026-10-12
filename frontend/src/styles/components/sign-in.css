@@ -1,0 +1,37 @@
+/* Entrar (SignIn). */
+.sign-in {
+  display: grid;
+  gap: var(--s-3);
+  max-width: 440px;
+  margin: var(--s-8) auto;
+  padding: var(--s-8);
+}
+.sign-in label {
+  display: grid;
+  gap: 6px;
+}
+.sign-in input {
+  margin: 0;
+}
+.sign-in button[type='submit'] {
+  min-height: 44px;
+  margin-top: var(--s-2);
+}
+/* Entrada da equipe recolhida no fim de Rascunhos: quem envia relato não precisa dela. */
+.sign-in-more {
+  margin: var(--space) 0 0;
+  padding-block: var(--s-3);
+}
+.sign-in-more > summary {
+  padding-block: 6px;
+}
+.sign-in-more .sign-in {
+  margin: var(--s-3) 0 0;
+  padding: 0;
+}
+
+@media (max-width: 899px) {
+  .sign-in {
+    padding: var(--s-5);
+  }
+}

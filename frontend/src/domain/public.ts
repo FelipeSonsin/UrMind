@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { PLAIN_ISSUE_NAMES } from '../content/plainLanguage';
+import { currentSurface } from '../surface';
 import { automaticClasses } from './capabilities';
 
 // Espelha app/schemas/public.py. Campo ausente chega como null com motivo: a tela
@@ -177,6 +179,8 @@ export const urbanAnalysisSchema = z.object({
       'PUBLIC_LIGHTING',
       'CIVIL_DEFENSE',
       'GENERAL_INSPECTION',
+      'PUBLIC_TRANSPORT',
+      'POWER_NETWORK',
     ])
     .nullable(),
   context: publicEventDetailBase.shape.context.default([]),
@@ -255,7 +259,7 @@ export const severityPresentation: Record<string, { label: string; shape: string
     high: { label: 'Grave', shape: '▲', level: 'high' },
     medium: { label: 'Moderada', shape: '■', level: 'medium' },
     low: { label: 'Leve', shape: '●', level: 'low' },
-    unknown: { label: 'Ainda não avaliada', shape: '?', level: 'unknown' },
+    unknown: { label: 'Gravidade a definir', shape: '?', level: 'unknown' },
   };
 
 /** Níveis avaliados, do mais grave ao mais leve (ordem dos filtros e da legenda). */
@@ -279,7 +283,7 @@ export const publicSituationLabels: Record<PublicSituation, string> = {
   received: 'Recebido',
   analyzing: 'Em análise',
   confirmed: 'Confirmado',
-  needs_location: 'Precisa de localização',
+  needs_location: 'Falta o local',
   declined: 'Não confirmado',
 };
 const SITUATION_BY_STATUS: Record<string, PublicSituation> = {
@@ -349,11 +353,38 @@ export const issueTaxonomySchema = z.object({
       photo_detectable: z.union([z.boolean(), z.literal('limited')]).optional(),
       limitations: z.array(z.string()).optional(),
       triage_priority_hint: z.string().nullable().optional(),
+      search_key: z.string().optional(),
+      search_aliases: z.array(z.string()).optional(),
+      photo_review_allowed: z.boolean().optional(),
+      photo_review_block_reason: z.string().nullable().optional(),
+      evidence_requirement: z
+        .enum(['visual_review', 'site_context_review', 'temporal_review', 'service_data_review'])
+        .optional(),
     }),
   ),
 });
 export type IssueTaxonomy = z.infer<typeof issueTaxonomySchema>;
 export type IssueDefinition = IssueTaxonomy['issues'][number];
+
+/** Busca pelos nomes simples, sinônimos e códigos; aceita acentos e underscores. */
+export function issueMatchesSearch(issue: IssueDefinition, query: string): boolean {
+  const normalized = (text: string) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_/\-]+/g, ' ')
+      .toLowerCase();
+  const terms = normalized(query).trim().split(/\s+/).filter(Boolean);
+  const text = normalized(
+    [
+      issue.display_name_pt,
+      issue.issue_code,
+      issue.search_key ?? '',
+      ...(issue.search_aliases ?? []),
+    ].join(' '),
+  );
+  return terms.every((term) => text.includes(term));
+}
 
 const taxonomyLabels = new Map<string, string>();
 const taxonomyFamilies = new Map<string, string>();
@@ -382,6 +413,8 @@ export const familyLabels: Record<string, string> = {
   PEDESTRIAN_INFRASTRUCTURE: 'Calçadas e pedestres',
   TRAFFIC_INFRASTRUCTURE: 'Sinalização e trânsito',
   URBAN_INFRASTRUCTURE: 'Infraestrutura urbana',
+  PUBLIC_TRANSPORT: 'Transporte público',
+  POWER_NETWORK: 'Fiação e rede elétrica',
   WASTE_OBSTRUCTION: 'Resíduos e entulho',
 };
 export function familyLabel(family: string): string {
@@ -578,6 +611,9 @@ export function modelSupportLabel(issue: Pick<IssueDefinition, 'model_support_st
 }
 
 export function labelFor(urmindClass: string): string {
+  // No site do cidadão, os termos de engenharia ganham o nome do dia a dia.
+  if (currentSurface() === 'public' && PLAIN_ISSUE_NAMES[urmindClass])
+    return PLAIN_ISSUE_NAMES[urmindClass];
   return taxonomyLabels.get(urmindClass) ?? publicClassLabels[urmindClass] ?? urmindClass;
 }
 

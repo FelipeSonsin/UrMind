@@ -28,6 +28,11 @@ export interface JsonRequestOptions extends RequestInit {
 }
 
 /** Único cliente HTTP do frontend: fetch + timeout + zod. Área logada e painel público o reutilizam. */
+/** Relato que não existe ou não é desta sessão (resposta 404 do acompanhamento). */
+export const REPORT_NOT_FOUND = 'Relato não encontrado ou sem acesso.';
+/** Protocolo sem relato desta sessão (resposta 404 da busca por protocolo). */
+export const PROTOCOL_NOT_FOUND = 'Protocolo sem relato neste aparelho.';
+
 export async function requestJson<T>(
   url: string,
   schema: z.ZodType<T>,
@@ -53,7 +58,9 @@ export async function requestJson<T>(
         .json()
         .then((body: { detail?: unknown }) => (typeof body.detail === 'string' ? body.detail : ''))
         .catch(() => '');
-      throw new Error(detail || `A API respondeu com erro ${response.status}.`);
+      throw Object.assign(new Error(detail || `A API respondeu com erro ${response.status}.`), {
+        status: response.status,
+      });
     }
     const parsed = schema.safeParse(await response.json());
     if (!parsed.success) throw new Error(messages.contract);
@@ -81,16 +88,16 @@ async function request<T>(
     ...requestInit,
     token: token ?? (await auth.accessToken()),
     messages: {
-      network: 'Não foi possível conectar ao backend.',
-      timeout: 'O backend demorou a responder. Tente novamente.',
-      contract: 'A resposta da API não corresponde ao contrato esperado.',
+      network: 'Não foi possível conectar ao UrMind. Confira a internet e tente de novo.',
+      timeout: 'O UrMind demorou a responder. Tente de novo em instantes.',
+      contract: 'O UrMind respondeu de um jeito inesperado. Tente de novo em instantes.',
     },
     statusError: (status) =>
       statusError?.(status) ??
       (status === 401
         ? new UnauthorizedError()
         : status === 503
-          ? new Error('Banco ou integração indisponível ou ainda não configurado.')
+          ? new Error('Serviço temporariamente indisponível. Tente de novo em instantes.')
           : undefined),
   });
 }
@@ -175,7 +182,7 @@ export const api = {
         z.object({
           name: z.string(),
           status: z.string(),
-          detail: z.string(),
+          detail: z.string().nullable(),
           checked_at: z.string(),
           latency_ms: z.number().nullable(),
           last_success: z.string().nullable(),
@@ -243,6 +250,7 @@ export const api = {
             public_id: z.string(),
             status: z.string(),
             origin: z.string(),
+            urmind_class: z.string().optional(),
           }),
         ),
         reviews: z.array(
@@ -301,7 +309,10 @@ export const api = {
     request(
       `/captures/by-protocol/${encodeURIComponent(protocol)}`,
       z.object({ capture_id: z.string().uuid(), protocol_code: z.string() }),
-      { signal },
+      {
+        signal,
+        statusError: (status) => (status === 404 ? new Error(PROTOCOL_NOT_FOUND) : undefined),
+      },
     ),
   captureMarkers: (signal?: AbortSignal, onlyMine = false, cursor: string | null = null) =>
     request(
@@ -381,8 +392,7 @@ export const api = {
   captureProcessing: (id: string, signal?: AbortSignal) =>
     request(`/captures/${id}/processing`, captureProcessingSchema, {
       signal,
-      statusError: (status) =>
-        status === 404 ? new Error('Captura não encontrada ou sem acesso.') : undefined,
+      statusError: (status) => (status === 404 ? new Error(REPORT_NOT_FOUND) : undefined),
     }),
   review: (id: string, payload: ReviewPayload) =>
     request(`/events/${id}/reviews`, z.object({ status: z.string() }), {

@@ -15,7 +15,8 @@ export function describeCameraError(
   if (!environment.secure)
     return {
       code: 'insecure_context',
-      message: 'A câmera só abre em HTTPS ou em localhost. Abra o UrMind por um endereço seguro.',
+      message:
+        'A câmera só funciona no endereço seguro do UrMind, que começa com https. Abra o site por ele.',
     };
   if (!environment.supported)
     return {
@@ -57,7 +58,6 @@ export function describeCameraError(
       return { code: 'unknown', message: 'Não foi possível abrir a câmera.' };
   }
 }
-
 
 /** A câmera é sempre a do aparelho que abriu o navegador; nada passa pelo servidor. */
 export function cameraEnvironment() {

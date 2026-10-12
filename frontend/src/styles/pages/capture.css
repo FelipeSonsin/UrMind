@@ -1,0 +1,398 @@
+/* Registrar relato: foto, localização, descrição e envio. */
+.capture-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space);
+}
+/* Número de cada etapa do formulário; fica cheio quando a etapa está feita. */
+.step {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: var(--s-2);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  vertical-align: 1px;
+  transition:
+    background-color var(--dur-base) var(--ease),
+    border-color var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease);
+}
+.step[data-done='true'] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.capture-grid h2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.capture-details h2 {
+  margin-top: var(--s-8);
+  padding-top: var(--s-6);
+  border-top: 1px solid var(--border);
+}
+.capture-details h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  margin-bottom: var(--s-4);
+  padding: var(--s-5);
+  overflow: hidden;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-l);
+  background: var(--surface-2);
+  text-align: center;
+}
+.upload-area:has(.photo) {
+  padding: var(--s-2);
+  border-style: solid;
+  border-color: var(--border);
+}
+.upload-area > svg {
+  margin-bottom: var(--s-3);
+  color: var(--primary);
+}
+.upload-area h3 {
+  margin-bottom: 4px;
+  font-size: var(--text-lg);
+}
+.upload-area p {
+  margin: 0 0 6px;
+}
+.upload-area small {
+  color: var(--text-muted);
+}
+.photo {
+  width: 100%;
+  height: 300px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+}
+.camera {
+  margin-top: 0;
+  padding: var(--s-3);
+}
+.camera video {
+  width: 100%;
+  max-height: 350px;
+  margin-bottom: var(--s-3);
+  border-radius: var(--radius);
+  background: var(--stage);
+}
+.filename {
+  margin: var(--s-3) 0;
+  overflow-wrap: anywhere;
+}
+.footnote {
+  margin-top: var(--s-4);
+  font-size: var(--text-xs);
+}
+/* Checagem da foto (PhotoCheck): o resultado em uma linha; as medidas, recolhidas. */
+.photo-check {
+  margin: var(--s-3) 0 var(--s-4);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+  border-radius: var(--radius);
+  background: var(--success-soft);
+}
+.photo-check.is-off {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+  background: var(--warning-soft);
+}
+.photo-check-result {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 6px 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.photo-check-result svg {
+  flex: none;
+  color: var(--success);
+}
+.photo-check.is-off .photo-check-result svg {
+  color: var(--warning);
+}
+.photo-check details {
+  margin: 0;
+}
+.photo-check summary {
+  min-height: 32px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.photo-check dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+}
+.photo-check dl > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.photo-check dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.photo-check dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--s-2);
+  margin: 0;
+}
+.photo-check-value {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.photo-check dd small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.photo-check-note {
+  margin: var(--s-1) 0 var(--s-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.location-status {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.location-status > p {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 10px;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.location-status > p.muted {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.location-status > p small {
+  grid-column: 2;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.location-status svg {
+  color: var(--text-secondary);
+}
+.location-status.is-located {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: var(--success-soft);
+}
+.location-status.is-located svg {
+  color: var(--success);
+}
+.location-status.is-error {
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: var(--danger-soft);
+}
+.location-status.is-error svg {
+  color: var(--danger);
+}
+.location-status .actions {
+  margin: var(--s-3) 0 0;
+}
+.location-status > button {
+  margin-top: var(--s-3);
+}
+.location-picker {
+  margin-top: var(--s-4);
+}
+.location-picker h3 {
+  font-size: var(--text-md);
+}
+.location-picker .map-panel {
+  margin-bottom: var(--s-3);
+  box-shadow: none;
+}
+.address-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.address-search label {
+  min-width: 0;
+}
+.address-search input {
+  margin-bottom: 0;
+}
+.address-search button {
+  min-height: 42px;
+}
+.address-results {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--s-3);
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.address-results button {
+  display: grid;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-weight: var(--weight-medium);
+  white-space: normal;
+  box-shadow: none;
+}
+.address-results button:hover {
+  background: var(--surface-2);
+}
+.address-results button[aria-pressed='true'] {
+  background: var(--primary-soft);
+}
+.address-results small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+.address-hint {
+  margin: 0 0 var(--s-3);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.consent {
+  margin-bottom: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.consent .checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-block: 4px;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.consent .checkbox input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: none;
+}
+.consent details {
+  margin: var(--s-2) 0 0 28px;
+}
+.consent summary {
+  padding: 4px 0;
+}
+.consent details p {
+  margin: var(--s-2) 0 0;
+  font-size: var(--text-sm);
+}
+.capture-details button[type='submit'] {
+  width: 100%;
+  min-height: 48px;
+  font-size: var(--text-md);
+}
+.capture-details button[type='submit'] + .muted {
+  margin: var(--s-2) 0 0;
+  text-align: center;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* "Tirar foto": no toque, o app de câmera do aparelho; no computador, a webcam. */
+@media (pointer: coarse) {
+  .desktop-camera {
+    display: none;
+  }
+}
+@media (pointer: fine) {
+  .phone-camera {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .capture-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 899px) {
+  .address-results button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .address-search {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Celular: "Tirar foto" e "Escolher foto" lado a lado, com a largura toda. */
+@media (max-width: 699px) {
+  .photo-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+  .photo-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 899px) {
+  .camera {
+    padding: var(--s-5);
+  }
+}

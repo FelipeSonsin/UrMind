@@ -1,0 +1,197 @@
+/* Campos: rótulos, entradas, seleção e linhas de campos. */
+label {
+  display: block;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+input,
+textarea,
+select {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  margin: 6px 0 var(--s-4);
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-regular);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+input::placeholder,
+textarea::placeholder {
+  color: #6b7785;
+}
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: #aab6c0;
+}
+/* Campo em foco (teclado ou toque): borda e anel. O Safari não desenha sombra em seleção
+   e caixa de marcar nativas, por isso o contorno também. */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+input[type='checkbox']:focus,
+input[type='radio']:focus {
+  outline-offset: 2px;
+  box-shadow: none;
+}
+input[readonly] {
+  background: var(--surface-2);
+}
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--primary);
+}
+/* Caixa de seleção sempre ao lado do próprio texto, alinhada pela primeira linha. */
+label:has(> input[type='checkbox']) {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  /* A linha inteira é a área de toque: pelo menos 24 px de altura. */
+  padding-block: 4px;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+label:has(> input[type='checkbox']) > input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+}
+/* Campo curto com o rótulo na mesma linha (filtro de período, operação). */
+.inline-field {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: 100%;
+}
+.inline-field label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.inline-field select,
+.inline-field input {
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding-block: 6px;
+  font-size: var(--text-sm);
+}
+/* Formulário de configuração: grupos com título e campos em colunas. */
+.settings-form {
+  display: grid;
+  gap: var(--space);
+}
+.settings-form fieldset {
+  min-width: 0;
+  margin: 0;
+}
+/* O espaço entre os grupos vem do gap; sem a margem de painel seguido de painel. */
+.settings-form > fieldset.panel {
+  margin-top: 0;
+}
+.settings-form legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--s-4);
+  padding: 0;
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+/* A legenda flutua para ficar dentro do painel; o que vem depois começa abaixo dela. */
+.settings-form legend + * {
+  clear: both;
+}
+.settings-grid {
+  clear: both;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: var(--s-2) var(--s-5);
+}
+.settings-grid label {
+  display: grid;
+  align-content: start;
+}
+.settings-grid input {
+  margin-bottom: 0;
+}
+.settings-grid small {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-weight: var(--weight-regular);
+}
+.settings-form fieldset > p {
+  clear: both;
+  margin: var(--s-4) 0 0;
+}
+.settings-form > .actions {
+  align-items: center;
+}
+.settings-form > .actions p {
+  margin: 0;
+}
+input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+input[aria-invalid='true']:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent);
+}
+textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+.field-note {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+}
+.field-error {
+  display: block;
+  margin-top: -10px;
+  margin-bottom: var(--s-3);
+  color: var(--danger);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.char-count {
+  margin: -10px 0 var(--s-3);
+  text-align: right;
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 420px) {
+  .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Campo com erro continua vermelho com o foco (o destaque de foco não o pinta de verde). */
+input[aria-invalid='true']:focus,
+input[aria-invalid='true']:focus-visible {
+  border-color: var(--danger);
+  outline-color: var(--danger);
+}

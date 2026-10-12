@@ -146,7 +146,7 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
 
   await expect(page).toHaveURL(new RegExp(`#\/processando\/${upload.id}$`));
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Seu relato' })).toBeVisible();
+  await expect(page.getByText(/^Situação:/)).toBeVisible();
   const ownerSession = await page.evaluate((ref) => {
     const value = localStorage.getItem(`sb-${ref}-auth-token`);
     return value ? JSON.parse(value) : null;
@@ -220,14 +220,15 @@ test('foto real → Anonymous Auth → Worker → resultado do proprietário', a
   await expect(page).toHaveURL(new RegExp(`#\/resultado\/${eventId}$`));
   const detail = page.locator('main');
   // A imagem privada não é publicada sem sanitização; Detection estruturada permanece visível.
-  await expect(detail.getByText(/imagem não publicada/)).toBeVisible();
-  await expect(detail.locator('.detection-list li').first()).toBeVisible();
+  await expect(detail.getByText(/A foto ainda não foi publicada/)).toBeVisible();
   await expect(page.getByLabel('Risco e explicação')).toBeVisible();
-  await expect(page.getByLabel('Como o UrMind analisou')).toBeVisible();
-  await expect(detail.getByText(/Análise experimental/)).toBeVisible();
+  await expect(detail.getByText(/análise experimental/i).first()).toBeVisible();
+  await page.getByText('Detalhes técnicos').click();
+  await expect(page.getByLabel('Análise da foto')).not.toContainText('Tipos detectadosnenhum');
+  await expect(page.getByLabel('Caminho da análise')).toBeVisible();
 
   // Contexto externo (§13): presente ou explicitamente indisponível, nunca inventado.
-  await expect(page.getByLabel('Contexto urbano')).toBeVisible();
+  await expect(page.getByLabel('Fontes de contexto')).toBeVisible();
 
   await page.goto('/#/map');
   await expect(page.getByRole('heading', { name: 'Mapa', exact: true })).toBeVisible();

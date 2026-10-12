@@ -12,11 +12,19 @@ export const classes = {
 } as const;
 export const statuses = {
   detected: 'Detectada',
-  review: 'Em revisão',
+  // "Revisão" é a Fila de relatos; a ocorrência espera a decisão da equipe.
+  review: 'Aguardando decisão',
   confirmed: 'Confirmada',
-  rejected: 'Rejeitada',
-  triage_required: 'Requer triagem',
+  rejected: 'Recusada',
+  triage_required: 'Responsável a definir',
 } as const;
+/** Cor da situação da ocorrência: a mesma na lista, no detalhe e no mapa. */
+export const statusTones: Record<string, string> = {
+  detected: 'tone-progress',
+  review: 'tone-progress',
+  confirmed: 'tone-success',
+  triage_required: 'tone-attention',
+};
 const optionalNumber = z.number().finite().nullable().optional();
 export const eventSchema = z.object({
   id: z.string().uuid(),
@@ -160,16 +168,18 @@ export type CaptureMarker = z.infer<typeof captureMarkerSchema>;
  * vê a situação agrupada de `publicSituation` (domain/public).
  */
 export const reportLabels: Record<CaptureMarker['report_status'], string> = {
-  location_required: 'Precisa de localização',
+  // Para a equipe, tudo o que ainda não tem decisão é "Aguardando revisão": a etapa
+  // interna do processamento não muda o que a pessoa faz.
+  location_required: 'Falta o local',
   received: 'Recebido',
-  processing: 'Processando',
-  model_not_available: 'Análise indisponível',
-  experimental: 'Analisado (experimental)',
-  no_supported_detection: 'Analisado — nenhum problema reconhecido',
-  human_confirmed: 'Confirmado na revisão',
+  processing: 'Aguardando revisão',
+  model_not_available: 'Aguardando revisão',
+  experimental: 'Aguardando revisão',
+  no_supported_detection: 'Aguardando revisão',
+  human_confirmed: 'Confirmado',
   published: 'Publicado',
-  rejected: 'Rejeitado na revisão',
-  duplicate: 'Duplicado',
+  rejected: 'Recusado',
+  duplicate: 'Repetido',
 };
 
 const detectionSchema = z.object({
@@ -236,13 +246,13 @@ export type ReviewPayload =
   | { decision: 'confirm' | 'reject'; notes?: string }
   | {
       decision: 'correct';
-      corrected_class?: keyof typeof classes;
+      corrected_class?: string;
       corrected_location?: Coordinate;
       notes?: string;
     };
 
 export const severities: Record<string, string> = {
-  unknown: 'Ainda não avaliada',
+  unknown: 'Gravidade a definir',
   low: 'Leve',
   medium: 'Moderada',
   high: 'Grave',

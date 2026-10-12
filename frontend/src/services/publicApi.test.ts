@@ -93,7 +93,7 @@ describe('cliente do painel público', () => {
 
   it('rejeita resposta que não corresponde ao contrato público', async () => {
     respond({ ...status, events_total: 'muitos' });
-    await expect(publicApi.status()).rejects.toThrow(/contrato público/);
+    await expect(publicApi.status()).rejects.toThrow(/jeito inesperado/);
   });
 
   it('propaga o motivo devolvido pela API em vez de inventar um', async () => {

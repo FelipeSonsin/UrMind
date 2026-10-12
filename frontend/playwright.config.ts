@@ -6,6 +6,15 @@ const mobile = {
   defaultBrowserType: 'chromium' as const,
   channel: 'msedge',
 };
+// Motor do Safari (WebKit), opcional: `npx playwright install webkit` e PW_WEBKIT=1.
+// Roda as varreduras de linguagem simples e de acabamento num iPhone emulado. No WebKit,
+// com o service worker do app no controle, os dados simulados (page.route) deixam de
+// valer e a página chama o servidor de verdade: o Playwright recomenda bloqueá-lo.
+const webkit = {
+  name: 'webkit',
+  use: { ...devices['iPhone 13'], serviceWorkers: 'block' as const },
+  testMatch: /(plain-language|design-quality)\.spec\.ts/,
+};
 
 export default defineConfig({
   testDir: './tests',
@@ -21,6 +30,7 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: desktop },
     { name: 'mobile', use: mobile },
+    ...(process.env.PW_WEBKIT ? [webkit] : []),
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined

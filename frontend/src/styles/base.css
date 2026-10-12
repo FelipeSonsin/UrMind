@@ -1,0 +1,118 @@
+/* Base: elementos HTML, foco, links, imagens e acessibilidade de movimento. */
+* {
+  box-sizing: border-box;
+}
+/* Foco por teclado nunca fica escondido sob as barras fixas. */
+html {
+  scroll-padding-top: var(--s-4);
+}
+a,
+button,
+summary,
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+}
+a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+/* Link no meio do texto: a cor de ação, sublinhado discreto. */
+main :is(p, li, dd, small, span) > a:not([class]),
+main > section a:not([class]),
+.map-detail a:not([class]) {
+  color: var(--primary-strong);
+  font-weight: var(--weight-medium);
+  text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+main :is(p, li, dd, small, span) > a:not([class]):hover,
+.map-detail a:not([class]):hover {
+  text-decoration-color: currentColor;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+::selection {
+  background: var(--primary-soft);
+  color: var(--text);
+}
+[hidden] {
+  display: none !important;
+}
+img {
+  max-width: 100%;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: fixed;
+  left: var(--s-4);
+  top: -120px;
+  z-index: var(--z-skip);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-l);
+  font-weight: var(--weight-semibold);
+}
+.skip-link:focus {
+  top: var(--s-4);
+}
+
+@media (max-width: 899px) {
+  html {
+    scroll-padding-top: 72px;
+    scroll-padding-bottom: calc(var(--tabbar) + var(--s-4));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Troca de página (useHashRoute): só o conteúdo esmaece e sobe um pouco; o menu e o
+   topo ficam parados. O nome existe apenas durante a transição. */
+[data-page-transition] main {
+  view-transition-name: page;
+}
+::view-transition-old(page) {
+  animation: page-out 90ms ease-in both;
+}
+::view-transition-new(page) {
+  animation: page-in 220ms var(--ease-out) both;
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

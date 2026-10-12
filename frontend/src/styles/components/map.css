@@ -1,0 +1,499 @@
+/* Mapa (UrbanMap): painel, filtros, legendas, detalhe do ponto e falha do WebGL. */
+.map-panel {
+  position: relative;
+  margin-bottom: var(--space);
+  padding: 0;
+  overflow: hidden;
+}
+.map-wrap {
+  position: relative;
+}
+.map {
+  /* Altura em MAP_DESIGN.slot.height (src/mapDesign.ts). */
+  background: var(--map-surface);
+}
+.map-frame {
+  position: relative;
+}
+/* Alvo no centro do mapa ao marcar um ponto: o ponto marcado é sempre o que está sob ele.
+   Aro com ponto central (não uma cruz, que se confundia com o + do zoom). */
+.map-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 3px solid var(--primary-strong);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--primary-strong) 0 3px, transparent 3.5px);
+  box-shadow:
+    0 0 0 2px #fff,
+    inset 0 0 0 2px #fff;
+  pointer-events: none;
+}
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border);
+}
+.map-toolbar label {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+.map-toolbar select,
+.map-toolbar input {
+  min-height: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+.map-toolbar .field-error {
+  margin: 0;
+}
+.map-count {
+  /* Na linha dos campos, alinhado ao texto deles (não aos rótulos). */
+  align-self: end;
+  margin: 0 0 0 auto;
+  padding-bottom: 9px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Aviso sobre o mapa: o mapa continua visível atrás, com os filtros à mão. */
+.map-empty {
+  position: absolute;
+  top: var(--s-3);
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 120px);
+  margin: 0;
+  padding: 7px 8px 7px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-m);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+  pointer-events: none;
+}
+.map-empty > span:only-child {
+  padding-right: 8px;
+}
+.map-empty button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+  pointer-events: auto;
+}
+/* Falha do WebGL: orientação no lugar do mapa; a lista de pontos continua abaixo. */
+.map-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: var(--s-6);
+  background: var(--surface-2);
+  text-align: center;
+}
+.map-fallback strong {
+  font-size: var(--text-lg);
+}
+.map-fallback p {
+  max-width: 48ch;
+  margin: 0 0 var(--s-2);
+}
+/*
+ * Uma caixa de legenda só, no canto superior esquerdo (longe dos créditos e dos
+ * controles). Gravidade e situação do relato ficam em grupos separados por um fio.
+ */
+.map-legends {
+  position: absolute;
+  left: var(--s-3);
+  top: var(--s-3);
+  z-index: 1;
+  display: grid;
+  gap: var(--s-2);
+  max-width: 220px;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--shadow-m);
+}
+.map-legends .map-legend + .map-legend {
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--border);
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.map-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Nome do grupo da legenda (Gravidade, Situação do relato). */
+.map-legend .map-legend-title {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: var(--weight-semibold);
+}
+.map-legends .map-legend {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+}
+.map-sign {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+.map-footer {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4) var(--s-3);
+  border-top: 1px solid var(--border);
+}
+.map-footer .map-point-list {
+  margin: 0;
+}
+.map-point-list summary {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: var(--text-sm);
+}
+.map-point-list ul {
+  margin: 0;
+  padding-left: var(--s-5);
+}
+.map-point-list button {
+  min-height: 32px;
+  padding-inline: 0;
+  color: var(--primary-strong);
+}
+.map-point-list li {
+  margin-block: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.map-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.map-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+}
+.map-export > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+@media (max-width: 599px) {
+  .map-export,
+  .map-export > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.map-export small {
+  color: var(--text-secondary);
+}
+/* Detalhe do ponto: cartão sobre o mapa (computador) ou folha inferior (celular). */
+.map-detail {
+  padding: var(--s-5);
+  max-height: 65vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-l);
+  color: var(--text);
+  animation: detail-in var(--dur-base) var(--ease) both;
+}
+@keyframes detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.map-detail > button:first-child {
+  float: right;
+  margin: -6px -6px var(--s-2) var(--s-2);
+}
+.map-detail h2 {
+  margin-bottom: var(--s-2);
+  font-size: var(--text-lg);
+}
+.map-detail img {
+  display: block;
+  width: 100%;
+  /* Espaço reservado antes de a foto chegar: o detalhe não muda de altura. */
+  aspect-ratio: 4 / 3;
+  height: auto;
+  max-height: 280px;
+  margin: var(--s-3) 0;
+  border-radius: var(--radius);
+  object-fit: contain;
+  background: var(--surface-2);
+}
+.map-detail a:not(.button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-right: var(--s-4);
+  color: var(--primary-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+@media (max-width: 899px) {
+  .map-detail {
+    position: fixed;
+    left: var(--s-3);
+    right: var(--s-3);
+    bottom: calc(var(--tabbar) + var(--s-3) + env(safe-area-inset-bottom));
+    z-index: var(--z-sheet);
+    max-height: 62dvh;
+    margin: 0;
+    overscroll-behavior: contain;
+  }
+  .map-detail img {
+    max-height: 26dvh;
+  }
+}
+@media (min-width: 900px) {
+  .map-detail {
+    position: absolute;
+    top: var(--s-4);
+    right: 56px;
+    z-index: 3;
+    width: min(360px, calc(100% - 120px));
+  }
+}
+/* Controles do MapLibre no tema claro; créditos compactos, sempre presentes. */
+.maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-m) !important;
+}
+.maplibregl-ctrl-group button {
+  min-height: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--border) !important;
+}
+.maplibregl-ctrl button:not(:disabled):hover {
+  background-color: var(--surface-2) !important;
+}
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib-inner {
+  color: var(--text-secondary) !important;
+  font-size: 11px;
+}
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+}
+.maplibregl-ctrl-attrib-inner {
+  background: transparent !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text-secondary) !important;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: var(--surface) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  min-height: 0;
+  background-color: transparent;
+}
+.maplibregl-popup-content {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  box-shadow: var(--shadow-m);
+}
+.maplibregl-popup-close-button {
+  min-height: 0;
+  padding: 0 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+.maplibregl-popup-close-button:hover {
+  background: var(--surface-2);
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--surface);
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--surface);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--surface);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--surface);
+}
+
+@media (max-width: 899px) {
+  .map-point-list summary,
+  .map-point-list button {
+    min-height: 44px;
+  }
+  .map-panel {
+    padding: 0;
+  }
+}
+
+@media (max-width: 699px) {
+  /* Celular: filtros em duas colunas que quebram linha; nada fica cortado na borda. */
+  .map-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px var(--s-3);
+  }
+  .map-toolbar label {
+    min-width: 0;
+  }
+  .map-count {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-bottom: 0;
+  }
+  .map-legends {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    max-width: none;
+    padding: 10px var(--s-3) 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .map-legends .map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+  .map-legends .map-legend + .map-legend {
+    padding-top: 0;
+    border-top: 0;
+  }
+  /* Aviso à esquerda, sem encostar nos controles de zoom (canto direito). */
+  .map-empty {
+    left: var(--s-3);
+    max-width: calc(100% - 76px);
+    transform: none;
+  }
+}
+
+/* Mapa dentro de um painel (Mapa interno, Meus relatos): filtros e rodapé alinhados às bordas
+   do mapa, com campos do mesmo tamanho dos da Fila de revisão. */
+.panel .map-panel .map-toolbar {
+  gap: var(--s-3) var(--s-4);
+  padding: 0 0 var(--s-4);
+  border-bottom: 0;
+}
+.panel .map-panel .map-toolbar label {
+  flex: 1 1 180px;
+  font-size: var(--text-sm);
+}
+.panel .map-panel .map-toolbar select,
+.panel .map-panel .map-toolbar input {
+  height: var(--control-h);
+  min-height: var(--control-h);
+  padding: 0 var(--s-3);
+  font-size: var(--text-md);
+}
+.panel .map-panel .map-footer {
+  padding-inline: 0;
+}
+@media (max-width: 899px) {
+  /* Listas de escolha na linha inteira; as duas datas lado a lado. */
+  .panel .map-panel .map-toolbar label:has(> select) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Celular: "Filtros" recolhido acima do mapa; a legenda com o nome em cima. */
+.map-filters {
+  padding: 0 0 var(--s-3);
+}
+.map-panel > .map-filters-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--border);
+}
+.map-filters-row > .map-filters {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+}
+.map-filters-row > .map-count {
+  margin: 0;
+  padding-block: 4px;
+}
+.panel .map-panel > .map-filters-row {
+  padding: 0 0 var(--s-3);
+  border-bottom: 0;
+}
+.map-filters > .map-toolbar {
+  padding-top: var(--s-3);
+}
+@media (max-width: 899px) {
+  .map-legends .map-legend .map-legend-title {
+    flex-basis: 100%;
+  }
+}

@@ -1,0 +1,118 @@
+/* Selos e estados: badges, gravidade e situação. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.badge.tone-success {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--success-soft);
+  color: var(--success);
+}
+.badge.tone-attention {
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.experimental-badge {
+  margin-bottom: var(--s-2);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.demo-badge {
+  align-self: flex-start;
+}
+.report-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.report-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chip, var(--text-secondary));
+}
+.situation-received {
+  --chip: var(--text-muted);
+}
+.situation-analyzing {
+  --chip: var(--primary);
+}
+.situation-confirmed {
+  --chip: var(--success);
+}
+.situation-needs_location {
+  --chip: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+}
+.situation-declined {
+  --chip: var(--text-muted);
+  color: var(--text-secondary);
+}
+.risk-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+/* O símbolo da placa do mapa (forma, cor e contorno), do tamanho da letra. */
+.risk-tag .severity-sign {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.risk-critical {
+  --risk: var(--danger);
+}
+.risk-high {
+  --risk: var(--severe);
+}
+.risk-medium {
+  --risk: var(--warning);
+}
+.risk-low {
+  --risk: var(--success);
+}
+.risk-unknown {
+  --risk: var(--text-secondary);
+}
+strong.risk-critical,
+strong.risk-high,
+strong.risk-medium,
+strong.risk-low,
+strong.risk-unknown {
+  color: var(--risk);
+}
+
+/* Em andamento (aguardando decisão): azul, o mesmo do mapa e da trilha. */
+.badge.tone-progress {
+  border-color: color-mix(in srgb, var(--progress) 30%, transparent);
+  background: color-mix(in srgb, var(--progress) 9%, var(--surface));
+  color: var(--progress);
+}

@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { auth, authConfigured } from '../services/auth';
 
-export function SignIn() {
+/**
+ * Entrar com conta. Na área da equipe (`team`) é a página inteira: o título é o h1 e o
+ * texto fala só com a equipe.
+ */
+export function SignIn({ team = false }: { team?: boolean }) {
+  const Heading = team ? 'h1' : 'h2';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +21,7 @@ export function SignIn() {
       if (
         existing?.user.is_anonymous &&
         !window.confirm(
-          'Entrar com outra conta não transfere suas capturas de visitante. Guarde o link do resultado antes de continuar. Deseja entrar?',
+          'Os relatos enviados sem conta não passam para a conta em que você vai entrar. Guarde o protocolo de cada relato antes de continuar. Deseja entrar?',
         )
       )
         return;
@@ -28,18 +33,20 @@ export function SignIn() {
     }
   }
 
+  // Variáveis VITE_SUPABASE_* ausentes no build: a pessoa só precisa saber que não dá.
   if (!authConfigured)
     return (
       <p className="error" role="alert">
-        Autenticação não configurada: defina VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.
+        Entrar com conta não está disponível nesta versão do site.
       </p>
     );
   return (
     <form className="panel sign-in" onSubmit={submit}>
-      <h2>Entrar no UrMind</h2>
+      <Heading>{team ? 'Entrar na área da equipe' : 'Entrar no UrMind'}</Heading>
       <p className="muted">
-        A revisão e os dados internos exigem uma conta autorizada. O registro público usa uma sessão
-        de visitante, sem acesso administrativo.
+        {team
+          ? 'Use a conta que a administração do UrMind liberou para você.'
+          : 'Use a conta que a administração do UrMind liberou para a equipe. Para enviar um relato não é preciso entrar.'}
       </p>
       <label>
         E-mail

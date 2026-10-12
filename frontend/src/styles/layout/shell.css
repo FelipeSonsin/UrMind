@@ -1,0 +1,490 @@
+/* Estrutura: barra lateral, navegação, barra do topo, área principal e rodapé.
+   No celular (< 900px) a mesma navegação vira barra inferior. */
+.app-shell {
+  min-height: 100vh;
+}
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--z-sidebar);
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar);
+  padding: var(--s-5) var(--s-3) var(--s-4);
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 40px;
+  margin: 0 0 var(--s-5);
+  padding: 0 var(--s-2);
+  border-radius: var(--radius-s);
+  text-decoration: none;
+}
+.surface-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  margin: -8px var(--s-2) var(--s-4);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.main-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-item,
+.nav-more-menu a,
+.nav-more-menu button,
+.sidebar-foot a,
+.sidebar-foot button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--s-3);
+  min-height: 40px;
+  padding: 0 var(--s-3);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 14.5px;
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.nav-item svg,
+.nav-more-menu svg,
+.sidebar-foot svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.nav-item:hover,
+.nav-more-menu a:hover,
+.nav-more-menu button:hover,
+.sidebar-foot a:hover,
+.sidebar-foot button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.nav-item[aria-current='page'] {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: var(--weight-semibold);
+}
+.nav-item[aria-current='page'] svg {
+  color: var(--primary);
+}
+/* A ação principal do cidadão fica no topo do menu, sempre visível. */
+.nav-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  margin-bottom: var(--s-4);
+  padding: 0 var(--s-4);
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  box-shadow: var(--shadow-s);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.nav-cta:hover,
+.nav-cta[aria-current='page'] {
+  background: var(--primary-strong);
+}
+.label-short {
+  display: none;
+}
+.nav-group {
+  margin: var(--s-5) var(--s-3) 6px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.nav-count {
+  margin-left: auto;
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.nav-more {
+  display: none;
+}
+.sidebar-foot {
+  display: grid;
+  gap: 2px;
+  margin-top: auto;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+.sidebar-foot button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  margin-left: var(--sidebar);
+}
+/* No computador a barra do topo só aparece com aviso de conexão. */
+.topbar {
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-3);
+  min-height: 44px;
+  padding: 0 var(--s-10);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+/* Ao vivo, o ponto verde basta no celular; no computador, a barra só surge com aviso. */
+.topbar:has(.network:not(.is-quiet)) {
+  display: flex;
+}
+.topbar-brand {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 21px;
+  text-decoration: none;
+}
+.topbar .surface-tag {
+  display: none;
+  margin: 0;
+}
+.network {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.network i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.network i.online {
+  position: relative;
+  background: var(--success);
+}
+.network i.online::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--success);
+  animation: live-pulse 2.4s var(--ease-out) infinite;
+}
+/* Conexão em tempo real ativa: um anel discreto se expande e some. */
+@keyframes live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  70%,
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+main {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--content) + 2 * var(--s-10));
+  margin: 0 auto;
+  padding: var(--s-8) var(--s-10) 0;
+  outline: none;
+}
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-5);
+  margin-top: var(--s-12);
+  padding: var(--s-5) 0 var(--s-6);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+footer a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+@media (max-width: 1199px) {
+  main {
+    padding: var(--s-8) var(--s-8) 0;
+  }
+}
+/* Área da equipe (sem rodapé): o último cartão não encosta na borda da janela. */
+@media (min-width: 900px) {
+  .internal-shell main {
+    padding-bottom: var(--s-10);
+  }
+}
+
+@media (max-width: 899px) {
+  .nav-item {
+    min-height: 44px;
+  }
+  .sidebar {
+    position: static;
+    width: auto;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: none;
+  }
+  .sidebar > .brand,
+  .sidebar > .surface-tag,
+  .sidebar-foot,
+  .nav-group,
+  .nav-tool {
+    display: none !important;
+  }
+  .workspace {
+    min-height: 0;
+    margin-left: 0;
+  }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-topbar);
+    display: flex;
+    justify-content: flex-start;
+    min-height: 56px;
+    padding: 0 var(--s-4);
+    /* Opaca: o que rola por baixo (mapa, fotos) não aparece borrado no topo. */
+    background: var(--surface);
+  }
+  .topbar-brand {
+    display: inline-flex;
+  }
+  .topbar .surface-tag {
+    display: inline-flex;
+    align-self: center;
+  }
+  .topbar .network {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar .network i {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .main-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: var(--z-tabbar);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    min-height: var(--tabbar);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 -4px 16px rgb(23 33 43 / 0.05);
+  }
+  .team-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .nav-overview {
+    order: 1;
+  }
+  .nav-my-reports {
+    order: 2;
+  }
+  .nav-cta {
+    order: 3;
+  }
+  .nav-map {
+    order: 4;
+  }
+  .nav-more {
+    order: 5;
+    position: relative;
+    display: block;
+    margin: 0;
+  }
+  .nav-item,
+  .nav-cta,
+  .nav-more > summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 54px;
+    margin: 0;
+    padding: 4px 2px;
+    border-radius: var(--radius);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: var(--weight-semibold);
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .nav-item[aria-current='page'],
+  .nav-more > summary[aria-current='page'] {
+    background: transparent;
+    color: var(--primary-strong);
+  }
+  .nav-item[aria-current='page'] svg,
+  .nav-more > summary[aria-current='page'] svg {
+    color: var(--primary);
+  }
+  .nav-item svg,
+  .nav-more > summary svg {
+    box-sizing: content-box;
+    padding-block: 6px;
+  }
+  .nav-more > summary::before {
+    content: none;
+  }
+  .nav-cta svg {
+    box-sizing: content-box;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .nav-cta:hover,
+  .nav-cta[aria-current='page'] {
+    background: transparent;
+    color: var(--primary-strong);
+  }
+  .nav-cta:hover svg,
+  .nav-cta[aria-current='page'] svg {
+    background: var(--primary-strong);
+  }
+  .nav-cta {
+    gap: 2px;
+  }
+  .label-long {
+    display: none;
+  }
+  .label-short {
+    display: inline;
+  }
+  .team-nav .nav-item:not(.is-primary) .label-long {
+    display: inline;
+  }
+  .nav-count {
+    display: none;
+  }
+  .nav-more > summary {
+    list-style: none;
+    width: 100%;
+    cursor: pointer;
+  }
+  .nav-more > summary::-webkit-details-marker {
+    display: none;
+  }
+  .nav-more > summary svg {
+    color: var(--text-muted);
+  }
+  .nav-more[open] > summary {
+    color: var(--text);
+  }
+  .nav-more-menu {
+    overscroll-behavior: contain;
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    display: grid;
+    gap: 2px;
+    width: max-content;
+    min-width: 220px;
+    max-width: calc(100vw - 16px);
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-l);
+    background: var(--surface);
+    box-shadow: var(--shadow-l);
+    animation: menu-in var(--dur-base) var(--ease) both;
+  }
+  .nav-more-menu a,
+  .nav-more-menu button {
+    min-height: 44px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .nav-more-menu .nav-count {
+    display: inline-block;
+  }
+  main {
+    padding: var(--s-6) var(--s-5) calc(var(--tabbar) + var(--s-8) + env(safe-area-inset-bottom));
+  }
+  footer {
+    margin-top: var(--s-10);
+  }
+}
+
+@media (max-width: 420px) {
+  main {
+    padding-inline: var(--s-4);
+  }
+  .topbar .network {
+    max-width: 52vw;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

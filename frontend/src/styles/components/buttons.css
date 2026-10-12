@@ -1,0 +1,187 @@
+/* Botões: principal, secundário, texto, perigo e tamanhos. */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: var(--control-h);
+  padding: 0 var(--s-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 14.5px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+button svg,
+.button svg {
+  flex: none;
+}
+button:hover,
+.button:hover {
+  background: var(--primary-strong);
+}
+:is(button, .button):not(:disabled):active {
+  transform: translateY(1px);
+}
+button.secondary,
+.button.secondary {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-s);
+}
+button.secondary:hover,
+.button.secondary:hover {
+  border-color: #aab6c0;
+  background: var(--surface-2);
+}
+button.ghost,
+.button.ghost,
+button.text-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  padding-inline: var(--s-3);
+  box-shadow: none;
+}
+button.ghost:hover,
+.button.ghost:hover,
+button.text-button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+a.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  color: var(--primary-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+a.text-button:hover {
+  text-decoration: underline;
+}
+button.danger,
+.button.danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: var(--surface);
+  color: var(--danger);
+}
+button.danger:hover,
+.button.danger:hover {
+  background: var(--danger-soft);
+}
+.text-button.danger {
+  border-color: transparent;
+  color: var(--danger);
+}
+/* Desabilitado vence qualquer variante e o passar do mouse: cinza legível (4,5:1),
+   nunca com cara de botão ativo. */
+button:disabled,
+button:disabled:hover {
+  border-color: var(--border);
+  background: var(--surface-3);
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+button.text-button:disabled,
+button.ghost:disabled,
+button.text-button:disabled:hover,
+button.ghost:disabled:hover {
+  background: transparent;
+}
+button.compact,
+.button.compact {
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  font-size: var(--text-sm);
+}
+.button.large,
+button.large {
+  min-height: 48px;
+  padding: 0 var(--s-5);
+  font-size: var(--text-md);
+}
+.button:has(:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.actions + .actions {
+  margin-top: var(--s-2);
+}
+/* Copiar (CopyButton): confirma no próprio botão por alguns segundos. */
+button.copy-button[data-copied] {
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+/* Ação que não se desfaz: a pergunta aparece no lugar do botão, com o efeito escrito. */
+.confirm-inline {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+}
+.confirm-inline p {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+.confirm-inline .actions {
+  margin: 0;
+}
+/* Na pergunta, a confirmação é o botão mais forte: vermelho cheio (desligado, cinza). */
+.confirm-inline button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+.confirm-inline button.danger:hover {
+  border-color: var(--danger-strong);
+  background: var(--danger-strong);
+}
+.confirm-inline button.danger:disabled,
+.confirm-inline button.danger:disabled:hover {
+  border-color: var(--border);
+  background: var(--surface-3);
+  color: var(--text-muted);
+}

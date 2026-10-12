@@ -1,0 +1,45 @@
+/* Avisos: sucesso, atenção, erro e informação. */
+.notice,
+.error,
+.success {
+  margin: 0 0 var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.notice {
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+  background: var(--warning-soft);
+}
+.error {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: var(--danger-soft);
+}
+.success {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--success-soft);
+}
+:is(.notice, .error, .success) button {
+  margin-left: var(--s-2);
+  vertical-align: middle;
+}
+.loading-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.loading-line::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--surface-3);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

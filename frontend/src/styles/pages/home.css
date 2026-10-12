@@ -1,0 +1,194 @@
+/* Início: apresentação, etapas e prévia do mapa. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+  align-items: center;
+  gap: var(--s-8) var(--s-12);
+  padding: var(--s-4) 0 var(--s-10);
+}
+.home-intro h1 {
+  max-width: 24ch;
+  margin-bottom: var(--s-4);
+  font-size: var(--text-3xl);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+/* Cada frase do título numa linha própria. */
+.home-intro h1 span {
+  display: block;
+}
+.home-intro > p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 16.5px;
+}
+.home-intro .actions {
+  margin-top: var(--s-6);
+}
+/* Sequência real (foto → revisão → mapa): numerada porque é uma ordem. */
+.home-steps,
+.robot-steps {
+  display: grid;
+  margin: 0;
+  padding: var(--s-2) var(--s-6);
+  list-style: none;
+  counter-reset: step;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+}
+.home-steps li,
+.robot-steps li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: var(--s-3);
+  padding: var(--s-4) 0;
+  counter-increment: step;
+}
+.home-steps li + li,
+.robot-steps li + li {
+  border-top: 1px solid var(--border);
+}
+.home-steps li::before,
+.robot-steps li::before {
+  content: counter(step);
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.home-steps strong,
+.robot-steps strong {
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.home-steps span,
+.robot-steps span {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+/* Etapas em funcionamento: nó cheio, como no caminho do relato (Transparência). */
+.home-steps li::before {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+/* Lista em coluna: uma linha liga cada etapa à seguinte. */
+@media (min-width: 1200px), (max-width: 699px) {
+  .home-steps li {
+    position: relative;
+  }
+  .home-steps li + li {
+    border-top: 0;
+  }
+  .home-steps li:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: calc(var(--s-4) + 34px);
+    bottom: calc(-1 * var(--s-4) + 4px);
+    border-left: 2px solid color-mix(in srgb, var(--primary) 45%, var(--surface));
+  }
+}
+/* Uma única entrada orquestrada: texto, depois as etapas. */
+.home-intro,
+.home-steps {
+  animation: rise 420ms var(--ease) both;
+}
+.home-steps {
+  animation-delay: 90ms;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.home-reports {
+  margin-bottom: var(--s-10);
+}
+.home-section {
+  margin: 0 0 var(--s-3);
+}
+.home-lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr);
+  align-items: start;
+  gap: var(--space);
+}
+.home-lead .map-panel {
+  margin-bottom: 0;
+}
+/* No Início o mapa é uma prévia: mais baixo que na página Mapa. */
+.home-lead .map {
+  height: clamp(300px, 48vh, 460px) !important;
+}
+.home-lead.is-empty {
+  grid-template-columns: minmax(0, 1fr);
+}
+.home-lead .diagnosis {
+  position: sticky;
+  top: var(--s-6);
+}
+.diagnosis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.diagnosis .empty {
+  margin: auto 0;
+  padding: var(--s-8) var(--s-3);
+}
+
+@media (max-width: 1199px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-8);
+  }
+  .home-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--s-6);
+    padding: var(--s-1) var(--s-6);
+  }
+  .home-steps li + li {
+    border-top: 0;
+  }
+}
+
+@media (max-width: 1099px) {
+  .home-lead {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-lead .diagnosis {
+    position: static;
+  }
+}
+
+@media (max-width: 699px) {
+  .home-hero {
+    padding-top: 0;
+    padding-bottom: var(--s-8);
+  }
+  .home-intro h1 {
+    font-size: 30px;
+  }
+  .home-intro > p {
+    font-size: var(--text-md);
+  }
+  .home-intro .actions > .button {
+    flex: 1 1 100%;
+  }
+  .home-steps {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--s-1) var(--s-5);
+  }
+}

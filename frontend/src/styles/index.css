@@ -1,0 +1,39 @@
+/* ============================================================================
+   UrMind — sistema visual
+   Superfícies claras e limpas, verde-petróleo como única cor de ação e uma família
+   tipográfica (Public Sans). Toda decisão visual comum mora em tokens.css: mudar um
+   token muda todas as páginas. Cores de estado (sucesso, atenção, erro) sempre
+   acompanham texto; nada depende só da cor.
+
+   A ordem abaixo é a ordem da cascata: com a mesma especificidade, o arquivo de
+   baixo vence. Cada arquivo traz no fim os próprios ajustes de tela pequena.
+   ========================================================================= */
+@import './tokens.css';
+@import './base.css';
+@import './typography.css';
+@import './components/buttons.css';
+@import './components/fields.css';
+@import './components/brand.css';
+@import './layout/shell.css';
+@import './layout/palette.css';
+@import './components/page-heading.css';
+@import './components/panels.css';
+@import './components/empty-state.css';
+@import './components/notices.css';
+@import './components/badges.css';
+@import './components/situation-track.css';
+@import './components/system-flow.css';
+@import './components/data.css';
+@import './pages/home.css';
+@import './pages/reports.css';
+@import './pages/report-status.css';
+@import './pages/events.css';
+@import './pages/transparency.css';
+@import './components/map.css';
+@import './pages/capture.css';
+@import './pages/drafts.css';
+@import './components/video.css';
+@import './pages/robot-camera.css';
+@import './pages/team.css';
+@import './components/sign-in.css';
+@import './components/loading.css';

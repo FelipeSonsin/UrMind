@@ -1,12 +1,10 @@
 import { Component, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-// Space Grotesk (texto e títulos) e Space Mono (legendas); Public Sans fica de reserva.
-import '@fontsource-variable/space-grotesk';
-import '@fontsource/space-mono/400.css';
-import '@fontsource/space-mono/700.css';
+// Public Sans: uma família só, de títulos a legendas (fonte livre, OFL).
 import '@fontsource-variable/public-sans';
-import './styles.css';
+// Estilos: tokens e um arquivo por camada, componente e página (ordem em index.css).
+import './styles/index.css';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -15,7 +13,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
   render() {
     return this.state.failed ? (
-      <main className="panel">
+      <main className="panel narrow crash">
         <h1>Não foi possível abrir esta tela</h1>
         <p>
           Recarregue o aplicativo para tentar novamente. Os rascunhos já salvos permanecem no

@@ -109,7 +109,7 @@ export async function currentFix(): Promise<GeolocationPosition> {
     const code = (error as GeolocationPositionError | undefined)?.code;
     if (code === 1)
       throw new LocationError(
-        'Localização bloqueada para este site. Libere em Configurações do navegador › Localização e toque em "Tentar de novo".',
+        'Localização bloqueada para este site. Libere em Configurações do navegador › Localização e toque em “Tentar de novo”.',
         'denied',
       );
   }

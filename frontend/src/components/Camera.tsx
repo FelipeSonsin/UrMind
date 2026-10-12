@@ -42,7 +42,7 @@ export function Camera({
     if (!frame?.videoWidth) return;
     if (Math.min(frame.videoWidth, frame.videoHeight) < 640) {
       setError(
-        `esta câmera entrega só ${frame.videoWidth}×${frame.videoHeight}. Use "Tirar foto" para abrir a câmera do aparelho.`,
+        `a imagem desta câmera é pequena demais (${frame.videoWidth} × ${frame.videoHeight} px). Use “Escolher foto” para enviar uma foto já tirada.`,
       );
       return;
     }

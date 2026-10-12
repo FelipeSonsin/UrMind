@@ -1,19 +1,9 @@
 import { severityOf } from '../domain/public';
 import { MAP_DESIGN, type MarkerShape } from '../mapDesign';
 
-/**
- * Sign shapes on a 32×32 grid. The same paths draw the map marker (canvas) and
- * the legend swatch (SVG), so the legend can never drift from the map.
- */
-export const SHAPE_PATHS: Record<MarkerShape, string> = {
-  warning: 'M16 3 L30 28 L2 28 Z',
-  triangle: 'M16 3 L30 28 L2 28 Z',
-  square: 'M7 4 H25 A3 3 0 0 1 28 7 V25 A3 3 0 0 1 25 28 H7 A3 3 0 0 1 4 25 V7 A3 3 0 0 1 7 4 Z',
-  circle: 'M3 16 A13 13 0 1 0 29 16 A13 13 0 1 0 3 16 Z',
-  ring: 'M3 16 A13 13 0 1 0 29 16 A13 13 0 1 0 3 16 Z',
-};
-/** Inner rule that turns a triangle into a warning plate. */
-export const WARNING_INSET = 'M16 9.5 L25 25 L7 25 Z';
+// Formas e contorno vêm de signShapes: o selo de gravidade das listas usa as mesmas.
+import { REPORT_HOLE, SHAPE_PATHS, WARNING_INSET } from './signShapes';
+export { REPORT_HOLE, SHAPE_PATHS, WARNING_INSET };
 /** Where the family glyph sits inside each shape (triangles are bottom-heavy). */
 const GLYPH_CENTER: Record<MarkerShape, [number, number]> = {
   warning: [16, 20],
@@ -21,6 +11,7 @@ const GLYPH_CENTER: Record<MarkerShape, [number, number]> = {
   square: [16, 16],
   circle: [16, 16],
   ring: [16, 16],
+  report: [16, 16],
 };
 
 export interface MarkerStyle {
@@ -38,7 +29,7 @@ export function markerStyle(marker: {
   const statusColors: Record<string, string> = markers.reportStatus;
   const reportColor = statusColors[marker.report_status ?? marker.status ?? ''];
   if (marker.report_status && reportColor)
-    return { shape: 'circle', fill: reportColor, glyph: markers.reportGlyph };
+    return { shape: 'report', fill: reportColor, glyph: markers.reportGlyph };
   const level = severityOf(marker.severity).level as keyof typeof markers.severity;
   return markers.severity[level] ?? markers.severity.unknown;
 }
@@ -111,7 +102,8 @@ export function markerImage(style: MarkerStyle, family: string): ImageData | nul
   context.lineWidth = 3.5;
   context.stroke(outline);
   if (style.shape === 'ring') {
-    context.fillStyle = keyline;
+    // Vazado: branco por dentro, aro cinza. Escuro, parecia o mais grave.
+    context.fillStyle = '#ffffff';
     context.fill(outline);
     context.strokeStyle = style.fill;
     context.lineWidth = 3;
@@ -124,6 +116,17 @@ export function markerImage(style: MarkerStyle, family: string): ImageData | nul
     context.strokeStyle = keyline;
     context.lineWidth = 1.4;
     context.stroke(new Path2D(WARNING_INSET));
+  }
+  // Relato: centro branco, sem ícone; a cor diz a situação.
+  if (style.shape === 'report') {
+    context.beginPath();
+    context.arc(16, 16, REPORT_HOLE, 0, Math.PI * 2);
+    context.fillStyle = '#ffffff';
+    context.fill();
+    context.strokeStyle = keyline;
+    context.lineWidth = 1.5;
+    context.stroke();
+    return context.getImageData(0, 0, pixels, pixels);
   }
   const [x, y] = GLYPH_CENTER[style.shape];
   const glyphScale = style.shape === 'warning' ? 0.3 : 0.42;

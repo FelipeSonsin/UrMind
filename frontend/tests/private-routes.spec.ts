@@ -32,8 +32,12 @@ test('navegação interna dedicada cabe em 320px e usa menu inferior', async ({ 
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
   await page.goto('/admin/#/app/dashboard');
   const nav = page.getByRole('navigation', { name: 'Navegação interna' });
-  await expect(nav.getByText('Área interna')).toBeVisible();
-  await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa']);
+  // No celular o topo fica só com a marca e a situação: o menu já diz que é a equipe.
+  await expect(page.locator('.topbar').getByText('Área da equipe')).toHaveCount(0);
+  // Texto visível: no celular os rótulos curtos substituem os longos.
+  await expect(nav.getByRole('link')).toHaveText(['Painel', 'Fila', 'Mapa'], {
+    useInnerText: true,
+  });
   const box = await nav.boundingBox();
   expect(box!.y + box!.height).toBeLessThanOrEqual(740);
   expect(box!.y).toBeGreaterThan(600);
@@ -140,10 +144,78 @@ test('painel apresenta saúde observada sem transformar configuração em sucess
     route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
   );
   await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  // Uma verificação real (fora do ar) e uma só de configuração, que não foi testada.
+  await page.route('**/api/v1/ops/integrations', (route) =>
+    route.fulfill({
+      json: [
+        {
+          name: 'Nominatim',
+          status: 'UNAVAILABLE',
+          detail: 'ReadTimeout',
+          checked_at: '2026-09-24T19:00:00Z',
+          latency_ms: 5000,
+          last_success: null,
+          last_failure: '2026-09-24T19:00:00Z',
+        },
+        {
+          name: 'Supabase',
+          status: 'CONFIGURED',
+          detail: 'offline registry',
+          checked_at: '2026-09-24T19:00:00Z',
+          latency_ms: null,
+          last_success: null,
+          last_failure: null,
+        },
+      ],
+    }),
+  );
   await page.goto('/admin/#/app/dashboard');
-  const panel = page.getByRole('region', { name: 'Integrações' });
-  await expect(panel.getByText('Nominatim: UNAVAILABLE')).toBeVisible();
-  await expect(panel.getByText(/Último sucesso: não observado/)).toBeVisible();
+  const panel = page.getByRole('region', { name: 'Serviços externos' });
+  // O problema em uma frase, com a consequência para os relatos.
+  await expect(panel).toContainText(
+    'Busca de endereços está fora do ar: os relatos continuam chegando, sem o endereço aproximado.',
+  );
+  await panel.getByText('Todos os serviços').click();
+  const address = panel.locator('.service-list li').filter({ hasText: 'Busca de endereços' });
+  await expect(address).toContainText('Fora do ar');
+  await expect(address).toContainText('Último sucesso: nunca registrado');
+  // Configuração não é saúde: fica como não verificada, nunca como funcionando.
+  const login = panel.locator('.service-list li').filter({ hasText: 'Login e armazenamento' });
+  await expect(login).toContainText('Não verificado');
+  await expect(login).not.toContainText('Funcionando');
+  // Nomes internos e códigos de estado não aparecem.
+  for (const code of ['Nominatim', 'Supabase', 'UNAVAILABLE', 'CONFIGURED', 'ReadTimeout'])
+    await expect(panel).not.toContainText(code);
+});
+
+test('taxonomia ampliada permite buscar classes por nomes simples e sinônimos', async ({
+  page,
+}) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [] }));
+  // O catálogo fica no fim da Fila de revisão, recolhido numa linha.
+  await page.goto('/admin/#/app/reviews');
+  const panel = page.getByRole('region', { name: 'Tipos de problema' });
+  await panel.getByText(/Consultar os tipos de problema/).click();
+  const search = panel.getByLabel('Buscar tipo de problema');
+  await search.fill('FIACAO CAOTICA');
+  await expect(panel.locator('li')).toHaveCount(1);
+  await expect(panel.locator('li')).toContainText('Fios desorganizados');
+  await search.fill('rua_sem_asfalto');
+  await expect(panel.locator('li')).toHaveCount(1);
+  await expect(panel.locator('li')).toContainText('Rua sem asfalto');
+  await search.fill('linhas insuficientes');
+  await expect(panel.locator('li')).toContainText('Poucas linhas de ônibus');
+  await expect(panel.locator('li')).toContainText('Depende de dados do serviço de ônibus');
+  await expect(panel).not.toContainText('YOLO');
+  await search.fill('problema inexistente');
+  await expect(panel).toContainText('Nenhum tipo encontrado para esta busca.');
+  await expect(panel.locator('li')).toHaveCount(0);
+  await search.clear();
+  await expect(panel.locator('li')).toHaveCount(46);
 });
 
 test('relato sem modelo recebe revisão humana e publicação sanitizada', async ({ page }) => {
@@ -237,21 +309,36 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
   });
   await page.goto('/admin/#/app/mapa');
   const csvDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Exportar CSV', exact: true }).click();
+  await page.getByRole('button', { name: 'Baixar planilha', exact: true }).click();
   expect((await csvDownload).suggestedFilename()).toBe('urmind-pontos-filtrados.csv');
-  await page.getByText(/Lista acessível de pontos/).click();
-  await page.getByRole('button', { name: /Selecionar ponto: Análise indisponível/ }).click();
+  // A lista do próprio mapa (que segue os filtros dele) abre o relato no mapa.
+  await page.getByText(/pontos? em lista/).click();
+  await page.getByRole('button', { name: /Selecionar ponto: Aguardando revisão/ }).click();
   const panel = page.getByRole('region', { name: 'Revisão do relato' });
-  await panel.getByLabel('Classe humana').selectOption('URMIND_ROAD_D40');
-  await expect(panel.getByText('Sugestão, não encaminhamento')).toBeVisible();
-  await expect(panel.getByRole('link', { name: 'canal oficial SP156' })).toHaveAttribute(
+  for (const code of [
+    'URMIND_MISSING_CURB_RAMP',
+    'URMIND_NONFUNCTIONING_TRAFFIC_LIGHT',
+    'URMIND_INSUFFICIENT_BUS_SERVICE',
+  ]) {
+    await panel.getByLabel('Tipo de problema').selectOption(code);
+    await expect(panel.getByRole('status').first()).toContainText(
+      'Não dá para confirmar só pela foto',
+    );
+    // O botão continua ativo e explica, junto dele, por que não confirma.
+    await panel.getByRole('button', { name: 'Confirmar relato' }).click();
+    await expect(panel.getByRole('alert')).toContainText('Não dá para confirmar só pela foto');
+    expect(reviewed).toBe(false);
+  }
+  await panel.getByLabel('Tipo de problema').selectOption('URMIND_ROAD_D40');
+  await expect(panel.getByText('Quem costuma resolver')).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'SP156' })).toHaveAttribute(
     'href',
     'https://sp156.prefeitura.sp.gov.br/portal',
   );
-  await panel.getByLabel('Adjudicar como admin').check();
-  await panel.getByRole('button', { name: 'Confirmar rótulo humano' }).click();
-  await expect(panel.getByText(/correct URMIND_ROAD_D40/)).toBeVisible();
-  await panel.getByLabel(/Atesto que o conteúdo visual/).check();
+  await panel.getByLabel(/Decidir como administrador/).check();
+  await panel.getByRole('button', { name: 'Confirmar relato' }).click();
+  await expect(panel.getByText(/confirmou como Buraco/)).toBeVisible();
+  await panel.getByLabel(/Confirmo que a foto pode ser publicada/).check();
   await panel.getByRole('button', { name: 'Publicar foto', exact: true }).click();
   await expect.poll(() => published).toBe(true);
   await page.route('**/api/v1/public/events?*', (route) =>
@@ -274,7 +361,9 @@ test('relato sem modelo recebe revisão humana e publicação sanitizada', async
     }),
   );
   await page.goto(`/#/mapa?ponto=${publicId}`);
-  await expect(page.getByAltText('Foto publicada e sanitizada da ocorrência')).toBeVisible();
+  await expect(
+    page.getByAltText('Foto publicada da ocorrência, revisada para privacidade'),
+  ).toBeVisible();
 });
 
 for (const anonymous of [false, true]) {
@@ -289,7 +378,7 @@ for (const anonymous of [false, true]) {
     });
     for (const path of paths) {
       await page.goto(`/admin/#/app/${path}`);
-      await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Entrar na área da equipe' })).toBeVisible();
     }
     expect(reads).toBe(0);
   });
@@ -336,19 +425,23 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
     }),
   );
   await page.goto('/admin/#/app/eventos');
-  await expect(page.getByText('private-fixture')).toBeVisible();
-  await page.getByRole('link', { name: 'Ver registro' }).click();
+  await expect(page.getByRole('cell', { name: 'Buraco' })).toBeVisible();
+  // O código interno da ocorrência não aparece na lista.
+  await expect(page.locator('main')).not.toContainText('private-fixture');
+  await page.getByRole('link', { name: 'Ver ocorrência' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/eventos/${EVENT_ID}$`));
-  // Sem revisão humana ainda: relatório, severidade e prioridade ficam ocultos ao revisor.
-  await expect(page.getByText('Oculto até a decisão humana').first()).toBeVisible();
+  // Sem revisão humana ainda: relatório, gravidade e prioridade ficam ocultos ao revisor.
+  await expect(page.getByRole('heading', { name: 'Decisão da equipe' })).toBeVisible();
+  await expect(page.getByText('Gravidade', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Relatório interno de teste')).toHaveCount(0);
   await expect(page.getByText('ANÁLISE EXPERIMENTAL', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('Oculto até a decisão humana').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Decisão da equipe' })).toBeVisible();
+  await expect(page.getByText('Gravidade', { exact: true })).toHaveCount(0);
   for (const [path, heading] of [
-    ['dashboard', 'Painel interno'],
-    ['reviews', 'Ocorrências urbanas'],
-    ['mapa', 'Gêmeo digital 2D'],
+    ['dashboard', 'Painel'],
+    ['reviews', 'Fila de revisão'],
+    ['mapa', 'Mapa interno'],
     ['admin', 'Acesso restrito'],
   ]) {
     await page.goto(`/admin/#/app/${path}`);
@@ -369,7 +462,7 @@ test('resultado do proprietário desaparece ao encerrar sessão em outra aba', a
       : route.fulfill({ status: 404, json: { detail: 'Ocorrência não encontrada' } }),
   );
   await page.goto(`/#/resultado/${EVENT_ID}`);
-  await expect(page.getByText('Somente proprietário', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Somente proprietário/)).toBeVisible();
   await page.evaluate(() => {
     const key = Object.keys(localStorage).find((item) => item.endsWith('-auth-token'))!;
     localStorage.removeItem(key);
@@ -377,8 +470,9 @@ test('resultado do proprietário desaparece ao encerrar sessão em outra aba', a
     channel.postMessage({ event: 'SIGNED_OUT', session: null });
     channel.close();
   });
-  await expect(page.getByText('Somente proprietário', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('alert')).toContainText('Ocorrência não encontrada');
+  await expect(page.getByText(/Somente proprietário/)).toHaveCount(0);
+  // Sem a sessão do dono, a ocorrência (não publicada) aparece como não encontrada.
+  await expect(page.getByRole('heading', { name: 'Ocorrência não encontrada' })).toBeVisible();
 });
 
 test('admin verificado acessa administração; login autenticado abre painel', async ({ page }) => {
@@ -406,16 +500,20 @@ test('admin verificado acessa administração; login autenticado abre painel', a
   });
   await page.goto('/admin/#/app/admin');
   await expect(page.getByRole('heading', { name: 'Administração' })).toBeVisible();
-  await page.getByLabel('Menor lado da imagem (px)').fill('800');
+  await page.getByLabel('Tamanho mínimo da foto').fill('800');
   await page.getByRole('button', { name: 'Salvar configuração' }).click();
-  await expect(page.getByText('Configuração salva com auditoria.')).toBeVisible();
+  await expect(page.getByText('Configuração salva e registrada na auditoria.')).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Menor lado da imagem (px)')).toHaveValue('800');
+  await expect(page.getByLabel('Tamanho mínimo da foto')).toHaveValue('800');
   await page.goto('/admin/#/login');
-  await expect(page.getByRole('heading', { name: 'Painel interno' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Fila de processamento' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Classes de problemas urbanos' })).toBeVisible();
-  await expect(page.getByText('Não disponível', { exact: true })).toHaveCount(2);
+  await expect(page.getByRole('heading', { name: 'Painel', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Próximos a revisar' })).toBeVisible();
+  // A fila da análise automática fica nos detalhes técnicos, recolhidos.
+  await page.getByText('Detalhes técnicos').click();
+  await expect(page.getByRole('heading', { name: 'Fila da análise automática' })).toBeVisible();
+  // Sem medições, uma linha só, sem "Não disponível" repetido.
+  await expect(page.getByText('ainda sem medições')).toBeVisible();
+  await expect(page.getByText('Não disponível', { exact: true })).toHaveCount(0);
 });
 
 test('falha de métricas não vira contagem zero', async ({ page }) => {
@@ -428,7 +526,8 @@ test('falha de métricas não vira contagem zero', async ({ page }) => {
     route.fulfill({ status: 503, json: { detail: 'indisponível' } }),
   );
   await page.goto('/admin/#/app/dashboard');
-  await expect(page.getByRole('alert')).toContainText('Métricas indisponíveis');
+  await page.getByText('Detalhes técnicos').click();
+  await expect(page.getByRole('alert')).toContainText('Não foi possível carregar os números');
   await expect(page.getByText('Pendentes', { exact: true })).toHaveCount(0);
 });
 
@@ -453,8 +552,18 @@ test('auditoria interna carrega filtros sem identidades', async ({ page }) => {
     }),
   );
   await page.goto('/admin/#/app/auditoria');
-  await expect(page.getByRole('heading', { name: 'Auditoria operacional' })).toBeVisible();
-  await page.getByLabel('Operação', { exact: true }).fill('photo_gate_configuration');
-  await expect(page.getByText('photo_gate_configuration', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Anterior' })).toBeDisabled();
+  await expect(page.getByRole('heading', { name: 'Auditoria', exact: true })).toBeVisible();
+  await page
+    .getByLabel('Tipo de registro', { exact: true })
+    .selectOption('photo_gate_configuration');
+  // A operação aparece em palavras.
+  const entry = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Regras da checagem de fotos alteradas' });
+  await expect(entry).toBeVisible();
+  // Nem no texto nem nas dicas: o código interno não aparece na tela.
+  await expect(page.locator('[title*="photo_gate"]')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('photo_gate_configuration');
+  // Uma página só: sem "Anterior" e "Próxima" desligados.
+  await expect(page.getByRole('button', { name: 'Anterior' })).toHaveCount(0);
 });

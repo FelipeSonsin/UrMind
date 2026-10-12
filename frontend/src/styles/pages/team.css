@@ -1,0 +1,669 @@
+/* Área da equipe: painel, fila e revisão. */
+.dashboard > .panel + .panel,
+.dashboard + .panel,
+.dashboard + section {
+  margin-top: var(--space);
+}
+/* Números que pedem ação ficam marcados quando há algo a fazer. */
+.stat-row > div.is-attention {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+.stat-row > div.is-attention dd {
+  color: var(--warning);
+}
+.stat-note {
+  margin: calc(-1 * var(--s-2)) 0 0;
+}
+.service-name small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+/* Auditoria: a operação em palavras, o que mudou e quando. */
+.audit-list {
+  margin: var(--s-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.audit-list li {
+  display: grid;
+  gap: 2px;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+.audit-list strong {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+.audit-list small {
+  color: var(--text-secondary);
+}
+/* Fila da equipe: relato e alertas à esquerda; situação e próxima ação alinhadas à direita.
+   As linhas dividem as mesmas colunas (subgrid): situações e ações ficam alinhadas, e a
+   coluna da ação cabe a mais longa ("Informar o local"). */
+.queue-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: var(--s-4);
+  margin: var(--s-3) 0;
+  padding: 0;
+  list-style: none;
+}
+.queue-list li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  row-gap: var(--s-2);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+.queue-list li:first-child {
+  border-top-color: transparent;
+}
+.queue-list li.is-selected,
+.queue-list li.is-selected + li {
+  border-top-color: transparent;
+}
+.queue-list li.is-selected {
+  margin-inline: calc(-1 * var(--s-3));
+  padding-inline: var(--s-3);
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+}
+.queue-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.queue-main .report-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.queue-alert {
+  margin: var(--s-1) 0 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+.queue-list .report-action {
+  justify-self: end;
+}
+@media (max-width: 699px) {
+  .queue-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--s-3);
+  }
+  .queue-main {
+    grid-column: 1 / -1;
+  }
+}
+/* Revisão de um relato (fila): foto e dados lado a lado; decisões em blocos. */
+.review-panel {
+  display: grid;
+  gap: var(--s-4);
+  margin: var(--s-4) 0;
+  padding: var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface-2);
+}
+.review-panel > h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.review-panel > :is(p, label, details, .notice, .error) {
+  margin: 0;
+}
+.review-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-5);
+}
+.review-photo {
+  margin: 0;
+}
+.review-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  max-height: 340px;
+  border-radius: var(--radius);
+  background: var(--stage);
+  object-fit: contain;
+}
+.review-photo figcaption {
+  margin-top: var(--s-2);
+  font-size: var(--text-sm);
+}
+.review-photo a,
+.routing-note a {
+  color: var(--primary-strong);
+  font-weight: var(--weight-semibold);
+}
+.review-step {
+  display: grid;
+  align-content: start;
+  gap: var(--s-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.review-step legend {
+  float: left;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.review-step > :is(p, label, .notice, select, input, .field-row) {
+  margin: 0;
+}
+.review-step select,
+.review-step input:not([type='checkbox']) {
+  margin-bottom: 0;
+}
+.review-step > button {
+  justify-self: start;
+}
+.routing-note {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius);
+  background: var(--primary-softer);
+  font-size: var(--text-sm);
+}
+.routing-note p {
+  margin: var(--s-1) 0 0;
+}
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s-2) var(--s-3);
+  margin-top: var(--s-3);
+}
+.inline-form label {
+  flex: 1 1 220px;
+}
+.inline-form input {
+  margin-bottom: 0;
+}
+.review-history {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.review-history time {
+  color: var(--text-secondary);
+}
+.review-history small {
+  display: block;
+  color: var(--text-secondary);
+}
+/* Detalhe interno de uma ocorrência: dados em duas colunas; decisões em grade. */
+.detail-facts {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--s-4) var(--s-6);
+}
+.review-box {
+  margin-top: var(--space);
+}
+.review-box > .review-history {
+  margin-bottom: var(--s-4);
+}
+@media (max-width: 899px) {
+  .review-evidence {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Painel: os números levam à lista do que contam (o cartão inteiro é clicável). */
+.dashboard > .panel {
+  margin-top: var(--space);
+}
+.stat-row > div {
+  position: relative;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.stat-link {
+  color: inherit;
+  text-decoration: none;
+}
+.stat-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.stat-row > div:has(.stat-link:hover) {
+  border-color: var(--border-strong);
+}
+@media (max-width: 699px) {
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3);
+  }
+  .stat-row > div {
+    padding: var(--s-4);
+  }
+}
+/* Serviços externos: uma frase por problema, com o ponto da mesma cor do estado. */
+.health-summary {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+p.health-summary,
+.health-summary li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+.health-summary .service-dot {
+  flex: none;
+  align-self: center;
+}
+/* Fila: filtros recolhidos no celular; a contagem logo acima da lista. */
+.panel > .filters,
+.filters-disclosure > .filters {
+  padding: 0;
+}
+.filters-disclosure {
+  margin: 0 0 var(--s-3);
+}
+.filters-disclosure > .filters {
+  margin: var(--s-3) 0 var(--space);
+}
+.filters.is-single {
+  grid-template-columns: minmax(0, 320px);
+}
+.queue-count {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.queue-list .badge {
+  justify-self: start;
+}
+/* Revisão em tela própria: o painel é a página, sem caixa dentro da caixa. */
+.review-panel.is-page {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.review-panel > h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.review-past > :is(h2, h3, h4) {
+  margin: 0 0 var(--s-2);
+  font-size: var(--text-md);
+}
+.review-photo.photo-placeholder {
+  min-height: 200px;
+  align-content: center;
+}
+.location-picker {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.field-error.is-block {
+  margin: 0;
+}
+/* Administração: rótulo, campo e dica alinhados entre as colunas, mesmo com rótulo longo. */
+.settings-grid label {
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 4px;
+}
+.settings-grid label > small {
+  margin-top: 0;
+}
+.settings-advanced {
+  display: grid;
+  gap: var(--space);
+  margin: 0;
+}
+.settings-advanced > fieldset.panel {
+  margin: 0;
+}
+.settings-actions > p {
+  margin: 0;
+}
+/* Alteração não salva: a barra de salvar acompanha a rolagem (numa tela baixa ela ficaria
+   fora de vista). O formulário ganha espaço no fim para nada ficar coberto por ela. */
+.settings-actions.is-dirty {
+  position: sticky;
+  bottom: var(--s-4);
+  z-index: var(--z-sidebar);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-m);
+}
+@media (max-width: 899px) {
+  .settings-actions.is-dirty {
+    bottom: calc(var(--tabbar) + var(--s-3) + env(safe-area-inset-bottom));
+  }
+}
+/* Ocorrências no celular: cada linha vira um cartão, com o nome do dado antes do valor. */
+@media (max-width: 699px) {
+  .table-scroll:has(> .cards-on-phone) {
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .cards-on-phone thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .cards-on-phone,
+  .cards-on-phone tbody,
+  .cards-on-phone tr,
+  .cards-on-phone td {
+    display: block;
+  }
+  .cards-on-phone tr {
+    display: grid;
+    gap: var(--s-1);
+    padding: var(--s-3) 0;
+    border-top: 1px solid var(--border);
+  }
+  .cards-on-phone tbody tr:hover {
+    background: none;
+  }
+  .cards-on-phone td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+  .cards-on-phone td[data-label]::before {
+    content: attr(data-label) ': ';
+    color: var(--text-secondary);
+  }
+  .cards-on-phone td:last-child a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+/* Revisão em tela própria e decisão da ocorrência: seções separadas por linha e espaço,
+   sem caixa dentro de caixa; a decisão fica sempre à vista, presa ao rodapé. */
+.review-panel.is-page .review-step,
+.review-box .review-step {
+  padding: var(--s-5) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+}
+.review-actions {
+  display: grid;
+  gap: var(--s-2);
+}
+.review-actions > p,
+.review-actions > .actions {
+  margin: 0;
+}
+.review-panel.is-page .review-actions,
+.review-box .review-actions {
+  position: sticky;
+  bottom: var(--s-4);
+  z-index: var(--z-sidebar);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  box-shadow: var(--shadow-m);
+}
+.review-box > .review-step,
+.review-box > label,
+.review-box > .review-actions {
+  margin-top: var(--s-4);
+}
+@media (max-width: 899px) {
+  .review-panel.is-page .review-actions,
+  .review-box .review-actions {
+    bottom: calc(var(--tabbar) + var(--s-3) + env(safe-area-inset-bottom));
+  }
+}
+/* Ocorrência: espaço entre a foto e os dados. */
+.detail > .photo-placeholder,
+.detail > .evidence-figure {
+  margin-bottom: var(--s-5);
+}
+/* Números do Painel sempre na base do cartão, mesmo quando o rótulo quebra a linha. */
+.stat-row > div {
+  grid-template-rows: 1fr auto;
+}
+.stat-row dd {
+  align-self: end;
+}
+/* O ponto de cada serviço acompanha a primeira linha do texto. */
+.health-summary .service-dot {
+  align-self: flex-start;
+  margin-top: 0.55em;
+}
+/* Celular: a barra de alteração não salva numa linha só, com os dois botões. */
+@media (max-width: 599px) {
+  .settings-actions.is-dirty {
+    flex-wrap: nowrap;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+  }
+  .settings-actions.is-dirty > button {
+    flex: 1 1 0;
+    padding-inline: var(--s-2);
+  }
+  .settings-actions.is-dirty > p {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* Campo em foco na revisão: a rolagem deixa espaço para a barra de decisão fixa. */
+.review-panel.is-page :is(input, select, textarea, summary),
+.review-box :is(input, select, textarea, summary) {
+  scroll-margin-bottom: 160px;
+}
+@media (max-width: 899px) {
+  .review-panel.is-page :is(input, select, textarea, summary),
+  .review-box :is(input, select, textarea, summary) {
+    scroll-margin-bottom: calc(var(--tabbar) + 200px);
+  }
+}
+.publication-state {
+  margin: 0;
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+
+/* Celular: as duas decisões lado a lado, do mesmo tamanho, só com o verbo; o nome completo
+   ("Confirmar relato") continua para o leitor de tela. A pergunta da recusa ocupa a linha. */
+@media (max-width: 899px) {
+  .review-actions .wide-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .review-actions > .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .review-actions > .actions > * {
+    width: 100%;
+  }
+  .review-actions > .actions > .confirm-inline {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Local na revisão: o ponto atual em texto, o ponto novo marcado e as coordenadas recolhidas. */
+.location-now {
+  margin: 0;
+  color: var(--text);
+}
+.location-now small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+.location-new {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.location-picker {
+  display: grid;
+  gap: var(--s-2);
+}
+.location-picker > .field-note {
+  margin: 0;
+}
+.review-step > details.coordinates > .field-row {
+  margin-top: var(--s-3);
+}
+
+/* Fila: a célula do selo existe mesmo vazia, para a ação ficar sempre na mesma coluna. */
+.badge-slot {
+  display: contents;
+}
+.badge-slot:empty {
+  display: block;
+}
+
+/* Catálogo de tipos no fim da fila: uma linha recolhida. */
+.taxonomy-disclosure {
+  padding-block: var(--s-3);
+}
+.taxonomy-disclosure > details > summary {
+  font-weight: var(--weight-semibold);
+}
+.taxonomy-disclosure > details[open] > :not(summary) {
+  margin-top: var(--s-3);
+}
+
+/* Administração: quatro campos em 2×2 (não 3 + 1). */
+@media (min-width: 700px) {
+  .settings-grid.is-pairs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* "Pular este relato" é um link discreto: não estica como botão no celular. */
+.page-heading-actions > .text-button {
+  flex: 0 0 auto;
+}
+
+/* Administração com alteração não salva: espaço para a barra fixa não cobrir o fim do form. */
+.settings-form:has(.settings-actions.is-dirty) > .settings-advanced {
+  margin-bottom: var(--s-6);
+}
+.settings-form:has(.settings-actions.is-dirty) {
+  padding-bottom: var(--s-6);
+}
+
+/* A pergunta da recusa dentro da barra de decisão: a própria barra é o aviso (sem caixa dentro
+   de caixa), com os dois botões do mesmo tamanho. */
+.review-actions .confirm-inline {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.review-actions:has(.confirm-inline) {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+  background: var(--danger-soft);
+}
+.review-actions .confirm-inline .actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 420px;
+}
+
+/* Ocorrências no celular: a data em cartão usa algarismos comuns (como o resto do texto). */
+@media (max-width: 699px) {
+  .cards-on-phone td {
+    font-variant-numeric: normal;
+  }
+}
+
+/* Celular: barra de decisão e barra de salvar encostadas nas abas (sem fresta). */
+@media (max-width: 899px) {
+  .review-panel.is-page .review-actions,
+  .review-box .review-actions,
+  .settings-actions.is-dirty {
+    bottom: calc(var(--tabbar) + env(safe-area-inset-bottom));
+  }
+}
+/* Etapas da revisão com o mesmo título: "Local" no tamanho de "Tipo de problema". */
+.review-step > legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+/* Protocolo no mesmo tamanho da data ao lado. */
+.queue-list .record-id {
+  font-size: inherit;
+}
+
+/* Campo dentro da barra fixa (motivo da recusa): já está à vista, a página não rola. */
+.review-actions :is(input, select, textarea, summary) {
+  scroll-margin-bottom: 0;
+}
+
+/* Aviso de local antes da foto: só no celular (no computador, ele fica ao lado da foto). */
+.review-flag {
+  display: none;
+  margin: 0;
+}
+@media (max-width: 899px) {
+  .review-flag {
+    display: block;
+  }
+  /* O mesmo aviso no resumo abaixo da foto seria repetido: some no celular. A regra
+     precisa vencer ".data-list > div" (que mostra cada dado em grade). */
+  .data-list > .flag-fact {
+    display: none;
+  }
+}
+
+/* No computador, o aviso de local ao lado da foto em âmbar, como os outros alertas. */
+.flag-fact dd {
+  color: var(--warning);
+  font-weight: var(--weight-semibold);
+}
+
+/* Contagem da fila e, com filtro ativo, "Limpar filtros" ao lado. */
+.queue-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-4);
+}

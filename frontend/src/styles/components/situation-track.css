@@ -1,0 +1,110 @@
+/* Trilha do relato (SituationTrack): Recebido → Em análise → Confirmado. */
+/* Recebido → Em análise → Confirmado: três segmentos e o nome da etapa atual. */
+.situation-track {
+  --track: var(--progress);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.situation-track.tone-done {
+  --track: var(--success);
+}
+.situation-track.tone-attention {
+  --track: var(--warning);
+}
+.situation-track.tone-ended {
+  --track: var(--text-muted);
+}
+.track-steps {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 16px);
+  gap: 3px;
+}
+.track-steps i {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border-strong);
+}
+.track-steps i.is-past {
+  background: color-mix(in srgb, var(--track) 45%, var(--surface));
+}
+.track-steps i.is-current {
+  background: var(--track);
+}
+.track-label {
+  color: var(--track);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.situation-track.tone-active .track-label {
+  color: var(--progress);
+}
+.situation-track.is-large {
+  display: grid;
+  gap: var(--s-2);
+  width: 100%;
+}
+.situation-track.is-large .track-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.situation-track.is-large .track-steps i {
+  height: 8px;
+  border-radius: 4px;
+}
+.situation-track.is-large .track-label {
+  display: none;
+}
+/* Relato em andamento: a etapa atual tem um brilho que percorre o segmento. */
+.situation-track.is-large.tone-active .track-steps i.is-current {
+  position: relative;
+  overflow: hidden;
+}
+.situation-track.is-large.tone-active .track-steps i.is-current::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 50%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--surface) 55%, transparent) 50%,
+    transparent 100%
+  );
+  animation: track-live 1.8s var(--ease) 2;
+}
+@keyframes track-live {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.track-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.track-legend li.is-reached {
+  color: var(--text-secondary);
+}
+.track-legend li[aria-current='step'] {
+  color: var(--track);
+  font-weight: var(--weight-bold);
+}
+.tone-active .track-legend li[aria-current='step'] {
+  color: var(--progress);
+}
+
+/* Falta o local: a barra fica âmbar, mas o nome da etapa ("Recebido") não parece um erro. */
+.situation-track.tone-attention .track-legend li[aria-current='step'] {
+  color: var(--text);
+}

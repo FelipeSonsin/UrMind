@@ -1,0 +1,21 @@
+/* Marca: símbolo e nome (componentes Brand e BrandMark em components/ui). */
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+  line-height: 1;
+}
+.brand-mark {
+  display: block;
+  flex: none;
+}
+.brand-word {
+  /* Tom suave do "mind", ainda com 4,5:1 sobre o branco. */
+  color: #6b7785;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.035em;
+}
+.brand-word b {
+  color: var(--text);
+  font-weight: var(--weight-bold);
+}

@@ -8,12 +8,9 @@ import {
   familyFor,
   filterMapRecords,
   filterPublicMap,
-  formatBrDate,
   issueHeadline,
   labelFor,
   mapFilterOptions,
-  maskBrDate,
-  parseBrDate,
   publicMapFilterOptions,
   publicSituation,
   publicSituationLabels,
@@ -37,9 +34,13 @@ import {
   SATELLITE_IMAGERY,
   type Polygon,
 } from '../mapConfig';
+import { MAP_LOCALE } from '../content/mapLocale';
+import { DateField } from './DateField';
+import { useWideScreen } from '../app/hooks/useWideScreen';
 import { reportLabels, statuses, type CaptureMarker } from '../domain/contracts';
 import { BRAZIL_CAPITALS, MAP_DESIGN, byZoom, type MapColors } from '../mapDesign';
 import {
+  REPORT_HOLE,
   SHAPE_PATHS,
   WARNING_INSET,
   markerImage,
@@ -405,6 +406,9 @@ const SITUATION_SAMPLE: Record<PublicSituation, string> = {
   declined: 'rejected',
 };
 
+/** Lista vazia estável: no modo de marcar um ponto, o mapa não mostra outros pontos. */
+const NO_POINTS: MapMarker[] = [];
+
 function markerLabel(event: MapMarker, audience: MapAudience) {
   if (audience === 'team')
     return event.report_status
@@ -421,7 +425,7 @@ function markerPopup(event: MapMarker, audience: MapAudience) {
   if (event.report_status) return label;
   const road = event.road_name ? ` · ${event.road_name}` : '';
   return audience === 'team'
-    ? `${label} · severidade ${severityOf(event.severity).label}${road}`
+    ? `${label} · gravidade ${severityOf(event.severity).label.toLowerCase()}${road}`
     : `${label}${road}`;
 }
 
@@ -439,11 +443,17 @@ export default function UrbanMap({
   audience = 'public',
   pickedPoint,
   initialZoom,
+  showList = true,
+  showLegend = true,
 }: {
   events: MapMarker[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onPickLocation?: (latitude: number, longitude: number) => void;
+  /**
+   * Onde o mapa abre. Sem ele, quem marca um ponto (`onPickLocation`) começa na área
+   * atendida, como no Registrar; os demais mapas enquadram os pontos ou o Brasil.
+   */
   initialCenter?: { latitude: number; longitude: number } | null;
   detail?: ReactNode;
   onCloseDetail?: () => void;
@@ -457,6 +467,10 @@ export default function UrbanMap({
   pickedPoint?: { latitude: number; longitude: number } | null;
   /** Zoom inicial ao abrir em `initialCenter` (padrão: nível de rua). */
   initialZoom?: number;
+  /** "Ver em lista" abaixo do mapa; desligado onde a página já mostra a lista. */
+  showList?: boolean;
+  /** Legenda; desligada quando o mapa mostra um ponto só, já descrito na página. */
+  showLegend?: boolean;
 }) {
   const exportController = useRef<AbortController | null>(null);
   const [exportError, setExportError] = useState('');
@@ -483,8 +497,9 @@ export default function UrbanMap({
   const team = audience === 'team';
   const events = useMemo(
     () =>
+      // Marcando um ponto, o mapa fica só com a mira: outros pontos confundiriam.
       onPickLocation
-        ? allEvents
+        ? NO_POINTS
         : team
           ? filterMapRecords(allEvents, filters)
           : filterPublicMap(allEvents, publicFilters),
@@ -535,11 +550,15 @@ export default function UrbanMap({
       map_to: next.to,
     });
   }
+  // Celular: os filtros do mapa ficam recolhidos em "Filtros", como na fila.
+  const wide = useWideScreen();
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map>(null);
   const pickCallback = useRef(onPickLocation);
   pickCallback.current = onPickLocation;
   const [error, setError] = useState('');
+  // WebGL ausente ou bloqueado: o mapa não desenha, mas a lista de pontos continua.
+  const [failed, setFailed] = useState(false);
   const mapEnvironment = {
     VITE_MAP_STYLE_URL: import.meta.env.VITE_MAP_STYLE_URL,
     VITE_CARTO_BASEMAPS_API_KEY: import.meta.env.VITE_CARTO_BASEMAPS_API_KEY,
@@ -574,19 +593,20 @@ export default function UrbanMap({
   audienceRef.current = audience;
   const fittedKey = useRef('');
   const pickMode = Boolean(onPickLocation);
-  const pickedMarker = useRef<maplibregl.Marker | null>(null);
+  const serviceArea = pickMode && initialCenter === undefined;
+  const startCenter = serviceArea ? MAP_DESIGN.framing.pilotArea : initialCenter;
+  const startZoom = serviceArea ? MAP_DESIGN.framing.areaZoom : initialZoom;
+  // Último ponto marcado aqui: quando ele volta como `pickedPoint`, o mapa não pula.
+  const lastPicked = useRef<{ latitude: number; longitude: number } | null>(null);
 
-  /** Um toque no mapa ou "Marcar o centro do mapa": o mesmo ponto confirmado pela pessoa. */
-  function pickPoint(map: maplibregl.Map, point: maplibregl.LngLat) {
+  /** O ponto sob o alvo, marcado por quem arrastou, tocou ou pediu a própria localização. */
+  function pickPoint(point: maplibregl.LngLat) {
     if (!isInsideBrazil(point.lat, point.lng)) {
       setError('Escolha um ponto dentro do território brasileiro.');
       return;
     }
     setError('');
-    pickedMarker.current?.remove();
-    pickedMarker.current = new maplibregl.Marker({ color: MAP_DESIGN.markers.picked })
-      .setLngLat(point)
-      .addTo(map);
+    lastPicked.current = { latitude: point.lat, longitude: point.lng };
     pickCallback.current?.(point.lat, point.lng);
   }
 
@@ -595,17 +615,19 @@ export default function UrbanMap({
     let map: maplibregl.Map | undefined;
     try {
       const shownCenter =
-        initialCenter && isInsideBrazil(initialCenter.latitude, initialCenter.longitude)
-          ? initialCenter
+        startCenter && isInsideBrazil(startCenter.latitude, startCenter.longitude)
+          ? startCenter
           : null;
       fittedKey.current = '';
       map = new maplibregl.Map({
         container: container.current,
         style,
+        // Dicas dos botões do mapa em português (o padrão do MapLibre é inglês).
+        locale: MAP_LOCALE,
         ...(shownCenter
           ? {
               center: [shownCenter.longitude, shownCenter.latitude],
-              zoom: initialZoom ?? MAP_DESIGN.framing.pointZoom,
+              zoom: startZoom ?? MAP_DESIGN.framing.pointZoom,
             }
           : { bounds: BRAZIL_FIT, fitBoundsOptions: { padding: BRAZIL_PADDING } }),
         renderWorldCopies: false,
@@ -631,15 +653,39 @@ export default function UrbanMap({
       lockToBrazil();
       map.on('resize', lockToBrazil);
       basemapIsDark = isDarkBasemap(style);
-      map.addControl(new maplibregl.NavigationControl(), 'top-right');
-      map.addControl(
-        new maplibregl.GeolocateControl({
-          positionOptions: { enableHighAccuracy: true },
-          trackUserLocation: false,
-        }),
-        'top-right',
-      );
-      if (pickMode) map.on('click', (event) => pickPoint(map!, event.lngLat));
+      // Aproximar e afastar; a bússola não ajuda quem procura uma rua.
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      const geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: false,
+      });
+      map.addControl(geolocate, 'top-right');
+      map
+        .getContainer()
+        .querySelector('.maplibregl-ctrl-geolocate')
+        ?.setAttribute('aria-label', MAP_LOCALE['GeolocateControl.FindMyLocation']);
+      if (pickMode) {
+        // Arrastar, aproximar ou usar as setas marca o ponto sob o alvo quando o mapa para; um
+        // toque leva o mapa até o ponto tocado; "minha localização" marca onde a pessoa está.
+        // Movimento feito pelo próprio site (enquadrar, buscar endereço) não marca nada.
+        let moved = false;
+        map.on('movestart', (event) => {
+          if ((event as { originalEvent?: unknown }).originalEvent) moved = true;
+        });
+        map.on('moveend', () => {
+          if (!moved || !map) return;
+          moved = false;
+          pickPoint(map.getCenter());
+        });
+        map.on('click', (event) => {
+          pickPoint(event.lngLat);
+          const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+          map!.easeTo({ center: event.lngLat, duration: still ? 0 : 300 });
+        });
+        geolocate.on('geolocate', (position) =>
+          pickPoint(new maplibregl.LngLat(position.coords.longitude, position.coords.latitude)),
+        );
+      }
       let fallbackUsed = false;
       let styleLoaded = false;
       map.on('error', () => {
@@ -759,13 +805,13 @@ export default function UrbanMap({
         if (map) map.getCanvas().style.cursor = '';
       });
     } catch {
-      setError('Mapa indisponível: verifique o suporte a WebGL do navegador.');
+      setFailed(true);
     }
     return () => {
       mapRef.current = null;
       map?.remove();
     };
-    // initialCenter only seeds the first view; later changes are applied below.
+    // startCenter only seeds the first view; later changes are applied below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cartoFallback.attribution,
@@ -783,33 +829,34 @@ export default function UrbanMap({
       showEvents(map, located, fittedKey, selectedRef.current, audienceRef.current);
   }, [located]);
 
-  // Endereço escolhido na busca: o marcador e o mapa vão até ele; a pessoa ainda pode ajustar.
+  // Endereço escolhido na busca (ou coordenada digitada): o mapa leva o alvo até ele; a
+  // pessoa ainda pode ajustar arrastando.
   const pickedLatitude = pickedPoint?.latitude;
   const pickedLongitude = pickedPoint?.longitude;
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !pickMode || pickedLatitude == null || pickedLongitude == null) return;
     if (!isInsideBrazil(pickedLatitude, pickedLongitude)) return;
-    pickedMarker.current?.remove();
-    pickedMarker.current = new maplibregl.Marker({ color: MAP_DESIGN.markers.picked })
-      .setLngLat([pickedLongitude, pickedLatitude])
-      .addTo(map);
+    const last = lastPicked.current;
+    if (last?.latitude === pickedLatitude && last.longitude === pickedLongitude) return;
     map.jumpTo({
       center: [pickedLongitude, pickedLatitude],
       zoom: Math.max(map.getZoom(), MAP_DESIGN.framing.pointZoom + 2),
     });
   }, [pickMode, pickedLatitude, pickedLongitude]);
 
-  const centerLatitude = initialCenter?.latitude;
-  const centerLongitude = initialCenter?.longitude;
+  const centerLatitude = startCenter?.latitude;
+  const centerLongitude = startCenter?.longitude;
   useEffect(() => {
     const map = mapRef.current;
     if (!map || centerLatitude == null || centerLongitude == null) return;
     if (!isInsideBrazil(centerLatitude, centerLongitude)) return;
     map.jumpTo({
       center: [centerLongitude, centerLatitude],
-      zoom: initialZoom ?? MAP_DESIGN.framing.pointZoom,
+      zoom: startZoom ?? MAP_DESIGN.framing.pointZoom,
     });
+    // The zoom only matters together with a new center.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerLatitude, centerLongitude]);
 
   useEffect(() => {
@@ -844,158 +891,194 @@ export default function UrbanMap({
       .map((event) => publicSituation(event.report_status)),
   );
   const showReportLegend = shownStatuses.size > 0;
-  // Público: a legenda explica só as gravidades que estão no mapa agora.
+  // A legenda explica só o que está desenhado agora. Relato é sempre o círculo vazado
+  // da situação; a placa de gravidade é só das ocorrências.
   const shownLevels = new Set(
     located
-      .filter((event) => !event.report_status || event.severity != null)
+      .filter((event) => !event.report_status)
       .map((event) => severityOf(event.severity).level),
   );
-  const showSeverityLegend = located.some(
-    (event) => !event.report_status || event.severity != null,
-  );
+  const showSeverityLegend = shownLevels.size > 0;
   const reportColors: Record<string, string> = MAP_DESIGN.markers.reportStatus;
   const { keyline } = MAP_DESIGN.markers;
-  const count = located.length === 1 ? '1 ponto visível' : `${located.length} pontos visíveis`;
+  const count = located.length === 1 ? '1 ponto no mapa' : `${located.length} pontos no mapa`;
+  // Com filtros, a contagem já aparece acima do mapa: a lista abaixo não repete o número.
+  const counted = !onPickLocation && showFilters && allEvents.length > 0;
   return (
     <section className="panel map-panel">
       {!onPickLocation && showFilters && allEvents.length > 0 && !team && (
-        <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
-          {publicOptions.issues.length > 1 && (
-            <label>
-              Tipo de problema
-              <select
-                aria-label="Tipo de problema"
-                value={publicFilters.issue}
-                onChange={(event) =>
-                  changePublicFilters({ ...publicFilters, issue: event.target.value })
-                }
-              >
-                <option value="">Todos</option>
-                {publicOptions.issues.map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {publicOptions.severities.length > 1 && (
-            <label>
-              Gravidade
-              <select
-                aria-label="Gravidade"
-                value={publicFilters.severity}
-                onChange={(event) =>
-                  changePublicFilters({ ...publicFilters, severity: event.target.value })
-                }
-              >
-                <option value="">Todas</option>
-                {publicOptions.severities.map(([level, label]) => (
-                  <option key={level} value={level}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {publicOptions.periods.length > 0 && (
-            <label>
-              Período
-              <select
-                aria-label="Período"
-                value={publicFilters.period}
-                onChange={(event) =>
-                  changePublicFilters({ ...publicFilters, period: event.target.value })
-                }
-              >
-                <option value="">Qualquer data</option>
-                {publicOptions.periods.map(([days, label]) => (
-                  <option key={days} value={days}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <p role="status" className="map-count">
-            {count}
-          </p>
-        </div>
+        <FiltersDisclosure wide={wide} count={count}>
+          <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
+            {publicOptions.issues.length > 1 && (
+              <label>
+                Tipo de problema
+                <select
+                  aria-label="Tipo de problema"
+                  value={publicFilters.issue}
+                  onChange={(event) =>
+                    changePublicFilters({ ...publicFilters, issue: event.target.value })
+                  }
+                >
+                  <option value="">Todos os tipos</option>
+                  {publicOptions.issues.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {publicOptions.severities.length > 1 && (
+              <label>
+                Gravidade
+                <select
+                  aria-label="Gravidade"
+                  value={publicFilters.severity}
+                  onChange={(event) =>
+                    changePublicFilters({ ...publicFilters, severity: event.target.value })
+                  }
+                >
+                  <option value="">Todas</option>
+                  {publicOptions.severities.map(([level, label]) => (
+                    <option key={level} value={level}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {publicOptions.periods.length > 0 && (
+              <label>
+                Período
+                <select
+                  aria-label="Período"
+                  value={publicFilters.period}
+                  onChange={(event) =>
+                    changePublicFilters({ ...publicFilters, period: event.target.value })
+                  }
+                >
+                  <option value="">Qualquer data</option>
+                  {publicOptions.periods.map(([days, label]) => (
+                    <option key={days} value={days}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {/* No celular, a contagem fica fora de "Filtros" (ver FiltersDisclosure). */}
+            {wide && (
+              <p role="status" className="map-count">
+                {count}
+              </p>
+            )}
+          </div>
+        </FiltersDisclosure>
       )}
       {!onPickLocation && showFilters && allEvents.length > 0 && team && (
-        <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
-          {options.statuses.length > 1 && (
-            <label>
-              Status do ponto
-              <select
-                value={filters.status}
-                onChange={(event) => changeFilters({ ...filters, status: event.target.value })}
-              >
-                <option value="">Todos</option>
-                {options.statuses.map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {options.families.length > 1 && (
-            <label>
-              Família do ponto
-              <select
-                value={filters.family}
-                onChange={(event) => changeFilters({ ...filters, family: event.target.value })}
-              >
-                <option value="">Todas</option>
-                {options.families.map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {options.issues.length > 1 && (
-            <label>
-              Classe do ponto
-              <select
-                value={filters.issue}
-                onChange={(event) => changeFilters({ ...filters, issue: event.target.value })}
-              >
-                <option value="">Todas</option>
-                {options.issues.map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <DateField
-            label="Desde"
-            value={filters.from}
-            onChange={(from) => changeFilters({ ...filters, from })}
-          />
-          <DateField
-            label="Até"
-            value={filters.to}
-            onChange={(to) => changeFilters({ ...filters, to })}
-          />
-          <p role="status" className="map-count">
-            {count}
-          </p>
-        </div>
+        <FiltersDisclosure wide={wide} count={count}>
+          <div className="map-toolbar" role="group" aria-label="Filtros do mapa">
+            {options.statuses.length > 1 && (
+              <label>
+                Situação
+                <select
+                  value={filters.status}
+                  onChange={(event) => changeFilters({ ...filters, status: event.target.value })}
+                >
+                  <option value="">Todas</option>
+                  {options.statuses.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {options.families.length > 1 && (
+              <label>
+                Grupo de problema
+                <select
+                  value={filters.family}
+                  onChange={(event) => changeFilters({ ...filters, family: event.target.value })}
+                >
+                  <option value="">Todos os grupos</option>
+                  {options.families.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {options.issues.length > 1 && (
+              <label>
+                Tipo de problema
+                <select
+                  value={filters.issue}
+                  onChange={(event) => changeFilters({ ...filters, issue: event.target.value })}
+                >
+                  <option value="">Todos os tipos</option>
+                  {options.issues.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <DateField
+              label="Recebido a partir de"
+              value={filters.from}
+              onChange={(from) => changeFilters({ ...filters, from })}
+            />
+            <DateField
+              label="Recebido até"
+              value={filters.to}
+              onChange={(to) => changeFilters({ ...filters, to })}
+            />
+            {/* No celular, a contagem fica fora de "Filtros" (ver FiltersDisclosure). */}
+            {wide && (
+              <p role="status" className="map-count">
+                {count}
+              </p>
+            )}
+          </div>
+        </FiltersDisclosure>
       )}
       <div className="map-wrap">
-        <div
-          className="map"
-          style={{ height: MAP_DESIGN.slot.height }}
-          ref={container}
-          role="img"
-          aria-label={`Mapa com ${located.length} de ${events.length} pontos localizados`}
-        />
-        {!located.length && !onPickLocation && (
+        {/* A moldura tem só a altura do mapa: a mira fica sobre ele. */}
+        <div className="map-frame">
+          <div
+            className="map"
+            style={{ height: MAP_DESIGN.slot.height }}
+            ref={container}
+            // Região com nome, não imagem: dentro ficam os botões e o mapa navegável.
+            role="region"
+            aria-label={
+              pickMode
+                ? 'Mapa para marcar o local: arraste o mapa, ou use as setas do teclado, até o alvo ficar sobre o local'
+                : `Mapa com ${located.length} de ${events.length} pontos localizados`
+            }
+          />
+          {pickMode && !failed && <span className="map-crosshair" aria-hidden="true" />}
+        </div>
+        {failed && (
+          <div className="map-fallback" role="alert">
+            <strong>O mapa não pôde ser exibido neste navegador</strong>
+            <p>
+              {onPickLocation
+                ? 'Sem o mapa não é possível marcar o ponto agora. Você pode enviar o relato e marcar o local depois, em outro aparelho.'
+                : located.length
+                  ? 'Os pontos continuam disponíveis na lista abaixo do mapa.'
+                  : 'Quando houver pontos, eles também aparecem em lista abaixo do mapa.'}{' '}
+              Atualize o navegador ou tente abrir em outro.
+            </p>
+            <button type="button" className="secondary" onClick={() => location.reload()}>
+              Recarregar página
+            </button>
+          </div>
+        )}
+        {!failed && !located.length && !onPickLocation && (
           <div className="map-empty" role="status">
             {filtering && allEvents.length > 0 ? (
               <>
@@ -1013,50 +1096,68 @@ export default function UrbanMap({
             )}
           </div>
         )}
-        {(showReportLegend || showSeverityLegend) && (
+        {showLegend && (showReportLegend || showSeverityLegend) && (
           <div className="map-legends">
             {showSeverityLegend && (
-              <ul
-                className="map-legend"
-                aria-label={team ? 'Legenda de severidade' : 'Legenda de gravidade'}
-              >
-                {LEGEND.filter((level) => team || shownLevels.has(level)).map((level) => {
+              <ul className="map-legend" aria-label="Legenda de gravidade">
+                <li className="map-legend-title" aria-hidden="true">
+                  Gravidade
+                </li>
+                {LEGEND.filter((level) => shownLevels.has(level)).map((level) => {
                   const sign = markerStyle({ severity: level });
                   return (
                     <li key={level}>
                       <SignSwatch style={sign} />
-                      {severityOf(level).label}
+                      {/* Sob o título "Gravidade", sem repetir a palavra. */}
+                      {level === 'unknown' ? 'A definir' : severityOf(level).label}
                     </li>
                   );
                 })}
               </ul>
             )}
             {showReportLegend && team && (
-              <ul className="map-legend" aria-label="Legenda de relatos">
-                {Object.entries(reportLabels)
-                  .filter(([status]) => shownStatuses.has(status as CaptureMarker['report_status']))
-                  .map(([status, label]) => (
-                    <li key={status}>
-                      <SignSwatch
-                        style={{
-                          shape: 'circle',
-                          fill: reportColors[status] ?? MAP_DESIGN.markers.reportStatus.received,
-                          glyph: keyline,
-                        }}
-                      />
-                      {label}
-                    </li>
-                  ))}
+              <ul className="map-legend" aria-label="Legenda da situação dos relatos">
+                <li className="map-legend-title" aria-hidden="true">
+                  Situação do relato
+                </li>
+                {/* Uma linha por cor: situações que o mapa pinta igual saem juntas
+                    ("Confirmado ou publicado"), sem duas linhas com a mesma cor. */}
+                {Object.values(
+                  Object.entries(reportLabels)
+                    .filter(([status]) =>
+                      shownStatuses.has(status as CaptureMarker['report_status']),
+                    )
+                    .reduce<Record<string, { color: string; labels: string[] }>>(
+                      (groups, [status, label]) => {
+                        const color =
+                          reportColors[status] ?? MAP_DESIGN.markers.reportStatus.received;
+                        const group = (groups[color] ??= { color, labels: [] });
+                        if (!group.labels.includes(label)) group.labels.push(label);
+                        return groups;
+                      },
+                      {},
+                    ),
+                ).map(({ color, labels }) => (
+                  <li key={color}>
+                    <SignSwatch style={{ shape: 'report', fill: color, glyph: keyline }} />
+                    {labels
+                      .map((label, index) => (index ? label.toLowerCase() : label))
+                      .join(' ou ')}
+                  </li>
+                ))}
               </ul>
             )}
             {showReportLegend && !team && (
-              <ul className="map-legend" aria-label="Legenda de relatos">
+              <ul className="map-legend" aria-label="Legenda da situação dos relatos">
+                <li className="map-legend-title" aria-hidden="true">
+                  Situação do relato
+                </li>
                 {SITUATION_ORDER.filter((situation) => shownSituations.has(situation)).map(
                   (situation) => (
                     <li key={situation}>
                       <SignSwatch
                         style={{
-                          shape: 'circle',
+                          shape: 'report',
                           fill: reportColors[SITUATION_SAMPLE[situation]],
                           glyph: keyline,
                         }}
@@ -1079,24 +1180,21 @@ export default function UrbanMap({
           </aside>
         )}
       </div>
-      {pickMode && (
-        <div className="map-footer map-pick-center">
-          {/* Alternativa ao toque: teclado (setas, + e -) move o mapa até o local. */}
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => mapRef.current && pickPoint(mapRef.current, mapRef.current.getCenter())}
-          >
-            Marcar o centro do mapa
-          </button>
-          <small>Toque no local da foto ou mova o mapa até ele e marque o centro.</small>
-        </div>
-      )}
       {/* Nada a listar nem exportar: sem rodapé vazio. */}
-      <div className="map-footer" hidden={pickMode || (!located.length && !allowExport)}>
-        {/* O canvas não é legível por leitor de tela: a mesma informação em texto. */}
-        <details className="map-point-list">
-          <summary>Lista acessível de pontos ({located.length})</summary>
+      <div
+        className="map-footer"
+        hidden={pickMode || ((!located.length || !showList) && !allowExport)}
+      >
+        {/* O canvas não é legível por leitor de tela: a mesma informação em texto. Onde a
+            lista já está na página (Meus relatos), não se repete aqui. */}
+        <details className="map-point-list" open={failed || undefined} hidden={!showList}>
+          <summary>
+            {located.length === 1
+              ? 'Ver o ponto em lista'
+              : counted
+                ? 'Ver os pontos em lista'
+                : `Ver os ${located.length} pontos em lista`}
+          </summary>
           <ul>
             {located.map((event) => (
               <li key={event.id} data-event-id={event.id}>
@@ -1110,12 +1208,14 @@ export default function UrbanMap({
                 </button>{' '}
                 {team ? (
                   <>
-                    {event.report_status ? '' : `· severidade ${severityOf(event.severity).label}`}{' '}
-                    · {event.road_name ?? 'via não associada'} · {event.latitude!.toFixed(5)},{' '}
+                    {event.report_status
+                      ? ''
+                      : `· gravidade ${severityOf(event.severity).label.toLowerCase()}`}{' '}
+                    · {event.road_name ?? 'sem via associada'} · {event.latitude!.toFixed(5)},{' '}
                     {event.longitude!.toFixed(5)}
                   </>
                 ) : (
-                  <>· {event.road_name ?? 'via não identificada'}</>
+                  event.road_name && <>· {event.road_name}</>
                 )}
               </li>
             ))}
@@ -1148,21 +1248,24 @@ export default function UrbanMap({
                     } catch (error) {
                       if (!controller.signal.aborted)
                         setExportError(
-                          error instanceof Error ? error.message : 'Exportação indisponível',
+                          error instanceof Error
+                            ? error.message
+                            : 'Não foi possível baixar agora. Tente de novo em instantes.',
                         );
                     } finally {
                       if (!controller.signal.aborted) setExporting(false);
                     }
                   }}
                 >
-                  Exportar {format.toUpperCase()}
+                  {exporting
+                    ? 'Preparando…'
+                    : format === 'csv'
+                      ? 'Baixar planilha'
+                      : 'Baixar para programas de mapa'}
                 </button>
               ))}
             </div>
-            <small>
-              Todos os relatos que correspondem aos filtros, em lotes no servidor; sem fotos ou
-              identidades.
-            </small>
+            <small>Todos os relatos dos filtros atuais, sem fotos nem dados pessoais.</small>
             {exportError && <p role="alert">{exportError}</p>}
           </div>
         )}
@@ -1177,48 +1280,28 @@ export default function UrbanMap({
   );
 }
 
-/**
- * Data digitada como dd/mm/aaaa: o campo nativo de data segue o idioma do navegador e
- * mostraria mm/dd/yyyy numa interface em português. Guarda aaaa-mm-dd internamente.
- */
-function DateField({
-  label,
-  value,
-  onChange,
+/** Filtros abertos no computador; no celular, recolhidos em "Filtros" (como na fila). */
+function FiltersDisclosure({
+  wide,
+  count,
+  children,
 }: {
-  label: string;
-  value: string;
-  onChange: (isoDate: string) => void;
+  wide: boolean;
+  /** "N pontos no mapa": no celular, à vista ao lado de "Filtros". */
+  count: string;
+  children: ReactNode;
 }) {
-  const [text, setText] = useState(() => formatBrDate(value));
-  const [lastValue, setLastValue] = useState(value);
-  if (value !== lastValue) {
-    setLastValue(value);
-    setText(formatBrDate(value));
-  }
-  const invalid = text.length === 10 && parseBrDate(text) === null;
+  if (wide) return <>{children}</>;
   return (
-    <label>
-      {label}
-      <input
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="dd/mm/aaaa"
-        maxLength={10}
-        value={text}
-        aria-invalid={invalid || undefined}
-        onChange={(event) => {
-          const next = maskBrDate(event.target.value);
-          setText(next);
-          if (!next) onChange('');
-          else {
-            const iso = parseBrDate(next);
-            if (iso) onChange(iso);
-          }
-        }}
-      />
-      {invalid && <small className="field-error">Data inexistente</small>}
-    </label>
+    <div className="map-filters-row">
+      <details className="filters-disclosure map-filters">
+        <summary>Filtros</summary>
+        {children}
+      </details>
+      <p role="status" className="map-count">
+        {count}
+      </p>
+    </div>
   );
 }
 
@@ -1229,13 +1312,23 @@ function SignSwatch({ style }: { style: MarkerStyle }) {
     <svg className="map-sign" viewBox="-2 -2 36 36" aria-hidden="true" focusable="false">
       <path
         d={SHAPE_PATHS[style.shape]}
-        fill={ring ? MAP_DESIGN.markers.keyline : style.fill}
+        fill={ring ? '#ffffff' : style.fill}
         stroke={ring ? style.fill : MAP_DESIGN.markers.keyline}
         strokeWidth={ring ? 3 : 2.5}
         strokeLinejoin="round"
       />
       {style.shape === 'warning' && (
         <path d={WARNING_INSET} fill="none" stroke={MAP_DESIGN.markers.keyline} strokeWidth={1.6} />
+      )}
+      {style.shape === 'report' && (
+        <circle
+          cx={16}
+          cy={16}
+          r={REPORT_HOLE}
+          fill="#ffffff"
+          stroke={MAP_DESIGN.markers.keyline}
+          strokeWidth={1.5}
+        />
       )}
     </svg>
   );

@@ -189,7 +189,7 @@ test('E. foto da galeria sem EXIF exige o ponto no mapa e nunca lê o GPS atual'
   const gpsReads = await countGpsReads(page);
   await page.goto('/#/registrar');
   await page.getByLabel('Escolher foto').setInputFiles(await GALLERY_PNG(page));
-  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+  await expect(page.getByText('Falta o local da foto')).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Selecione no mapa onde esta foto foi tirada' }),
   ).toBeVisible();
@@ -238,9 +238,11 @@ test('E3. sem localização, busca o endereço, marca o ponto e confirma o local
   expect(queries).toEqual([{ method: 'POST', body: { query: 'Rua Galvão Bueno 100' } }]);
   await expect(page.getByText(/via Nominatim/)).toBeVisible();
   const confirm = page.getByRole('button', { name: 'Confirmar local', exact: true });
-  await expect(confirm).toBeDisabled();
+  // Sem ponto, o botão não fica cinza: diz o que falta.
+  await confirm.click();
+  await expect(page.getByRole('alert')).toContainText('arraste o mapa até o alvo');
   await results.getByRole('button', { name: /Rua Galvão Bueno, 100/ }).click();
-  await expect(page.getByText('Confira o marcador e toque no mapa para ajustar')).toBeVisible();
+  await expect(page.getByText('Confira se o alvo está sobre o local exato')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('busca-endereco.png'), fullPage: true });
   await confirm.click();
   await expect(page.getByText('Local marcado no mapa')).toBeVisible();
@@ -273,14 +275,16 @@ test('E2. sem mouse, o ponto é marcado pelo centro do mapa usando só o teclado
 }) => {
   await page.goto('/#/registrar');
   await page.getByLabel('Escolher foto').setInputFiles(await GALLERY_PNG(page));
-  const center = page.getByRole('button', { name: 'Marcar o centro do mapa' });
-  await center.focus();
-  await page.keyboard.press('Enter');
+  // As setas movem o mapa; quando ele para, o ponto sob o alvo fica marcado.
+  await page.locator('.map canvas').focus();
+  await page.keyboard.press('ArrowRight');
   const confirm = page.getByRole('button', { name: 'Confirmar local', exact: true });
-  await expect(confirm).toBeEnabled();
   await confirm.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByText('Local marcado no mapa')).toBeVisible();
+  // O ponto é marcado quando o mapa para; antes disso, Enter só lembra de arrastar o mapa.
+  await expect(async () => {
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Local marcado no mapa')).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
 
 test('F. resposta atrasada do GPS de uma foto anterior não vai para a foto atual', async ({
@@ -309,7 +313,7 @@ test('F. resposta atrasada do GPS de uma foto anterior não vai para a foto atua
     ...(await GALLERY_PNG(page)),
     name: 'segunda.png',
   });
-  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+  await expect(page.getByText('Falta o local da foto')).toBeVisible();
   await page.evaluate(() => {
     const state = window as unknown as { __pendingFixes: Array<(p: unknown) => void> };
     for (const resolve of state.__pendingFixes)
@@ -319,20 +323,17 @@ test('F. resposta atrasada do GPS de uma foto anterior não vai para a foto atua
       });
   });
   await expect(page.getByText('Localização obtida')).toHaveCount(0);
-  await expect(page.getByText('Precisamos que você confirme onde a foto foi tirada')).toBeVisible();
+  await expect(page.getByText('Falta o local da foto')).toBeVisible();
 });
-test('captura usa o tema escuro do UrMind e alvos de toque em 320px', async ({ page }) => {
+test('captura usa o tema claro do UrMind e alvos de toque em 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.emulateMedia({ colorScheme: 'light' });
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/#/registrar');
-  // Identidade única, escura, qualquer que seja a preferência do aparelho.
-  await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(5, 5, 7)');
-  // Blocos em azul-marinho translúcido sobre o fundo de espaço (--surface-elevated a 78%).
-  await expect(page.locator('.panel').first()).toHaveCSS(
-    'background-color',
-    /^(color\(srgb 0\.05\d* 0\.07\d* 0\.18\d* \/ 0\.78\)|rgba\(13, 19, 48, 0\.78\))$/,
-  );
+  // Identidade única, clara, qualquer que seja a preferência do aparelho.
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(246, 247, 249)');
+  // Blocos brancos e opacos sobre o fundo cinza muito claro.
+  await expect(page.locator('.panel').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   for (const button of await page.getByRole('button').all()) {
     // File input is intentionally transparent; its enclosing label is the touch target.
@@ -340,8 +341,8 @@ test('captura usa o tema escuro do UrMind e alvos de toque em 320px', async ({ p
     if (await target.isVisible())
       expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light');
 });
 
 test('foto e descrição viram relato no mapa sem modelo e localização pode vir depois', async ({
@@ -421,16 +422,17 @@ test('foto e descrição viram relato no mapa sem modelo e localização pode vi
   await page.getByRole('button', { name: 'Enviar relato' }).click();
   await expect.poll(() => uploaded).toBe(true);
   await expect(page).toHaveURL(new RegExp(`processando/${id}`));
-  await expect(page.getByText('Situação: Precisa de localização', { exact: true })).toBeVisible();
+  await expect(page.getByText('Situação: Falta o local', { exact: true })).toBeVisible();
   // O mapa enquadra o Brasil inteiro; o centro do quadro fica em território
   // brasileiro, enquanto os cantos caem na máscara e são recusados.
   await page.locator('.map canvas').click();
-  await page.getByRole('button', { name: 'Confirmar localização do relato' }).click();
+  await page.getByRole('button', { name: 'Confirmar este local' }).click();
   await expect(page.getByText('Situação: Em análise', { exact: true })).toBeVisible();
   // A descrição aparece na lista e no detalhe do ponto recém-enviado, sempre como texto.
   await expect(page.getByText(description, { exact: true }).first()).toBeVisible();
   await expect(page.locator(`[data-event-id="${id}"]`)).toHaveCount(1);
-  await expect(page.getByRole('list', { name: 'Legenda de relatos' })).toContainText('Em análise');
+  // Um ponto só, já descrito no cartão acima: o mapa do relato não repete a legenda.
+  await expect(page.getByRole('list', { name: 'Legenda da situação dos relatos' })).toHaveCount(0);
 });
 
 test('confirma relato próximo e envia evidência adicional com aceite', async ({ page }) => {
@@ -523,13 +525,13 @@ test('recupera a captura pela URL após refresh sem antecipar análise', async (
   await page.goto(`/#/processando/${captureId}`);
   await expect(page.getByText('Situação: Em análise', { exact: true })).toBeVisible();
   await expect(page.getByText(/Resultado automático em teste/)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByText('Situação: Em análise', { exact: true })).toBeVisible();
   expect(reads).toBeGreaterThanOrEqual(2);
   stage = 'completed';
   await page.reload();
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toHaveAttribute(
     'href',
     `#/resultado/${publicId}`,
   );
@@ -542,7 +544,12 @@ test('rota de captura alheia mostra acesso negado', async ({ page }) => {
     route.fulfill({ status: 404, json: { detail: 'Captura não encontrada' } }),
   );
   await page.goto(`/#/processando/${captureId}`);
-  await expect(page.getByRole('alert')).toContainText('Captura não encontrada ou sem acesso');
+  // Relato de outra sessão: tela própria de não encontrado, com o que fazer.
+  await expect(
+    page.getByRole('heading', { name: 'Relato não encontrado', level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByText('Não encontramos este relato neste aparelho')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ver meus relatos' })).toBeVisible();
 });
 
 test('protocolo recupera apenas o relato da sessão e sobrevive ao refresh', async ({ page }) => {
@@ -595,14 +602,14 @@ test('logout em outra aba remove o resultado e interrompe consultas da captura',
     });
   });
   await page.goto(`/#/processando/${captureId}`);
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toBeVisible();
   await page.evaluate((key) => {
     localStorage.removeItem(key);
     const channel = new BroadcastChannel(key);
     channel.postMessage({ event: 'SIGNED_OUT', session: null });
     channel.close();
   }, supabaseStorageKey());
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toHaveCount(0);
   await expect(page.getByText('Situação: Analisado', { exact: true })).toHaveCount(0);
   await expect(page.getByText(/modelo rejeitado para produção/)).toHaveCount(0);
   await expect(page).not.toHaveURL(new RegExp(captureId));
@@ -689,12 +696,13 @@ test('logout durante upload cancela resposta tardia sem navegar para captura ant
     channel.postMessage({ event: 'SIGNED_OUT', session: null });
     channel.close();
   }, supabaseStorageKey());
-  await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
+  // Sem sessão, os rascunhos oferecem a entrada da equipe, recolhida.
+  await expect(page.getByText('Tem conta da equipe? Entrar')).toBeVisible();
   release();
   await expect(page.getByText('Foto enviada e registrada', { exact: false })).toHaveCount(0);
   // Give the released HTTP continuation a visible, deterministic checkpoint.
   await expect(page.getByRole('button', { name: 'Enviar', exact: true })).toBeEnabled();
-  await expect(page.getByRole('heading', { name: 'logout-test.png' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Relato sem descrição' })).toBeVisible();
   await expect(page).not.toHaveURL(new RegExp(captureId));
 });
 
@@ -740,7 +748,7 @@ test('logout na fila aborta polling pendente e ignora resposta tardia', async ({
   await page.clock.fastForward(15_000);
   expect(reads).toBe(2);
   await expect(page.getByText('Situação: Analisado', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toHaveCount(0);
 });
 
 for (const boundary of ['origin', 'signup'] as const) {
@@ -857,7 +865,7 @@ for (const boundary of ['origin', 'signup'] as const) {
             : 'a0000000-1111-4222-8333-944445555666',
       );
       expect(uploads).toBe(action === 'success' ? 1 : 0);
-      await expect(page.getByRole('heading', { name: 'auth-boundary.png' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Relato sem descrição' })).toBeVisible();
     });
   }
 }
@@ -881,7 +889,7 @@ test('foto sem detecção termina sem anunciar revisão de Event inexistente', a
   await page.goto(`/#/processando/${captureId}`);
   await expect(page.getByText('Situação: Em análise', { exact: true })).toBeVisible();
   await expect(page.getByText(/não reconheceu buraco nem trinca/)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Ver ocorrência no mapa' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ver ocorrência', exact: true })).toHaveCount(0);
 });
 
 test('site do cidadão e área da equipe ficam em endereços separados', async ({
@@ -904,15 +912,15 @@ test('site do cidadão e área da equipe ficam em endereços separados', async (
   }
   // A área da equipe fica em /admin/: sem sessão pede login e não mostra o menu do cidadão.
   await page.goto('/admin/');
-  await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Entrar na área da equipe' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Sobre e privacidade' })).toHaveCount(0);
   // Página do cidadão pedida em /admin/ abre o painel da equipe, não o site público.
   await page.goto('/admin/#/transparency');
-  await expect(page.getByRole('heading', { name: 'Entrar no UrMind' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Entrar na área da equipe' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Como o UrMind funciona' })).toHaveCount(0);
   await page.goto('/#/transparency');
-  await expect(page.getByRole('heading', { name: 'Como o UrMind analisou' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Como o UrMind funciona' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -932,29 +940,30 @@ test('salva foto real localmente, restaura após recarga e mantém edição idem
   await expect(page.getByAltText('Evidência selecionada')).toBeVisible();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Enviar relato' }).click();
-  await expect(page.getByText('Localização pendente', { exact: true })).toBeVisible();
+  await expect(page.getByText('Falta o local', { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'evidencia.png' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continuar edição' }).click();
+  await expect(page.getByRole('heading', { name: 'Relato sem descrição' })).toBeVisible();
+  await page.getByRole('link', { name: 'Continuar edição' }).click();
   // Rascunho da galeria sem local: o mapa abre sozinho; nenhum campo de coordenada.
   await expect(page.getByLabel(/Latitude|Longitude/)).toHaveCount(0);
   await expect(
     page.getByRole('heading', { name: 'Selecione no mapa onde esta foto foi tirada' }),
   ).toBeVisible();
   const confirm = page.getByRole('button', { name: 'Confirmar local', exact: true });
-  await expect(confirm).toBeDisabled();
+  await confirm.click();
+  await expect(page.getByRole('alert')).toContainText('arraste o mapa até o alvo');
   await page.locator('.map canvas').click();
   await confirm.click();
   await expect(page.getByText('Local marcado no mapa')).toBeVisible();
   await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
   await page.getByRole('button', { name: 'Enviar relato' }).click();
-  await expect(page.getByRole('heading', { name: 'evidencia.png' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'evidencia.png' })).toHaveCount(1);
-  page.once('dialog', (dialog) => dialog.accept());
+  await expect(page.getByRole('heading', { name: 'Relato sem descrição' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Relato sem descrição' })).toHaveCount(1);
+  // Excluir pergunta na própria página, com o efeito escrito, antes de apagar.
   await page.getByRole('button', { name: 'Excluir', exact: true }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Seu próximo registro começa aqui' }),
-  ).toBeVisible();
+  await expect(page.getByText(/não podem ser recuperados/)).toBeVisible();
+  await page.getByRole('button', { name: 'Excluir rascunho' }).click();
+  await expect(page.getByRole('heading', { name: 'Nenhum rascunho guardado' })).toBeVisible();
 });
 
 test('rejeita conteúdo inválido com extensão de imagem', async ({ page }) => {
@@ -1026,24 +1035,35 @@ test('a revisão exibe dados da API, filtra e mantém zero de confiança', async
     }),
   );
   await signedIn(page, 'admin');
-  await page.goto('/admin/#/app/reviews');
+  await page.goto('/admin/#/app/eventos');
   // Evento ainda em revisão: o score do modelo não aparece antes da decisão humana.
   await expect(page.getByText('Oculto até a revisão', { exact: true })).toBeVisible();
   await expect(page.getByText('0.0%', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Ver registro' }).click();
-  await expect(page.getByText('-23.5, -46.6', { exact: true })).toBeVisible();
-  // Severidade e prioridade ficam ocultas até a primeira decisão humana.
-  await expect(page.getByText('Oculto até a decisão humana')).toHaveCount(2);
-  // Rejeitar exige motivo; só "erro visual" vira rótulo negativo no export.
-  await expect(page.getByRole('button', { name: 'Rejeitar' })).toBeDisabled();
-  await page.getByLabel('Motivo da rejeição').selectOption('duplicidade');
-  await expect(page.getByRole('button', { name: 'Rejeitar' })).toBeEnabled();
-  await expect(page.getByText(/Na dúvida, não decida/)).toBeVisible();
-  await expect(page.getByText('-23.501, -46.601 (3.0 m)', { exact: true })).toBeVisible();
-  await page.getByLabel('Estado', { exact: true }).selectOption('confirmed');
+  // No celular os filtros ficam atrás de "Filtros".
+  const filtersToggle = page.getByText('Filtros', { exact: true });
+  if (await filtersToggle.isVisible()) await filtersToggle.click();
+  // Sem ocorrência confirmada, o filtro por situação explica que nada corresponde.
+  await page.getByLabel('Situação', { exact: true }).selectOption('confirmed');
   await expect(
-    page.getByRole('heading', { name: 'Nenhuma ocorrência neste recorte' }),
+    page.getByRole('heading', { name: 'Nenhuma ocorrência neste filtro' }),
   ).toBeVisible();
+  await page.getByLabel('Situação', { exact: true }).selectOption('');
+  await page.getByRole('link', { name: 'Ver ocorrência' }).click();
+  await expect(page.getByText('-23.50000, -46.60000', { exact: true })).toBeVisible();
+  // Gravidade e prioridade não aparecem antes da primeira decisão humana (revisão às cegas).
+  await expect(page.getByText('Gravidade', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Prioridade', { exact: true })).toHaveCount(0);
+  // Recusar pergunta antes e exige o motivo; só "erro visual" vira rótulo negativo no export.
+  // Enquanto pergunta, "Confirmar ocorrência" sai da barra: nada compete com a recusa.
+  await page.getByRole('button', { name: 'Recusar ocorrência' }).click();
+  await expect(page.getByRole('button', { name: 'Confirmar ocorrência' })).toHaveCount(0);
+  const refuse = page.getByRole('button', { name: 'Recusar ocorrência', exact: true });
+  await expect(refuse).toBeDisabled();
+  await page.getByLabel('Motivo', { exact: true }).selectOption('duplicidade');
+  await expect(refuse).toBeEnabled();
+  await expect(page.getByText(/Se tiver dúvida, deixe pendente/)).toBeVisible();
+  // O ponto ajustado à via aparece separado do ponto informado.
+  await expect(page.getByText('a 3 m do ponto informado', { exact: true })).toBeVisible();
 });
 
 test('reabre o aplicativo sem rede após instalar o service worker', async ({ page, context }) => {
@@ -1074,7 +1094,7 @@ test('reabre o aplicativo sem rede após instalar o service worker', async ({ pa
   ).toBeVisible();
   await page
     .getByRole('navigation', { name: 'Navegação principal' })
-    .getByRole('link', { name: 'Registrar evidência' })
+    .getByRole('link', { name: /^Registrar/ })
     .click();
   await expect(page.getByRole('button', { name: 'Enviar relato' })).toBeVisible();
 });
@@ -1101,7 +1121,7 @@ test('meus relatos inclui captura sem localização e preserva descrição como 
   await expect(page.getByText('<b>Calçada</b>', { exact: true })).toBeVisible();
   // Uma situação só: o filtro seria redundante e não aparece.
   await expect(page.getByRole('radiogroup', { name: 'Situação do relato' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Informar localização' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Informar o local' })).toHaveAttribute(
     'href',
     /processando/,
   );
@@ -1134,16 +1154,16 @@ test('meus relatos filtra por situação só com as situações que existem', as
   );
   await page.goto('/#/meus-relatos');
   const filter = page.getByRole('radiogroup', { name: 'Situação do relato' });
-  // Sem relato sem localização, "Precisa de localização" não aparece.
+  // Sem relato sem localização, "Falta o local" não aparece.
   await expect(filter.getByRole('radio')).toHaveCount(3);
-  await expect(filter.getByRole('radio', { name: 'Precisa de localização' })).toHaveCount(0);
+  await expect(filter.getByRole('radio', { name: 'Falta o local' })).toHaveCount(0);
   const list = page.getByRole('list', { name: 'Lista de relatos' });
   await expect(list.getByRole('listitem')).toHaveCount(3);
   // Situação pública, nunca o estado técnico do processamento.
   await expect(list).not.toContainText('model_not_available');
   await filter.getByText('Confirmado').click();
   await expect(list.getByRole('listitem')).toHaveCount(1);
-  await expect(list).toContainText('Buraco · Grave');
+  await expect(list).toContainText('Buraco');
   await filter.getByText('Em análise').click();
   await expect(list.getByRole('listitem')).toHaveCount(2);
   await filter.getByText('Todos').click();
