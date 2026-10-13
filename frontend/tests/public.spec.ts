@@ -396,10 +396,89 @@ test('a transparência declara revisão humana e fontes', async ({ page }) => {
   await expect(sources).not.toContainText('LLM');
 });
 
-test('falha da API aparece como aviso, não como painel vazio silencioso', async ({ page }) => {
+test('falha da API aparece como aviso, sem dizer que não há ocorrências', async ({ page }) => {
   await stubPublicApi(page, { eventsError: 503 });
+  for (const path of ['/#/', '/#/mapa', '/#/events']) {
+    await page.goto(path);
+    // Uma frase simples no lugar do código de erro. Sem resposta não se sabe se há
+    // ocorrências: nenhuma tela diz que não há.
+    await expect(
+      page.getByText('O UrMind está fora do ar agora. Tente de novo em instantes.'),
+    ).toBeVisible();
+    await expect(page.getByText(/Nenhuma ocorrência publicada ainda/)).toHaveCount(0);
+  }
+});
+
+test('com a API acordando, a tela explica a espera e não diz que não há ocorrências', async ({
+  page,
+}) => {
+  await stubPublicApi(page, {
+    events: [],
+    status: { ...publicStatus, events_total: 0, last_event_at: null },
+  });
+  // As ocorrências só respondem quando o teste soltar, como a API voltando de um tempo parada.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    async (route) => {
+      await held;
+      await route.fulfill({ json: [] });
+    },
+  );
+  await page.goto('/#/');
+  const wait = page.getByText('Aguarde um pouco: depois de um tempo sem uso', { exact: false });
+  await expect(wait).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Carregando ocorrências…')).toBeVisible();
+  await expect(page.getByText(/Nenhuma ocorrência publicada ainda/)).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   await page.goto('/#/events');
-  await expect(page.getByRole('alert')).toContainText('serviço indisponível');
+  await expect(page.locator('main .skeleton')).toBeVisible();
+  await expect(page.getByText(/Nenhuma ocorrência publicada ainda/)).toHaveCount(0);
+  release();
+  await expect(
+    page.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
+  ).toBeVisible();
+  await expect(wait).toHaveCount(0);
+});
+
+test('nas releituras a cada 30 s, a lista e o Início vazios não piscam', async ({ page }) => {
+  await page.clock.install();
+  await stubPublicApi(page, {
+    events: [],
+    status: { ...publicStatus, events_total: 0, last_event_at: null },
+  });
+  await page.goto('/#/events');
+  const empty = page.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' });
+  await expect(empty).toBeVisible();
+  // A releitura seguinte demora: o aviso vazio continua, sem esqueleto no lugar dele.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    async (route) => {
+      await held;
+      await route.fulfill({ json: [] });
+    },
+  );
+  const refresh = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === '/api/v1/public/events',
+  );
+  await page.clock.fastForward(31_000);
+  await refresh;
+  await expect(empty).toBeVisible();
+  await expect(page.locator('main .skeleton')).toHaveCount(0);
+  // No Início, com a mesma releitura pendente, o painel da ocorrência não aparece.
+  await page.goto('/#/');
+  await expect(
+    page.getByRole('heading', { name: 'Viu um problema na rua? Registre com uma foto.' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Diagnóstico da ocorrência selecionada')).toHaveCount(0);
+  release();
 });
 
 test('o painel não expõe campo interno algum nas telas públicas', async ({ page }) => {

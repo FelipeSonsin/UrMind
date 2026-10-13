@@ -24,9 +24,15 @@ function get<T>(
     signal,
     token,
     cache: token ? 'no-store' : undefined,
+    // Servidor fora do ar (o provedor responde 502/503, às vezes sem detalhe): uma frase
+    // simples no lugar do código de erro.
+    statusError: (status) =>
+      status >= 500
+        ? new Error('O UrMind está fora do ar agora. Tente de novo em instantes.')
+        : undefined,
     messages: {
-      network: 'Não foi possível conectar ao UrMind.',
-      timeout: 'O UrMind demorou a responder.',
+      network: 'Não foi possível conectar ao UrMind. Confira a internet e tente de novo.',
+      timeout: 'O UrMind demorou a responder. Tente de novo em instantes.',
       contract: 'O UrMind respondeu de um jeito inesperado. Tente de novo em instantes.',
     },
   });

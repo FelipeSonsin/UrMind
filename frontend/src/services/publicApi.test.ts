@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { publicApi } from './publicApi';
 import { auth } from './auth';
 import { eventDetail } from '../../tests/fixtures';
-import { api } from './api';
+import { api, oldestPendingRead } from './api';
 
 const status = {
   api: { name: 'api', status: 'ok', detail: null },
@@ -149,5 +149,73 @@ describe('cliente do painel público', () => {
     );
     controller.abort();
     await expect(publicApi.status(controller.signal)).rejects.toThrow();
+  });
+});
+
+describe('espera pela API (que dorme quando fica parada)', () => {
+  it('leitura sem resposta fica registrada até chegar, para a tela explicar a demora', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      ),
+    );
+    expect(oldestPendingRead()).toBeNull();
+    const reading = publicApi.status();
+    expect(oldestPendingRead()).toEqual(expect.any(Number));
+    answer({ ok: true, status: 200, json: async () => status });
+    await reading;
+    expect(oldestPendingRead()).toBeNull();
+  });
+
+  it('envio da foto não conta como leitura demorada: ele tem o próprio progresso', async () => {
+    vi.spyOn(auth, 'accessToken').mockResolvedValue('owner-test-token');
+    let answer: (value: unknown) => void = () => undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const sending = api.uploadPhoto({
+      id: 'local-draft',
+      photo: new Blob(['fixture']),
+      filename: 'foto.jpg',
+      source: 'exif_upload',
+      captured_at: null,
+      created_at: '2026-09-24T00:00:00Z',
+      coordinate: { latitude: -23.5, longitude: -46.6, accuracy_m: null },
+      source_location: 'manual',
+      location_timestamp: null,
+      heading_deg: null,
+      speed_mps: null,
+      note: '',
+      status: 'local_draft',
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(oldestPendingRead()).toBeNull();
+    answer({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: eventDetail.id,
+        capture_key: 'fixture',
+        created: true,
+        requires_manual_location: false,
+      }),
+    });
+    await sending;
+  });
+
+  it('o tempo limite padrão cobre o despertar da API, perto de um minuto', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    respond(status);
+    await publicApi.status();
+    expect(timeout).toHaveBeenCalledWith(70_000);
   });
 });

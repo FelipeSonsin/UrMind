@@ -6,13 +6,14 @@ import { labelFor, type PublicEvent } from '../../domain/public';
 /** Ocorrências confirmadas em lista, com o filtro por tipo de problema no cabeçalho. */
 export function PublicEventsPage({
   events,
-  loading,
+  loaded,
   error,
   filters,
   onFilters,
 }: {
   events: PublicEvent[];
-  loading: boolean;
+  /** As ocorrências já chegaram uma vez: antes disso, nada de "nenhuma ocorrência". */
+  loaded: boolean;
   error: string;
   filters: { urmind_class: string; status: string };
   onFilters: (value: { urmind_class: string; status: string }) => void;
@@ -58,9 +59,10 @@ export function PublicEventsPage({
           {error}
         </p>
       )}
-      {/* Ao trocar o filtro, a lista anterior fica à vista até a nova chegar. */}
-      {loading && !events.length ? (
-        <Skeleton lines={4} />
+      {/* Esqueleto só na primeira carga; depois, a lista (ou o aviso vazio) fica à vista nas
+          releituras e na troca de filtro até a nova chegar. Se a carga falhou, só o erro. */}
+      {!loaded ? (
+        !error && <Skeleton lines={4} />
       ) : (
         <EventFeed
           events={events}

@@ -16,13 +16,14 @@ export function HomePage({
   revision,
   events,
   reports,
-  loading,
+  loaded,
   error,
 }: {
   revision: number;
   events: PublicEvent[];
   reports: CaptureMarker[];
-  loading: boolean;
+  /** As ocorrências já chegaram uma vez: antes disso, nada de "nenhuma ocorrência". */
+  loaded: boolean;
   error: string;
 }) {
   const { route } = useAppState();
@@ -112,12 +113,19 @@ export function HomePage({
             selectedId={selected}
             onSelect={setSelected}
             showFilters={false}
-            emptyMessage="Nenhuma ocorrência publicada ainda."
+            emptyMessage={
+              loaded
+                ? 'Nenhuma ocorrência publicada ainda.'
+                : error
+                  ? null
+                  : 'Carregando ocorrências…'
+            }
           />
         </Suspense>
-        {(events.length > 0 || loading) && (
+        {/* Painel só com ocorrência: nas releituras (a cada 30 s) nada aparece e some. */}
+        {events.length > 0 && (
           <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
-            {(loading || detailLoading) && !detail ? (
+            {detailLoading && !detail ? (
               <Skeleton lines={5} />
             ) : detailError && events.length > 0 ? (
               <p className="muted">Não foi possível abrir esta ocorrência agora. Tente de novo.</p>

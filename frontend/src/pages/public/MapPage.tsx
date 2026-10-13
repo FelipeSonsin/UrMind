@@ -24,9 +24,14 @@ const MAP_KINDS: [MapKind, string][] = [
  */
 export function PublicMapPage({
   events,
+  loaded = true,
+  error = '',
   reports = [],
 }: {
   events: PublicEvent[];
+  /** As ocorrências já chegaram uma vez: antes disso, nada de "nenhuma ocorrência". */
+  loaded?: boolean;
+  error?: string;
   reports?: CaptureMarker[];
 }) {
   const query = () => new URLSearchParams(location.hash.split('?')[1] ?? '');
@@ -115,6 +120,11 @@ export function PublicMapPage({
         title="Mapa"
         description="Ocorrências confirmadas pela equipe e os relatos que você enviou. Escolha um ponto para ver os detalhes."
       />
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       {views.length > 1 && (
         <div className="segmented" role="radiogroup" aria-label="Mostrar no mapa">
           {views.map(([value, label]) => (
@@ -139,7 +149,11 @@ export function PublicMapPage({
           emptyMessage={
             shownKind === 'mine'
               ? 'Seus relatos com localização aparecem aqui.'
-              : 'Nenhuma ocorrência publicada ainda.'
+              : loaded
+                ? 'Nenhuma ocorrência publicada ainda.'
+                : error
+                  ? null
+                  : 'Carregando ocorrências…'
           }
           audience="public"
           onSelect={(id) => {

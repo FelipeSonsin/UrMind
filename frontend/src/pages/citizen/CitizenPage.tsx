@@ -36,7 +36,7 @@ export function CitizenPage() {
           revision={publicRevision}
           events={publicData.events ?? []}
           reports={reports.own}
-          loading={publicData.loading}
+          loaded={publicData.events !== null}
           error={publicData.error}
         />
       );
@@ -45,6 +45,8 @@ export function CitizenPage() {
         <PublicMapPage
           key={session?.user.id ?? 'no-session'}
           events={publicData.events ?? []}
+          loaded={publicData.events !== null}
+          error={publicData.error}
           reports={reports.own}
         />
       );
@@ -52,7 +54,7 @@ export function CitizenPage() {
       return (
         <PublicEventsPage
           events={publicData.events ?? []}
-          loading={publicData.loading}
+          loaded={publicData.events !== null}
           error={publicData.error}
           filters={publicData.filters}
           onFilters={publicData.setFilters}

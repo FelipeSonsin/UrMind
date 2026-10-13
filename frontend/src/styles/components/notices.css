@@ -43,3 +43,7 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+/* Espera longa pela API: uma linha calma no topo, sem cor de alerta (não é erro). */
+.slow-notice {
+  margin: 0 0 var(--s-4);
+}

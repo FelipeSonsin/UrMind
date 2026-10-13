@@ -458,7 +458,8 @@ export default function UrbanMap({
   detail?: ReactNode;
   onCloseDetail?: () => void;
   allowExport?: boolean;
-  emptyMessage?: string;
+  /** Aviso sem pontos; `null` não mostra nada (por exemplo, quando a carga falhou). */
+  emptyMessage?: string | null;
   /** Mapas de apoio (início) mostram os pontos sem a barra de filtros. */
   showFilters?: boolean;
   /** Público vê filtros simples e nomes simples; a equipe, o vocabulário técnico. */
@@ -1078,7 +1079,7 @@ export default function UrbanMap({
             </button>
           </div>
         )}
-        {!failed && !located.length && !onPickLocation && (
+        {!failed && !located.length && !onPickLocation && emptyMessage !== null && (
           <div className="map-empty" role="status">
             {filtering && allEvents.length > 0 ? (
               <>
