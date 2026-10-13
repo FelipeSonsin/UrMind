@@ -186,9 +186,11 @@ export function TechnicalDetails({ event }: { event: PublicEventDetail }) {
               <Row term="Fundamento">
                 {responsibility.source
                   ? plain(responsibility.source)
-                  : 'ainda não há regra de competência para este trecho'}
+                  : 'ainda não há regra que indique o responsável por este trecho'}
               </Row>
-              <Row term="Regras de competência">{versionName(responsibility.version)}</Row>
+              <Row term="Regras para indicar o responsável">
+                {versionName(responsibility.version)}
+              </Row>
               <Row term="Observação">{responsibility.note && plain(responsibility.note)}</Row>
               {event.action && (
                 <Row term="Lista de ações">

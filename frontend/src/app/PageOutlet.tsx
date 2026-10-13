@@ -8,19 +8,28 @@ const TeamArea = lazy(() =>
   import('../pages/team/TeamArea').then((m) => ({ default: m.TeamArea })),
 );
 
-/** Espera longa por uma resposta: diz que é normal e quanto pode durar. */
+/**
+ * Espera longa por uma resposta: diz que é normal e quanto pode durar. A região de aviso
+ * fica sempre na página (vazia), para o leitor de tela anunciar quando o texto entra; o
+ * aviso em si flutua no pé do conteúdo, sem empurrar nada.
+ */
 function SlowNotice() {
-  return useSlowResponse() ? (
-    <p className="loading-line slow-notice" role="status">
-      Aguarde um pouco: depois de um tempo sem uso, o UrMind pode levar até um minuto para
-      responder.
-    </p>
-  ) : null;
+  const slow = useSlowResponse();
+  return (
+    <div role="status">
+      {slow && (
+        <p className="loading-line slow-notice">
+          Aguarde um pouco: depois de um tempo sem uso, o UrMind pode levar até um minuto para
+          responder.
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
- * Conteúdo da página atual: avisos gerais no topo (espera longa pela resposta,
- * atualização do app, aviso da última ação, erro de rascunho) e a página da rota. O site do cidadão e a área da equipe
+ * Conteúdo da página atual: avisos gerais (no topo: atualização do app, aviso da última
+ * ação, erro de rascunho; flutuando no pé: espera longa pela resposta) e a página da rota. O site do cidadão e a área da equipe
  * escolhem as próprias páginas em `CitizenPage` e `TeamArea`.
  */
 export function PageOutlet() {

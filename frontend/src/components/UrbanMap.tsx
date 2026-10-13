@@ -451,8 +451,8 @@ export default function UrbanMap({
   onSelect?: (id: string) => void;
   onPickLocation?: (latitude: number, longitude: number) => void;
   /**
-   * Onde o mapa abre. Sem ele, quem marca um ponto (`onPickLocation`) começa na área
-   * atendida, como no Registrar; os demais mapas enquadram os pontos ou o Brasil.
+   * Onde o mapa abre. Sem ele, quem marca um ponto (`onPickLocation`) começa na região do
+   * projeto piloto, como no Registrar; os demais mapas enquadram os pontos ou o Brasil.
    */
   initialCenter?: { latitude: number; longitude: number } | null;
   detail?: ReactNode;

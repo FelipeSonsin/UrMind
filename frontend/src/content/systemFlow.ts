@@ -139,7 +139,7 @@ export function systemFlow({
       who: 'Regras fixas e públicas; a solução é sempre uma sugestão.',
       details: [
         'A gravidade e a prioridade seguem regras fixas e públicas, sem inteligência artificial.',
-        'O responsável sugerido sai de uma tabela de competências. Sem regra para o local, a equipe define.',
+        'O responsável sugerido é o órgão que a lei indica para cada tipo de problema. Sem regra para o local, a equipe define.',
       ],
       planned:
         'Planejado: uma estimativa de risco aprendida com casos já revisados, sempre como recomendação que a equipe pode contestar.',

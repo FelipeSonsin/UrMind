@@ -209,9 +209,6 @@
   min-height: 36px;
   margin: 0;
 }
-.feed-empty {
-  margin: var(--s-4) 0;
-}
 .feed-list {
   display: grid;
   gap: 2px;

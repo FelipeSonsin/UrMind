@@ -63,21 +63,31 @@ export function MyReportsPage() {
           <span />
         </div>
       )}
-      {!reports.loading && !reports.error && own.length === 0 && (
-        <EmptyState
-          icon={<ClipboardList size={22} strokeWidth={1.8} />}
-          title="Você ainda não enviou relatos por este aparelho"
-          action={
-            <a className="button" href="#/registrar">
-              <Camera size={17} aria-hidden="true" /> Registrar relato
-            </a>
-          }
-        >
-          Tire uma foto do problema; o local vem do aparelho ou da própria foto.
-        </EmptyState>
-      )}
+      {!reports.loading && !reports.error && own.length === 0 && <NoReportsYet />}
       {(reports.cursors.length > 1 || own.length >= 100) && <ReportsPager />}
     </section>
+  );
+}
+
+/**
+ * Nenhum relato ainda, com ou sem sessão: o mesmo cartão, o mesmo título e um convite. A
+ * página já diz o que aparece aqui; o aviso só explica onde ficam os relatos de outro lugar.
+ */
+function NoReportsYet() {
+  return (
+    <div className="panel">
+      <EmptyState
+        icon={<ClipboardList size={22} strokeWidth={1.8} />}
+        title="Nenhum relato neste aparelho ainda"
+        action={
+          <a className="button" href="#/registrar">
+            <Camera size={17} aria-hidden="true" /> Registrar relato
+          </a>
+        }
+      >
+        Relatos enviados de outro navegador ou aparelho aparecem só onde foram enviados.
+      </EmptyState>
+    </div>
   );
 }
 
@@ -89,20 +99,7 @@ function MyReportsWithoutSession() {
         title="Meus relatos"
         description="Os relatos enviados por este aparelho aparecem aqui, com a situação de cada um."
       />
-      <div className="panel">
-        <EmptyState
-          icon={<ClipboardList size={22} strokeWidth={1.8} />}
-          title="Nenhum relato neste aparelho ainda"
-          action={
-            <a className="button" href="#/registrar">
-              <Camera size={17} aria-hidden="true" /> Registrar relato
-            </a>
-          }
-        >
-          Tire uma foto do problema; o local vem do aparelho ou da própria foto. Relatos enviados de
-          outro navegador aparecem só nele.
-        </EmptyState>
-      </div>
+      <NoReportsYet />
     </section>
   );
 }

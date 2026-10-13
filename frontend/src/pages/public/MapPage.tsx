@@ -118,7 +118,9 @@ export function PublicMapPage({
     <>
       <PageHeader
         title="Mapa"
-        description="Ocorrências confirmadas pela equipe e os relatos que você enviou. Escolha um ponto para ver os detalhes."
+        // Texto fixo: nada de pedir "escolha um ponto" sem ponto, nem de a página pular
+        // quando os pontos chegam.
+        description="Ocorrências confirmadas pela equipe e os relatos que você enviou."
       />
       {error && (
         <p className="error" role="alert">

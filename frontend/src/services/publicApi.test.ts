@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { publicApi } from './publicApi';
+import { z } from 'zod';
+import { publicApi, withoutAutoRetry } from './publicApi';
 import { auth } from './auth';
 import { eventDetail } from '../../tests/fixtures';
-import { api, oldestPendingRead } from './api';
+import { api, requestJson } from './api';
+import { oldestPendingRead } from './network';
 
 const status = {
   api: { name: 'api', status: 'ok', detail: null },
@@ -217,5 +219,50 @@ describe('espera pela API (que dorme quando fica parada)', () => {
     respond(status);
     await publicApi.status();
     expect(timeout).toHaveBeenCalledWith(70_000);
+  });
+
+  it('a leitura sai do registro também com servidor fora do ar, cancelamento e tempo esgotado', async () => {
+    // Servidor fora do ar: frase simples, sem código, e nada pendente.
+    respond({ detail: 'erro interno' }, { ok: false, status: 502 });
+    await expect(publicApi.status()).rejects.toThrow(
+      'O UrMind está fora do ar agora. A página tenta de novo sozinha em instantes.',
+    );
+    expect(oldestPendingRead()).toBeNull();
+
+    // Uma resposta que nunca chega: só termina quando o sinal é cancelado.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, options: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            options.signal?.addEventListener('abort', () => reject(options.signal?.reason));
+          }),
+      ),
+    );
+    const controller = new AbortController();
+    const cancelled = publicApi.status(controller.signal);
+    expect(oldestPendingRead()).not.toBeNull();
+    controller.abort();
+    await expect(cancelled).rejects.toThrow();
+    expect(oldestPendingRead()).toBeNull();
+
+    const expired = requestJson('/api/v1/public/status', z.object({}), {
+      timeoutMs: 20,
+      messages: { network: 'sem rede', timeout: 'tempo esgotado', contract: 'inesperado' },
+    });
+    await expect(expired).rejects.toThrow('tempo esgotado');
+    expect(oldestPendingRead()).toBeNull();
+  });
+
+  it('na área da equipe, que não relê sozinha, a falha não promete nova tentativa', async () => {
+    respond({ detail: 'erro interno' }, { ok: false, status: 503 });
+    const failure = await publicApi.taxonomy().then(
+      () => '',
+      (reason: Error) => reason.message,
+    );
+    expect(failure).toContain('A página tenta de novo sozinha em instantes.');
+    expect(withoutAutoRetry(failure)).toBe(
+      'O UrMind está fora do ar agora. Tente de novo em instantes.',
+    );
   });
 });

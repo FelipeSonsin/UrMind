@@ -44,13 +44,19 @@ export function useSystemStatus(revision: number, enabled = true) {
   );
 }
 
-/** Ocorrências publicadas (até 50), com o filtro de tipo da página Ocorrências. */
+/**
+ * Ocorrências publicadas (até 50), com o filtro de tipo da página Ocorrências. Cada lista
+ * guarda o tipo que a gerou: trocado o filtro, uma lista vazia antiga não vale como "nenhuma".
+ */
 export function usePublicEvents(
   revision: number,
   filters: { urmind_class?: string; status?: string },
 ) {
-  return usePublicData<PublicEvent[]>(
-    (signal) => publicApi.events({ limit: 50, ...filters }, signal),
+  return usePublicData<{ items: PublicEvent[]; urmind_class: string }>(
+    async (signal) => ({
+      items: await publicApi.events({ limit: 50, ...filters }, signal),
+      urmind_class: filters.urmind_class ?? '',
+    }),
     [revision, filters.urmind_class, filters.status],
   );
 }

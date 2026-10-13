@@ -29,14 +29,17 @@ const RobotPhonePage = lazy(() =>
 export function CitizenPage() {
   const app = useAppState();
   const { page, route, session, publicRevision, publicData, reports, drafts, navigate } = app;
+  // Início e Mapa mostram todas as ocorrências: uma lista ainda filtrada (vinda da página
+  // Ocorrências) não vale para eles, que esperam a lista completa chegar.
+  const allEvents = publicData.eventsFilter ? null : publicData.events;
   switch (page) {
     case 'overview':
       return (
         <HomePage
           revision={publicRevision}
-          events={publicData.events ?? []}
+          events={allEvents ?? []}
           reports={reports.own}
-          loaded={publicData.events !== null}
+          loaded={allEvents !== null}
           error={publicData.error}
         />
       );
@@ -44,8 +47,8 @@ export function CitizenPage() {
       return (
         <PublicMapPage
           key={session?.user.id ?? 'no-session'}
-          events={publicData.events ?? []}
-          loaded={publicData.events !== null}
+          events={allEvents ?? []}
+          loaded={allEvents !== null}
           error={publicData.error}
           reports={reports.own}
         />
@@ -55,6 +58,7 @@ export function CitizenPage() {
         <PublicEventsPage
           events={publicData.events ?? []}
           loaded={publicData.events !== null}
+          listFilter={publicData.eventsFilter}
           error={publicData.error}
           filters={publicData.filters}
           onFilters={publicData.setFilters}

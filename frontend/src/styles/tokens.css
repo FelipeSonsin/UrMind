@@ -91,6 +91,7 @@
   --dur-slow: 320ms;
 
   /* ---- Camadas (do mais baixo ao mais alto) ---- */
+  --z-notice: 35;
   --z-sidebar: 40;
   --z-topbar: 45;
   --z-tabbar: 50;

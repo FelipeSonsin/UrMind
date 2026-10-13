@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { registerTaxonomy } from '../../domain/public';
+import { oldestPendingRead } from '../../services/network';
 import { publicApi } from '../../services/publicApi';
 
 /** Releitura do painel público: curta o bastante para parecer vivo, longa o bastante
@@ -16,7 +17,10 @@ export function usePublicRefresh(revision: number) {
   const [publicRevision, setPublicRevision] = useState(0);
   useEffect(() => {
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') setPublicRevision((value) => value + 1);
+      // A releitura nunca cancela uma leitura ainda sem resposta: com a API lenta ou parada,
+      // ela chega ao tempo limite e a tela mostra o erro, em vez de recomeçar a cada 30 s.
+      if (document.visibilityState === 'visible' && oldestPendingRead() === null)
+        setPublicRevision((value) => value + 1);
     }, PUBLIC_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);

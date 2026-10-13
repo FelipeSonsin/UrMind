@@ -10,6 +10,7 @@ import {
 import { localDayStart } from '../domain/public';
 import { auth } from './auth';
 import type { CaptureDraft } from './drafts';
+import { API_TIMEOUT_MS, trackRead } from './network';
 
 const base = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 
@@ -32,50 +33,16 @@ export const REPORT_NOT_FOUND = 'Relato não encontrado ou sem acesso.';
 /** Protocolo sem relato desta sessão (resposta 404 da busca por protocolo). */
 export const PROTOCOL_NOT_FOUND = 'Protocolo sem relato neste aparelho.';
 
-/**
- * A API dorme depois de um tempo parada (plano gratuito do Render) e leva perto de um
- * minuto para voltar: o tempo limite padrão cobre esse despertar, para a primeira visita
- * não virar erro. Durante a espera, a tela avisa que ela é normal (`useSlowResponse`).
- */
-const DEFAULT_TIMEOUT_MS = 70_000;
-
-// Leituras (GET) em andamento, só com o horário de início, para a tela avisar quando a
-// mais antiga demora. Envios (POST) não entram: o envio da foto tem o próprio progresso.
-const pendingReads = new Map<number, number>();
-let lastReadId = 0;
-const readListeners = new Set<() => void>();
-
-function markRead(id: number, startedAt: number | null) {
-  if (startedAt === null) pendingReads.delete(id);
-  else pendingReads.set(id, startedAt);
-  readListeners.forEach((listener) => listener());
-}
-
-/** Início (ms) da leitura mais antiga ainda sem resposta; `null` sem leitura pendente. */
-export function oldestPendingRead(): number | null {
-  let oldest: number | null = null;
-  for (const startedAt of pendingReads.values())
-    if (oldest === null || startedAt < oldest) oldest = startedAt;
-  return oldest;
-}
-
-export function subscribePendingReads(listener: () => void) {
-  readListeners.add(listener);
-  return () => {
-    readListeners.delete(listener);
-  };
-}
-
 /** Único cliente HTTP do frontend: fetch + timeout + zod. Área logada e painel público o reutilizam. */
 export async function requestJson<T>(
   url: string,
   schema: z.ZodType<T>,
   options: JsonRequestOptions,
 ): Promise<T> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal, token, messages, statusError, ...rest } = options;
+  const { timeoutMs = API_TIMEOUT_MS, signal, token, messages, statusError, ...rest } = options;
   const timeout = AbortSignal.timeout(timeoutMs);
-  const readId = !rest.method || rest.method === 'GET' ? ++lastReadId : 0;
-  if (readId) markRead(readId, Date.now());
+  // Só leituras contam para o aviso de espera (`network.ts`).
+  const done = !rest.method || rest.method === 'GET' ? trackRead() : undefined;
   try {
     const response = await fetch(url, {
       ...rest,
@@ -94,9 +61,10 @@ export async function requestJson<T>(
         .json()
         .then((body: { detail?: unknown }) => (typeof body.detail === 'string' ? body.detail : ''))
         .catch(() => '');
-      throw Object.assign(new Error(detail || `A API respondeu com erro ${response.status}.`), {
-        status: response.status,
-      });
+      throw Object.assign(
+        new Error(detail || 'O UrMind não conseguiu atender agora. Tente de novo em instantes.'),
+        { status: response.status },
+      );
     }
     const parsed = schema.safeParse(await response.json());
     if (!parsed.success) throw new Error(messages.contract);
@@ -108,7 +76,7 @@ export async function requestJson<T>(
       throw new Error(messages.timeout);
     throw error;
   } finally {
-    if (readId) markRead(readId, null);
+    done?.();
   }
 }
 
@@ -130,12 +98,13 @@ async function request<T>(
       timeout: 'O UrMind demorou a responder. Tente de novo em instantes.',
       contract: 'O UrMind respondeu de um jeito inesperado. Tente de novo em instantes.',
     },
+    // Servidor fora do ar (502, 503, 504…): a mesma frase simples do site público, sem código.
     statusError: (status) =>
       statusError?.(status) ??
       (status === 401
         ? new UnauthorizedError()
-        : status === 503
-          ? new Error('Serviço temporariamente indisponível. Tente de novo em instantes.')
+        : status >= 500
+          ? new Error('O UrMind está fora do ar agora. Tente de novo em instantes.')
           : undefined),
   });
 }

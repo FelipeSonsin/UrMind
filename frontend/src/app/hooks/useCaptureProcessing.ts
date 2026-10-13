@@ -36,8 +36,8 @@ interface ProcessingDeps {
 
 /**
  * Acompanhamento do relato aberto em `#/processando/<id>` (ou `#/relato/<protocolo>`).
- * A Capture não tem política de leitura no Realtime: uma consulta limitada (24 vezes,
- * a cada 5 s) acompanha só o relato aberto, sem assinar a tabela inteira.
+ * A Capture não tem política de leitura no Realtime: uma consulta a cada 5 s (uma por vez,
+ * por até 2 minutos) acompanha só o relato aberto, sem assinar a tabela inteira.
  */
 export function useCaptureProcessing({
   route,
@@ -73,14 +73,20 @@ export function useCaptureProcessing({
     if (route.page !== 'processing' || !route.captureId || !session) return;
     const controller = new AbortController();
     processingController.current = controller;
-    let attempts = 0;
     let finished = false;
+    // Uma consulta por vez: com a API lenta ou acordando (até 70 s), as consultas de 5 em
+    // 5 s não se acumulam.
+    let inFlight = false;
+    // Limite em tempo, não em tentativas: com a API parada (até 70 s por consulta), o aviso
+    // chega em uns 2 minutos, como com a API respondendo rápido.
+    const startedAt = Date.now();
+    const overdue = () => Date.now() - startedAt >= 120_000;
     async function refreshStatus() {
-      if (controller.signal.aborted || finished) return;
-      attempts += 1;
+      if (controller.signal.aborted || finished || inFlight) return;
+      inFlight = true;
       try {
         const result = await api.captureProcessing(route.captureId!, controller.signal);
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || finished) return;
         setCaptureStatus(result);
         const notice = result.additional_evidence
           ? 'Foto anexada como evidência adicional ao relato que já existia nesse ponto. A equipe confere se é o mesmo problema.'
@@ -99,7 +105,7 @@ export function useCaptureProcessing({
           setProcessingError(error.message);
           finished = true;
         }
-        if (!controller.signal.aborted && attempts >= 24) {
+        if (!controller.signal.aborted && overdue()) {
           setProcessingError(
             error instanceof Error
               ? error.message
@@ -107,8 +113,10 @@ export function useCaptureProcessing({
           );
           finished = true;
         }
+      } finally {
+        inFlight = false;
       }
-      if (attempts >= 24 && !finished) {
+      if (overdue() && !finished) {
         finished = true;
         if (!controller.signal.aborted) {
           setProcessingError(

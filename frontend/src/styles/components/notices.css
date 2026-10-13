@@ -43,7 +43,71 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-/* Espera longa pela API: uma linha calma no topo, sem cor de alerta (não é erro). */
+/* Espera longa pela API: uma caixa calma que flutua no pé do conteúdo, sem empurrar a
+   página nem usar cor de alerta (não é erro). Fica abaixo das barras fixas (decisão da
+   equipe, abas) e não deixa um toque passar para o que está escondido atrás dela. */
 .slow-notice {
-  margin: 0 0 var(--s-4);
+  position: fixed;
+  z-index: var(--z-notice);
+  right: 0;
+  bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+  left: var(--sidebar);
+  width: max-content;
+  max-width: min(52rem, calc(100vw - var(--sidebar) - 2 * var(--s-5)));
+  margin: 0 auto;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-m);
+}
+/* Página com a barra de decisão fixa da equipe (revisão em tela própria ou decisão da
+   ocorrência; o painel do Mapa interno não fixa a barra): a caixa flutua acima dela. Quando a
+   barra mostra a própria mensagem (erro ou decisão salva), a caixa sai: a barra já diz o que houve. */
+main:has(:is(.review-panel.is-page, .review-box) .review-actions) .slow-notice {
+  bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+main:has(:is(.review-panel.is-page, .review-box) .review-actions :is(.error, .success))
+  .slow-notice {
+  display: none;
+}
+/* Com o aviso à vista, o foco do teclado não fica escondido atrás dele e o fim da página ganha
+   folga para nada ficar preso embaixo dele (a folga fica depois do rodapé: nada visível pula
+   quando a caixa aparece; quem está bem no fim vê a página descer um pouco quando ela sai). */
+html:has(.slow-notice) {
+  scroll-padding-bottom: 6rem;
+}
+html:has(:is(.review-panel.is-page, .review-box) .review-actions):has(.slow-notice) {
+  scroll-padding-bottom: 11rem;
+}
+main:has(.slow-notice)::after {
+  content: '';
+  display: block;
+  height: 5rem;
+}
+main:has(:is(.review-panel.is-page, .review-box) .review-actions):has(.slow-notice)::after {
+  height: 9rem;
+}
+/* Celular: logo acima da barra de baixo (com barra de decisão, acima dela). */
+@media (max-width: 899px) {
+  .slow-notice {
+    left: 0;
+    bottom: calc(var(--tabbar) + var(--s-3) + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 2 * var(--s-4));
+  }
+  main:has(:is(.review-panel.is-page, .review-box) .review-actions) .slow-notice {
+    bottom: calc(var(--tabbar) + 6rem + env(safe-area-inset-bottom));
+  }
+  html:has(.slow-notice) {
+    scroll-padding-bottom: calc(var(--tabbar) + 9rem);
+  }
+  html:has(:is(.review-panel.is-page, .review-box) .review-actions):has(.slow-notice) {
+    scroll-padding-bottom: calc(var(--tabbar) + 14rem);
+  }
+  main:has(.slow-notice)::after {
+    height: 7rem;
+  }
+  main:has(:is(.review-panel.is-page, .review-box) .review-actions):has(.slow-notice)::after {
+    height: 11rem;
+  }
 }

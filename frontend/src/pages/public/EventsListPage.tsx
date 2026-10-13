@@ -7,6 +7,7 @@ import { labelFor, type PublicEvent } from '../../domain/public';
 export function PublicEventsPage({
   events,
   loaded,
+  listFilter,
   error,
   filters,
   onFilters,
@@ -14,10 +15,15 @@ export function PublicEventsPage({
   events: PublicEvent[];
   /** As ocorrências já chegaram uma vez: antes disso, nada de "nenhuma ocorrência". */
   loaded: boolean;
+  /** Tipo de problema que gerou `events`; diferente do filtro atual, a lista ainda vai mudar. */
+  listFilter: string;
   error: string;
   filters: { urmind_class: string; status: string };
   onFilters: (value: { urmind_class: string; status: string }) => void;
 }) {
+  // A lista na tela é de outro filtro e a nova ainda está chegando: o seletor fica (com o
+  // foco) e a lista dá lugar ao esqueleto, sem contagem nem itens do filtro anterior.
+  const switching = loaded && listFilter !== filters.urmind_class;
   // Só tipos presentes; com um tipo escolhido, ele continua na lista para voltar a "Todos".
   const present = new Set(events.map((event) => event.urmind_class));
   if (filters.urmind_class) present.add(filters.urmind_class);
@@ -25,7 +31,7 @@ export function PublicEventsPage({
     .map((code): [string, string] => [code, labelFor(code)])
     .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
   const filter =
-    classOptions.length > 1 || filters.urmind_class ? (
+    classOptions.length > 1 || filters.urmind_class || switching ? (
       <label>
         Tipo de problema
         <select
@@ -59,33 +65,39 @@ export function PublicEventsPage({
           {error}
         </p>
       )}
-      {/* Esqueleto só na primeira carga; depois, a lista (ou o aviso vazio) fica à vista nas
-          releituras e na troca de filtro até a nova chegar. Se a carga falhou, só o erro. */}
+      {/* Esqueleto da página só na primeira carga; nas releituras, a lista (ou o aviso vazio)
+          fica à vista. Se a primeira carga falhou, só o erro. */}
       {!loaded ? (
-        !error && <Skeleton lines={4} />
+        !error && (
+          <>
+            <p className="sr-only" role="status">
+              Carregando ocorrências…
+            </p>
+            <Skeleton lines={4} />
+          </>
+        )
       ) : (
         <EventFeed
-          events={events}
+          events={switching ? [] : events}
+          // Se a troca falhou, só o seletor e o erro (a página tenta de novo sozinha). Um erro
+          // anterior também esconde o "carregando" da troca: melhor que piscar a cada releitura
+          // de 30 s com o servidor fora do ar.
+          loading={switching && !error}
           toolbar={filter}
+          emptyStatus={switching ? undefined : 'Nenhuma ocorrência corresponde a este filtro.'}
           empty={
-            filters.urmind_class ? (
-              <p className="muted feed-empty" role="status">
-                Nenhuma ocorrência corresponde a este filtro.
-              </p>
-            ) : (
-              // Mesmo desenho do vazio de "Meus relatos": o que é e o que fazer.
-              <EmptyState
-                icon={<MapPin size={22} strokeWidth={1.8} />}
-                title="Nenhuma ocorrência publicada ainda"
-                action={
-                  <a className="button" href="#/registrar">
-                    <Camera size={17} aria-hidden="true" /> Registrar relato
-                  </a>
-                }
-              >
-                Depois da revisão da equipe, cada relato confirmado aparece aqui e no mapa.
-              </EmptyState>
-            )
+            // Mesmo desenho do vazio de "Meus relatos": o que é e o que fazer.
+            <EmptyState
+              icon={<MapPin size={22} strokeWidth={1.8} />}
+              title="Nenhuma ocorrência publicada ainda"
+              action={
+                <a className="button" href="#/registrar">
+                  <Camera size={17} aria-hidden="true" /> Registrar relato
+                </a>
+              }
+            >
+              Depois da revisão da equipe, cada relato confirmado aparece aqui e no mapa.
+            </EmptyState>
           }
         />
       )}

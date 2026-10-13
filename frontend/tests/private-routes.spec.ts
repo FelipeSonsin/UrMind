@@ -454,6 +454,53 @@ test('revisor navega para detalhe interno e conserva a rota ao recarregar', asyn
   ).toHaveCount(0);
 });
 
+test('o aviso de espera não cobre a barra de decisão da equipe', async ({ page }) => {
+  await session(page);
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({ json: { id: EVENT_ID, email: null, can_review: true, can_admin: false } }),
+  );
+  await page.route('**/api/v1/events?*', (route) => route.fulfill({ json: [record] }));
+  await page.route(`**/api/v1/events/${EVENT_ID}`, (route) =>
+    route.fulfill({
+      json: {
+        ...record,
+        model_status: 'EXPERIMENTAL_SHADOW',
+        image_url: null,
+        capture: null,
+        detections: [],
+        risk: null,
+        responsibility: null,
+        action: null,
+        report: null,
+        reviews: [],
+        context: [],
+      },
+    }),
+  );
+  // Uma leitura de fundo que não responde, como a API acordando: o aviso de espera aparece.
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    () => new Promise<void>(() => undefined),
+  );
+  await page.goto(`/admin/#/app/eventos/${EVENT_ID}`);
+  await expect(page.getByRole('heading', { name: 'Decisão da equipe' })).toBeVisible();
+  const notice = page.locator('.slow-notice');
+  await expect(notice).toBeVisible({ timeout: 10_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // O aviso flutua acima da barra de decisão: não cobre nenhum dos botões dela.
+  const shown = (await notice.boundingBox())!;
+  const buttons = page.locator('.review-actions button:visible');
+  expect(await buttons.count()).toBeGreaterThan(0);
+  for (const box of await Promise.all((await buttons.all()).map((b) => b.boundingBox()))) {
+    const apart =
+      shown.y + shown.height <= box!.y ||
+      box!.y + box!.height <= shown.y ||
+      shown.x + shown.width <= box!.x ||
+      box!.x + box!.width <= shown.x;
+    expect(apart).toBe(true);
+  }
+});
+
 test('resultado do proprietário desaparece ao encerrar sessão em outra aba', async ({ page }) => {
   await session(page, true, 'public');
   await page.route(`**/api/v1/public/events/${EVENT_ID}`, (route) =>

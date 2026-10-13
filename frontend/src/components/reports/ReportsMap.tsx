@@ -10,7 +10,7 @@ const CaptureReviewPanel = lazy(() =>
 /**
  * Mapa dos relatos carregados (os da sessão no site do cidadão; os de todos na área da
  * equipe), com o detalhe do relato selecionado. No acompanhamento de um relato sem
- * localização, um toque no mapa marca o ponto (o mapa abre na área atendida).
+ * localização, um toque no mapa marca o ponto (o mapa abre na região do projeto piloto).
  */
 export function ReportsMap({
   onlyId,

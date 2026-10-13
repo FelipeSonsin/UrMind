@@ -1,5 +1,6 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { currentSurface } from '../surface';
+import { API_TIMEOUT_MS, trackRead } from './network';
 
 // Só a publishable key vai ao navegador (MASTER_PLAN §6.2, §17). A secret key
 // fica no backend; o token do usuário é validado pelo FastAPI via JWKS.
@@ -140,12 +141,15 @@ export const auth = {
       const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
       let origin: string;
       let visitorUploadEnabled = false;
+      // Primeira chamada do envio: com a API dormindo, espera o despertar como as demais
+      // leituras (e conta para o aviso de espera), em vez de desistir em poucos segundos.
+      const done = trackRead();
       try {
         const response = await fetch(`${apiBase}/public/auth-origin`, {
           cache: 'no-store',
           signal: signal
-            ? AbortSignal.any([signal, AbortSignal.timeout(8000)])
-            : AbortSignal.timeout(8000),
+            ? AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)])
+            : AbortSignal.timeout(API_TIMEOUT_MS),
         });
         if (!response.ok) throw new Error('Auth origin unavailable');
         const payload = (await response.json()) as {
@@ -158,6 +162,8 @@ export const auth = {
         throw new Error(
           'Não foi possível enviar agora: o site não conseguiu confirmar o acesso. Tente de novo em instantes.',
         );
+      } finally {
+        done();
       }
       if (origin !== new URL(url as string).origin)
         throw new Error(

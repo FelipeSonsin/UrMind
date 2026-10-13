@@ -11,7 +11,7 @@ const PLAIN_PHRASES: Record<string, string> = {
   'regras versionadas, sem LLM':
     'Calculadas por regras fixas e públicas. Nenhuma inteligência artificial escreve ou decide.',
   'tabela de competência com fundamento legal; sem regra, requer triagem':
-    'Indicado por uma tabela de competências com base legal. Sem regra para o local, a equipe define.',
+    'O órgão que a lei indica para cada tipo de problema. Sem regra para o local, a equipe define.',
   'catálogo versionado de ações; sempre sugestão':
     'Escolhida de uma lista fixa de providências e sempre apresentada como sugestão.',
   // Fontes de contexto (→ context_sources[].use)

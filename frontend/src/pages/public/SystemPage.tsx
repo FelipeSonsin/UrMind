@@ -30,7 +30,7 @@ function at(iso: string): string {
 
 /**
  * Situação do serviço, fora da navegação do cidadão: cada parte com o próprio estado
- * (nunca um único "online"), a área atendida e o que já foi publicado.
+ * (nunca um único "online"), o que já foi publicado e a região do projeto piloto.
  */
 export function SystemPage({
   status,
@@ -97,13 +97,11 @@ export function SystemPage({
             </ul>
             <p className="muted service-checked">Verificado em {at(status.checked_at)}.</p>
           </section>
+          {/* Os números contam tudo o que foi publicado; a região do projeto piloto é um dado
+              ao lado, não um limite (relatos de qualquer lugar do Brasil são recebidos). */}
           <section className="panel" aria-labelledby="coverage-title">
-            <h2 id="coverage-title">Área atendida</h2>
+            <h2 id="coverage-title">Mapa público</h2>
             <dl className="data-list coverage-list">
-              <div>
-                <dt>Região</dt>
-                <dd>{pilotAreaName(status.pilot_area)}</dd>
-              </div>
               <div>
                 <dt>Ocorrências confirmadas</dt>
                 <dd>{number.format(status.events_total)}</dd>
@@ -111,6 +109,10 @@ export function SystemPage({
               <div>
                 <dt>Última publicação</dt>
                 <dd>{since(status.last_event_at)}</dd>
+              </div>
+              <div>
+                <dt>Projeto piloto</dt>
+                <dd>{pilotAreaName(status.pilot_area)}</dd>
               </div>
             </dl>
           </section>

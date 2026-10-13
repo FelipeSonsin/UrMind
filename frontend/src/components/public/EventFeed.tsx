@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { labelFor, severityOf, type PublicEvent } from '../../domain/public';
 import { SeveritySign } from '../SeveritySign';
+import { Skeleton } from '../ui';
 
 /**
  * Lista de ocorrências publicadas (todas já confirmadas pela equipe): o tipo, a rua e a
@@ -12,6 +13,8 @@ export function EventFeed({
   events,
   label = 'Ocorrências',
   toolbar,
+  loading = false,
+  emptyStatus,
   empty,
 }: {
   events: PublicEvent[];
@@ -19,7 +22,14 @@ export function EventFeed({
   label?: string;
   /** Filtros no cabeçalho da lista, ao lado da contagem. */
   toolbar?: ReactNode;
-  /** Lista vazia: só este aviso, sem uma contagem "0 ocorrências" dizendo o mesmo. */
+  /** Troca de filtro em andamento: o cabeçalho fica (com o filtro) e a lista vira esqueleto. */
+  loading?: boolean;
+  /**
+   * Filtro sem resultado: a frase fica no lugar da contagem, que continua montada para o
+   * leitor de tela anunciar a troca (de "2 ocorrências" para a frase e de volta).
+   */
+  emptyStatus?: string;
+  /** Lista vazia sem filtro: só este aviso, sem uma contagem "0 ocorrências" dizendo o mesmo. */
   empty: ReactNode;
 }) {
   const count = events.length === 1 ? '1 ocorrência' : `${events.length} ocorrências`;
@@ -27,16 +37,16 @@ export function EventFeed({
     <section className="panel feed" aria-label={label}>
       {(events.length > 0 || toolbar) && (
         <div className="feed-head">
-          {events.length > 0 && (
-            <p className="feed-count" role="status">
-              {count}
-            </p>
-          )}
+          <p className="feed-count" role="status">
+            {loading ? 'Carregando ocorrências…' : events.length > 0 ? count : emptyStatus}
+          </p>
           {toolbar}
         </div>
       )}
-      {events.length === 0 ? (
-        empty
+      {loading ? (
+        <Skeleton lines={4} />
+      ) : events.length === 0 ? (
+        !toolbar && empty
       ) : (
         <ul className="feed-list">
           {events.map((event) => {

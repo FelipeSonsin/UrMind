@@ -11,7 +11,7 @@ import {
 import { flushSync } from 'react-dom';
 import { ImageOff, MapPin } from 'lucide-react';
 import { api } from '../services/api';
-import { publicApi } from '../services/publicApi';
+import { publicApi, withoutAutoRetry } from '../services/publicApi';
 import { type IssueDefinition, labelFor } from '../domain/public';
 import { ConfirmButton } from './ConfirmButton';
 import { plain } from '../content/plainLanguage';
@@ -553,7 +553,8 @@ export function CaptureReviewPanel({
         }
       })
       .catch((reason: Error) => {
-        if (!controller.signal.aborted) setError(reason.message);
+        // Esta tela não relê sozinha: sem a promessa de nova tentativa do site público.
+        if (!controller.signal.aborted) setError(withoutAutoRetry(reason.message));
       });
     return () => controller.abort();
   }, [id, revision]);
@@ -1077,7 +1078,9 @@ export function EventDetail({
           setCorrected((current) => current || data.urmind_class);
         }
       })
-      .catch((reason: Error) => !controller.signal.aborted && setError(reason.message));
+      .catch(
+        (reason: Error) => !controller.signal.aborted && setError(withoutAutoRetry(reason.message)),
+      );
     return () => controller.abort();
   }, [id, revision, refreshAt]);
 

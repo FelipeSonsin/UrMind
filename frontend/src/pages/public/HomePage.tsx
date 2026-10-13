@@ -125,10 +125,12 @@ export function HomePage({
         {/* Painel só com ocorrência: nas releituras (a cada 30 s) nada aparece e some. */}
         {events.length > 0 && (
           <section className="panel diagnosis" aria-label="Diagnóstico da ocorrência selecionada">
-            {detailLoading && !detail ? (
-              <Skeleton lines={5} />
-            ) : detailError && events.length > 0 ? (
-              <p className="muted">Não foi possível abrir esta ocorrência agora. Tente de novo.</p>
+            {/* Há ocorrência: sem o detalhe ainda, esqueleto (nunca "nenhuma ocorrência"). */}
+            {detailError && !detailLoading ? (
+              <p className="muted">
+                Não foi possível abrir esta ocorrência agora. A página tenta de novo sozinha em
+                instantes.
+              </p>
             ) : detail ? (
               <>
                 <QuickDiagnosis
@@ -141,13 +143,7 @@ export function HomePage({
                 </a>
               </>
             ) : (
-              <div className="empty">
-                <h3>Nenhuma ocorrência publicada ainda</h3>
-                <p>
-                  Depois da revisão da equipe, cada ocorrência aparece aqui com tipo, gravidade e a
-                  solução indicada.
-                </p>
-              </div>
+              <Skeleton lines={5} />
             )}
           </section>
         )}

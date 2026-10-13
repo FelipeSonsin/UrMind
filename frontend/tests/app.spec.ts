@@ -119,6 +119,65 @@ test('A. foto tirada agora envia GPS, precisão e horário, e o ponto aparece no
   await expect(page.locator(`[data-event-id="${id}"]`)).toHaveCount(1);
 });
 
+test('A2. com a API acordando, o primeiro envio espera em vez de desistir', async ({ page }) => {
+  test.setTimeout(60_000);
+  await signedIn(page);
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: -23.556, longitude: -46.637, accuracy: 12 });
+  const id = '7a2c3d4e-5f60-4a71-8b82-93c4d5e6f708';
+  let sent = false;
+  // A primeira chamada do envio só responde depois de 9 s, como a API voltando de um tempo
+  // parada (antes, o site desistia em 8 s e o envio falhava).
+  await page.route('**/api/v1/public/auth-origin', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 9000));
+    await route.fulfill({
+      json: {
+        auth_origin: `https://${supabaseStorageKey().split('-')[1]}.supabase.co`,
+        visitor_upload_enabled: true,
+      },
+    });
+  });
+  await page.route('**/api/v1/captures/nearby-reports?*', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/captures/photo', (route) => {
+    sent = true;
+    return route.fulfill({
+      json: { id, capture_key: 'photo-wake', created: true, requires_manual_location: false },
+    });
+  });
+  await page.route(`**/api/v1/captures/${id}/processing`, (route) =>
+    route.fulfill({
+      json: {
+        capture_id: id,
+        status: 'queued',
+        requires_manual_location: false,
+        event_ids: [],
+        model_version_id: null,
+        model_status: null,
+        updated_at: null,
+      },
+    }),
+  );
+  await page.route(`**/api/v1/captures/${id}/image`, (route) =>
+    route.fulfill({ status: 404, json: { detail: 'sem foto no teste' } }),
+  );
+  await page.route('**/api/v1/captures/markers*', (route) => route.fulfill({ json: [] }));
+  await page.goto('/#/registrar');
+  await page.getByLabel('Tirar foto').setInputFiles({
+    ...(await GALLERY_PNG(page)),
+    name: 'camera.png',
+  });
+  await expect(page.getByText('Localização obtida')).toBeVisible();
+  await page.getByRole('checkbox', { name: /Li e aceito/ }).check();
+  await page.getByRole('button', { name: 'Enviar relato' }).click();
+  // Durante a espera, o aviso explica; depois o envio segue, sem erro de acesso.
+  await expect(page.getByText('Aguarde um pouco', { exact: false })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect.poll(() => sent, { timeout: 20_000 }).toBe(true);
+  await expect(page).toHaveURL(new RegExp(`processando/${id}`));
+  await expect(page.getByText('confirmar o acesso', { exact: false })).toHaveCount(0);
+});
+
 test('B. sem permissão de localização, a foto tirada agora explica e abre o mapa', async ({
   page,
 }) => {

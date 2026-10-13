@@ -99,6 +99,14 @@ function useAppController() {
   useTaxonomyLabels();
   const [publicRevision, refreshPublic] = usePublicRefresh(revision);
   const [publicFilters, setPublicFilters] = useState({ urmind_class: '', status: '' });
+  // O filtro de tipo é da página Ocorrências (e do detalhe aberto a partir dela): fora delas,
+  // Início e Mapa mostram todas as ocorrências, não a lista filtrada sem aviso.
+  useEffect(() => {
+    if (page !== 'events' && page !== 'event-detail')
+      setPublicFilters((current) =>
+        current.urmind_class || current.status ? { urmind_class: '', status: '' } : current,
+      );
+  }, [page]);
   // Diagnóstico técnico (API, banco, detector) só na página Sistema, fora do fluxo do cidadão.
   const status = useSystemStatus(publicRevision, page === 'settings');
   const events = usePublicEvents(publicRevision, publicFilters);
@@ -132,7 +140,9 @@ function useAppController() {
     publicRevision,
     refreshPublic,
     publicData: {
-      events: events.data,
+      events: events.data?.items ?? null,
+      /** Tipo de problema que gerou `events` (pode ser de um filtro anterior, ainda carregando). */
+      eventsFilter: events.data?.urmind_class ?? '',
       loading: events.loading,
       error: events.error,
       filters: publicFilters,

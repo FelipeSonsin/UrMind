@@ -14,6 +14,14 @@ import { captureMarkerSchema } from '../domain/contracts';
 // Painel público: sem token e somente leitura, sobre o mesmo cliente HTTP da área logada.
 const base = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '') + '/public';
 
+/** Fim das mensagens de falha das leituras públicas: as telas do site releem sozinhas a cada 30 s. */
+export const RETRIES_ALONE = 'A página tenta de novo sozinha em instantes.';
+
+/** A mesma mensagem para telas que não releem sozinhas (área da equipe). */
+export function withoutAutoRetry(message: string) {
+  return message.replace(RETRIES_ALONE, 'Tente de novo em instantes.');
+}
+
 function get<T>(
   path: string,
   schema: z.ZodType<T>,
@@ -25,14 +33,13 @@ function get<T>(
     token,
     cache: token ? 'no-store' : undefined,
     // Servidor fora do ar (o provedor responde 502/503, às vezes sem detalhe): uma frase
-    // simples no lugar do código de erro.
+    // simples no lugar do código de erro. As telas do site que mostram estes avisos releem os
+    // dados sozinhas a cada 30 s (usePublicRefresh); a área da equipe usa `withoutAutoRetry`.
     statusError: (status) =>
-      status >= 500
-        ? new Error('O UrMind está fora do ar agora. Tente de novo em instantes.')
-        : undefined,
+      status >= 500 ? new Error(`O UrMind está fora do ar agora. ${RETRIES_ALONE}`) : undefined,
     messages: {
       network: 'Não foi possível conectar ao UrMind. Confira a internet e tente de novo.',
-      timeout: 'O UrMind demorou a responder. Tente de novo em instantes.',
+      timeout: `O UrMind demorou a responder. ${RETRIES_ALONE}`,
       contract: 'O UrMind respondeu de um jeito inesperado. Tente de novo em instantes.',
     },
   });
@@ -75,7 +82,7 @@ export const publicApi = {
           ? new Error('A busca está ocupada. Aguarde um instante e tente de novo.')
           : status === 422
             ? new Error('Digite ao menos 3 letras do endereço ou um CEP.')
-            : status === 503
+            : status >= 500
               ? new Error('Busca de endereço indisponível agora. Marque o local no mapa.')
               : undefined,
       messages: {

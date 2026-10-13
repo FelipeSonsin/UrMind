@@ -381,6 +381,120 @@ test('a lista pública filtra por classe e declara quando nada corresponde', asy
   await expect(page.getByText('Nenhuma ocorrência corresponde a este filtro.')).toBeVisible();
 });
 
+test('ao trocar o filtro, o seletor fica e a lista antiga dá lugar ao esqueleto', async ({
+  page,
+}) => {
+  await stubPublicApi(page);
+  // Com um tipo escolhido, a API devolve só as ocorrências desse tipo.
+  const cracks = publicEvents.filter((event) => event.urmind_class === 'URMIND_ROAD_D00');
+  await page.route(
+    (url) =>
+      url.pathname === '/api/v1/public/events' &&
+      url.searchParams.get('urmind_class') === 'URMIND_ROAD_D00',
+    (route) => route.fulfill({ json: cracks }),
+  );
+  await page.goto('/#/events');
+  await expect(page.getByText('2 ocorrências')).toBeVisible();
+  const classFilter = page.getByLabel('Tipo de problema');
+  await classFilter.selectOption('URMIND_ROAD_D00');
+  await expect(page.getByText('1 ocorrência', { exact: true })).toBeVisible();
+  // De volta a "Todos os tipos", a lista completa demora a chegar. A lista na tela só tem um
+  // tipo: antes, o seletor sumia (e o foco junto) e a lista antiga ficava sob o filtro novo.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events' && !url.searchParams.has('urmind_class'),
+    async (route) => {
+      await held;
+      await route.fallback();
+    },
+  );
+  await classFilter.focus();
+  await classFilter.selectOption('');
+  await expect(classFilter).toBeVisible();
+  await expect(classFilter).toBeFocused();
+  await expect(page.getByText('Carregando ocorrências…')).toBeVisible();
+  await expect(page.getByText('1 ocorrência', { exact: true })).toHaveCount(0);
+  await expect(page.locator('main .skeleton')).toBeVisible();
+  release();
+  await expect(page.getByText('2 ocorrências')).toBeVisible();
+  await expect(page.locator('main .skeleton')).toHaveCount(0);
+});
+
+test('o filtro da lista não muda o Início nem o Mapa', async ({ page }) => {
+  await stubPublicApi(page);
+  const queries: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === '/api/v1/public/events') queries.push(url.search);
+  });
+  await page.goto('/#/events');
+  await page.getByLabel('Tipo de problema').selectOption('URMIND_ROAD_D00');
+  await expect
+    .poll(() => queries.some((query) => query.includes('urmind_class=URMIND_ROAD_D00')))
+    .toBe(true);
+  await expect(page.locator('main .skeleton')).toHaveCount(0);
+  // A lista completa demora a chegar: o Início espera por ela em vez de mostrar a filtrada.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events' && !url.searchParams.has('urmind_class'),
+    async (route) => {
+      await held;
+      await route.fallback();
+    },
+  );
+  // Fora da lista, as ocorrências voltam a ser todas: o Início não herda o filtro sem aviso.
+  await page.goto('/#/');
+  await expect.poll(() => queries.at(-1) ?? '').not.toContain('urmind_class');
+  await expect(page.getByText('Carregando ocorrências…')).toBeVisible();
+  release();
+  await expect(page.getByText('Carregando ocorrências…')).toHaveCount(0);
+});
+
+test('se a troca de filtro falha, ficam o seletor e o erro, sem "carregando"', async ({ page }) => {
+  await stubPublicApi(page);
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events' && url.searchParams.has('urmind_class'),
+    (route) => route.fulfill({ status: 503, json: { detail: 'serviço indisponível' } }),
+  );
+  await page.goto('/#/events');
+  await expect(page.getByText('2 ocorrências')).toBeVisible();
+  const classFilter = page.getByLabel('Tipo de problema');
+  await classFilter.selectOption('URMIND_ROAD_D00');
+  await expect(page.getByText('O UrMind está fora do ar agora', { exact: false })).toBeVisible();
+  await expect(classFilter).toBeVisible();
+  await expect(page.getByText('Carregando ocorrências…')).toHaveCount(0);
+  await expect(page.locator('main .skeleton')).toHaveCount(0);
+  await expect(page.getByText('Nenhuma ocorrência corresponde a este filtro.')).toHaveCount(0);
+});
+
+test('durante a espera, o fim da página não fica preso embaixo do aviso', async ({ page }) => {
+  await stubPublicApi(page, {
+    events: [],
+    status: { ...publicStatus, events_total: 0, last_event_at: null },
+  });
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    () => new Promise<void>(() => undefined),
+  );
+  await page.goto('/#/');
+  const notice = page.locator('.slow-notice');
+  await expect(notice).toBeVisible({ timeout: 10_000 });
+  await page.evaluate(() =>
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }),
+  );
+  const shown = (await notice.boundingBox())!;
+  for (const link of await page.locator('footer a').all()) {
+    const box = (await link.boundingBox())!;
+    expect(box.y + box.height <= shown.y || shown.y + shown.height <= box.y).toBe(true);
+  }
+});
+
 test('a transparência declara revisão humana e fontes', async ({ page }) => {
   await stubPublicApi(page);
   await page.goto('/#/transparency');
@@ -403,7 +517,9 @@ test('falha da API aparece como aviso, sem dizer que não há ocorrências', asy
     // Uma frase simples no lugar do código de erro. Sem resposta não se sabe se há
     // ocorrências: nenhuma tela diz que não há.
     await expect(
-      page.getByText('O UrMind está fora do ar agora. Tente de novo em instantes.'),
+      page.getByText(
+        'O UrMind está fora do ar agora. A página tenta de novo sozinha em instantes.',
+      ),
     ).toBeVisible();
     await expect(page.getByText(/Nenhuma ocorrência publicada ainda/)).toHaveCount(0);
   }
@@ -442,6 +558,35 @@ test('com a API acordando, a tela explica a espera e não diz que não há ocorr
     page.getByRole('heading', { name: 'Nenhuma ocorrência publicada ainda' }),
   ).toBeVisible();
   await expect(wait).toHaveCount(0);
+});
+
+test('a releitura de 30 s não cancela uma leitura ainda sem resposta', async ({ page }) => {
+  await page.clock.install();
+  await stubPublicApi(page, {
+    events: [],
+    status: { ...publicStatus, events_total: 0, last_event_at: null },
+  });
+  // API parada: a leitura das ocorrências nunca responde.
+  let calls = 0;
+  await page.route(
+    (url) => url.pathname === '/api/v1/public/events',
+    () => {
+      calls += 1;
+      return new Promise<void>(() => undefined);
+    },
+  );
+  await page.goto('/#/events');
+  // A abertura da página já lê as ocorrências (às vezes duas vezes, a primeira cancelada de
+  // imediato); conta-se a partir daí.
+  await expect.poll(() => calls).toBeGreaterThan(0);
+  await page.waitForTimeout(1000);
+  const opened = calls;
+  // Duas releituras passam sem cancelar a leitura pendente: ela segue até o tempo limite e
+  // só então a tela mostra o erro, em vez de recomeçar a espera a cada 30 s.
+  await page.clock.fastForward(31_000);
+  await page.clock.fastForward(31_000);
+  await page.waitForTimeout(500);
+  expect(calls).toBe(opened);
 });
 
 test('nas releituras a cada 30 s, a lista e o Início vazios não piscam', async ({ page }) => {
@@ -520,7 +665,10 @@ test('estado do sistema é auditável na rota pública dedicada', async ({ page 
   await expect(parts).toContainText('Funcionando');
   await expect(page.locator('main')).not.toContainText('Scout');
   // Contagem interna de trechos de rua não diz nada a quem consulta: fica fora da tela.
-  const area = page.getByRole('region', { name: 'Área atendida' });
+  // Relatos de qualquer lugar do Brasil são recebidos: a região do projeto piloto é um dado
+  // ao lado do que foi publicado, não um limite.
+  const area = page.getByRole('region', { name: 'Mapa público' });
+  await expect(area).toContainText('Projeto piloto');
   await expect(area).toContainText('Ocorrências confirmadas');
   await expect(area).not.toContainText('Trechos');
 });
